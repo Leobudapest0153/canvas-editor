@@ -92,6 +92,7 @@ export const useCanvasWithHistory = () => {
     eliminarPlanta: (plantaId) => {
       const planta = canvasStore.plantas.find((p) => p.id === plantaId)
 
+      // eslint-disable-next-line no-useless-catch
       try {
         canvasStore.eliminarPlanta(plantaId)
         history.pushState(`Planta eliminada: ${planta?.nombre || plantaId}`)

@@ -1,22 +1,5 @@
 <!--
-  CanvasView  <div ref="containerRef"
-       :class="['canvas-container', { 'drag-over': isDragOverCanvas }]"
-       @drop="handleDrop"
-       @dragover="handleDragOver"
-       @dragenter="handleDragEnter"
-       @dragleave="handleDragLeave">
-    <v-stage
-      ref="stageRef"
-      :config="stageConfig"
-      @wheel="handleWheel"
-      @dragstart="handleStageDragStart"
-      @dragend="handleStageDragEnd"
-    >Componente principal del lienzo con Ko  console.log('Creando elemento desde drop:', nuevoElemento)
-  actions.agregarElemento(nuevoElemento)
-
-  // Seleccionar el elemento recién creado
-  actions.seleccionarElemento(nuevoElemento.id)ara el editor visual jerárquico.
-
+  CanvasView
   Responsabilidades:
   - Renderizar el canvas principal usando vue-konva
   - Manejar eventos de interacción (drag, drop, select, etc.)
@@ -46,15 +29,41 @@
       @click="handleStageClick"
     >
       <v-layer ref="layerRef">
-        <!-- Debug: mostrar número de elementos -->
+        <!-- Fondo de la planta - área delimitada -->
+        <v-rect
+          :config="{
+            x: 0,
+            y: 0,
+            width: layerConfig.width,
+            height: layerConfig.height,
+            fill: '#ffffff',
+            stroke: '#3b82f6',
+            strokeWidth: 2,
+            opacity: 0.1,
+            listening: false,
+          }"
+        />
+
+        <!-- Debug: mostrar información de la planta -->
         <v-text
           :config="{
             x: 10,
             y: 10,
-            text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
-            fontSize: 14,
+            text: `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
+            fontSize: 12,
             fontFamily: 'Arial',
-            fill: '#000',
+            fill: '#3b82f6',
+            listening: false,
+          }"
+        />
+        <v-text
+          :config="{
+            x: 10,
+            y: 30,
+            text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
+            fontSize: 11,
+            fontFamily: 'Arial',
+            fill: '#6b7280',
             listening: false,
           }"
         />
@@ -179,12 +188,12 @@
           />
         </template>
 
-        <!-- Grid de referencia (opcional) -->
+        <!-- Grid de referencia de la planta -->
         <v-line
           v-for="i in gridLines.vertical"
           :key="`v-${i}`"
           :config="{
-            points: [i, 0, i, stageConfig.height],
+            points: [i, 0, i, layerConfig.height],
             stroke: '#e5e7eb',
             strokeWidth: 1,
             opacity: 0.5,
@@ -195,7 +204,7 @@
           v-for="i in gridLines.horizontal"
           :key="`h-${i}`"
           :config="{
-            points: [0, i, stageConfig.width, i],
+            points: [0, i, layerConfig.width, i],
             stroke: '#e5e7eb',
             strokeWidth: 1,
             opacity: 0.5,
@@ -205,10 +214,15 @@
       </v-layer>
     </v-stage>
 
-    <!-- Información de zoom y posición -->
+    <!-- Información de zoom, vista y dimensiones -->
     <div class="canvas-info">
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
       <span>Vista: {{ canvasStore.vistaActiva }}</span>
+      <span v-if="canvasStore.plantaActivaData">
+        Planta: {{ canvasStore.plantaActivaData.dimensiones.ancho }}×{{
+          canvasStore.plantaActivaData.dimensiones.largo
+        }}cm
+      </span>
       <span v-if="canvasStore.elementoSeleccionado">
         Seleccionado: {{ canvasStore.elementoSeleccionado }}
       </span>
@@ -274,10 +288,10 @@ const isDragOverCanvas = ref(false)
 const isElementDragging = ref(false)
 const stageDragEnabled = ref(true)
 
-// Configuración del stage con zoom y pan
+// Configuración del stage - OCUPA TODO EL CONTENEDOR
 const stageConfig = computed(() => ({
-  width: canvasStore.canvasAdaptativo.width || stageSize.value.width,
-  height: canvasStore.canvasAdaptativo.height || stageSize.value.height,
+  width: stageSize.value.width, // Tamaño del contenedor, no de canvasAdaptativo
+  height: stageSize.value.height, // Tamaño del contenedor, no de canvasAdaptativo
   scaleX: canvasStore.zoom,
   scaleY: canvasStore.zoom,
   x: canvasStore.panX,
@@ -285,22 +299,41 @@ const stageConfig = computed(() => ({
   draggable: stageDragEnabled.value,
 }))
 
+// Configuración del layer - TAMAÑO DE LA PLANTA ACTIVA
+const layerConfig = computed(() => {
+  const planta = canvasStore.plantaActivaData
+  if (!planta) {
+    return { width: 800, height: 600 } // Fallback
+  }
+
+  // Convertir dimensiones de cm a pixels (1cm = 2px para buena visualización)
+  const escalaVisualizacion = 2
+  return {
+    width: planta.dimensiones.ancho * escalaVisualizacion,
+    height: planta.dimensiones.largo * escalaVisualizacion,
+  }
+})
+
 // Elementos visibles en el canvas (excluye elementos ocultos)
 const elementosVisiblesEnCanvas = computed(() => {
   return canvasStore.elementosVisibles.filter((elemento) => elemento.visible !== false)
 })
 
-// Grid de referencia
+// Grid de referencia - BASADO EN LAS DIMENSIONES DE LA PLANTA
 const gridLines = computed(() => {
-  const gridSize = 50
+  const gridSize = 50 // 50px = 25cm en la escala de visualización
   const vertical = []
   const horizontal = []
 
-  for (let i = 0; i <= stageConfig.value.width; i += gridSize) {
+  // Usar las dimensiones del layer (planta) para el grid
+  const layerWidth = layerConfig.value.width
+  const layerHeight = layerConfig.value.height
+
+  for (let i = 0; i <= layerWidth; i += gridSize) {
     vertical.push(i)
   }
 
-  for (let i = 0; i <= stageConfig.value.height; i += gridSize) {
+  for (let i = 0; i <= layerHeight; i += gridSize) {
     horizontal.push(i)
   }
 
@@ -562,11 +595,31 @@ const createElementFromBuffer = (data, dropEvent) => {
 const updateStageSize = () => {
   if (containerRef.value) {
     const container = containerRef.value
-    stageSize.value = {
+    const newSize = {
       width: container.offsetWidth,
       height: container.offsetHeight,
     }
+    stageSize.value = newSize
+
+    // Centrar la planta en el canvas cuando cambia el tamaño
+    centrarPlantaEnCanvas()
   }
+}
+
+const centrarPlantaEnCanvas = () => {
+  const stage = stageRef.value?.getNode()
+  if (!stage) return
+
+  const stageWidth = stageSize.value.width
+  const stageHeight = stageSize.value.height
+  const layerWidth = layerConfig.value.width
+  const layerHeight = layerConfig.value.height
+
+  // Calcular posición para centrar la planta
+  const centerX = (stageWidth - layerWidth * canvasStore.zoom) / 2
+  const centerY = (stageHeight - layerHeight * canvasStore.zoom) / 2
+
+  canvasStore.configurarPan(centerX, centerY)
 }
 
 const handleGlobalClick = (e) => {
@@ -590,6 +643,10 @@ onMounted(async () => {
     resizeObserver = new ResizeObserver(updateStageSize)
     resizeObserver.observe(containerRef.value)
   }
+
+  // Centrar la planta cuando se monta el componente
+  await nextTick()
+  centrarPlantaEnCanvas()
 
   window.addEventListener('click', handleGlobalClick)
 })
