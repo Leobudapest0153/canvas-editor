@@ -256,3 +256,9 @@ export const COLORES_DISPONIBLES = [
   '#ec4899',
   '#6b7280',
 ]
+
+// === Escalas y tolerancias de interacción ===
+// Conversión de centímetros a pixeles en la visualización (usada para layer/planta)
+export const CM_TO_PX = 2
+// Tolerancia para aplicar "pegado" al borde en px
+export const SNAP_EPS = 4

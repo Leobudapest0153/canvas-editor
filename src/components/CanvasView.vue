@@ -82,13 +82,14 @@
               width: elemento.width,
               height: elemento.height,
               fill: elemento.color,
-              stroke: canvasStore.elementoSeleccionado === elemento.id ? '#000' : '#666',
+              stroke: getStrokeColor(elemento.id),
               strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
               opacity: 0.8,
               draggable: true,
               shadowColor: 'black',
               shadowBlur: 4,
               shadowOpacity: 0.3,
+              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
@@ -106,13 +107,14 @@
               y: elemento.y + elemento.height / 2,
               radius: Math.min(elemento.width, elemento.height) / 2,
               fill: elemento.color,
-              stroke: canvasStore.elementoSeleccionado === elemento.id ? '#000' : '#666',
+              stroke: getStrokeColor(elemento.id),
               strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
               opacity: 0.8,
               draggable: true,
               shadowColor: 'black',
               shadowBlur: 4,
               shadowOpacity: 0.3,
+              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'circle'),
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
@@ -123,7 +125,6 @@
 
           <!-- Elementos triangulares -->
           <template v-else-if="elemento.forma === 'triangular'">
-            <!-- Área de interacción invisible más grande -->
             <v-rect
               :config="{
                 id: elemento.id + '_interaction',
@@ -135,6 +136,7 @@
                 stroke: 'transparent',
                 opacity: 0,
                 draggable: true,
+                dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
               }"
               @click="() => selectElement(elemento.id)"
               @dblclick="() => handleElementDoubleClick(elemento)"
@@ -142,8 +144,6 @@
               @dragmove="(e) => updateElementPosition(e, elemento.id, 'triangular')"
               @dragend="() => endElementDrag(elemento.id)"
             />
-
-            <!-- Forma visual triangular -->
             <v-line
               :config="{
                 id: elemento.id + '_visual',
@@ -158,7 +158,7 @@
                   elemento.y,
                 ],
                 fill: elemento.color,
-                stroke: canvasStore.elementoSeleccionado === elemento.id ? '#000' : '#666',
+                stroke: getStrokeColor(elemento.id),
                 strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
                 opacity: 0.8,
                 draggable: false,
@@ -269,6 +269,12 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useCanvasWithHistory } from '@/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/composables/useCanvasBuffer'
+import {
+  rectInsidePolygon,
+  circleInsidePolygon,
+  boundedRectDrag,
+} from '@/utils/geometry'
+import { SNAP_EPS } from '@/utils/constants'
 
 // Definir emits
 const emit = defineEmits(['select', 'drill-down'])
@@ -340,6 +346,17 @@ const gridLines = computed(() => {
   return { vertical, horizontal }
 })
 
+// Obtiene el contorno de la planta activa como rect o polígono
+const computeBoundary = () => {
+  const W = layerConfig.value.width
+  const H = layerConfig.value.height
+  const planta = canvasStore.plantaActivaData
+  if (planta?.poligono && Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
+    return { type: 'polygon', points: planta.poligono }
+  }
+  return { type: 'rect', W, H }
+}
+
 // === FUNCIONES DE ZOOM ===
 const handleWheel = (e) => {
   e.evt.preventDefault()
@@ -406,6 +423,101 @@ const handleElementDoubleClick = (elemento) => {
   }
 }
 
+// Tracking de posiciones iniciales para revertir si corresponde
+const dragStartPositions = ref(new Map())
+// Última posición válida por elemento (en coords de layer)
+const lastValidPositions = ref(new Map())
+// Marca de borde para feedback visual
+const atEdgeMap = ref(new Map())
+
+// Helper: color de borde con feedback
+const getStrokeColor = (elementId) => {
+  if (atEdgeMap.value.get(elementId)) return '#f59e0b' // advertencia en borde
+  return canvasStore.elementoSeleccionado === elementId ? '#000' : '#666'
+}
+
+// Convierte posición stage->layer considerando zoom/pan
+const toLayerCoords = (pos) => {
+  const stage = stageRef.value.getNode()
+  const scale = stage.scaleX() || 1
+  const x = (pos.x - stage.x()) / scale
+  const y = (pos.y - stage.y()) / scale
+  return { x, y }
+}
+
+// Convierte posición layer->stage considerando zoom/pan
+const toStageCoords = (pos) => {
+  const stage = stageRef.value.getNode()
+  const scale = stage.scaleX() || 1
+  return { x: pos.x * scale + stage.x(), y: pos.y * scale + stage.y() }
+}
+
+// Drag bound para cada elemento y forma
+const dragBoundForElement = (pos, elemento, forma = 'rect') => {
+  const layerPos = toLayerCoords(pos)
+  const boundary = computeBoundary()
+
+  if (forma === 'circle') {
+    // pos viene como centro
+    const r = Math.min(elemento.width, elemento.height) / 2
+    if (boundary.type === 'rect') {
+      const clamped = {
+        x: Math.max(r, Math.min(layerPos.x, boundary.W - r)),
+        y: Math.max(r, Math.min(layerPos.y, boundary.H - r)),
+      }
+      // Snap a bordes si cerca
+      const toLeft = Math.abs(clamped.x - r)
+      const toTop = Math.abs(clamped.y - r)
+      const toRight = Math.abs(boundary.W - (clamped.x + r))
+      const toBottom = Math.abs(boundary.H - (clamped.y + r))
+      const atEdge = toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
+      atEdgeMap.value.set(elemento.id, atEdge)
+      if (toLeft <= SNAP_EPS) clamped.x = r
+      if (toTop <= SNAP_EPS) clamped.y = r
+      if (toRight <= SNAP_EPS) clamped.x = boundary.W - r
+      if (toBottom <= SNAP_EPS) clamped.y = boundary.H - r
+      lastValidPositions.value.set(elemento.id, { x: clamped.x - r, y: clamped.y - r })
+      return toStageCoords(clamped)
+    }
+    if (boundary.type === 'polygon') {
+      const inside = circleInsidePolygon(layerPos.x, layerPos.y, r, boundary.points)
+      if (!inside) {
+        // Mantener último válido
+        const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+        const centerPrev = { x: prev.x + r, y: prev.y + r }
+        return toStageCoords(centerPrev)
+      }
+      atEdgeMap.value.set(elemento.id, false)
+      lastValidPositions.value.set(elemento.id, { x: layerPos.x - r, y: layerPos.y - r })
+      return pos
+    }
+  }
+
+  // Rectangular / triangular usan bbox axis-aligned
+  const w = elemento.width
+  const h = elemento.height
+
+  if (boundary.type === 'rect') {
+    const bounded = boundedRectDrag(layerPos.x, layerPos.y, w, h, boundary, SNAP_EPS)
+    atEdgeMap.value.set(elemento.id, !!bounded.atEdge)
+    lastValidPositions.value.set(elemento.id, { x: bounded.x, y: bounded.y })
+    return toStageCoords({ x: bounded.x, y: bounded.y })
+  }
+
+  if (boundary.type === 'polygon') {
+    const inside = rectInsidePolygon(layerPos.x, layerPos.y, w, h, boundary.points)
+    if (!inside) {
+      const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+      return toStageCoords(prev)
+    }
+    atEdgeMap.value.set(elemento.id, false)
+    lastValidPositions.value.set(elemento.id, { x: layerPos.x, y: layerPos.y })
+    return pos
+  }
+
+  return pos
+}
+
 const startElementDrag = (elementId) => {
   console.log('Iniciando arrastre del elemento:', elementId)
   isElementDragging.value = true
@@ -413,6 +525,12 @@ const startElementDrag = (elementId) => {
 
   // Seleccionar elemento automáticamente al arrastrarlo
   canvasStore.seleccionarElemento(elementId)
+
+  const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
+  if (elemento) {
+    dragStartPositions.value.set(elementId, { x: elemento.x, y: elemento.y })
+    lastValidPositions.value.set(elementId, { x: elemento.x, y: elemento.y })
+  }
 }
 
 const updateElementPosition = (e, elementId, forma = 'rectangular') => {
@@ -420,7 +538,6 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   let x = target.x()
   let y = target.y()
 
-  // Ajustar para elementos circulares (el centro está en x,y pero el elemento está offset)
   if (forma === 'circular') {
     const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
     if (elemento) {
@@ -429,20 +546,19 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
     }
   }
 
-  // Debug específico para estante esquinero
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
-  if (elemento && elemento.tipo === 'estantes' && elemento.nombre?.includes('Esquinero')) {
-    console.log(`🔧 Estante Esquinero - Posición actualizada:`, {
-      elementId,
-      forma,
-      targetId: target.id(),
-      originalPos: { x: target.x(), y: target.y() },
-      finalPos: { x, y },
-      elementSize: { width: elemento.width, height: elemento.height },
-    })
+  if (!elemento) return
+
+  // Feedback visual: bordes cuando está pegado
+  const warn = atEdgeMap.value.get(elementId)
+  try {
+    const strokeColor = warn ? '#f59e0b' : canvasStore.elementoSeleccionado === elementId ? '#000' : '#666'
+    target.stroke(strokeColor)
+    target.getLayer()?.batchDraw()
+  } catch (err) {
+    // noop
   }
 
-  console.log(`Actualizando posición de ${elementId}:`, { x, y })
   canvasStore.actualizarPosicion(elementId, x, y)
 }
 
@@ -453,12 +569,20 @@ const endElementDrag = (elementId) => {
 
   // Guardar en historial al finalizar el arrastre
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
+  if (!elemento) return
+
+  const final = lastValidPositions.value.get(elementId) || { x: elemento.x, y: elemento.y }
+
+  // Guardar en historial al finalizar el arrastre
   actions.actualizarPosicion(
     elementId,
-    elemento.x,
-    elemento.y,
-    true, // saveToHistory = true
+    final.x,
+    final.y,
+    true,
   )
+
+  dragStartPositions.value.delete(elementId)
+  atEdgeMap.value.delete(elementId)
 }
 
 // === FUNCIONES DE DROP DESDE CATÁLOGO ===
