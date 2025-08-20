@@ -82,13 +82,14 @@
               width: elemento.width,
               height: elemento.height,
               fill: elemento.color,
-              stroke: canvasStore.elementoSeleccionado === elemento.id ? '#000' : '#666',
+              stroke: getStrokeColor(elemento.id),
               strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
               opacity: 0.8,
               draggable: true,
               shadowColor: 'black',
               shadowBlur: 4,
               shadowOpacity: 0.3,
+              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
@@ -106,13 +107,14 @@
               y: elemento.y + elemento.height / 2,
               radius: Math.min(elemento.width, elemento.height) / 2,
               fill: elemento.color,
-              stroke: canvasStore.elementoSeleccionado === elemento.id ? '#000' : '#666',
+              stroke: getStrokeColor(elemento.id),
               strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
               opacity: 0.8,
               draggable: true,
               shadowColor: 'black',
               shadowBlur: 4,
               shadowOpacity: 0.3,
+              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'circle'),
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
@@ -123,7 +125,6 @@
 
           <!-- Elementos triangulares -->
           <template v-else-if="elemento.forma === 'triangular'">
-            <!-- Área de interacción invisible más grande -->
             <v-rect
               :config="{
                 id: elemento.id + '_interaction',
@@ -135,6 +136,7 @@
                 stroke: 'transparent',
                 opacity: 0,
                 draggable: true,
+                dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
               }"
               @click="() => selectElement(elemento.id)"
               @dblclick="() => handleElementDoubleClick(elemento)"
@@ -142,8 +144,6 @@
               @dragmove="(e) => updateElementPosition(e, elemento.id, 'triangular')"
               @dragend="() => endElementDrag(elemento.id)"
             />
-
-            <!-- Forma visual triangular -->
             <v-line
               :config="{
                 id: elemento.id + '_visual',
@@ -158,7 +158,7 @@
                   elemento.y,
                 ],
                 fill: elemento.color,
-                stroke: canvasStore.elementoSeleccionado === elemento.id ? '#000' : '#666',
+                stroke: getStrokeColor(elemento.id),
                 strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
                 opacity: 0.8,
                 draggable: false,
@@ -269,6 +269,17 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useCanvasWithHistory } from '@/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/composables/useCanvasBuffer'
+import { useConflicts } from '@/composables/useConflicts'
+import { detectConflictsFor, throttle, computeMTD, projectMTDAgainstBoundary } from '@/utils/collision'
+import {
+  rectInsidePolygon,
+  circleInsidePolygon,
+  boundedRectDrag,
+  clampRectToRect,
+  snapToGrid,
+  safeSnapRect,
+} from '@/utils/geometry'
+import { SNAP_EPS } from '@/utils/constants'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -286,6 +297,94 @@ const layerRef = ref(null)
 // Composable con historial integrado
 const { store: canvasStore, actions, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
+const conflictsApi = useConflicts()
+
+// Conflictos en vivo durante el arrastre
+const liveConflicts = conflictsApi.conflicts
+const setLiveConflictsThrottled = throttle((movingEl) => {
+  try {
+    const list = detectConflictsFor(movingEl, canvasStore.elementosVisibles)
+    conflictsApi.setConflicts(list, movingEl.id)
+  } catch {
+    // noop: evitar romper el drag por errores transitorios
+  }
+}, 32)
+
+// Resolver posición contra obstáculos bloqueantes (suelo–suelo) usando MTD AABB
+const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
+  const all = canvasStore.elementosVisibles
+  const w = elemento.width
+  const h = elemento.height
+  let x = candidateX
+  let y = candidateY
+
+  // Iterar para resolver múltiples colisiones respetando contorno
+  const MAX_ITERS = 3
+  const boundary = computeBoundary()
+  const W = boundary.type === 'rect' ? boundary.W : Infinity
+  const H = boundary.type === 'rect' ? boundary.H : Infinity
+
+  // Paso (1): clamp al área primero
+  if (boundary.type === 'rect') {
+    const c = clampRectToRect(x, y, w, h, W, H)
+    x = c.x
+    y = c.y
+  }
+
+  for (let iter = 0; iter < MAX_ITERS; iter++) {
+    const moving = { ...elemento, x, y }
+    const conflicts = detectConflictsFor(moving, all)
+    const blocking = conflicts.filter((c) => c.bloqueante)
+    if (blocking.length === 0) break
+
+    // (3) MTD agregado sobre AABB
+    let accDx = 0
+    let accDy = 0
+    for (const c of blocking) {
+      const otherId = c.aId === elemento.id ? c.bId : c.aId
+      const other = all.find((el) => el.id === otherId)
+      if (!other) continue
+      const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height)
+      accDx += dx
+      accDy += dy
+    }
+
+    // Proyección del MTD contra el contorno rectangular
+    if (boundary.type === 'rect') {
+      const proj = projectMTDAgainstBoundary(x, y, accDx, accDy, w, h, W, H)
+      accDx = proj.dx
+      accDy = proj.dy
+    }
+
+    // Aplicar MTD y volver a clavar al área
+    x += accDx
+    y += accDy
+
+    if (boundary.type === 'rect') {
+      const c2 = clampRectToRect(x, y, w, h, W, H)
+      x = c2.x
+      y = c2.y
+    } else if (boundary.type === 'polygon') {
+      // En polígono no hay clamp trivial; si sale, revertimos a última válida luego
+    }
+
+    // Si la corrección fue nula, detener
+    if (Math.abs(accDx) < 1e-6 && Math.abs(accDy) < 1e-6) break
+  }
+
+  // Validaciones finales: si aún hay colisión bloqueante o quedó fuera, volver a última válida
+  const movingEnd = { ...elemento, x, y }
+  const endConf = detectConflictsFor(movingEnd, all).filter((c) => c.bloqueante)
+  const outsideRect =
+    boundary.type === 'rect' ? x < -1e-6 || y < -1e-6 || x + w > W + 1e-6 || y + h > H + 1e-6 : false
+  if (endConf.length > 0 || outsideRect) {
+    const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+    return { x: prev.x, y: prev.y, fellBack: true }
+  }
+
+  // No hacer snap aquí para no cuantizar el arrastre
+  return { x, y, fellBack: false }
+}
 
 // Estado local del canvas
 const stageSize = ref({ width: 800, height: 600 })
@@ -326,7 +425,7 @@ const elementosVisiblesEnCanvas = computed(() => {
 
 // Grid de referencia - BASADO EN LAS DIMENSIONES DE LA PLANTA
 const gridLines = computed(() => {
-  const gridSize = 50 // 50px = 25cm en la escala de visualización
+  const gridSizePx = canvasStore.gridSize || 50
   const vertical = []
   const horizontal = []
 
@@ -334,16 +433,27 @@ const gridLines = computed(() => {
   const layerWidth = layerConfig.value.width
   const layerHeight = layerConfig.value.height
 
-  for (let i = 0; i <= layerWidth; i += gridSize) {
+  for (let i = 0; i <= layerWidth; i += gridSizePx) {
     vertical.push(i)
   }
 
-  for (let i = 0; i <= layerHeight; i += gridSize) {
+  for (let i = 0; i <= layerHeight; i += gridSizePx) {
     horizontal.push(i)
   }
 
   return { vertical, horizontal }
 })
+
+// Obtiene el contorno de la planta activa como rect o polígono
+const computeBoundary = () => {
+  const W = layerConfig.value.width
+  const H = layerConfig.value.height
+  const planta = canvasStore.plantaActivaData
+  if (planta?.poligono && Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
+    return { type: 'polygon', points: planta.poligono }
+  }
+  return { type: 'rect', W, H }
+}
 
 // === FUNCIONES DE ZOOM ===
 const handleWheel = (e) => {
@@ -411,6 +521,139 @@ const handleElementDoubleClick = (elemento) => {
   }
 }
 
+// Tracking de posiciones iniciales para revertir si corresponde
+const dragStartPositions = ref(new Map())
+// Última posición válida por elemento (en coords de layer)
+const lastValidPositions = ref(new Map())
+// Marca de borde para feedback visual
+const atEdgeMap = ref(new Map())
+
+// Helper: color de borde con feedback
+const getStrokeColor = (elementId) => {
+  if (atEdgeMap.value.get(elementId)) return '#f59e0b' // advertencia en borde
+  return canvasStore.elementoSeleccionado === elementId ? '#000' : '#666'
+}
+
+// Convierte posición stage->layer considerando zoom/pan
+const toLayerCoords = (pos) => {
+  const stage = stageRef.value.getNode()
+  const scale = stage.scaleX() || 1
+  const x = (pos.x - stage.x()) / scale
+  const y = (pos.y - stage.y()) / scale
+  return { x, y }
+}
+
+// Convierte posición layer->stage considerando zoom/pan
+const toStageCoords = (pos) => {
+  const stage = stageRef.value.getNode()
+  const scale = stage.scaleX() || 1
+  return { x: pos.x * scale + stage.x(), y: pos.y * scale + stage.y() }
+}
+
+// Drag bound para cada elemento y forma
+const dragBoundForElement = (pos, elemento, forma = 'rect') => {
+  const layerPos = toLayerCoords(pos)
+  const boundary = computeBoundary()
+
+  if (forma === 'circle') {
+    // pos viene como centro
+    const r = Math.min(elemento.width, elemento.height) / 2
+    if (boundary.type === 'rect') {
+      // Orden: clamp → colisiones → clamp → validar (sin snap en drag)
+      const clampedCenter = {
+        x: Math.max(r, Math.min(layerPos.x, boundary.W - r)),
+        y: Math.max(r, Math.min(layerPos.y, boundary.H - r)),
+      }
+      const asRect = { ...elemento, width: r * 2, height: r * 2 }
+      const resolved = resolveAgainstBlockingObstacles(
+        clampedCenter.x - r,
+        clampedCenter.y - r,
+        asRect,
+      )
+      const finalCenter = { x: resolved.x + r, y: resolved.y + r }
+
+      // Edge feedback
+      const toLeft = Math.abs(finalCenter.x - r)
+      const toTop = Math.abs(finalCenter.y - r)
+      const toRight = Math.abs(boundary.W - (finalCenter.x + r))
+      const toBottom = Math.abs(boundary.H - (finalCenter.y + r))
+      const atEdge = toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
+      atEdgeMap.value.set(elemento.id, atEdge)
+
+      lastValidPositions.value.set(elemento.id, { x: finalCenter.x - r, y: finalCenter.y - r })
+      return toStageCoords(finalCenter)
+    }
+    if (boundary.type === 'polygon') {
+      const inside = circleInsidePolygon(layerPos.x, layerPos.y, r, boundary.points)
+      if (!inside) {
+        // Mantener último válido
+        const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+        const centerPrev = { x: prev.x + r, y: prev.y + r }
+        return toStageCoords(centerPrev)
+      }
+      atEdgeMap.value.set(elemento.id, false)
+      lastValidPositions.value.set(elemento.id, { x: layerPos.x - r, y: layerPos.y - r })
+      return pos
+    }
+  }
+
+  // Rectangular / triangular usan bbox axis-aligned
+  const w = elemento.width
+  const h = elemento.height
+
+  if (boundary.type === 'rect') {
+    // Orden: clamp → colisiones → clamp → snap → validar
+    // (1) clamp inicial sin snap
+    const clamped = clampRectToRect(layerPos.x, layerPos.y, w, h, boundary.W, boundary.H)
+
+    // (2-4) resolver bloqueantes no-expansivo con prioridad de contorno
+    let adjusted = { x: clamped.x, y: clamped.y }
+    if (forma !== 'triangular') {
+      const res = resolveAgainstBlockingObstacles(clamped.x, clamped.y, elemento)
+      adjusted = { x: res.x, y: res.y }
+    } else {
+      // Triángulo: fallback a última válida si hay bloqueantes
+      const moving = { ...elemento, x: clamped.x, y: clamped.y }
+      const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles)
+      if (conflicts.some((c) => c.bloqueante)) {
+        const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+        adjusted = prev
+      }
+    }
+
+    // Edge feedback basado en posición final
+    const toLeft = Math.abs(adjusted.x)
+    const toTop = Math.abs(adjusted.y)
+    const toRight = Math.abs(boundary.W - (adjusted.x + w))
+    const toBottom = Math.abs(boundary.H - (adjusted.y + h))
+    const atEdge = toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
+
+    atEdgeMap.value.set(elemento.id, atEdge)
+    lastValidPositions.value.set(elemento.id, { x: adjusted.x, y: adjusted.y })
+    return toStageCoords({ x: adjusted.x, y: adjusted.y })
+  }
+
+  if (boundary.type === 'polygon') {
+    const inside = rectInsidePolygon(layerPos.x, layerPos.y, w, h, boundary.points)
+    if (!inside) {
+      const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+      return toStageCoords(prev)
+    }
+    // En polígono, no resolvemos contra obstáculos complejos: fallback si bloquea
+    const moving = { ...elemento, x: layerPos.x, y: layerPos.y }
+    const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles)
+    if (conflicts.some((c) => c.bloqueante)) {
+      const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+      return toStageCoords(prev)
+    }
+    atEdgeMap.value.set(elemento.id, false)
+    lastValidPositions.value.set(elemento.id, { x: layerPos.x, y: layerPos.y })
+    return pos
+  }
+
+  return pos
+}
+
 const startElementDrag = (elementId) => {
   console.log('Iniciando arrastre del elemento:', elementId)
   isElementDragging.value = true
@@ -418,6 +661,15 @@ const startElementDrag = (elementId) => {
 
   // Seleccionar elemento automáticamente al arrastrarlo
   canvasStore.seleccionarElemento(elementId)
+
+  const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
+  if (elemento) {
+    dragStartPositions.value.set(elementId, { x: elemento.x, y: elemento.y })
+    lastValidPositions.value.set(elementId, { x: elemento.x, y: elemento.y })
+  }
+
+  // Limpiar conflictos previos al iniciar un nuevo arrastre
+  conflictsApi.clear()
 }
 
 const updateElementPosition = (e, elementId, forma = 'rectangular') => {
@@ -425,7 +677,6 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   let x = target.x()
   let y = target.y()
 
-  // Ajustar para elementos circulares (el centro está en x,y pero el elemento está offset)
   if (forma === 'circular') {
     const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
     if (elemento) {
@@ -434,20 +685,40 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
     }
   }
 
-  // Debug específico para estante esquinero
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
-  if (elemento && elemento.tipo === 'estantes' && elemento.nombre?.includes('Esquinero')) {
-    console.log(`🔧 Estante Esquinero - Posición actualizada:`, {
-      elementId,
-      forma,
-      targetId: target.id(),
-      originalPos: { x: target.x(), y: target.y() },
-      finalPos: { x, y },
-      elementSize: { width: elemento.width, height: elemento.height },
-    })
+  if (!elemento) return
+
+  // Feedback visual: bordes cuando está pegado o hay conflicto
+  const warn = atEdgeMap.value.get(elementId)
+
+  // Detectar conflictos en tiempo real (no bloquea)
+  const moving = { ...elemento, x, y }
+  setLiveConflictsThrottled(moving)
+  const hasAnyConflict = liveConflicts.value.length > 0
+
+  try {
+    const strokeColor = hasAnyConflict
+      ? '#ef4444'
+      : warn
+        ? '#f59e0b'
+        : canvasStore.elementoSeleccionado === elementId
+          ? '#000'
+          : '#666'
+    target.stroke(strokeColor)
+    if (hasAnyConflict) {
+      target.shadowColor('#ef4444')
+      target.shadowBlur(8)
+      target.shadowOpacity(0.6)
+    } else {
+      target.shadowColor('black')
+      target.shadowBlur(4)
+      target.shadowOpacity(0.3)
+    }
+    target.getLayer()?.batchDraw()
+  } catch {
+    // noop
   }
 
-  console.log(`Actualizando posición de ${elementId}:`, { x, y })
   canvasStore.actualizarPosicion(elementId, x, y)
 }
 
@@ -458,12 +729,75 @@ const endElementDrag = (elementId) => {
 
   // Guardar en historial al finalizar el arrastre
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
+  if (!elemento) return
+
+  let final = lastValidPositions.value.get(elementId) || { x: elemento.x, y: elemento.y }
+
+  // Snap-to-grid al finalizar el drag, preservando contorno y contacto con vecinos
+  const boundary = computeBoundary()
+  if (boundary.type === 'rect') {
+    const neighbors = canvasStore.elementosVisibles.filter((el) => el.id !== elementId)
+    // Aplicar snap seguro para rectángulos; círculos mantienen posición final para no romper radios
+    if (elemento.forma === 'rectangular' || elemento.forma === 'cuadrado' || !elemento.forma) {
+      const snapped = safeSnapRect(
+        final.x,
+        final.y,
+        elemento.width,
+        elemento.height,
+        { W: boundary.W, H: boundary.H },
+        neighbors,
+        canvasStore.gridSize || 50,
+        1e-6,
+        { snapX: true, snapY: true },
+        canvasStore.snapGridEps || 6,
+      )
+      // Validar que el snap no introduzca bloqueos; si lo hace, mantener final
+      const test = { ...elemento, x: snapped.x, y: snapped.y }
+      const conflicts = detectConflictsFor(test, canvasStore.elementosVisibles).filter((c) => c.bloqueante)
+      if (conflicts.length === 0) {
+        final = { x: snapped.x, y: snapped.y }
+      }
+    } else if (elemento.forma === 'circular') {
+      // Snap del centro por proximidad; no forzar si no está cerca ni si saca fuera
+      const r = Math.min(elemento.width, elemento.height) / 2
+      const center = { x: final.x + r, y: final.y + r }
+      const snappedC = snapToGrid(center.x, center.y, canvasStore.gridSize || 50)
+      const gridEps = canvasStore.snapGridEps || 6
+      const targetC = {
+        x: Math.abs(snappedC.x - center.x) <= gridEps ? snappedC.x : center.x,
+        y: Math.abs(snappedC.y - center.y) <= gridEps ? snappedC.y : center.y,
+      }
+      const clampedC = {
+        x: Math.max(r, Math.min(targetC.x, boundary.W - r)),
+        y: Math.max(r, Math.min(targetC.y, boundary.H - r)),
+      }
+      // Aceptar si el clamp no cambió el resultado (no expulsa fuera)
+      if (Math.abs(clampedC.x - targetC.x) < 1e-6 && Math.abs(clampedC.y - targetC.y) < 1e-6) {
+        final = { x: clampedC.x - r, y: clampedC.y - r }
+      }
+    }
+  }
+
+  // Evaluar conflictos al finalizar (solo para pintar/estado, sin modal ni toasts)
+  const movingNow = { ...elemento, x: final.x, y: final.y }
+  const conflicts = detectConflictsFor(movingNow, canvasStore.elementosVisibles)
+  conflictsApi.setConflicts(conflicts, elementId)
+
+  // Actualizar posición final
+  canvasStore.actualizarPosicion(elementId, final.x, final.y)
+
+  // Persistir en historial (único punto)
   actions.actualizarPosicion(
     elementId,
-    elemento.x,
-    elemento.y,
-    true, // saveToHistory = true
+    final.x,
+    final.y,
+    true,
   )
+
+  // No mostrar toasts ni abrir modales
+
+  dragStartPositions.value.delete(elementId)
+  atEdgeMap.value.delete(elementId)
 }
 
 // === FUNCIONES DE DROP DESDE CATÁLOGO ===
@@ -507,8 +841,8 @@ const createElementFromDrop = (data, dropEvent) => {
 
   // Obtener posición del mouse en el canvas
   const rect = containerRef.value.getBoundingClientRect()
-  const x = (dropEvent.clientX - rect.left - stage.x()) / stage.scaleX()
-  const y = (dropEvent.clientY - rect.top - stage.y()) / stage.scaleY()
+  const rawX = (dropEvent.clientX - rect.left - stage.x()) / stage.scaleX()
+  const rawY = (dropEvent.clientY - rect.top - stage.y()) / stage.scaleY()
 
   const elemento = data.elemento
 
@@ -517,7 +851,7 @@ const createElementFromDrop = (data, dropEvent) => {
   let height = elemento.height || elemento.dimensiones?.alto || 60
 
   // Aplicar dimensiones mínimas para mejorar la interacción
-  // Especialmente importante para elementos como el estante esquinero
+  // Especialmente importante para elementos como el esquinero
   const MIN_WIDTH = 40 // Mínimo 40px de ancho para interacción
   const MIN_HEIGHT = 30 // Mínimo 30px de alto para interacción
 
@@ -526,6 +860,31 @@ const createElementFromDrop = (data, dropEvent) => {
 
   const color = elemento.color || elemento.colorBase || '#3B82F6'
 
+  // Calcular tope dentro del área y contra obstáculos bloqueantes
+  const boundary = computeBoundary()
+  // Raw top-left candidato
+  let candX = rawX - width / 2
+  let candY = rawY - height / 2
+  if (boundary.type === 'rect') {
+    const bounded = boundedRectDrag(candX, candY, width, height, boundary, SNAP_EPS)
+    // Resolver contra obstáculos si corresponde
+    const tempEl = {
+      id: '__temp__',
+      x: bounded.x,
+      y: bounded.y,
+      width,
+      height,
+      ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
+    }
+    const resolved = resolveAgainstBlockingObstacles(bounded.x, bounded.y, tempEl)
+    candX = resolved.x
+    candY = resolved.y
+  } else if (boundary.type === 'polygon') {
+    // Si cae fuera, ponerlo en 0,0 como fallback
+    candX = Math.max(0, candX)
+    candY = Math.max(0, candY)
+  }
+
   const nuevoElemento = {
     id: `${elemento.tipo || elemento.categoria}_${Date.now()}`,
     tipo: elemento.tipo || elemento.categoria || 'elemento',
@@ -533,8 +892,8 @@ const createElementFromDrop = (data, dropEvent) => {
 
     // Estructura correcta para posición
     posicion: {
-      x: x - width / 2,
-      y: y - height / 2,
+      x: candX,
+      y: candY,
       z: 0,
       rotation: 0,
     },
@@ -547,8 +906,8 @@ const createElementFromDrop = (data, dropEvent) => {
     },
 
     // Propiedades legacy para compatibilidad con Konva
-    x: x - width / 2,
-    y: y - height / 2,
+    x: candX,
+    y: candY,
     width: width,
     height: height,
 

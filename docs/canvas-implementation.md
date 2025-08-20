@@ -169,3 +169,22 @@ canvasStore.configurarPan(x, y)
 - **Configuración Dinámica**: Stage se ajusta automáticamente
 - **Mantiene Estado**: Zoom y pan se preservan durante resize
 - **Performance**: Usa `nextTick` para optimizar actualizaciones
+
+## 🔒 Resolución de restricciones con prioridad de contorno
+
+Orden exacto aplicado durante drag/drop (rectas y círculos usando AABB):
+
+1) Clamp al área: candidate = clampToArea(candidate)
+2) Detectar colisiones bloqueantes: collisions = detectConflictsFor(candidate) filtrando solo bloqueantes (suelo–suelo)
+3) Si hay colisiones, calcular MTD AABB agregado (suma de dx/dy sobre todos los bloqueantes) y PROYECTAR contra contorno:
+   - Si candidate.x == minX y MTD.x < 0 ⇒ MTD.x = 0
+   - Si candidate.x == maxX y MTD.x > 0 ⇒ MTD.x = 0
+   - Análogo para Y
+4) Aplicar candidate = clampToArea(candidate + MTD proyectado)
+5) Repetir (2)–(4) hasta 2–3 iteraciones o hasta no tener colisiones
+6) Snap-to-grid (opcional y no-expansivo): aplicar snap solo si no expulsa fuera del área; si el clamp cambia el resultado del snap, se ignora el snap
+7) Validación final: si tras iterar aún hay penetración bloqueante o el candidato queda fuera del área, se revierte a lastValidPos
+
+Notas:
+- Las colisiones con paredes (suelo–pared, pared–pared) no bloquean; solo generan advertencias visuales.
+- Para formas triangulares se usa el bbox para interacción y un fallback conservador a última válida cuando hay bloqueantes.

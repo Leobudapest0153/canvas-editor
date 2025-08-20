@@ -75,6 +75,21 @@ export const useCanvasStore = defineStore('canvas', () => {
   const panX = ref(0)
   const panY = ref(0)
 
+  // Configuración de grilla y snap
+  const gridSize = ref(50) // px entre líneas de grilla
+  const snapGridEps = ref(6) // px de proximidad para aplicar snap al soltar
+
+  const setGridSize = (sizePx) => {
+    const s = Number(sizePx)
+    if (!Number.isFinite(s)) return
+    gridSize.value = Math.max(5, Math.min(500, s))
+  }
+  const setSnapGridEps = (epsPx) => {
+    const e = Number(epsPx)
+    if (!Number.isFinite(e)) return
+    snapGridEps.value = Math.max(0, Math.min(50, e))
+  }
+
   // === NAVEGACIÓN JERÁRQUICA ===
   // Contexto de navegación: representa la "ubicación" actual en la jerarquía
   const contextoNavegacion = ref({
@@ -673,6 +688,9 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       // Estado de elementos con propiedades estáticas y personalizadas
       elementos: elementos.value.map((elemento) => ({
+        // Elevación y tolerancias
+        elevacion: elemento.elevacion || { zBase: 0, altura: elemento.dimensiones?.alto || elemento.alto || 0, espesor: elemento.elevacion?.espesor || 0 },
+        tolerancias: elemento.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
         id: elemento.id,
         nombre: elemento.nombre,
         tipo: elemento.tipo,
@@ -761,6 +779,11 @@ export const useCanvasStore = defineStore('canvas', () => {
           height: canvasAdaptativo.value.height,
           escala: canvasAdaptativo.value.escala,
         },
+        // Nueva configuración de grilla/snap
+        grid: {
+          size: gridSize.value,
+          snapEps: snapGridEps.value,
+        },
       },
     }
 
@@ -818,6 +841,13 @@ export const useCanvasStore = defineStore('canvas', () => {
           tipo: elementoData.tipo,
           categoria: elementoData.categoria,
           plantaId: elementoData.plantaId,
+
+          elevacion: elementoData.elevacion || {
+            zBase: elementoData.posicion?.z || 0,
+            altura: elementoData.dimensiones?.alto || 0,
+            espesor: 0,
+          },
+          tolerancias: elementoData.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
 
           // Propiedades físicas (estructura nueva)
           dimensiones: {
@@ -899,6 +929,12 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
       }
 
+      // Restaurar grid/snapping si existe
+      if (config.grid) {
+        if (Number.isFinite(config.grid.size)) gridSize.value = config.grid.size
+        if (Number.isFinite(config.grid.snapEps)) snapGridEps.value = config.grid.snapEps
+      }
+
       // Guardar en historial
       saveToHistory('Estado deserializado desde JSON')
 
@@ -932,6 +968,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     zoom,
     panX,
     panY,
+    gridSize,
+    snapGridEps,
 
     // Getters
     elementosVisibles,
@@ -958,6 +996,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     cambiarVista,
     configurarZoom,
     configurarPan,
+    setGridSize,
+    setSnapGridEps,
 
     // Actions - Plantas
     seleccionarPlanta,
