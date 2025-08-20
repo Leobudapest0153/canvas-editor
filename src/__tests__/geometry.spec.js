@@ -4,6 +4,7 @@ import {
   rectWithinRect,
   boundedRectDrag,
   isBBoxInsidePolygon,
+  safeSnapRect,
 } from '@/utils/geometry'
 
 describe('geometry helpers', () => {
@@ -47,5 +48,19 @@ describe('geometry helpers', () => {
     expect(isBBoxInsidePolygon(-5, 10, 50, 40, poly)).toBe(false)
     expect(isBBoxInsidePolygon(180, 120, 30, 40, poly)).toBe(false) // se sale
   })
-})
 
+  it('safeSnapRect preserva el “tope” entre elementos y no introduce margen con el snap', () => {
+    const boundary = { W: 400, H: 300 }
+    const w = 100, h = 60
+    // Vecino A fijo en x=0..100
+    const A = { id: 'A', x: 0, y: 40, width: 100, height: 60 }
+    // B está exactamente “topado” a la derecha de A (x=100) y y=40 (no cerca de grilla 50)
+    const Bx = 100
+    const By = 40
+
+    const snapped = safeSnapRect(Bx, By, w, h, boundary, [A], 50)
+    // Debe mantener x=100 (contacto) y no forzar snap en Y por no estar cerca de la grilla
+    expect(snapped.x).toBe(100)
+    expect(snapped.y).toBe(By)
+  })
+})
