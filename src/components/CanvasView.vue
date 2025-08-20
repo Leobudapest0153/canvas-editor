@@ -229,7 +229,7 @@
     </div>
 
     <!-- Botones flotantes de Undo/Redo -->
-    <div class="floating-controls">
+    <div class="floating-controls" :style="{ right: `${props.safeRight}px` }">
       <button
         @click="undo()"
         :disabled="!canUndo"
@@ -269,6 +269,11 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useCanvasWithHistory } from '@/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/composables/useCanvasBuffer'
+
+// Nuevo: espacio seguro a la derecha para no quedar debajo del panel
+const props = defineProps({
+  safeRight: { type: Number, default: 20 },
+})
 
 // Definir emits
 const emit = defineEmits(['select', 'drill-down'])
@@ -699,7 +704,7 @@ onUnmounted(() => {
 .floating-controls {
   position: absolute;
   top: 20px;
-  right: 20px;
+  right: 20px; /* valor por defecto, será sobrescrito por :style */
   display: flex;
   gap: 8px;
   z-index: 10;

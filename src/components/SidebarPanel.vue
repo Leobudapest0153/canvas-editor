@@ -115,7 +115,7 @@ const tabs = [
   },
   {
     id: 'buffer',
-    label: 'Buffer',
+    label: 'Portapapeles',
     tooltip: 'Almacén temporal de elementos',
   },
 ]

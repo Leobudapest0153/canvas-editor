@@ -10,7 +10,7 @@
       <h2 class="text-lg font-semibold text-gray-800">Propiedades</h2>
     </div>
 
-    <!-- Contenido -->
+    <!-- Contenido (scroll) -->
     <div class="flex-1 overflow-y-auto p-4">
       <!-- Sin elemento seleccionado -->
       <div v-if="!elementoSeleccionado" class="text-center py-12">
@@ -192,11 +192,12 @@
           </div>
         </div>
 
-        <!-- Preview del elemento -->
+        <!-- Vista Previa -->
         <div class="bg-gray-50 rounded-lg p-4">
           <h3 class="text-sm font-medium text-gray-700 mb-3">Vista Previa</h3>
           <div
-            class="flex items-center justify-center p-4 bg-white border border-gray-200 rounded-lg"
+            class="flex items-center justify-center p-4 bg-white border border-gray-200 rounded-lg overflow-hidden isolate shadow-sm"
+            style="transform: translateZ(0)"
           >
             <div
               class="flex items-center justify-center border border-gray-300 rounded"
@@ -215,22 +216,24 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
 
-        <!-- Acciones -->
-        <div class="flex gap-2">
-          <button
-            @click="resetearPropiedades"
-            class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
-          >
-            Restablecer
-          </button>
-          <button
-            @click="deseleccionarElemento"
-            class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-          >
-            Deseleccionar
-          </button>
-        </div>
+    <!-- Footer fijo con acciones -->
+    <div v-if="elementoSeleccionado" class="p-4 border-t border-gray-200 bg-white">
+      <div class="flex gap-2">
+        <button
+          @click="resetearPropiedades"
+          class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+        >
+          Restablecer
+        </button>
+        <button
+          @click="deseleccionarElemento"
+          class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+        >
+          Deseleccionar
+        </button>
       </div>
     </div>
   </div>
@@ -302,8 +305,6 @@ const deseleccionarElemento = () => {
 </script>
 
 <style scoped>
-@reference '@/styles/index.css';
-
 /* Estilos personalizados para mejor UX */
 input[type='color'] {
   -webkit-appearance: none;

@@ -1,52 +1,12 @@
 <template>
   <div id="app">
-    <header class="app-header">
-      <h1>DV Canvas Editor</h1>
-      <div class="header-center">
-        <button
-          @click="openHistorialModal"
-          class="header-btn historial-btn"
-          title="Ver historial completo"
-        >
-          <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          Historial
-        </button>
-
-        <button
-          @click="openImportExportModal"
-          class="header-btn import-export-btn"
-          title="Importar / Exportar Canvas"
-        >
-          <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-            />
-          </svg>
-          Import/Export
-        </button>
-      </div>
-      <div class="header-info">
-        <span>Editor Visual Jerárquico</span>
-      </div>
-    </header>
-
     <!-- Panel de plantas -->
     <PlantasPanel />
 
     <!-- Navegación jerárquica -->
     <NavegacionJerarquica />
 
-    <main class="app-main">
+    <main class="app-main relative">
       <!-- Sidebar con tabs -->
       <div class="app-sidebar-left">
         <SidebarPanel />
@@ -54,58 +14,43 @@
 
       <!-- Canvas principal -->
       <div class="app-canvas">
-        <CanvasView @select="handleElementSelect" @drill-down="handleDrillDown" />
+        <CanvasView
+          @select="handleElementSelect"
+          @drill-down="handleDrillDown"
+          :safeRight="showPropiedadesPanel ? 320 : 20"
+        />
       </div>
 
-      <!-- Panel de propiedades -->
-      <div class="app-sidebar-right">
+      <!-- Panel de propiedades (superpuesto para no empujar el canvas) -->
+      <div
+        class="app-sidebar-right absolute inset-y-0 right-0"
+        v-if="showPropiedadesPanel"
+        data-properties-panel
+      >
         <PropiedadesPanel />
       </div>
     </main>
-
-    <!-- Modal de historial -->
-    <HistorialModal :is-open="showHistorialModal" @close="closeHistorialModal" />
-
-    <!-- Modal de importar/exportar -->
-    <ImportExportModal :mostrar="showImportExportModal" @cerrar="closeImportExportModal" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import SidebarPanel from './components/SidebarPanel.vue'
 import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
 import PropiedadesPanel from './components/PropiedadesPanel.vue'
-import HistorialModal from './components/HistorialModal.vue'
-import ImportExportModal from './components/ImportExportModal.vue'
 import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
+
 
 // Composable para undo/redo global
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
 
+const showPropiedadesPanel = computed(() => canvasStore.elementoSeleccionadoCompleto)
+
 const selectedElement = ref(null)
-const showHistorialModal = ref(false)
-const showImportExportModal = ref(false)
-
-const openHistorialModal = () => {
-  showHistorialModal.value = true
-}
-
-const closeHistorialModal = () => {
-  showHistorialModal.value = false
-}
-
-const openImportExportModal = () => {
-  showImportExportModal.value = true
-}
-
-const closeImportExportModal = () => {
-  showImportExportModal.value = false
-}
 
 const handleElementSelect = (elemento) => {
   selectedElement.value = elemento
