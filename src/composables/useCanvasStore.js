@@ -648,6 +648,9 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       // Estado de elementos con propiedades estáticas y personalizadas
       elementos: elementos.value.map((elemento) => ({
+        // Elevación y tolerancias
+        elevacion: elemento.elevacion || { zBase: 0, altura: elemento.dimensiones?.alto || elemento.alto || 0, espesor: elemento.elevacion?.espesor || 0 },
+        tolerancias: elemento.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
         id: elemento.id,
         nombre: elemento.nombre,
         tipo: elemento.tipo,
@@ -793,6 +796,13 @@ export const useCanvasStore = defineStore('canvas', () => {
           tipo: elementoData.tipo,
           categoria: elementoData.categoria,
           plantaId: elementoData.plantaId,
+
+          elevacion: elementoData.elevacion || {
+            zBase: elementoData.posicion?.z || 0,
+            altura: elementoData.dimensiones?.alto || 0,
+            espesor: 0,
+          },
+          tolerancias: elementoData.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
 
           // Propiedades físicas (estructura nueva)
           dimensiones: {

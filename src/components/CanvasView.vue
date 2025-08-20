@@ -269,6 +269,8 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useCanvasWithHistory } from '@/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/composables/useCanvasBuffer'
+import { useConflicts } from '@/composables/useConflicts'
+import { detectConflictsFor, throttle, computeMTD } from '@/utils/collision'
 import {
   rectInsidePolygon,
   circleInsidePolygon,
@@ -287,6 +289,61 @@ const layerRef = ref(null)
 // Composable con historial integrado
 const { store: canvasStore, actions, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
+const conflictsApi = useConflicts()
+
+// Conflictos en vivo durante el arrastre
+const liveConflicts = conflictsApi.conflicts
+const setLiveConflictsThrottled = throttle((movingEl) => {
+  try {
+    const list = detectConflictsFor(movingEl, canvasStore.elementosVisibles)
+    conflictsApi.setConflicts(list, movingEl.id)
+  } catch {
+    // noop: evitar romper el drag por errores transitorios
+  }
+}, 32)
+
+// Resolver posición contra obstáculos bloqueantes (suelo–suelo) usando MTD AABB
+const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
+  const all = canvasStore.elementosVisibles
+  const w = elemento.width
+  const h = elemento.height
+  let x = candidateX
+  let y = candidateY
+
+  // Iterar para resolver múltiples colisiones si fuera necesario
+  const MAX_ITERS = 5
+  for (let iter = 0; iter < MAX_ITERS; iter++) {
+    const moving = { ...elemento, x, y }
+    const conflicts = detectConflictsFor(moving, all)
+    const blocking = conflicts.filter((c) => c.bloqueante)
+    if (blocking.length === 0) break
+
+    // Tomar la mínima traslación acumulada considerando todos los bloqueantes
+    // Estrategia: aplicar de a una (la más pequeña en magnitud)
+    let bestDx = 0
+    let bestDy = 0
+    let bestMag = Infinity
+
+    for (const c of blocking) {
+      const other = all.find((el) => el.id === (c.aId === elemento.id ? c.bId : c.aId))
+      if (!other) continue
+      const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height)
+      const mag = Math.abs(dx) + Math.abs(dy)
+      if (mag > 0 && mag < bestMag) {
+        bestMag = mag
+        bestDx = dx
+        bestDy = dy
+      }
+    }
+
+    if (bestMag === Infinity) break
+
+    x += bestDx
+    y += bestDy
+  }
+
+  return { x, y }
+}
 
 // Estado local del canvas
 const stageSize = ref({ width: 800, height: 600 })
@@ -499,14 +556,36 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
 
   if (boundary.type === 'rect') {
     const bounded = boundedRectDrag(layerPos.x, layerPos.y, w, h, boundary, SNAP_EPS)
+
+    // Aplicar tope contra obstáculos bloqueantes solo para formas AABB (no triangulares rotadas)
+    let adjusted = { x: bounded.x, y: bounded.y }
+    if (forma !== 'triangular') {
+      adjusted = resolveAgainstBlockingObstacles(bounded.x, bounded.y, elemento)
+    } else {
+      // Triángulo: fallback a última válida si hay bloqueantes
+      const moving = { ...elemento, x: bounded.x, y: bounded.y }
+      const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles)
+      if (conflicts.some((c) => c.bloqueante)) {
+        const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+        adjusted = prev
+      }
+    }
+
     atEdgeMap.value.set(elemento.id, !!bounded.atEdge)
-    lastValidPositions.value.set(elemento.id, { x: bounded.x, y: bounded.y })
-    return toStageCoords({ x: bounded.x, y: bounded.y })
+    lastValidPositions.value.set(elemento.id, { x: adjusted.x, y: adjusted.y })
+    return toStageCoords({ x: adjusted.x, y: adjusted.y })
   }
 
   if (boundary.type === 'polygon') {
     const inside = rectInsidePolygon(layerPos.x, layerPos.y, w, h, boundary.points)
     if (!inside) {
+      const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+      return toStageCoords(prev)
+    }
+    // En polígono, no resolvemos contra obstáculos complejos: fallback si bloquea
+    const moving = { ...elemento, x: layerPos.x, y: layerPos.y }
+    const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles)
+    if (conflicts.some((c) => c.bloqueante)) {
       const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
       return toStageCoords(prev)
     }
@@ -531,6 +610,9 @@ const startElementDrag = (elementId) => {
     dragStartPositions.value.set(elementId, { x: elemento.x, y: elemento.y })
     lastValidPositions.value.set(elementId, { x: elemento.x, y: elemento.y })
   }
+
+  // Limpiar conflictos previos al iniciar un nuevo arrastre
+  conflictsApi.clear()
 }
 
 const updateElementPosition = (e, elementId, forma = 'rectangular') => {
@@ -549,13 +631,34 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (!elemento) return
 
-  // Feedback visual: bordes cuando está pegado
+  // Feedback visual: bordes cuando está pegado o hay conflicto
   const warn = atEdgeMap.value.get(elementId)
+
+  // Detectar conflictos en tiempo real (no bloquea)
+  const moving = { ...elemento, x, y }
+  setLiveConflictsThrottled(moving)
+  const hasAnyConflict = liveConflicts.value.length > 0
+
   try {
-    const strokeColor = warn ? '#f59e0b' : canvasStore.elementoSeleccionado === elementId ? '#000' : '#666'
+    const strokeColor = hasAnyConflict
+      ? '#ef4444'
+      : warn
+        ? '#f59e0b'
+        : canvasStore.elementoSeleccionado === elementId
+          ? '#000'
+          : '#666'
     target.stroke(strokeColor)
+    if (hasAnyConflict) {
+      target.shadowColor('#ef4444')
+      target.shadowBlur(8)
+      target.shadowOpacity(0.6)
+    } else {
+      target.shadowColor('black')
+      target.shadowBlur(4)
+      target.shadowOpacity(0.3)
+    }
     target.getLayer()?.batchDraw()
-  } catch (err) {
+  } catch {
     // noop
   }
 
@@ -571,15 +674,25 @@ const endElementDrag = (elementId) => {
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (!elemento) return
 
-  const final = lastValidPositions.value.get(elementId) || { x: elemento.x, y: elemento.y }
+  let final = lastValidPositions.value.get(elementId) || { x: elemento.x, y: elemento.y }
 
-  // Guardar en historial al finalizar el arrastre
+  // Evaluar conflictos al finalizar (solo para pintar/estado, sin modal ni toasts)
+  const movingNow = { ...elemento, x: final.x, y: final.y }
+  const conflicts = detectConflictsFor(movingNow, canvasStore.elementosVisibles)
+  conflictsApi.setConflicts(conflicts, elementId)
+
+  // No revertimos; el tope ya impidió solapamiento bloqueante
+  canvasStore.actualizarPosicion(elementId, final.x, final.y)
+
+  // Persistir en historial (único punto)
   actions.actualizarPosicion(
     elementId,
     final.x,
     final.y,
     true,
   )
+
+  // No mostrar toasts ni abrir modales
 
   dragStartPositions.value.delete(elementId)
   atEdgeMap.value.delete(elementId)
@@ -626,8 +739,8 @@ const createElementFromDrop = (data, dropEvent) => {
 
   // Obtener posición del mouse en el canvas
   const rect = containerRef.value.getBoundingClientRect()
-  const x = (dropEvent.clientX - rect.left - stage.x()) / stage.scaleX()
-  const y = (dropEvent.clientY - rect.top - stage.y()) / stage.scaleY()
+  const rawX = (dropEvent.clientX - rect.left - stage.x()) / stage.scaleX()
+  const rawY = (dropEvent.clientY - rect.top - stage.y()) / stage.scaleY()
 
   const elemento = data.elemento
 
@@ -636,7 +749,7 @@ const createElementFromDrop = (data, dropEvent) => {
   let height = elemento.height || elemento.dimensiones?.alto || 60
 
   // Aplicar dimensiones mínimas para mejorar la interacción
-  // Especialmente importante para elementos como el estante esquinero
+  // Especialmente importante para elementos como el esquinero
   const MIN_WIDTH = 40 // Mínimo 40px de ancho para interacción
   const MIN_HEIGHT = 30 // Mínimo 30px de alto para interacción
 
@@ -645,6 +758,31 @@ const createElementFromDrop = (data, dropEvent) => {
 
   const color = elemento.color || elemento.colorBase || '#3B82F6'
 
+  // Calcular tope dentro del área y contra obstáculos bloqueantes
+  const boundary = computeBoundary()
+  // Raw top-left candidato
+  let candX = rawX - width / 2
+  let candY = rawY - height / 2
+  if (boundary.type === 'rect') {
+    const bounded = boundedRectDrag(candX, candY, width, height, boundary, SNAP_EPS)
+    // Resolver contra obstáculos si corresponde
+    const tempEl = {
+      id: '__temp__',
+      x: bounded.x,
+      y: bounded.y,
+      width,
+      height,
+      ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
+    }
+    const resolved = resolveAgainstBlockingObstacles(bounded.x, bounded.y, tempEl)
+    candX = resolved.x
+    candY = resolved.y
+  } else if (boundary.type === 'polygon') {
+    // Si cae fuera, ponerlo en 0,0 como fallback
+    candX = Math.max(0, candX)
+    candY = Math.max(0, candY)
+  }
+
   const nuevoElemento = {
     id: `${elemento.tipo || elemento.categoria}_${Date.now()}`,
     tipo: elemento.tipo || elemento.categoria || 'elemento',
@@ -652,8 +790,8 @@ const createElementFromDrop = (data, dropEvent) => {
 
     // Estructura correcta para posición
     posicion: {
-      x: x - width / 2,
-      y: y - height / 2,
+      x: candX,
+      y: candY,
       z: 0,
       rotation: 0,
     },
@@ -666,8 +804,8 @@ const createElementFromDrop = (data, dropEvent) => {
     },
 
     // Propiedades legacy para compatibilidad con Konva
-    x: x - width / 2,
-    y: y - height / 2,
+    x: candX,
+    y: candY,
     width: width,
     height: height,
 
