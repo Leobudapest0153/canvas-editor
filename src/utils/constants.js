@@ -113,3 +113,7 @@ export const COLORES_DISPONIBLES = [
 export const CM_TO_PX = 2
 // Tolerancia para aplicar "pegado" al borde en px
 export const SNAP_EPS = 4
+
+// Parámetros por defecto para guard de redimensionado
+export const MARGIN_CM = 5 // margen perimetral interno en cm para packing
+export const FACTOR_UTILIZACION = 0.9 // porcentaje máximo de ocupación de área

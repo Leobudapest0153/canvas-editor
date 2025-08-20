@@ -182,6 +182,7 @@
                 <input
                   id="ancho"
                   v-model.number="formularioPlanta.dimensiones.ancho"
+                  @input="onDimChange()"
                   type="number"
                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
                   placeholder="800"
@@ -195,6 +196,7 @@
                 <input
                   id="largo"
                   v-model.number="formularioPlanta.dimensiones.largo"
+                  @input="onDimChange()"
                   type="number"
                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
                   placeholder="1000"
@@ -215,6 +217,19 @@
                   max="1000"
                   required
                 />
+              </div>
+            </div>
+            <!-- Aviso inline del guard -->
+            <div v-if="preview.status !== 'ok'" class="mt-3">
+              <div
+                :class="[
+                  'px-3 py-2 rounded text-sm',
+                  preview.status === 'block' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-800 border border-amber-200',
+                ]"
+              >
+                <strong v-if="preview.status==='block'">No es posible reducir</strong>
+                <strong v-else>Se requiere reacomodo</strong>
+                <span class="ml-1">{{ preview.message }}</span>
               </div>
             </div>
           </div>
@@ -348,6 +363,8 @@ import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore'
 import HistorialModal from './HistorialModal.vue'
 import ImportExportModal from './ImportExportModal.vue'
+import { usePlantResizeGuard, pack as packShelf } from '@/composables/usePlantResizeGuard'
+import { CM_TO_PX, MARGIN_CM, FACTOR_UTILIZACION } from '@/utils/constants'
 // Store
 const canvasStore = useCanvasStore()
 
@@ -359,6 +376,10 @@ const mostrarModalEditar = ref(false)
 const mostrarConfirmacionEliminar = ref(false)
 const plantaAEliminar = ref(null)
 const menuAbiertoPlanta = ref(null)
+
+// Estado de preview del guard
+const preview = ref({ status: 'ok', message: '', placements: [] })
+let dimChangeTimer = null
 
 // Posición del menú (teleport fijo)
 const menuPosX = ref(0)
@@ -376,6 +397,37 @@ const formularioPlanta = ref({
   },
   pesoMaximoSoportado: 3000,
 })
+
+// Guard de redimensionado ligado al estado actual
+const guard = usePlantResizeGuard(() => {
+  const plantaId = canvasStore.plantaActiva
+  const elements = canvasStore.elementos.filter((el) => el.plantaId === plantaId)
+  return {
+    elements,
+    gridSizePx: canvasStore.gridSize,
+    cmToPx: CM_TO_PX,
+    rotPerm: true,
+    marginCm: MARGIN_CM,
+    utilizationFactor: FACTOR_UTILIZACION,
+  }
+})
+
+// Debounce preview en inputs de ancho/largo
+const onDimChange = () => {
+  clearTimeout(dimChangeTimer)
+  dimChangeTimer = setTimeout(() => {
+    const { ancho, largo } = formularioPlanta.value.dimensiones || {}
+    if (!Number.isFinite(ancho) || !Number.isFinite(largo)) return
+    const res = guard.simulateResize(ancho, largo)
+    if (res.status === 'block') {
+      preview.value = { status: 'block', message: 'elementos no caben con las nuevas dimensiones', placements: [] }
+    } else if (res.status === 'auto_adjust') {
+      preview.value = { status: 'auto_adjust', message: `Se reacomodarán ${res.placements.length} elementos`, placements: res.placements }
+    } else {
+      preview.value = { status: 'ok', message: '', placements: [] }
+    }
+  }, 200)
+}
 
 // Computed
 const elementosEnPlantaAEliminar = computed(() => {
@@ -496,31 +548,169 @@ const eliminarPlantaConfirmada = () => {
   }
 }
 
-const guardarPlanta = () => {
+// Helpers post-apply
+const EPS = 1e-6
+const isInside = (el, W, H, margin) => {
+  const x = el.posicion?.x ?? el.x ?? 0
+  const y = el.posicion?.y ?? el.y ?? 0
+  const rot = el.posicion?.rotation ?? el.rotation ?? 0
+  const w = el.dimensiones?.ancho ?? el.width ?? 0
+  const h = el.dimensiones?.largo ?? el.height ?? 0
+  const orientedW = rot % 180 !== 0 ? h : w
+  const orientedH = rot % 180 !== 0 ? w : h
+  const left = x
+  const top = y
+  const right = left + orientedW
+  const bottom = top + orientedH
+  return (
+    left >= margin - EPS && top >= margin - EPS && right <= W - margin + EPS && bottom <= H - margin + EPS
+  )
+}
+const gridPxToCm = (gridPx) => (gridPx > 0 ? gridPx / CM_TO_PX : 0)
+const snapToGridCM = (x, y, gridCm) => {
+  if (!gridCm) return { x, y }
+  const sx = Math.round(x / gridCm) * gridCm
+  const sy = Math.round(y / gridCm) * gridCm
+  return { x: sx, y: sy }
+}
+const clampToArea = (x, y, w, h, W, H) => {
+  const nx = Math.max(MARGIN_CM, Math.min(x, Math.max(MARGIN_CM, W - MARGIN_CM - w)))
+  const ny = Math.max(MARGIN_CM, Math.min(y, Math.max(MARGIN_CM, H - MARGIN_CM - h)))
+  return { x: nx, y: ny }
+}
+
+// Helpers de sincronización y repaint
+const waitRaf = () => new Promise((resolve) => requestAnimationFrame(() => resolve()))
+const runCanvasSyncSequence = async () => {
+  try {
+    await nextTick()
+    await waitRaf()
+    window.__canvasApi?.recomputeBoundsAndIndex?.()
+    await nextTick()
+    await waitRaf()
+    window.__canvasApi?.forceRedraw?.()
+    window.__canvasApi?.resetVolatileState?.()
+  } catch {
+    // noop
+  }
+}
+
+const guardarPlanta = async () => {
   if (!formularioPlanta.value.nombre.trim()) {
     alert('El nombre de la planta es requerido')
     return
   }
 
   try {
+    const dims = formularioPlanta.value.dimensiones
+    const res = guard.simulateResize(dims.ancho, dims.largo)
+
+    if (res.status === 'block') {
+      window.__toasts?.show?.('No es posible reducir: elementos no caben con las nuevas dimensiones', { type: 'error' })
+      return
+    }
+
     if (mostrarModalEditar.value) {
-      // Editar planta existente
+      // Guardar dimensiones previas para posibles reversiones
+      const plantaPrev = canvasStore.plantaPorId(canvasStore.plantaActiva)
+      const prevDims = {
+        ancho: plantaPrev?.dimensiones?.ancho || 800,
+        largo: plantaPrev?.dimensiones?.largo || 1000,
+        alto: plantaPrev?.dimensiones?.alto || 280,
+      }
+
+      // 1) Aplicar nuevas dimensiones
       canvasStore.editarPlanta(canvasStore.plantaActiva, {
         nombre: formularioPlanta.value.nombre.trim(),
         descripcion: formularioPlanta.value.descripcion.trim(),
-        dimensiones: formularioPlanta.value.dimensiones,
+        dimensiones: { ...dims },
         pesoMaximoSoportado: formularioPlanta.value.pesoMaximoSoportado,
       })
+
+      // 2) Post-apply validation pass
+      const W = dims.ancho
+      const H = dims.largo
+      const plantaId = canvasStore.plantaActiva
+      const gridCm = gridPxToCm(canvasStore.gridSize)
+
+      // Candidatos: raíz + suelo (incluso invisibles), excluir suelo decorativo si existiera
+      const candidates = canvasStore.elementos.filter(
+        (e) => e.plantaId === plantaId && !e.padre && (e.ubicacion || 'suelo') === 'suelo' && !(e.decorativo && (e.tipo === 'suelo' || /\bsuelo\b/i.test(e.nombre || ''))),
+      )
+
+      const anyOut = candidates.some((e) => !isInside(e, W, H, MARGIN_CM))
+
+      if (anyOut) {
+        // Ejecutar pack determinista
+        const placements = packShelf(candidates, { W, H }, { grid: gridCm, margin: MARGIN_CM, rotPerm: true })
+        if (!placements) {
+          // Revertir dimensiones
+          canvasStore.editarPlanta(canvasStore.plantaActiva, {
+            dimensiones: { ...prevDims },
+          })
+          window.__toasts?.show?.('No fue posible reacomodar elementos; se revierte la redimensión', { type: 'error' })
+          // Secuencia de sync para reflejar reversión inmediatamente
+          await runCanvasSyncSequence()
+          return
+        }
+
+        // Aplicar placements con clamp->snap->clamp para seguridad
+        const byId = new Map(candidates.map((e) => [e.id, e]))
+        let moved = 0
+        for (const p of placements) {
+          const el = byId.get(p.id)
+          if (!el) continue
+          const w = p.width
+          const h = p.height
+          // clamp 1
+          let pos = clampToArea(p.x, p.y, w, h, W, H)
+          // snap
+          const snapped = snapToGridCM(pos.x, pos.y, gridCm)
+          // clamp 2
+          pos = clampToArea(snapped.x, snapped.y, w, h, W, H)
+
+          const dx = Math.abs((el.posicion?.x ?? el.x ?? 0) - pos.x)
+          const dy = Math.abs((el.posicion?.y ?? el.y ?? 0) - pos.y)
+          const drot = Math.abs((((el.posicion?.rotation ?? el.rotation ?? 0) % 360) + 360) % 360 - (((p.rotation ?? 0) % 360) + 360) % 360)
+          if (dx > EPS || dy > EPS || drot > EPS) moved++
+
+          el.x = pos.x
+          el.y = pos.y
+          el.width = w
+          el.height = h
+          if (!el.posicion) el.posicion = { x: pos.x, y: pos.y, rotation: p.rotation }
+          else {
+            el.posicion.x = pos.x
+            el.posicion.y = pos.y
+            el.posicion.rotation = p.rotation
+          }
+          if (el.dimensiones) {
+            el.dimensiones.ancho = w
+            el.dimensiones.largo = h
+          }
+          el.rotation = p.rotation
+        }
+
+        window.__toasts?.show?.(`Se reacomodaron ${moved} elementos`, { type: 'warn' })
+        canvasStore.saveToHistory('Auto-adjust after resize (post-apply)')
+      } else {
+        // No ajustes requeridos
+        canvasStore.saveToHistory('Dimensiones de planta actualizadas')
+      }
+
+      // Forzar repaint inmediato tras aplicar dimensiones/pack
+      await runCanvasSyncSequence()
     } else {
-      // Agregar nueva planta
+      // Crear nueva planta
       const nuevaPlantaId = canvasStore.agregarPlanta({
         nombre: formularioPlanta.value.nombre.trim(),
         descripcion: formularioPlanta.value.descripcion.trim(),
         dimensiones: formularioPlanta.value.dimensiones,
         pesoMaximoSoportado: formularioPlanta.value.pesoMaximoSoportado,
       })
-      // Seleccionar la nueva planta
       canvasStore.navegarAPlanta(nuevaPlantaId)
+      canvasStore.saveToHistory('Nueva planta creada')
+      await runCanvasSyncSequence()
     }
 
     cerrarModales()
