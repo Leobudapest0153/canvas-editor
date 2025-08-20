@@ -267,7 +267,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useCanvasWithHistory } from '@/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/composables/useCanvasBuffer'
 import { useConflicts } from '@/composables/useConflicts'
@@ -411,12 +411,13 @@ const stageConfig = computed(() => ({
 
 // Formato de punto
 const flatPoints = computed(() => {
+  maxWidth.value = layerConfig.value.width;
+  maxHeight.value = layerConfig.value.height;
   if (canvasStore.plantaActivaData.poligono) {
     canvasStore.plantaActivaData.poligono.forEach((coord) => {
       maxWidth.value = Math.max(coord.x, maxWidth.value);
       maxHeight.value = Math.max(coord.y, maxHeight.value);
     });
-    console.log(maxWidth.value);
     return canvasStore.plantaActivaData.poligono.flatMap(p => [p.x, p.y]);
   } else {
     return [];
@@ -1041,7 +1042,78 @@ onUnmounted(() => {
     resizeObserver.disconnect()
   }
   window.removeEventListener('click', handleGlobalClick)
+  if (typeof window !== 'undefined' && window.__canvasApi) {
+    // limpiar referencias globales al desmontar
+    if (window.__canvasApi.recomputeBoundsAndIndex === recomputeBoundsAndIndex) {
+      delete window.__canvasApi
+    }
+  }
 })
+
+// Método: recomputar bounds, grid y limpiar índices/estados volátiles
+const recomputeBoundsAndIndex = async () => {
+  try {
+    // Limpiar conflictos y estados transitorios
+    conflictsApi.clear()
+    lastValidPositions.value.clear()
+    atEdgeMap.value.clear()
+    isElementDragging.value = false
+    stageDragEnabled.value = true
+
+    // Recentrar planta en canvas para evitar offsets tras cambios
+    await nextTick()
+    centrarPlantaEnCanvas()
+  } catch {
+    // noop
+  }
+}
+
+// Método: forzar redraw del layer/stage y limpiar caches
+const forceRedraw = () => {
+  try {
+    const layer = layerRef.value?.getNode?.()
+    const stage = stageRef.value?.getNode?.()
+    if (!layer || !stage) return
+    // clear caches si existiera cache en nodos
+    try { layer.clearCache?.() } catch (e) { void e }
+    try { stage.clearCache?.() } catch (e) { void e }
+    layer.batchDraw?.()
+    stage.batchDraw?.()
+  } catch (e) {
+    void e
+  }
+}
+
+// Método: reset mínimo de estados volátiles
+const resetVolatileState = () => {
+  try {
+    lastValidPositions.value.clear()
+    atEdgeMap.value.clear()
+    conflictsApi.clear()
+    isElementDragging.value = false
+    stageDragEnabled.value = true
+  } catch {}
+}
+
+// Exponer API global para que otros componentes (p.ej. PlantasPanel) sin acceso por ref puedan sincronizar
+if (typeof window !== 'undefined') {
+  window.__canvasApi = {
+    recomputeBoundsAndIndex,
+    forceRedraw,
+    resetVolatileState,
+  }
+}
+
+// Watch: cuando cambia el tamaño del layer (planta), recomputar y redibujar
+watch(
+  () => [layerConfig.value.width, layerConfig.value.height],
+  async () => {
+    await nextTick()
+    await recomputeBoundsAndIndex()
+    await nextTick()
+    forceRedraw()
+  },
+)
 </script>
 
 <style scoped>

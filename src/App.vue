@@ -30,11 +30,8 @@
         <PropiedadesPanel />
       </div>
     </main>
-    <!-- Modal de historial -->
-    <HistorialModal :is-open="showHistorialModal" @close="closeHistorialModal" />
-
-    <!-- Modal de importar/exportar -->
-    <ImportExportModal :mostrar="showImportExportModal" @cerrar="closeImportExportModal" />
+    <!-- Contenedor de toasts -->
+    <ToastContainer />
     <WorkspaceEditor/>
   </div>
 </template>
@@ -49,6 +46,7 @@ import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
+import ToastContainer from './components/ToastContainer.vue'
 
 
 // Composable para undo/redo global
