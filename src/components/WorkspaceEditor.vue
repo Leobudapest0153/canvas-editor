@@ -8,7 +8,6 @@
 
       <div class="grid gap-4 md:grid-cols-5 flex-grow min-h-0">
         <div class="md:col-span-3 flex flex-col">
-          <!-- ANOTACIÓN: Aquí usamos el nuevo componente CanvasEditor -->
           <DrawEditor ref="canvasEditorRef"
                         :polygon="local.polygon"
                         :worldWidth="worldWidth"
@@ -25,14 +24,16 @@
             <button class="px-3 py-2 rounded-lg border bg-white text-slate-800" :class="{ 'ring-2 ring-rose-500': deleting }" @click="toggleDeleteMode">{{ deleting ? 'Salir de modo eliminar' : 'Eliminar vértice' }}</button>
             <button class="px-3 py-2 rounded-lg border bg-white text-slate-800" @click="() => canvasEditorRef.fitStageToPolygon()">Ajustar Vista</button>
           </div>
-          <div class="mt-1 text-xs flex-shrink-0" :class="notice ? 'text-rose-600' : 'text-transparent'">{{ notice || '.' }}</div>
+          <!-- MODIFICADO: El mensaje de error/aviso ahora es más visible -->
+          <div class="mt-1 text-sm h-5 flex-shrink-0" :class="notice ? 'text-rose-600' : 'text-transparent'">{{ notice || '.' }}</div>
         </div>
 
         <!-- Panel de Propiedades -->
         <div class="md:col-span-2 space-y-3">
           <div class="border rounded-lg p-3">
             <label class="text-xs text-slate-600">Nombre</label>
-            <input class="w-full border rounded-lg px-3 py-2" v-model="local.name" placeholder="Ej. Bodega A" />
+            <!-- MODIFICADO: Añadido feedback de validación -->
+            <input class="w-full border rounded-lg px-3 py-2" :class="{'border-rose-500 ring-1 ring-rose-500': errors.name}" v-model="local.name" placeholder="Ej. Bodega A" />
           </div>
           <div class="border rounded-lg p-3">
             <h4 class="font-medium mb-2">Forma</h4>
@@ -45,11 +46,13 @@
               <template v-if="local.shape === 'rectangle'">
                 <div>
                   <label class="text-xs text-slate-600">Ancho (m)</label>
-                  <input type="number" class="w-full border rounded-lg px-2 py-1" v-model.number="rectWMeters" />
+                  <!-- MODIFICADO: Añadido feedback de validación -->
+                  <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="rectWMeters" />
                 </div>
                 <div>
                   <label class="text-xs text-slate-600">Largo (m)</label>
-                  <input type="number" class="w-full border rounded-lg px-2 py-1" v-model.number="rectLMeters" />
+                  <!-- MODIFICADO: Añadido feedback de validación -->
+                  <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="rectLMeters" />
                 </div>
               </template>
               <template v-if="local.shape === 'circle'">
@@ -61,7 +64,8 @@
             </div>
             <div v-if="local.shape === 'rectangle'" class="mt-2">
               <label class="text-xs text-slate-600">Alto (m)</label>
-              <input type="number" class="w-full border rounded-lg px-2 py-1" v-model.number="heightMeters" />
+              <!-- MODIFICADO: Añadido feedback de validación -->
+              <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="heightMeters" />
             </div>
             <div v-if="local.shape==='custom'" class="mt-2 space-y-2">
               <p class="text-xs text-slate-600">Edita los vértices directamente en el lienzo.</p>
@@ -78,14 +82,14 @@
       </div>
 
       <div class="mt-4 flex justify-end gap-2 flex-shrink-0">
-        <button class="px-3 py-2 rounded-lg border bg-blue-600 text-white border-blue-600" @click="onSave">Guardar Cambios</button>
+        <button class="px-3 py-2 rounded-lg border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors" @click="onSave">Guardar Cambios</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore'
 import DrawEditor from './DrawEditor.vue';
 
@@ -99,8 +103,9 @@ const PIXELS_PER_CM = 10
 const plantaAnchoMetros = ref(20)
 const plantaLargoMetros = ref(15)
 
-const rectW = ref(100)
-const rectL = ref(50)
+// MODIFICADO: Valores por defecto cambiados a 500cm (5m)
+const rectW = ref(500)
+const rectL = ref(500)
 const circleR = ref(40)
 
 const worldWidth = computed(() => {
@@ -115,16 +120,21 @@ const worldHeight = computed(() => {
 
 const local = reactive({
   id: null,
-  name: 'Área de prueba',
+  name: '', // MODIFICADO: Nombre por defecto vacío
   shape: 'rectangle',
   polygon: [],
   unit: 'cm',
   pixelsPerUnit: PIXELS_PER_CM,
-  height: 0,
-  maxWeight: 0,
+  height: 500, // MODIFICADO: Altura por defecto 500cm (5m)
+  maxWeight: 1000, // MODIFICADO: Peso por defecto 1000kg
 })
 
 const notice = ref('')
+// NUEVO: Estado para manejar los errores de validación
+const errors = reactive({
+  name: false,
+  dimensions: false,
+})
 
 function defaultRect() {
   const w = rectW.value * PIXELS_PER_CM
@@ -178,12 +188,18 @@ function applyRect(){
   const wPx = rectW.value * PIXELS_PER_CM
   const lPx = rectL.value * PIXELS_PER_CM
   local.polygon = [ { x: 0, y: 0 }, { x: wPx, y: 0 }, { x: wPx, y: lPx }, { x: 0, y: lPx } ]
+  nextTick(() => {
+    canvasEditorRef.value?.fitStageToPolygon()
+  })
 }
 
 function applyCircle() {
   const rPx = circleR.value * PIXELS_PER_CM
   const cx = rPx, cy = rPx
   local.polygon = circleSamplePoints(cx, cy, rPx, 32).map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }))
+  nextTick(() => {
+    canvasEditorRef.value?.fitStageToPolygon()
+  })
 }
 
 watch([rectW, rectL], () => { if (local.shape === 'rectangle') applyRect() })
@@ -196,15 +212,38 @@ function onShapeChange() {
   deleting.value = false
 }
 
+// MODIFICADO: Añadida lógica de validación
 function onSave(){
+  // Resetear errores y avisos
   notice.value = ''
+  errors.name = false
+  errors.dimensions = false
+
+  // 1. Validar nombre
+  if (!local.name.trim()) {
+    errors.name = true
+    notice.value = 'El campo "Nombre" es obligatorio.'
+    return
+  }
+
+  // 2. Validar dimensiones (solo para rectángulos)
+  if (local.shape === 'rectangle') {
+    if (rectWMeters.value <= 0 || rectLMeters.value <= 0 || heightMeters.value <= 0) {
+      errors.dimensions = true
+      notice.value = 'Las dimensiones deben ser mayores a cero.'
+      return
+    }
+  }
+
+  // 3. Validar polígono (para formas personalizadas)
   if ((local.polygon?.length || 0) < 3){
     notice.value = 'El polígono debe tener al menos 3 vértices.'
     return
   }
 
+  // Si todo es válido, proceder a guardar
   const nuevaPlanta = {
-    nombre: local.name.trim() || 'Área',
+    nombre: local.name.trim(),
     pesoMaximoSoportado: local.maxWeight,
     dimensiones: {
       alto: local.height,

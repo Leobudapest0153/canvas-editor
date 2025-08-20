@@ -295,10 +295,6 @@ const containerRef = ref(null)
 const stageRef = ref(null)
 const layerRef = ref(null)
 
-// Tamaño del área
-const maxWidth = ref(100);
-const maxHeight = ref(100);
-
 // Composable con historial integrado
 const { store: canvasStore, actions, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
@@ -457,8 +453,8 @@ const gridLines = computed(() => {
   const horizontal = []
 
   // Usar las dimensiones del layer (planta) para el grid
-  const layerWidth = maxWidth.value;
-  const layerHeight = maxHeight.value;
+  const layerWidth = floorBoundary.value.width;
+  const layerHeight = floorBoundary.value.height;
 
   for (let i = 0; i <= layerWidth; i += gridSizePx) {
     vertical.push(i)
