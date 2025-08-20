@@ -30,6 +30,9 @@
         <PropiedadesPanel />
       </div>
     </main>
+
+    <!-- Contenedor de toasts -->
+    <ToastContainer />
   </div>
 </template>
 
@@ -42,6 +45,7 @@ import PropiedadesPanel from './components/PropiedadesPanel.vue'
 import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
+import ToastContainer from './components/ToastContainer.vue'
 
 
 // Composable para undo/redo global
