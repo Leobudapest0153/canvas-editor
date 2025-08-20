@@ -203,195 +203,15 @@
       </div>
     </div>
 
-    <!-- Modal para crear nuevo elemento -->
-    <div v-if="mostrarModalCrear" class="modal-overlay" @click="cerrarModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h2 class="text-xl font-semibold text-gray-800">Crear Nuevo Elemento</h2>
-          <button @click="cerrarModal" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-
-        <form @submit.prevent="crearElemento" class="modal-body">
-          <!-- Información básica -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div class="form-group">
-              <label class="form-label">Nombre</label>
-              <input
-                v-model="nuevoElemento.nombre"
-                type="text"
-                class="form-input"
-                placeholder="Ej: Mesa de trabajo personalizada"
-                required
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Categoría</label>
-              <select v-model="nuevoElemento.categoria" class="form-input" required>
-                <option value="">Seleccionar categoría</option>
-                <option v-for="categoria in CATEGORIAS" :key="categoria.id" :value="categoria.id">
-                  {{ categoria.nombre }}
-                </option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Forma</label>
-              <select v-model="nuevoElemento.forma" class="form-input" required>
-                <option value="">Seleccionar forma</option>
-                <option v-for="forma in FORMAS_DISPONIBLES" :key="forma.id" :value="forma.id">
-                  {{ forma.nombre }}
-                </option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Ubicación</label>
-              <select v-model="nuevoElemento.ubicacion" class="form-input" required>
-                <option value="">Seleccionar ubicación</option>
-                <option
-                  v-for="ubicacion in UBICACIONES_DISPONIBLES"
-                  :key="ubicacion.id"
-                  :value="ubicacion.id"
-                >
-                  {{ ubicacion.nombre }}
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Dimensiones -->
-          <div class="mb-6">
-            <h3 class="text-lg font-medium text-gray-800 mb-3">Dimensiones (cm)</h3>
-            <div class="grid grid-cols-3 gap-4">
-              <div class="form-group">
-                <label class="form-label">Ancho</label>
-                <input
-                  v-model.number="nuevoElemento.dimensiones.ancho"
-                  type="number"
-                  min="1"
-                  class="form-input"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Largo</label>
-                <input
-                  v-model.number="nuevoElemento.dimensiones.largo"
-                  type="number"
-                  min="1"
-                  class="form-input"
-                  required
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Alto</label>
-                <input
-                  v-model.number="nuevoElemento.dimensiones.alto"
-                  type="number"
-                  min="1"
-                  class="form-input"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Especificaciones -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div class="form-group">
-              <label class="form-label">Peso Máximo (kg)</label>
-              <input
-                v-model.number="nuevoElemento.pesoMaximo"
-                type="number"
-                min="0"
-                class="form-input"
-                required
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Color Base</label>
-              <div class="flex gap-2">
-                <input
-                  v-model="nuevoElemento.colorBase"
-                  type="color"
-                  class="w-12 h-10 border border-gray-300 rounded cursor-pointer"
-                />
-                <input
-                  v-model="nuevoElemento.colorBase"
-                  type="text"
-                  class="form-input flex-1"
-                  placeholder="#3b82f6"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Descripción -->
-          <div class="form-group mb-6">
-            <label class="form-label">Descripción</label>
-            <textarea
-              v-model="nuevoElemento.descripcion"
-              class="form-textarea"
-              rows="3"
-              placeholder="Descripción del elemento..."
-            ></textarea>
-          </div>
-
-          <!-- Preview del nuevo elemento -->
-          <div class="preview-container mb-6">
-            <h3 class="text-lg font-medium text-gray-800 mb-3">Vista Previa</h3>
-            <div class="preview-card">
-              <div
-                class="preview-shape"
-                :class="[
-                  `shape-${nuevoElemento.forma}`,
-                  nuevoElemento.ubicacion === 'pared' ? 'wall-mounted' : '',
-                ]"
-                :style="{ backgroundColor: nuevoElemento.colorBase || '#6b7280' }"
-              >
-                <component :is="getIconComponent('box')" class="w-4 h-4 text-white" />
-              </div>
-              <div class="ml-3">
-                <p class="font-medium">{{ nuevoElemento.nombre || 'Nuevo Elemento' }}</p>
-                <p class="text-sm text-gray-500">
-                  {{ nuevoElemento.dimensiones.ancho || 0 }}×{{
-                    nuevoElemento.dimensiones.largo || 0
-                  }}×{{ nuevoElemento.dimensiones.alto || 0 }} cm
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Botones del formulario -->
-          <div class="flex justify-end gap-3">
-            <button
-              type="button"
-              @click="cerrarModal"
-              class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Crear Elemento
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <ElementEditor
+      :visible="mostrarModalCrear"
+      :categorias="CATEGORIAS"
+      :formas="FORMAS_DISPONIBLES"
+      :ubicaciones="UBICACIONES_DISPONIBLES"
+      :value="nuevoElemento"
+      @cancel="cerrarModal"
+      @save="onGuardarElemento"
+    />
   </div>
 </template>
 
@@ -404,12 +224,12 @@ import {
   UBICACIONES_DISPONIBLES,
 } from '@/utils/constants'
 
+import ElementEditor from './modals/ElementEditor.vue'
 // Estado local
 const filtroTexto = ref('')
 const categoriaSeleccionada = ref(null)
 const mostrarModalCrear = ref(false)
 const elementosPersonalizados = ref([])
-
 // Formulario para nuevo elemento
 const nuevoElemento = ref({
   nombre: '',
@@ -426,6 +246,19 @@ const nuevoElemento = ref({
   descripcion: '',
   icono: 'box',
 })
+
+const onGuardarElemento = (elemento) => {
+  const elementoNuevo = {
+    ...elemento,
+    id: `custom_${Date.now()}`,
+    icono: 'box',
+    personalizado: true,
+  }
+  elementosPersonalizados.value.push(elementoNuevo)
+  cerrarModal()
+  categoriaSeleccionada.value = elementoNuevo.categoria
+  filtroTexto.value = ''
+}
 
 // Todos los elementos (predefinidos + personalizados)
 const todosLosElementos = computed(() => {
@@ -512,95 +345,9 @@ const finalizarArrastre = (event) => {
   event.target.classList.remove('dragging')
 }
 
-// Crear nuevo elemento
-const crearElemento = () => {
-  if (!validarFormulario()) {
-    return
-  }
-
-  const elementoNuevo = {
-    id: `custom_${Date.now()}`,
-    nombre: nuevoElemento.value.nombre,
-    categoria: nuevoElemento.value.categoria,
-    forma: nuevoElemento.value.forma,
-    colorBase: nuevoElemento.value.colorBase,
-    dimensiones: { ...nuevoElemento.value.dimensiones },
-    pesoMaximo: nuevoElemento.value.pesoMaximo,
-    ubicacion: nuevoElemento.value.ubicacion,
-    descripcion: nuevoElemento.value.descripcion,
-    icono: 'box',
-    personalizado: true,
-  }
-
-  elementosPersonalizados.value.push(elementoNuevo)
-  cerrarModal()
-
-  // Mostrar el nuevo elemento (limpiar filtros)
-  categoriaSeleccionada.value = elementoNuevo.categoria
-  filtroTexto.value = ''
-}
-
-const validarFormulario = () => {
-  const elemento = nuevoElemento.value
-
-  if (!elemento.nombre.trim()) {
-    alert('El nombre es requerido')
-    return false
-  }
-
-  if (!elemento.categoria) {
-    alert('La categoría es requerida')
-    return false
-  }
-
-  if (!elemento.forma) {
-    alert('La forma es requerida')
-    return false
-  }
-
-  if (!elemento.ubicacion) {
-    alert('La ubicación es requerida')
-    return false
-  }
-
-  if (
-    elemento.dimensiones.ancho <= 0 ||
-    elemento.dimensiones.largo <= 0 ||
-    elemento.dimensiones.alto <= 0
-  ) {
-    alert('Las dimensiones deben ser mayores a 0')
-    return false
-  }
-
-  if (elemento.pesoMaximo <= 0) {
-    alert('El peso máximo debe ser mayor a 0')
-    return false
-  }
-
-  return true
-}
-
 const cerrarModal = () => {
   mostrarModalCrear.value = false
-  resetearFormulario()
-}
-
-const resetearFormulario = () => {
-  nuevoElemento.value = {
-    nombre: '',
-    categoria: '',
-    forma: '',
-    colorBase: '#3b82f6',
-    dimensiones: {
-      ancho: 100,
-      largo: 100,
-      alto: 75,
-    },
-    pesoMaximo: 50,
-    ubicacion: 'suelo',
-    descripcion: '',
-    icono: 'box',
-  }
+  // El formulario se resetea automáticamente al abrir el modal
 }
 
 // Cargar elementos personalizados del localStorage

@@ -36,32 +36,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       },
       pesoMaximoSoportado: 5000, // kg
     },
-    {
-      id: 'planta_2',
-      nombre: 'Primer Piso',
-      descripcion: 'Segundo nivel del edificio',
-      elementos: [], // Los elementos se calculan dinámicamente
-      activa: false,
-      dimensiones: {
-        alto: 280,
-        ancho: 1000,
-        largo: 1200,
-      },
-      pesoMaximoSoportado: 4500,
-    },
-    {
-      id: 'planta_3',
-      nombre: 'Segundo Piso',
-      descripcion: 'Tercer nivel del edificio',
-      elementos: [], // Los elementos se calculan dinámicamente
-      activa: false,
-      dimensiones: {
-        alto: 280,
-        ancho: 800,
-        largo: 1000,
-      },
-      pesoMaximoSoportado: 4000,
-    },
   ])
 
   const plantaActiva = ref('planta_1')
@@ -624,6 +598,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const eliminarPlantaConHistorial = (plantaId) => {
     const planta = plantas.value.find((p) => p.id === plantaId)
 
+    // eslint-disable-next-line no-useless-catch
     try {
       eliminarPlanta(plantaId)
       saveToHistory(`Planta eliminada: ${planta?.nombre || plantaId}`)

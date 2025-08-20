@@ -4,6 +4,24 @@
  * Constantes y elementos predefinidos para el catálogo del editor.
  */
 
+// Elemento base para representar espacios dentro de los demás elementos
+export const CONTENEDOR_BASE = {
+  id: 'contenedor',
+  nombre: 'Contenedor Base',
+  categoria: 'contenedores',
+  forma: 'rectangular',
+  colorBase: '#3b82f6',
+  dimensiones: {
+    ancho: 10,
+    largo: 10,
+    alto: 10,
+  },
+  pesoMaximo: 10,
+  ubicacion: 'interior',
+  descripcion: 'Contenedor para almacenamiento',
+  icono: 'box',
+}
+
 export const ELEMENTOS_PREDEFINIDOS = [
   // Anaqueles
   {
