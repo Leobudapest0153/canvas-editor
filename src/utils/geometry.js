@@ -248,3 +248,57 @@ export const boundedRectDrag = (candidateX, candidateY, w, h, boundary, snapEps 
   }
   return { x: candidateX, y: candidateY, atEdge: false, snapped: false, inside: true }
 }
+
+// Detecta si dos AABB están en contacto exacto en X o Y (bordes coinciden) con solape en el eje ortogonal
+export const aabbTouchingAxes = (ax, ay, aw, ah, bx, by, bw, bh, eps = EPSILON) => {
+  const aRight = ax + aw
+  const aBottom = ay + ah
+  const bRight = bx + bw
+  const bBottom = by + bh
+
+  // Solape en Y para contacto por X
+  const overlapY = !(aBottom <= by + eps || bBottom <= ay + eps)
+  // Solape en X para contacto por Y
+  const overlapX = !(aRight <= bx + eps || bRight <= ax + eps)
+
+  const touchX = overlapY && (approxEqual(aRight, bx, eps) || approxEqual(bRight, ax, eps))
+  const touchY = overlapX && (approxEqual(aBottom, by, eps) || approxEqual(bBottom, ay, eps))
+  return { touchX, touchY }
+}
+
+// Snap-to-grid que preserva ejes en contacto con vecinos para no abrir margen
+export const safeSnapRect = (x, y, w, h, boundaryRect, neighbors = [], gridSize = 50, eps = EPSILON, axes = { snapX: true, snapY: true }, gridEps = 6) => {
+  const { W, H } = boundaryRect
+  // Detectar si hay contacto en X/Y con algún vecino
+  let preserveX = false
+  let preserveY = false
+  for (const n of neighbors) {
+    const { touchX, touchY } = aabbTouchingAxes(x, y, w, h, n.x, n.y, n.width, n.height, eps)
+    preserveX = preserveX || touchX
+    preserveY = preserveY || touchY
+    if (preserveX && preserveY) break
+  }
+
+  const snapped = snapToGrid(x, y, gridSize)
+  const nearX = Math.abs(snapped.x - x) <= gridEps
+  const nearY = Math.abs(snapped.y - y) <= gridEps
+
+  let nx = preserveX ? x : (axes?.snapX && nearX ? snapped.x : x)
+  let ny = preserveY ? y : (axes?.snapY && nearY ? snapped.y : y)
+
+  // Clamp final y validar que no se alteró el eje preservado
+  const c = clampRectToRect(nx, ny, w, h, W, H)
+  // Si clamp modificó un eje preservado, mantener original
+  if (preserveX && !approxEqual(c.x, x, eps)) {
+    nx = x
+  } else {
+    nx = c.x
+  }
+  if (preserveY && !approxEqual(c.y, y, eps)) {
+    ny = y
+  } else {
+    ny = c.y
+  }
+
+  return { x: nx, y: ny }
+}
