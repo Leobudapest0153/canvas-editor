@@ -19,13 +19,13 @@
       </div>
       <div class="flex flex-col md:flex-row gap-6 p-6">
         <!-- Columna izquierda: Canvas Vue-Konva -->
-        <div class="w-full md:w-1/2 flex flex-col items-center justify-start relative">
+        <div class="w-full md:w-2/3 flex flex-col items-center justify-start relative">
           <h3 class="text-lg font-medium text-gray-800 mb-3">Vista de frente</h3>
           <!-- vue-konva -->
         </div>
         <!-- Columna derecha: Formulario y preview -->
-        <form @submit.prevent="handleSubmit" class="w-full md:w-1/2">
-          <div class="max-h-[70vh] overflow-y-auto">
+        <form @submit.prevent="handleSubmit" class="w-full md:w-1/3">
+          <div class="max-h-[70vh] overflow-y-auto pr-2">
             <!-- Información básica -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div class="mb-2">
@@ -45,7 +45,7 @@
                   class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                   required
                 >
-                  <option value="">Seleccionar categoría</option>
+                  <option value="">Seleccionar</option>
                   <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
                     {{ categoria.nombre }}
                   </option>
@@ -58,7 +58,7 @@
                   class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                   required
                 >
-                  <option value="">Seleccionar forma</option>
+                  <option value="">Seleccionar</option>
                   <option v-for="forma in formas" :key="forma.id" :value="forma.id">
                     {{ forma.nombre }}
                   </option>
@@ -71,7 +71,7 @@
                   class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                   required
                 >
-                  <option value="">Seleccionar ubicación</option>
+                  <option value="">Seleccionar</option>
                   <option
                     v-for="ubicacion in ubicaciones"
                     :key="ubicacion.id"
@@ -293,14 +293,7 @@ const handleSubmit = () => {
 .shape-circular {
   border-radius: 9999px;
 }
-.shape-triangular {
-  border-radius: 0.125rem;
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-}
-.shape-cuadrado {
-  border-radius: 0.125rem;
-  aspect-ratio: 1/1;
-}
+
 .wall-mounted::after {
   content: '';
   position: absolute;

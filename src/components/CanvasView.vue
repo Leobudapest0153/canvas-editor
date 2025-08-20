@@ -72,9 +72,7 @@
         <template v-for="elemento in elementosVisiblesEnCanvas" :key="elemento.id">
           <!-- Elementos rectangulares (anaqueles, mesas, armarios, contenedores) -->
           <v-rect
-            v-if="
-              elemento.forma === 'rectangular' || elemento.forma === 'cuadrado' || !elemento.forma
-            "
+            v-if="elemento.forma === 'rectangular' || !elemento.forma"
             :config="{
               id: elemento.id,
               x: elemento.x,
@@ -122,54 +120,6 @@
             @dragmove="(e) => updateElementPosition(e, elemento.id, 'circular')"
             @dragend="() => endElementDrag(elemento.id)"
           />
-
-          <!-- Elementos triangulares -->
-          <template v-else-if="elemento.forma === 'triangular'">
-            <v-rect
-              :config="{
-                id: elemento.id + '_interaction',
-                x: elemento.x,
-                y: elemento.y,
-                width: elemento.width,
-                height: elemento.height,
-                fill: 'transparent',
-                stroke: 'transparent',
-                opacity: 0,
-                draggable: true,
-                dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
-              }"
-              @click="() => selectElement(elemento.id)"
-              @dblclick="() => handleElementDoubleClick(elemento)"
-              @dragstart="() => startElementDrag(elemento.id)"
-              @dragmove="(e) => updateElementPosition(e, elemento.id, 'triangular')"
-              @dragend="() => endElementDrag(elemento.id)"
-            />
-            <v-line
-              :config="{
-                id: elemento.id + '_visual',
-                points: [
-                  elemento.x + elemento.width / 2,
-                  elemento.y,
-                  elemento.x,
-                  elemento.y + elemento.height,
-                  elemento.x + elemento.width,
-                  elemento.y + elemento.height,
-                  elemento.x + elemento.width / 2,
-                  elemento.y,
-                ],
-                fill: elemento.color,
-                stroke: getStrokeColor(elemento.id),
-                strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
-                opacity: 0.8,
-                draggable: false,
-                shadowColor: 'black',
-                shadowBlur: 4,
-                shadowOpacity: 0.3,
-                closed: true,
-                listening: false,
-              }"
-            />
-          </template>
 
           <!-- Texto con el nombre del elemento -->
           <v-text
@@ -270,7 +220,12 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useCanvasWithHistory } from '@/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/composables/useCanvasBuffer'
 import { useConflicts } from '@/composables/useConflicts'
-import { detectConflictsFor, throttle, computeMTD, projectMTDAgainstBoundary } from '@/utils/collision'
+import {
+  detectConflictsFor,
+  throttle,
+  computeMTD,
+  projectMTDAgainstBoundary,
+} from '@/utils/collision'
 import {
   rectInsidePolygon,
   circleInsidePolygon,
@@ -376,7 +331,9 @@ const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
   const movingEnd = { ...elemento, x, y }
   const endConf = detectConflictsFor(movingEnd, all).filter((c) => c.bloqueante)
   const outsideRect =
-    boundary.type === 'rect' ? x < -1e-6 || y < -1e-6 || x + w > W + 1e-6 || y + h > H + 1e-6 : false
+    boundary.type === 'rect'
+      ? x < -1e-6 || y < -1e-6 || x + w > W + 1e-6 || y + h > H + 1e-6
+      : false
   if (endConf.length > 0 || outsideRect) {
     const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
     return { x: prev.x, y: prev.y, fellBack: true }
@@ -577,7 +534,8 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
       const toTop = Math.abs(finalCenter.y - r)
       const toRight = Math.abs(boundary.W - (finalCenter.x + r))
       const toBottom = Math.abs(boundary.H - (finalCenter.y + r))
-      const atEdge = toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
+      const atEdge =
+        toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
       atEdgeMap.value.set(elemento.id, atEdge)
 
       lastValidPositions.value.set(elemento.id, { x: finalCenter.x - r, y: finalCenter.y - r })
@@ -597,7 +555,7 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     }
   }
 
-  // Rectangular / triangular usan bbox axis-aligned
+  // Rectangular usan bbox axis-aligned
   const w = elemento.width
   const h = elemento.height
 
@@ -608,25 +566,16 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
 
     // (2-4) resolver bloqueantes no-expansivo con prioridad de contorno
     let adjusted = { x: clamped.x, y: clamped.y }
-    if (forma !== 'triangular') {
-      const res = resolveAgainstBlockingObstacles(clamped.x, clamped.y, elemento)
-      adjusted = { x: res.x, y: res.y }
-    } else {
-      // Triángulo: fallback a última válida si hay bloqueantes
-      const moving = { ...elemento, x: clamped.x, y: clamped.y }
-      const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles)
-      if (conflicts.some((c) => c.bloqueante)) {
-        const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
-        adjusted = prev
-      }
-    }
+    const res = resolveAgainstBlockingObstacles(clamped.x, clamped.y, elemento)
+    adjusted = { x: res.x, y: res.y }
 
     // Edge feedback basado en posición final
     const toLeft = Math.abs(adjusted.x)
     const toTop = Math.abs(adjusted.y)
     const toRight = Math.abs(boundary.W - (adjusted.x + w))
     const toBottom = Math.abs(boundary.H - (adjusted.y + h))
-    const atEdge = toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
+    const atEdge =
+      toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
 
     atEdgeMap.value.set(elemento.id, atEdge)
     lastValidPositions.value.set(elemento.id, { x: adjusted.x, y: adjusted.y })
@@ -738,7 +687,7 @@ const endElementDrag = (elementId) => {
   if (boundary.type === 'rect') {
     const neighbors = canvasStore.elementosVisibles.filter((el) => el.id !== elementId)
     // Aplicar snap seguro para rectángulos; círculos mantienen posición final para no romper radios
-    if (elemento.forma === 'rectangular' || elemento.forma === 'cuadrado' || !elemento.forma) {
+    if (elemento.forma === 'rectangular' || !elemento.forma) {
       const snapped = safeSnapRect(
         final.x,
         final.y,
@@ -753,7 +702,9 @@ const endElementDrag = (elementId) => {
       )
       // Validar que el snap no introduzca bloqueos; si lo hace, mantener final
       const test = { ...elemento, x: snapped.x, y: snapped.y }
-      const conflicts = detectConflictsFor(test, canvasStore.elementosVisibles).filter((c) => c.bloqueante)
+      const conflicts = detectConflictsFor(test, canvasStore.elementosVisibles).filter(
+        (c) => c.bloqueante,
+      )
       if (conflicts.length === 0) {
         final = { x: snapped.x, y: snapped.y }
       }
@@ -787,12 +738,7 @@ const endElementDrag = (elementId) => {
   canvasStore.actualizarPosicion(elementId, final.x, final.y)
 
   // Persistir en historial (único punto)
-  actions.actualizarPosicion(
-    elementId,
-    final.x,
-    final.y,
-    true,
-  )
+  actions.actualizarPosicion(elementId, final.x, final.y, true)
 
   // No mostrar toasts ni abrir modales
 

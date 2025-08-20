@@ -304,10 +304,6 @@ const getShapeClass = (forma) => {
       return 'rounded-sm'
     case 'circular':
       return 'rounded-full'
-    case 'triangular':
-      return 'rounded-sm [clip-path:polygon(50%_0%,_0%_100%,_100%_100%)]'
-    case 'cuadrado':
-      return 'rounded-sm h-12'
     default:
       return 'rounded-sm'
   }
