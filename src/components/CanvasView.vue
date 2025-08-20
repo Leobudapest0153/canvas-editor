@@ -234,8 +234,9 @@ import {
   clampRectToRect,
   snapToGrid,
   safeSnapRect,
+  nudgePlace,
 } from '@/utils/geometry'
-import { SNAP_EPS } from '@/utils/constants'
+import { SNAP_EPS, GRID_SIZE } from '@/utils/constants'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -809,14 +810,34 @@ const handleDrop = (e) => {
   }
 }
 
-const createElementFromDrop = (data, dropEvent) => {
+// Función auxiliar para mostrar toast de error
+const showToast = (message, type = 'error') => {
+  if (typeof window !== 'undefined' && window.__toasts) {
+    window.__toasts.show(message, { type, timeout: 4000 })
+  } else {
+    console.warn('Toast:', message)
+  }
+}
+
+// Función auxiliar para convertir coordenadas del puntero a coordenadas de mundo
+const getWorldCoordinatesFromPointer = (dropEvent) => {
   const stage = stageRef.value.getNode()
-
-  // Obtener posición del mouse en el canvas
   const rect = containerRef.value.getBoundingClientRect()
-  const rawX = (dropEvent.clientX - rect.left - stage.x()) / stage.scaleX()
-  const rawY = (dropEvent.clientY - rect.top - stage.y()) / stage.scaleY()
 
+  // Obtener posición del puntero considerando zoom y pan
+  const pointerPos = {
+    x: dropEvent.clientX - rect.left,
+    y: dropEvent.clientY - rect.top
+  }
+
+  // Convertir a coordenadas de mundo (layer) considerando transformación del stage
+  const worldX = (pointerPos.x - stage.x()) / stage.scaleX()
+  const worldY = (pointerPos.y - stage.y()) / stage.scaleY()
+
+  return { x: worldX, y: worldY }
+}
+
+const createElementFromDrop = (data, dropEvent) => {
   const elemento = data.elemento
 
   // Obtener dimensiones base
@@ -824,39 +845,97 @@ const createElementFromDrop = (data, dropEvent) => {
   let height = elemento.height || elemento.dimensiones?.alto || 60
 
   // Aplicar dimensiones mínimas para mejorar la interacción
-  // Especialmente importante para elementos como el esquinero
-  const MIN_WIDTH = 40 // Mínimo 40px de ancho para interacción
-  const MIN_HEIGHT = 30 // Mínimo 30px de alto para interacción
-
+  const MIN_WIDTH = 40
+  const MIN_HEIGHT = 30
   width = Math.max(width, MIN_WIDTH)
   height = Math.max(height, MIN_HEIGHT)
 
-  const color = elemento.color || elemento.colorBase || '#3B82F6'
+  // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
+  const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
 
-  // Calcular tope dentro del área y contra obstáculos bloqueantes
+  // 2. Calcular posición candidata centrada en el puntero
+  let candX = worldCoords.x - width / 2
+  let candY = worldCoords.y - height / 2
+
+  // 3. Aplicar snap a grilla ANTES de validar
+  const snapped = snapToGrid(candX, candY, GRID_SIZE)
+  candX = snapped.x
+  candY = snapped.y
+
+  // 4. Calcular bbox candidato y verificar área
   const boundary = computeBoundary()
-  // Raw top-left candidato
-  let candX = rawX - width / 2
-  let candY = rawY - height / 2
+
+  // 5. Verificar que esté dentro del área (clampToArea)
+  let isInsideArea = true
   if (boundary.type === 'rect') {
-    const bounded = boundedRectDrag(candX, candY, width, height, boundary, SNAP_EPS)
-    // Resolver contra obstáculos si corresponde
-    const tempEl = {
-      id: '__temp__',
-      x: bounded.x,
-      y: bounded.y,
+    isInsideArea = candX >= 0 && candY >= 0 &&
+                   candX + width <= boundary.W &&
+                   candY + height <= boundary.H
+
+    // Si está fuera, intentar clamp
+    if (!isInsideArea) {
+      const clamped = clampRectToRect(candX, candY, width, height, boundary.W, boundary.H)
+      candX = clamped.x
+      candY = clamped.y
+    }
+  } else if (boundary.type === 'polygon') {
+    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.polygon)
+  }
+
+  // 6. Crear elemento temporal para detectar conflictos
+  const tempElement = {
+    id: '__temp_drop__',
+    x: candX,
+    y: candY,
+    width,
+    height,
+    ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
+    tipo: elemento.tipo || elemento.categoria || 'elemento',
+    forma: elemento.forma || 'rectangular'
+  }
+
+  // 7. Ejecutar detectConflictsFor contra elementos existentes
+  const allElements = canvasStore.elementosVisibles
+  const conflicts = detectConflictsFor(tempElement, allElements)
+  const blockingConflicts = conflicts.filter(c => c.bloqueante)
+
+  // 8. Si hay conflicto BLOQUEANTE o queda fuera de área, intentar nudgePlace
+  let finalPosition = { x: candX, y: candY }
+  let placementSuccessful = blockingConflicts.length === 0 && isInsideArea
+
+  if (!placementSuccessful) {
+    console.log('🔍 Posición inicial tiene conflictos o está fuera de área, intentando nudgePlace...')
+
+    const nudgeResult = nudgePlace(
+      candX,
+      candY,
       width,
       height,
-      ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
+      boundary,
+      allElements,
+      tempElement,
+      GRID_SIZE,
+      16, // máximo 16 intentos
+      detectConflictsFor // Pasar la función como parámetro
+    )
+
+    if (nudgeResult.found) {
+      finalPosition = { x: nudgeResult.x, y: nudgeResult.y }
+      placementSuccessful = true
+      console.log('✅ nudgePlace encontró posición válida:', finalPosition)
+    } else {
+      console.log('❌ nudgePlace no encontró posición válida')
     }
-    const resolved = resolveAgainstBlockingObstacles(bounded.x, bounded.y, tempEl)
-    candX = resolved.x
-    candY = resolved.y
-  } else if (boundary.type === 'polygon') {
-    // Si cae fuera, ponerlo en 0,0 como fallback
-    candX = Math.max(0, candX)
-    candY = Math.max(0, candY)
   }
+
+  // 9. Si aún no hay posición válida, rechazar y mostrar toast
+  if (!placementSuccessful) {
+    showToast('No hay espacio aquí para colocar el elemento', 'error')
+    return // NO crear la instancia, NO comprometer historial
+  }
+
+  // 10. Crear el elemento solo si la validación fue exitosa
+  const color = elemento.color || elemento.colorBase || '#3B82F6'
 
   const nuevoElemento = {
     id: `${elemento.tipo || elemento.categoria}_${Date.now()}`,
@@ -865,8 +944,8 @@ const createElementFromDrop = (data, dropEvent) => {
 
     // Estructura correcta para posición
     posicion: {
-      x: candX,
-      y: candY,
+      x: finalPosition.x,
+      y: finalPosition.y,
       z: 0,
       rotation: 0,
     },
@@ -879,8 +958,8 @@ const createElementFromDrop = (data, dropEvent) => {
     },
 
     // Propiedades legacy para compatibilidad con Konva
-    x: candX,
-    y: candY,
+    x: finalPosition.x,
+    y: finalPosition.y,
     width: width,
     height: height,
 
@@ -891,7 +970,6 @@ const createElementFromDrop = (data, dropEvent) => {
     pesoMaximo: elemento.pesoMaximo || 0,
     descripcion: elemento.descripcion || '',
 
-    // No asignar plantaId ni padre aquí - el store se encarga según el contexto
     hijos: [],
     metadata: {
       pesoMaximo: elemento.pesoMaximo || 'N/A',
@@ -903,7 +981,7 @@ const createElementFromDrop = (data, dropEvent) => {
     },
   }
 
-  console.log('Creando elemento desde drop:', nuevoElemento)
+  console.log('✅ Creando elemento desde drop en posición válida:', nuevoElemento)
   canvasStore.agregarElemento(nuevoElemento)
 
   // Seleccionar el elemento recién creado
@@ -911,18 +989,103 @@ const createElementFromDrop = (data, dropEvent) => {
 }
 
 const createElementFromBuffer = (data, dropEvent) => {
-  const stage = stageRef.value.getNode()
+  // Obtener el elemento del buffer para validar sus dimensiones
+  const bufferItem = buffer.getBufferItem(data.bufferItemId)
+  if (!bufferItem) {
+    showToast('Elemento no encontrado en el buffer', 'error')
+    return
+  }
 
-  // Obtener posición del mouse en el canvas
-  const rect = containerRef.value.getBoundingClientRect()
-  const x = (dropEvent.clientX - rect.left - stage.x()) / stage.scaleX()
-  const y = (dropEvent.clientY - rect.top - stage.y()) / stage.scaleY()
+  const elemento = bufferItem.elemento
+  const width = elemento.width || elemento.dimensiones?.ancho || 100
+  const height = elemento.height || elemento.dimensiones?.alto || 60
 
-  // Pegar elemento desde buffer
-  const newElementId = buffer.pasteFromBuffer(data.bufferItemId, { x, y })
+  // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
+  const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
+
+  // 2. Calcular posición candidata
+  let candX = worldCoords.x - width / 2
+  let candY = worldCoords.y - height / 2
+
+  // 3. Aplicar snap a grilla ANTES de validar
+  const snapped = snapToGrid(candX, candY, GRID_SIZE)
+  candX = snapped.x
+  candY = snapped.y
+
+  // 4. Verificar área y conflictos
+  const boundary = computeBoundary()
+
+  let isInsideArea = true
+  if (boundary.type === 'rect') {
+    isInsideArea = candX >= 0 && candY >= 0 &&
+                   candX + width <= boundary.W &&
+                   candY + height <= boundary.H
+
+    if (!isInsideArea) {
+      const clamped = clampRectToRect(candX, candY, width, height, boundary.W, boundary.H)
+      candX = clamped.x
+      candY = clamped.y
+    }
+  } else if (boundary.type === 'polygon') {
+    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.polygon)
+  }
+
+  // 5. Crear elemento temporal y detectar conflictos
+  const tempElement = {
+    id: '__temp_buffer__',
+    x: candX,
+    y: candY,
+    width,
+    height,
+    ubicacion: elemento.ubicacion || 'suelo',
+    tipo: elemento.tipo || 'elemento',
+    forma: elemento.forma || 'rectangular'
+  }
+
+  const allElements = canvasStore.elementosVisibles
+  const conflicts = detectConflictsFor(tempElement, allElements)
+  const blockingConflicts = conflicts.filter(c => c.bloqueante)
+
+  // 6. Si hay conflictos o está fuera de área, intentar nudgePlace
+  let finalPosition = { x: candX, y: candY }
+  let placementSuccessful = blockingConflicts.length === 0 && isInsideArea
+
+  if (!placementSuccessful) {
+    console.log('🔍 Elemento del buffer tiene conflictos, intentando nudgePlace...')
+
+    const nudgeResult = nudgePlace(
+      candX,
+      candY,
+      width,
+      height,
+      boundary,
+      allElements,
+      tempElement,
+      GRID_SIZE,
+      16,
+      detectConflictsFor // Pasar la función como parámetro
+    )
+
+    if (nudgeResult.found) {
+      finalPosition = { x: nudgeResult.x, y: nudgeResult.y }
+      placementSuccessful = true
+      console.log('✅ nudgePlace encontró posición válida para elemento del buffer:', finalPosition)
+    } else {
+      console.log('❌ nudgePlace no encontró posición válida para elemento del buffer')
+    }
+  }
+
+  // 7. Si no hay posición válida, rechazar
+  if (!placementSuccessful) {
+    showToast('No hay espacio aquí para pegar el elemento', 'error')
+    return // NO pegar, NO comprometer historial
+  }
+
+  // 8. Pegar elemento desde buffer en posición válida
+  const newElementId = buffer.pasteFromBuffer(data.bufferItemId, finalPosition)
 
   if (newElementId) {
-    console.log('🔄 Elemento pegado desde buffer al canvas:', newElementId)
+    console.log('✅ Elemento pegado desde buffer al canvas en posición válida:', newElementId, finalPosition)
     // Seleccionar el elemento recién pegado
     canvasStore.seleccionarElemento(newElementId)
   }
