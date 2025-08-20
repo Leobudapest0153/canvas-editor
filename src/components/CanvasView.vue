@@ -72,9 +72,7 @@
         <template v-for="elemento in elementosVisiblesEnCanvas" :key="elemento.id">
           <!-- Elementos rectangulares (anaqueles, mesas, armarios, contenedores) -->
           <v-rect
-            v-if="
-              elemento.forma === 'rectangular' || elemento.forma === 'cuadrado' || !elemento.forma
-            "
+            v-if="elemento.forma === 'rectangular' || elemento.forma === 'cuadrado' || !elemento.forma"
             :config="{
               id: elemento.id,
               x: elemento.x,
@@ -84,8 +82,8 @@
               fill: elemento.color,
               stroke: getStrokeColor(elemento.id),
               strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
-              opacity: 0.8,
-              draggable: true,
+              opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
+              draggable: !isElementLocked(elemento.id),
               shadowColor: 'black',
               shadowBlur: 4,
               shadowOpacity: 0.3,
@@ -93,10 +91,45 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => startElementDrag(elemento.id)"
-            @dragmove="(e) => updateElementPosition(e, elemento.id)"
-            @dragend="() => endElementDrag(elemento.id)"
+            @dragstart="() => !isElementLocked(elemento.id) && startElementDrag(elemento.id)"
+            @dragmove="(e) => !isElementLocked(elemento.id) && updateElementPosition(e, elemento.id)"
+            @dragend="() => !isElementLocked(elemento.id) && endElementDrag(elemento.id)"
           />
+          <!-- Icono de candado para elemento bloqueado -->
+          <v-group
+            v-if="isElementLocked(elemento.id)"
+            :config="{
+              x: elemento.x,
+              y: elemento.y,
+              width: elemento.width,
+              height: elemento.height,
+              listening: false,
+            }"
+          >
+            <v-rect
+              :config="{
+                x: 0,
+                y: 0,
+                width: elemento.width,
+                height: elemento.height,
+                fill: '#000',
+                opacity: 0.12,
+                cornerRadius: 8,
+                listening: false,
+              }"
+            />
+            <v-text
+              :config="{
+                x: elemento.width / 2 - 16,
+                y: elemento.height / 2 - 16,
+                text: '🔒',
+                fontSize: 32,
+                fontFamily: 'Arial',
+                fill: '#f59e0b',
+                listening: false,
+              }"
+            />
+          </v-group>
 
           <!-- Elementos circulares -->
           <v-circle
@@ -109,8 +142,8 @@
               fill: elemento.color,
               stroke: getStrokeColor(elemento.id),
               strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
-              opacity: 0.8,
-              draggable: true,
+              opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
+              draggable: !isElementLocked(elemento.id),
               shadowColor: 'black',
               shadowBlur: 4,
               shadowOpacity: 0.3,
@@ -118,10 +151,43 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => startElementDrag(elemento.id)"
-            @dragmove="(e) => updateElementPosition(e, elemento.id, 'circular')"
-            @dragend="() => endElementDrag(elemento.id)"
+            @dragstart="() => !isElementLocked(elemento.id) && startElementDrag(elemento.id)"
+            @dragmove="(e) => !isElementLocked(elemento.id) && updateElementPosition(e, elemento.id, 'circular')"
+            @dragend="() => !isElementLocked(elemento.id) && endElementDrag(elemento.id)"
           />
+          <!-- Icono de candado para elemento circular bloqueado -->
+          <v-group
+            v-if="isElementLocked(elemento.id) && elemento.forma === 'circular'"
+            :config="{
+              x: elemento.x,
+              y: elemento.y,
+              width: elemento.width,
+              height: elemento.height,
+              listening: false,
+            }"
+          >
+            <v-circle
+              :config="{
+                x: elemento.width / 2,
+                y: elemento.height / 2,
+                radius: Math.min(elemento.width, elemento.height) / 2,
+                fill: '#000',
+                opacity: 0.12,
+                listening: false,
+              }"
+            />
+            <v-text
+              :config="{
+                x: elemento.width / 2 - 16,
+                y: elemento.height / 2 - 16,
+                text: '🔒',
+                fontSize: 32,
+                fontFamily: 'Arial',
+                fill: '#f59e0b',
+                listening: false,
+              }"
+            />
+          </v-group>
 
           <!-- Elementos triangulares -->
           <template v-else-if="elemento.forma === 'triangular'">
@@ -135,15 +201,50 @@
                 fill: 'transparent',
                 stroke: 'transparent',
                 opacity: 0,
-                draggable: true,
+                draggable: !isElementLocked(elemento.id),
                 dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
               }"
               @click="() => selectElement(elemento.id)"
               @dblclick="() => handleElementDoubleClick(elemento)"
-              @dragstart="() => startElementDrag(elemento.id)"
-              @dragmove="(e) => updateElementPosition(e, elemento.id, 'triangular')"
-              @dragend="() => endElementDrag(elemento.id)"
+              @dragstart="() => !isElementLocked(elemento.id) && startElementDrag(elemento.id)"
+              @dragmove="(e) => !isElementLocked(elemento.id) && updateElementPosition(e, elemento.id, 'triangular')"
+              @dragend="() => !isElementLocked(elemento.id) && endElementDrag(elemento.id)"
             />
+            <!-- Icono de candado para elemento triangular bloqueado -->
+            <v-group
+              v-if="isElementLocked(elemento.id) && elemento.forma === 'triangular'"
+              :config="{
+                x: elemento.x,
+                y: elemento.y,
+                width: elemento.width,
+                height: elemento.height,
+                listening: false,
+              }"
+            >
+              <v-rect
+                :config="{
+                  x: 0,
+                  y: 0,
+                  width: elemento.width,
+                  height: elemento.height,
+                  fill: '#000',
+                  opacity: 0.12,
+                  cornerRadius: 8,
+                  listening: false,
+                }"
+              />
+              <v-text
+                :config="{
+                  x: elemento.width / 2 - 16,
+                  y: elemento.height / 2 - 16,
+                  text: '🔒',
+                  fontSize: 32,
+                  fontFamily: 'Arial',
+                  fill: '#f59e0b',
+                  listening: false,
+                }"
+              />
+            </v-group>
             <v-line
               :config="{
                 id: elemento.id + '_visual',
@@ -228,7 +329,7 @@
       </span>
     </div>
 
-    <!-- Botones flotantes de Undo/Redo -->
+    <!-- Botones flotantes de Undo/Redo y Bloqueo -->
     <div class="floating-controls" :style="{ right: `${props.safeRight}px` }">
       <button
         @click="undo()"
@@ -259,6 +360,27 @@
             stroke-width="2"
             d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"
           />
+        </svg>
+      </button>
+
+      <!-- Botón de bloqueo/desbloqueo -->
+      <button
+        v-if="canvasStore.elementoSeleccionado"
+        @click="toggleLockElement(canvasStore.elementoSeleccionado)"
+        class="floating-btn btn-lock"
+        :title="isElementLocked(canvasStore.elementoSeleccionado) ? 'Desbloquear' : 'Bloquear'"
+      >
+        <!-- Candado cerrado -->
+        <svg v-if="isElementLocked(canvasStore.elementoSeleccionado)" class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path d="M7 11V7a5 5 0 0110 0v4" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="5" y="11" width="14" height="8" rx="2" fill="#f59e0b" opacity="0.5" stroke="#f59e0b" stroke-width="2"/>
+          <circle cx="12" cy="15" r="2" fill="#fff" />
+        </svg>
+        <!-- Candado abierto -->
+        <svg v-else class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path d="M7 11V7a5 5 0 0110 0v2" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="5" y="11" width="14" height="8" rx="2" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="2"/>
+          <circle cx="12" cy="15" r="2" fill="#fff" />
         </svg>
       </button>
     </div>
@@ -298,6 +420,18 @@ const layerRef = ref(null)
 const { store: canvasStore, actions, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
 const conflictsApi = useConflicts()
+
+// === BLOQUEO DE ELEMENTOS ===
+const isElementLocked = (elementId) => {
+  const el = canvasStore.elementosVisibles.find((e) => e.id === elementId)
+  return el?.bloqueado === true
+}
+
+const toggleLockElement = (elementId) => {
+  const el = canvasStore.elementosVisibles.find((e) => e.id === elementId)
+  if (!el) return
+  canvasStore.actualizarElemento(elementId, { bloqueado: !el.bloqueado })
+}
 
 // Conflictos en vivo durante el arrastre
 const liveConflicts = conflictsApi.conflicts
@@ -393,15 +527,20 @@ const isElementDragging = ref(false)
 const stageDragEnabled = ref(true)
 
 // Configuración del stage - OCUPA TODO EL CONTENEDOR
-const stageConfig = computed(() => ({
-  width: stageSize.value.width, // Tamaño del contenedor, no de canvasAdaptativo
-  height: stageSize.value.height, // Tamaño del contenedor, no de canvasAdaptativo
-  scaleX: canvasStore.zoom,
-  scaleY: canvasStore.zoom,
-  x: canvasStore.panX,
-  y: canvasStore.panY,
-  draggable: stageDragEnabled.value,
-}))
+const stageConfig = computed(() => {
+  // Si hay elemento seleccionado y está bloqueado, nunca permitir arrastre del canvas
+  const seleccionado = canvasStore.elementoSeleccionado
+  const bloqueado = seleccionado && isElementLocked(seleccionado)
+  return {
+    width: stageSize.value.width,
+    height: stageSize.value.height,
+    scaleX: canvasStore.zoom,
+    scaleY: canvasStore.zoom,
+    x: canvasStore.panX,
+    y: canvasStore.panY,
+    draggable: !bloqueado && stageDragEnabled.value,
+  }
+})
 
 // Configuración del layer - TAMAÑO DE LA PLANTA ACTIVA
 const layerConfig = computed(() => {
@@ -484,7 +623,13 @@ const handleWheel = (e) => {
 // === FUNCIONES DE CANVAS/STAGE ===
 const handleStageMouseDown = (e) => {
   // Si el click es en el stage (no en un elemento), habilitar arrastre del canvas
+  // Solo si NO hay elemento seleccionado bloqueado
+  const seleccionado = canvasStore.elementoSeleccionado
   if (e.target === e.target.getStage()) {
+    if (seleccionado && isElementLocked(seleccionado)) {
+      stageDragEnabled.value = false
+      return
+    }
     stageDragEnabled.value = true
   }
 }
@@ -655,6 +800,12 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
 }
 
 const startElementDrag = (elementId) => {
+  if (isElementLocked(elementId)) {
+    // Si está bloqueado, no iniciar drag ni mover el layer
+    isElementDragging.value = false
+    stageDragEnabled.value = false
+    return
+  }
   console.log('Iniciando arrastre del elemento:', elementId)
   isElementDragging.value = true
   stageDragEnabled.value = false // Deshabilitar arrastre del canvas
@@ -1070,7 +1221,9 @@ const resetVolatileState = () => {
     conflictsApi.clear()
     isElementDragging.value = false
     stageDragEnabled.value = true
-  } catch {}
+  } catch(e) {
+    console.error('Error reseteando estado volátil:', e)
+  }
 }
 
 // Exponer API global para que otros componentes (p.ej. PlantasPanel) sin acceso por ref puedan sincronizar
