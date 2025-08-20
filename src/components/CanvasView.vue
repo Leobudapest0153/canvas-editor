@@ -34,8 +34,8 @@
           :config="{
             x: 0,
             y: 0,
-            width: maxWidth,
-            height: maxHeight,
+            width: floorBoundary.width,
+            height: floorBoundary.height,
             fill: '#ffffff',
             stroke: '#3b82f6',
             strokeWidth: 2,
@@ -43,7 +43,7 @@
             listening: false,
           }"
         />
-        <v-line :config="{ points: flatPoints, closed:true, stroke:'#0ea5e9', fill:'rgba(14,165,233,0.08)', strokeWidth:2 }" />
+        <v-line :config="{ points: floorBoundary.points, closed:true, stroke:'#0ea5e9', fill:'rgba(14,165,233,0.08)', strokeWidth:2 }" />
         <!-- Debug: mostrar información de la planta -->
         <v-text
           :config="{
@@ -194,7 +194,7 @@
           v-for="i in gridLines.vertical"
           :key="`v-${i}`"
           :config="{
-            points: [i, 0, i, maxHeight],
+            points: [i, 0, i, floorBoundary.height],
             stroke: '#e5e7eb',
             strokeWidth: 1,
             opacity: 0.5,
@@ -205,7 +205,7 @@
           v-for="i in gridLines.horizontal"
           :key="`h-${i}`"
           :config="{
-            points: [0, i, maxWidth, i],
+            points: [0, i, floorBoundary.width, i],
             stroke: '#e5e7eb',
             strokeWidth: 1,
             opacity: 0.5,
@@ -409,19 +409,24 @@ const stageConfig = computed(() => ({
 }))
 
 
-// Formato de punto
-const flatPoints = computed(() => {
-  maxWidth.value = layerConfig.value.width;
-  maxHeight.value = layerConfig.value.height;
-  if (canvasStore.plantaActivaData.poligono) {
-    canvasStore.plantaActivaData.poligono.forEach((coord) => {
-      maxWidth.value = Math.max(coord.x, maxWidth.value);
-      maxHeight.value = Math.max(coord.y, maxHeight.value);
+const floorBoundary = computed(() => {
+  // Empezamos con las dimensiones base del layer
+  let width = layerConfig.value.width;
+  let height = layerConfig.value.height;
+  let points = [];
+
+  const poligono = canvasStore.plantaActivaData?.poligono;
+
+  // Si hay un polígono, lo usamos para expandir los límites y obtener los puntos
+  if (poligono && Array.isArray(poligono) && poligono.length > 0) {
+    poligono.forEach(coord => {
+      width = Math.max(coord.x, width);
+      height = Math.max(coord.y, height);
     });
-    return canvasStore.plantaActivaData.poligono.flatMap(p => [p.x, p.y]);
-  } else {
-    return [];
+    points = poligono.flatMap(p => [p.x, p.y]);
   }
+
+  return { width, height, points };
 });
 
 
