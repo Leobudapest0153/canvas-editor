@@ -30,6 +30,12 @@
         <PropiedadesPanel />
       </div>
     </main>
+    <!-- Modal de historial -->
+    <HistorialModal :is-open="showHistorialModal" @close="closeHistorialModal" />
+
+    <!-- Modal de importar/exportar -->
+    <ImportExportModal :mostrar="showImportExportModal" @cerrar="closeImportExportModal" />
+    <WorkspaceEditor/>
   </div>
 </template>
 
@@ -40,6 +46,7 @@ import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
 import PropiedadesPanel from './components/PropiedadesPanel.vue'
 import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
+import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
 

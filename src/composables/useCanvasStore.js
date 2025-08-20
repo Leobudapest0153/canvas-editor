@@ -72,6 +72,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const elementoSeleccionado = ref(null)
   const vistaActiva = ref('XY') // XY, ZX, ZY
   const zoom = ref(1)
+  const crearPlanta = ref(false);
   const panX = ref(0)
   const panY = ref(0)
 
@@ -466,6 +467,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const agregarPlanta = (nuevaPlanta) => {
     const id = `planta_${Date.now()}`
+    
     plantas.value.push({
       id,
       nombre: nuevaPlanta.nombre || 'Nueva Planta',
@@ -473,9 +475,9 @@ export const useCanvasStore = defineStore('canvas', () => {
       elementos: [],
       activa: false,
       dimensiones: {
-        alto: nuevaPlanta.dimensiones?.alto || 280,
-        ancho: nuevaPlanta.dimensiones?.ancho || 800,
-        largo: nuevaPlanta.dimensiones?.largo || 1000,
+        alto: nuevaPlanta.dimensiones?.alto || 0,
+        ancho: nuevaPlanta.dimensiones?.ancho || 0,
+        largo: nuevaPlanta.dimensiones?.largo || 0,
       },
       pesoMaximoSoportado: nuevaPlanta.pesoMaximoSoportado || 3000,
       ...nuevaPlanta,
@@ -956,6 +958,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+  const abrirEditor = () => {
+    crearPlanta.value = true;
+  }
+
+  const cerrarEditor = () => {
+    crearPlanta.value = false;
+  }
+
   // === FIN FUNCIONES DE SERIALIZACIÓN ===
 
   return {
@@ -970,6 +980,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     panY,
     gridSize,
     snapGridEps,
+    crearPlanta,
 
     // Getters
     elementosVisibles,
@@ -1030,5 +1041,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     // === FUNCIONES DE SERIALIZACIÓN ===
     serialize,
     deserialize,
+
+    // == Editor de planta
+    abrirEditor,
+    cerrarEditor
   }
 })
