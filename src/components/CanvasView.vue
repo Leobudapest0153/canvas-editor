@@ -43,7 +43,15 @@
             listening: false,
           }"
         />
-        <v-line :config="{ points: floorBoundary.points, closed:true, stroke:'#0ea5e9', fill:'rgba(14,165,233,0.08)', strokeWidth:2 }" />
+        <v-line
+          :config="{
+            points: floorBoundary.points,
+            closed: true,
+            stroke: '#0ea5e9',
+            fill: 'rgba(14,165,233,0.08)',
+            strokeWidth: 2,
+          }"
+        />
         <!-- Debug: mostrar información de la planta -->
         <v-text
           :config="{
@@ -70,7 +78,6 @@
 
         <!-- Renderizado de elementos del store -->
         <template v-for="elemento in elementosVisiblesEnCanvas" :key="elemento.id">
-          
           <!-- Elementos rectangulares (anaqueles, mesas, armarios, contenedores) -->
           <v-rect
             v-if="elemento.forma === 'rectangular' || !elemento.forma"
@@ -252,8 +259,8 @@ const stageRef = ref(null)
 const layerRef = ref(null)
 
 // Tamaño del área
-const maxWidth = ref(100);
-const maxHeight = ref(100);
+const maxWidth = ref(100)
+const maxHeight = ref(100)
 
 // Composable con historial integrado
 const { store: canvasStore, actions, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -366,27 +373,25 @@ const stageConfig = computed(() => ({
   draggable: stageDragEnabled.value,
 }))
 
-
 const floorBoundary = computed(() => {
   // Empezamos con las dimensiones base del layer
-  let width = layerConfig.value.width;
-  let height = layerConfig.value.height;
-  let points = [];
+  let width = layerConfig.value.width
+  let height = layerConfig.value.height
+  let points = []
 
-  const poligono = canvasStore.plantaActivaData?.poligono;
+  const poligono = canvasStore.plantaActivaData?.poligono
 
   // Si hay un polígono, lo usamos para expandir los límites y obtener los puntos
   if (poligono && Array.isArray(poligono) && poligono.length > 0) {
-    poligono.forEach(coord => {
-      width = Math.max(coord.x, width);
-      height = Math.max(coord.y, height);
-    });
-    points = poligono.flatMap(p => [p.x, p.y]);
+    poligono.forEach((coord) => {
+      width = Math.max(coord.x, width)
+      height = Math.max(coord.y, height)
+    })
+    points = poligono.flatMap((p) => [p.x, p.y])
   }
 
-  return { width, height, points };
-});
-
+  return { width, height, points }
+})
 
 // Configuración del layer - TAMAÑO DE LA PLANTA ACTIVA
 const layerConfig = computed(() => {
@@ -415,8 +420,8 @@ const gridLines = computed(() => {
   const horizontal = []
 
   // Usar las dimensiones del layer (planta) para el grid
-  const layerWidth = maxWidth.value;
-  const layerHeight = maxHeight.value;
+  const layerWidth = maxWidth.value
+  const layerHeight = maxHeight.value
 
   for (let i = 0; i <= layerWidth; i += gridSizePx) {
     vertical.push(i)
@@ -827,7 +832,7 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   // Obtener posición del puntero considerando zoom y pan
   const pointerPos = {
     x: dropEvent.clientX - rect.left,
-    y: dropEvent.clientY - rect.top
+    y: dropEvent.clientY - rect.top,
   }
 
   // Convertir a coordenadas de mundo (layer) considerando transformación del stage
@@ -868,9 +873,8 @@ const createElementFromDrop = (data, dropEvent) => {
   // 5. Verificar que esté dentro del área (clampToArea)
   let isInsideArea = true
   if (boundary.type === 'rect') {
-    isInsideArea = candX >= 0 && candY >= 0 &&
-                   candX + width <= boundary.W &&
-                   candY + height <= boundary.H
+    isInsideArea =
+      candX >= 0 && candY >= 0 && candX + width <= boundary.W && candY + height <= boundary.H
 
     // Si está fuera, intentar clamp
     if (!isInsideArea) {
@@ -891,20 +895,22 @@ const createElementFromDrop = (data, dropEvent) => {
     height,
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     tipo: elemento.tipo || elemento.categoria || 'elemento',
-    forma: elemento.forma || 'rectangular'
+    forma: elemento.forma || 'rectangular',
   }
 
   // 7. Ejecutar detectConflictsFor contra elementos existentes
   const allElements = canvasStore.elementosVisibles
   const conflicts = detectConflictsFor(tempElement, allElements)
-  const blockingConflicts = conflicts.filter(c => c.bloqueante)
+  const blockingConflicts = conflicts.filter((c) => c.bloqueante)
 
   // 8. Si hay conflicto BLOQUEANTE o queda fuera de área, intentar nudgePlace
   let finalPosition = { x: candX, y: candY }
   let placementSuccessful = blockingConflicts.length === 0 && isInsideArea
 
   if (!placementSuccessful) {
-    console.log('🔍 Posición inicial tiene conflictos o está fuera de área, intentando nudgePlace...')
+    console.log(
+      '🔍 Posición inicial tiene conflictos o está fuera de área, intentando nudgePlace...',
+    )
 
     const nudgeResult = nudgePlace(
       candX,
@@ -916,7 +922,7 @@ const createElementFromDrop = (data, dropEvent) => {
       tempElement,
       GRID_SIZE,
       16, // máximo 16 intentos
-      detectConflictsFor // Pasar la función como parámetro
+      detectConflictsFor, // Pasar la función como parámetro
     )
 
     if (nudgeResult.found) {
@@ -1017,9 +1023,8 @@ const createElementFromBuffer = (data, dropEvent) => {
 
   let isInsideArea = true
   if (boundary.type === 'rect') {
-    isInsideArea = candX >= 0 && candY >= 0 &&
-                   candX + width <= boundary.W &&
-                   candY + height <= boundary.H
+    isInsideArea =
+      candX >= 0 && candY >= 0 && candX + width <= boundary.W && candY + height <= boundary.H
 
     if (!isInsideArea) {
       const clamped = clampRectToRect(candX, candY, width, height, boundary.W, boundary.H)
@@ -1039,12 +1044,12 @@ const createElementFromBuffer = (data, dropEvent) => {
     height,
     ubicacion: elemento.ubicacion || 'suelo',
     tipo: elemento.tipo || 'elemento',
-    forma: elemento.forma || 'rectangular'
+    forma: elemento.forma || 'rectangular',
   }
 
   const allElements = canvasStore.elementosVisibles
   const conflicts = detectConflictsFor(tempElement, allElements)
-  const blockingConflicts = conflicts.filter(c => c.bloqueante)
+  const blockingConflicts = conflicts.filter((c) => c.bloqueante)
 
   // 6. Si hay conflictos o está fuera de área, intentar nudgePlace
   let finalPosition = { x: candX, y: candY }
@@ -1063,7 +1068,7 @@ const createElementFromBuffer = (data, dropEvent) => {
       tempElement,
       GRID_SIZE,
       16,
-      detectConflictsFor // Pasar la función como parámetro
+      detectConflictsFor, // Pasar la función como parámetro
     )
 
     if (nudgeResult.found) {
@@ -1085,7 +1090,11 @@ const createElementFromBuffer = (data, dropEvent) => {
   const newElementId = buffer.pasteFromBuffer(data.bufferItemId, finalPosition)
 
   if (newElementId) {
-    console.log('✅ Elemento pegado desde buffer al canvas en posición válida:', newElementId, finalPosition)
+    console.log(
+      '✅ Elemento pegado desde buffer al canvas en posición válida:',
+      newElementId,
+      finalPosition,
+    )
     // Seleccionar el elemento recién pegado
     canvasStore.seleccionarElemento(newElementId)
   }
@@ -1189,8 +1198,16 @@ const forceRedraw = () => {
     const stage = stageRef.value?.getNode?.()
     if (!layer || !stage) return
     // clear caches si existiera cache en nodos
-    try { layer.clearCache?.() } catch (e) { void e }
-    try { stage.clearCache?.() } catch (e) { void e }
+    try {
+      layer.clearCache?.()
+    } catch (e) {
+      void e
+    }
+    try {
+      stage.clearCache?.()
+    } catch (e) {
+      void e
+    }
     layer.batchDraw?.()
     stage.batchDraw?.()
   } catch (e) {
