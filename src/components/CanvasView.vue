@@ -34,8 +34,8 @@
           :config="{
             x: 0,
             y: 0,
-            width: layerConfig.width,
-            height: layerConfig.height,
+            width: maxWidth,
+            height: maxHeight,
             fill: '#ffffff',
             stroke: '#3b82f6',
             strokeWidth: 2,
@@ -43,7 +43,7 @@
             listening: false,
           }"
         />
-
+        <v-line :config="{ points: flatPoints, closed:true, stroke:'#0ea5e9', fill:'rgba(14,165,233,0.08)', strokeWidth:2 }" />
         <!-- Debug: mostrar información de la planta -->
         <v-text
           :config="{
@@ -70,6 +70,7 @@
 
         <!-- Renderizado de elementos del store -->
         <template v-for="elemento in elementosVisiblesEnCanvas" :key="elemento.id">
+          
           <!-- Elementos rectangulares (anaqueles, mesas, armarios, contenedores) -->
           <v-rect
             v-if="elemento.forma === 'rectangular' || !elemento.forma"
@@ -143,7 +144,7 @@
           v-for="i in gridLines.vertical"
           :key="`v-${i}`"
           :config="{
-            points: [i, 0, i, layerConfig.height],
+            points: [i, 0, i, maxHeight],
             stroke: '#e5e7eb',
             strokeWidth: 1,
             opacity: 0.5,
@@ -154,7 +155,7 @@
           v-for="i in gridLines.horizontal"
           :key="`h-${i}`"
           :config="{
-            points: [0, i, layerConfig.width, i],
+            points: [0, i, maxWidth, i],
             stroke: '#e5e7eb',
             strokeWidth: 1,
             opacity: 0.5,
@@ -248,6 +249,10 @@ const emit = defineEmits(['select', 'drill-down'])
 const containerRef = ref(null)
 const stageRef = ref(null)
 const layerRef = ref(null)
+
+// Tamaño del área
+const maxWidth = ref(100);
+const maxHeight = ref(100);
 
 // Composable con historial integrado
 const { store: canvasStore, actions, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -360,6 +365,23 @@ const stageConfig = computed(() => ({
   draggable: stageDragEnabled.value,
 }))
 
+
+// Formato de punto
+const flatPoints = computed(() => {
+  maxWidth.value = layerConfig.value.width;
+  maxHeight.value = layerConfig.value.height;
+  if (canvasStore.plantaActivaData.poligono) {
+    canvasStore.plantaActivaData.poligono.forEach((coord) => {
+      maxWidth.value = Math.max(coord.x, maxWidth.value);
+      maxHeight.value = Math.max(coord.y, maxHeight.value);
+    });
+    return canvasStore.plantaActivaData.poligono.flatMap(p => [p.x, p.y]);
+  } else {
+    return [];
+  }
+});
+
+
 // Configuración del layer - TAMAÑO DE LA PLANTA ACTIVA
 const layerConfig = computed(() => {
   const planta = canvasStore.plantaActivaData
@@ -387,8 +409,8 @@ const gridLines = computed(() => {
   const horizontal = []
 
   // Usar las dimensiones del layer (planta) para el grid
-  const layerWidth = layerConfig.value.width
-  const layerHeight = layerConfig.value.height
+  const layerWidth = maxWidth.value;
+  const layerHeight = maxHeight.value;
 
   for (let i = 0; i <= layerWidth; i += gridSizePx) {
     vertical.push(i)
