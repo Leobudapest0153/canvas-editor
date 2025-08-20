@@ -879,7 +879,7 @@ const createElementFromDrop = (data, dropEvent) => {
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.polygon)
+    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.points)
   }
 
   // 6. Crear elemento temporal para detectar conflictos
@@ -1027,7 +1027,7 @@ const createElementFromBuffer = (data, dropEvent) => {
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.polygon)
+    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.points)
   }
 
   // 5. Crear elemento temporal y detectar conflictos
