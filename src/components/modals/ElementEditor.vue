@@ -104,6 +104,7 @@
                     min="1"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                     required
+                    :disabled="esFormaCircular"
                   />
                 </div>
                 <div class="mb-2">
@@ -205,8 +206,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { CONTENEDOR_BASE, CM_TO_PX } from '@/utils/constants'
+import { ref, watch, computed } from 'vue'
 
 const props = defineProps({
   visible: Boolean,
@@ -216,6 +216,8 @@ const props = defineProps({
   value: Object,
 })
 const emit = defineEmits(['cancel', 'save'])
+
+const esFormaCircular = computed(() => localElemento.value.forma === 'circular')
 
 // const getIconComponent = (iconType) => {
 //   // Retorna un componente SVG simple (placeholder)
@@ -243,6 +245,27 @@ watch(
     }
   },
   { immediate: true, deep: true },
+)
+
+// Vigilar cuando cambia la forma para actualizar dimensiones si es circular
+watch(
+  () => localElemento.value.forma,
+  (nuevaForma) => {
+    if (nuevaForma === 'circular') {
+      // Si es circular, hacer que largo sea igual a ancho
+      localElemento.value.dimensiones.largo = localElemento.value.dimensiones.ancho
+    }
+  },
+)
+
+// Vigilar cuando cambia el ancho para actualizar el largo si es circular
+watch(
+  () => localElemento.value.dimensiones.ancho,
+  (nuevoAncho) => {
+    if (esFormaCircular.value) {
+      localElemento.value.dimensiones.largo = nuevoAncho
+    }
+  },
 )
 
 const onCancel = () => emit('cancel')
