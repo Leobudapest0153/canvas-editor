@@ -302,3 +302,90 @@ export const safeSnapRect = (x, y, w, h, boundaryRect, neighbors = [], gridSize 
 
   return { x: nx, y: ny }
 }
+
+// Nudge placement: búsqueda en espiral para encontrar posición válida
+export const nudgePlace = (
+  x,
+  y,
+  width,
+  height,
+  boundary,
+  allElements,
+  elementToPlace,
+  gridSize = 20,
+  maxAttempts = 16,
+  detectConflictsFn = null // Función para detectar conflictos pasada como parámetro
+) => {
+  // Función auxiliar para verificar si una posición es válida
+  const isValidPosition = (testX, testY) => {
+    // Verificar que esté dentro del área
+    if (boundary.type === 'rect') {
+      if (testX < 0 || testY < 0 || testX + width > boundary.W || testY + height > boundary.H) {
+        return false
+      }
+    } else if (boundary.type === 'polygon') {
+      if (!rectInsidePolygon(testX, testY, width, height, boundary.points)) {
+        return false
+      }
+    }
+
+    // Solo verificar conflictos si se proporciona la función
+    if (detectConflictsFn) {
+      // Crear elemento temporal para verificar conflictos
+      const tempElement = {
+        ...elementToPlace,
+        x: testX,
+        y: testY,
+        width,
+        height
+      }
+
+      const conflicts = detectConflictsFn(tempElement, allElements)
+      const blockingConflicts = conflicts.filter(c => c.bloqueante)
+
+      return blockingConflicts.length === 0
+    }
+
+    return true
+  }
+
+  // Verificar posición inicial
+  if (isValidPosition(x, y)) {
+    return { x, y, found: true }
+  }
+
+  // Búsqueda en espiral
+  for (let radius = 1; radius <= maxAttempts; radius++) {
+    const step = gridSize
+    const currentRadius = radius * step
+
+    // Generar puntos en espiral
+    const spiralPoints = []
+
+    // Arriba
+    for (let i = -radius; i <= radius; i++) {
+      spiralPoints.push({ x: x + i * step, y: y - currentRadius })
+    }
+    // Derecha
+    for (let i = -radius + 1; i <= radius; i++) {
+      spiralPoints.push({ x: x + currentRadius, y: y + i * step })
+    }
+    // Abajo
+    for (let i = radius - 1; i >= -radius; i--) {
+      spiralPoints.push({ x: x + i * step, y: y + currentRadius })
+    }
+    // Izquierda
+    for (let i = radius - 1; i >= -radius + 1; i--) {
+      spiralPoints.push({ x: x - currentRadius, y: y + i * step })
+    }
+
+    // Probar cada punto en esta distancia
+    for (const point of spiralPoints) {
+      if (isValidPosition(point.x, point.y)) {
+        return { x: point.x, y: point.y, found: true }
+      }
+    }
+  }
+
+  return { x, y, found: false }
+}
