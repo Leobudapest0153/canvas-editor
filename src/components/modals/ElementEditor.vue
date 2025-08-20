@@ -268,7 +268,37 @@ watch(
   },
 )
 
-const onCancel = () => emit('cancel')
+// Restablecer el formulario cuando el modal se abre
+watch(
+  () => props.visible,
+  (esVisible) => {
+    if (esVisible && !props.value) {
+      // Si se abre el modal y no hay valor previo, restablecer el formulario
+      restablecerFormulario()
+    }
+  },
+)
+
+// Función para restablecer el formulario a valores iniciales
+const restablecerFormulario = () => {
+  localElemento.value = {
+    nombre: '',
+    categoria: '',
+    forma: '',
+    colorBase: '#3b82f6',
+    dimensiones: { ancho: 100, largo: 100, alto: 75 },
+    pesoMaximo: 50,
+    ubicacion: 'suelo',
+    descripcion: '',
+    icono: 'box',
+    contenedores: [],
+  }
+}
+
+const onCancel = () => {
+  emit('cancel')
+  restablecerFormulario()
+}
 
 const validarFormulario = () => {
   const elemento = localElemento.value
@@ -306,6 +336,7 @@ const validarFormulario = () => {
 const handleSubmit = () => {
   if (!validarFormulario()) return
   emit('save', { ...localElemento.value })
+  restablecerFormulario()
 }
 </script>
 
