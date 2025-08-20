@@ -13,41 +13,53 @@
 -->
 
 <template>
-  <div class="plantas-panel">
-    <div class="flex items-center justify-between">
+  <div class="bg-white border-b border-gray-200 p-4 shadow-sm" style="overflow: visible;">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center" style="overflow: visible;">
       <!-- Lista de plantas con scroll horizontal -->
-      <div class="flex items-center space-x-4 flex-1 overflow-x-auto">
-        <div class="flex space-x-3 min-w-max">
+      <div class="flex flex-row overflow-x-auto space-x-4 col-span-1 lg:col-span-8" style="overflow-y: visible;">
           <!-- Tarjetas de plantas -->
           <div
             v-for="planta in canvasStore.plantas"
             :key="planta.id"
-            @click="seleccionarPlanta(planta.id)"
             :class="[
-              'planta-card cursor-pointer transition-all duration-200 transform hover:scale-105',
+              'relative flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-blue-400',
               {
-                'planta-activa': planta.id === canvasStore.plantaActiva,
-                'planta-inactiva': planta.id !== canvasStore.plantaActiva,
+                'bg-blue-50 border-blue-300 shadow-md': planta.id === canvasStore.plantaActiva,
+                'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300': planta.id !== canvasStore.plantaActiva,
               },
             ]"
+            style="overflow: visible;"
           >
-            <div class="flex items-center space-x-3">
-              <div class="planta-icon">
+            <div class="flex items-center space-x-3" @click="seleccionarPlanta(planta.id)">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-gradient-to-br from-blue-500 to-blue-600">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path
                     d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"
                   />
                 </svg>
               </div>
-              <div class="planta-info">
-                <h3 class="planta-nombre">{{ planta.nombre }}</h3>
-                <p class="planta-elementos">{{ contarElementosEnPlanta(planta.id) }} elementos</p>
-                <p class="planta-dimensiones">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-800">{{ planta.nombre }}</h3>
+                <p class="text-xs text-gray-500 m-0">{{ contarElementosEnPlanta(planta.id) }} elementos</p>
+                <p class="text-xs text-gray-400 m-0 font-medium">
                   {{ planta.dimensiones?.ancho || 800 }}×{{ planta.dimensiones?.largo || 1000 }}×{{
                     planta.dimensiones?.alto || 280
                   }}cm
                 </p>
               </div>
+            </div>
+
+            <!-- Menú desplegable de acciones -->
+            <div class="relative ml-2">
+              <button
+                @click.stop="toggleMenuPlanta(planta.id, $event)"
+                class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                title="Opciones de planta"
+              >
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                </svg>
+              </button>
             </div>
 
             <!-- Indicador de planta activa -->
@@ -56,59 +68,60 @@
               class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
             ></div>
           </div>
-        </div>
+                <!-- Botón de agregar planta (siempre visible al hacer scroll) -->
+          <div class="sticky right-0 z-10 pl-2 -mr-2 bg-gradient-to-l from-white via-white/70 to-transparent flex items-center pointer-events-none">
+            <button
+              @click="mostrarModalAgregar = true"
+              class="pointer-events-auto inline-flex items-center justify-center w-10 h-10 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-md hover:shadow-lg cursor-pointer"
+              title="Agregar nueva planta"
+              type="button"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+            </button>
+          </div>
       </div>
 
-      <!-- Botones de acción -->
-      <div class="flex items-center space-x-2 ml-4">
+      <!-- Acciones (Historial e Import/Export) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 col-span-1 lg:col-span-4 lg:justify-self-end">
         <button
-          @click="mostrarModalAgregar = true"
-          class="btn-action btn-primary"
-          title="Agregar nueva planta"
+          type="button"
+          class="inline-flex items-center gap-2 w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
+          title="Ver historial completo"
+          @click="openHistorialModal"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
               stroke-width="2"
-              d="M12 4v16m8-8H4"
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <span class="hidden sm:inline ml-1">Agregar</span>
+          <span>Historial</span>
         </button>
 
         <button
-          @click="editarPlantaActual"
-          :disabled="!canvasStore.plantaActiva"
-          class="btn-action btn-secondary"
-          title="Editar planta actual"
+          type="button"
+          class="inline-flex items-center gap-2 w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
+          title="Importar / Exportar Canvas"
+          @click="openImportExportModal"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
               stroke-width="2"
-              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
             />
           </svg>
-          <span class="hidden sm:inline ml-1">Editar</span>
-        </button>
-
-        <button
-          @click="confirmarEliminarPlanta"
-          :disabled="!canvasStore.plantaActiva || canvasStore.plantas.length <= 1"
-          class="btn-action btn-danger"
-          title="Eliminar planta actual"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-            />
-          </svg>
-          <span class="hidden sm:inline ml-1">Eliminar</span>
+          <span>Import/Export</span>
         </button>
       </div>
     </div>
@@ -116,15 +129,15 @@
     <!-- Modal para agregar/editar planta -->
     <div
       v-if="mostrarModalAgregar || mostrarModalEditar"
-      class="modal-overlay"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       @click="cerrarModales"
     >
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h2 class="modal-title">
+      <div class="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4 max-h-screen overflow-y-auto" @click.stop>
+        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+          <h2 class="text-lg font-semibold text-gray-800">
             {{ mostrarModalEditar ? 'Editar Planta' : 'Nueva Planta' }}
           </h2>
-          <button @click="cerrarModales" class="modal-close">
+          <button @click="cerrarModales" class="text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
@@ -136,41 +149,41 @@
           </button>
         </div>
 
-        <form @submit.prevent="guardarPlanta" class="modal-body">
-          <div class="form-group">
-            <label for="nombre" class="form-label">Nombre de la planta</label>
+        <form @submit.prevent="guardarPlanta" class="p-6">
+          <div class="mb-4">
+            <label for="nombre" class="block text-sm font-medium text-gray-700 mb-2">Nombre de la planta</label>
             <input
               id="nombre"
               v-model="formularioPlanta.nombre"
               type="text"
-              class="form-input"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
               placeholder="Ej: Planta Baja, Primer Piso..."
               required
             />
           </div>
 
-          <div class="form-group">
-            <label for="descripcion" class="form-label">Descripción (opcional)</label>
+          <div class="mb-4">
+            <label for="descripcion" class="block text-sm font-medium text-gray-700 mb-2">Descripción (opcional)</label>
             <textarea
               id="descripcion"
               v-model="formularioPlanta.descripcion"
-              class="form-textarea"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all resize-none"
               placeholder="Descripción de la planta..."
               rows="3"
             ></textarea>
           </div>
 
           <!-- Dimensiones -->
-          <div class="form-group">
-            <label class="form-label">Dimensiones (cm)</label>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Dimensiones (cm)</label>
             <div class="grid grid-cols-3 gap-3">
               <div>
-                <label for="ancho" class="form-label-small">Ancho</label>
+                <label for="ancho" class="block mb-1 text-xs font-medium text-gray-600">Ancho</label>
                 <input
                   id="ancho"
                   v-model.number="formularioPlanta.dimensiones.ancho"
                   type="number"
-                  class="form-input"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
                   placeholder="800"
                   min="100"
                   max="5000"
@@ -178,12 +191,12 @@
                 />
               </div>
               <div>
-                <label for="largo" class="form-label-small">Largo</label>
+                <label for="largo" class="block mb-1 text-xs font-medium text-gray-600">Largo</label>
                 <input
                   id="largo"
                   v-model.number="formularioPlanta.dimensiones.largo"
                   type="number"
-                  class="form-input"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
                   placeholder="1000"
                   min="100"
                   max="5000"
@@ -191,12 +204,12 @@
                 />
               </div>
               <div>
-                <label for="alto" class="form-label-small">Alto</label>
+                <label for="alto" class="block mb-1 text-xs font-medium text-gray-600">Alto</label>
                 <input
                   id="alto"
                   v-model.number="formularioPlanta.dimensiones.alto"
                   type="number"
-                  class="form-input"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
                   placeholder="280"
                   min="200"
                   max="1000"
@@ -207,13 +220,13 @@
           </div>
 
           <!-- Peso máximo soportado -->
-          <div class="form-group">
-            <label for="pesoMaximo" class="form-label">Peso máximo soportado (kg)</label>
+          <div class="mb-6">
+            <label for="pesoMaximo" class="block text-sm font-medium text-gray-700 mb-2">Peso máximo soportado (kg)</label>
             <input
               id="pesoMaximo"
               v-model.number="formularioPlanta.pesoMaximoSoportado"
               type="number"
-              class="form-input"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
               placeholder="3000"
               min="500"
               max="50000"
@@ -221,9 +234,9 @@
             />
           </div>
 
-          <div class="modal-footer">
-            <button type="button" @click="cerrarModales" class="btn-cancel">Cancelar</button>
-            <button type="submit" class="btn-save">
+          <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+            <button type="button" @click="cerrarModales" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 border-none rounded-lg cursor-pointer transition-colors">Cancelar</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white border-none rounded-lg cursor-pointer transition-colors">
               {{ mostrarModalEditar ? 'Guardar Cambios' : 'Crear Planta' }}
             </button>
           </div>
@@ -234,15 +247,15 @@
     <!-- Modal de confirmación para eliminar -->
     <div
       v-if="mostrarConfirmacionEliminar"
-      class="modal-overlay"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       @click="mostrarConfirmacionEliminar = false"
     >
-      <div class="modal-content modal-small" @click.stop>
-        <div class="modal-header">
-          <h2 class="modal-title text-red-600">Confirmar Eliminación</h2>
+      <div class="bg-white rounded-lg shadow-2xl max-w-sm w-full mx-4" @click.stop>
+        <div class="p-6 border-b border-gray-200">
+          <h2 class="text-lg font-semibold text-red-600">Confirmar Eliminación</h2>
         </div>
 
-        <div class="modal-body">
+        <div class="p-6">
           <p class="text-gray-700 mb-4">
             ¿Estás seguro que deseas eliminar la planta
             <strong>"{{ plantaAEliminar?.nombre }}"</strong>?
@@ -268,12 +281,12 @@
           </div>
         </div>
 
-        <div class="modal-footer">
-          <button @click="mostrarConfirmacionEliminar = false" class="btn-cancel">Cancelar</button>
+        <div class="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
+          <button @click="mostrarConfirmacionEliminar = false" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 border-none rounded-lg cursor-pointer transition-colors">Cancelar</button>
           <button
             v-if="elementosEnPlantaAEliminar === 0"
             @click="eliminarPlantaConfirmada"
-            class="btn-danger"
+            class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white border-none rounded-lg cursor-pointer transition-colors"
           >
             Eliminar Planta
           </button>
@@ -281,20 +294,76 @@
       </div>
     </div>
   </div>
+
+  <!-- Teleport del menú a body para evitar overflow de contenedores -->
+  <teleport to="body">
+    <div
+      v-if="menuAbiertoPlanta"
+      ref="menuEl"
+      class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-32"
+      :style="{ top: menuPosY + 'px', left: menuPosX + 'px' }"
+      v-click-outside="() => cerrarMenuPlanta()"
+    >
+      <button
+        @click="editarPlanta(menuAbiertoPlanta)"
+        class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-all border-none bg-transparent cursor-pointer"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+          />
+        </svg>
+        <span>Editar</span>
+      </button>
+      <button
+        @click="confirmarEliminarPlantaMenu(menuAbiertoPlanta)"
+        :disabled="canvasStore.plantas.length <= 1"
+        class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all border-none bg-transparent cursor-pointer"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+          />
+        </svg>
+        <span>Eliminar</span>
+      </button>
+    </div>
+  </teleport>
+
+  <!-- Modal de historial -->
+  <HistorialModal :is-open="showHistorialModal" @close="closeHistorialModal" />
+
+  <!-- Modal de importar/exportar -->
+  <ImportExportModal :mostrar="showImportExportModal" @cerrar="closeImportExportModal" />
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore'
-
+import HistorialModal from './HistorialModal.vue'
+import ImportExportModal from './ImportExportModal.vue'
 // Store
 const canvasStore = useCanvasStore()
 
 // Estado local para modales
+const showHistorialModal = ref(false)
+const showImportExportModal = ref(false)
 const mostrarModalAgregar = ref(false)
 const mostrarModalEditar = ref(false)
 const mostrarConfirmacionEliminar = ref(false)
 const plantaAEliminar = ref(null)
+const menuAbiertoPlanta = ref(null)
+
+// Posición del menú (teleport fijo)
+const menuPosX = ref(0)
+const menuPosY = ref(0)
+const menuEl = ref(null)
 
 // Formulario para agregar/editar plantas
 const formularioPlanta = ref({
@@ -315,6 +384,22 @@ const elementosEnPlantaAEliminar = computed(() => {
 })
 
 // Métodos
+const openHistorialModal = () => {
+  showHistorialModal.value = true
+}
+
+const closeHistorialModal = () => {
+  showHistorialModal.value = false
+}
+
+const openImportExportModal = () => {
+  showImportExportModal.value = true
+}
+
+const closeImportExportModal = () => {
+  showImportExportModal.value = false
+}
+
 const seleccionarPlanta = (plantaId) => {
   canvasStore.navegarAPlanta(plantaId)
 }
@@ -323,28 +408,78 @@ const contarElementosEnPlanta = (plantaId) => {
   return canvasStore.elementosEnPlanta(plantaId).length
 }
 
-const editarPlantaActual = () => {
-  const plantaActual = canvasStore.plantaPorId(canvasStore.plantaActiva)
-  if (plantaActual) {
-    formularioPlanta.value = {
-      nombre: plantaActual.nombre,
-      descripcion: plantaActual.descripcion || '',
-      dimensiones: {
-        alto: plantaActual.dimensiones?.alto || 280,
-        ancho: plantaActual.dimensiones?.ancho || 800,
-        largo: plantaActual.dimensiones?.largo || 1000,
-      },
-      pesoMaximoSoportado: plantaActual.pesoMaximoSoportado || 3000,
-    }
-    mostrarModalEditar.value = true
+// Métodos para el menú desplegable
+const toggleMenuPlanta = (plantaId, event) => {
+  if (menuAbiertoPlanta.value === plantaId) {
+    menuAbiertoPlanta.value = null
+    return
+  }
+  menuAbiertoPlanta.value = plantaId
+  const rect = event?.currentTarget?.getBoundingClientRect?.()
+  if (rect) {
+    nextTick(() => {
+      const menuRect = menuEl.value?.getBoundingClientRect?.()
+      const w = menuRect?.width || 180
+      const h = menuRect?.height || 0
+      const gap = 8
+
+      const viewportLeft = window.scrollX + 8
+      const viewportRight = window.scrollX + window.innerWidth - 8
+      const viewportTop = window.scrollY + 8
+      const viewportBottom = window.scrollY + window.innerHeight - 8
+
+      // Alinear por defecto bajo el botón y con borde derecho alineado al botón
+      let left = rect.right + window.scrollX - w
+      let top = rect.bottom + window.scrollY + gap
+
+      // Si no cabe a la derecha/izquierda, ajustar
+      if (left < viewportLeft) {
+        left = Math.min(rect.left + window.scrollX, viewportRight - w)
+      }
+
+      // Si no cabe abajo, mostrar arriba del botón
+      if (top + h > viewportBottom) {
+        top = rect.top + window.scrollY - h - gap
+      }
+
+      // Clamp final a viewport
+      left = Math.max(viewportLeft, Math.min(left, viewportRight - w))
+      top = Math.max(viewportTop, Math.min(top, viewportBottom - h))
+
+      menuPosX.value = left
+      menuPosY.value = top
+    })
   }
 }
 
-const confirmarEliminarPlanta = () => {
-  const plantaActual = canvasStore.plantaPorId(canvasStore.plantaActiva)
-  if (plantaActual) {
-    plantaAEliminar.value = plantaActual
+const cerrarMenuPlanta = () => {
+  menuAbiertoPlanta.value = null
+}
+
+const editarPlanta = (plantaId) => {
+  const planta = canvasStore.plantaPorId(plantaId)
+  if (planta) {
+    formularioPlanta.value = {
+      nombre: planta.nombre,
+      descripcion: planta.descripcion || '',
+      dimensiones: {
+        alto: planta.dimensiones?.alto || 280,
+        ancho: planta.dimensiones?.ancho || 800,
+        largo: planta.dimensiones?.largo || 1000,
+      },
+      pesoMaximoSoportado: planta.pesoMaximoSoportado || 3000,
+    }
+    mostrarModalEditar.value = true
+    cerrarMenuPlanta()
+  }
+}
+
+const confirmarEliminarPlantaMenu = (plantaId) => {
+  const planta = canvasStore.plantaPorId(plantaId)
+  if (planta) {
+    plantaAEliminar.value = planta
     mostrarConfirmacionEliminar.value = true
+    cerrarMenuPlanta()
   }
 }
 
@@ -409,435 +544,23 @@ const cerrarModales = () => {
     pesoMaximoSoportado: 3000,
   }
 }
+
+// Directiva personalizada para cerrar el menú al hacer clic fuera
+const vClickOutside = {
+  beforeMount: (el, binding) => {
+    el.clickOutsideEvent = event => {
+      if (!(el === event.target || el.contains(event.target))) {
+        binding.value()
+      }
+    }
+    document.addEventListener('click', el.clickOutsideEvent)
+  },
+  unmounted: el => {
+    document.removeEventListener('click', el.clickOutsideEvent)
+  },
+}
 </script>
 
 <style scoped>
-.plantas-panel {
-  background: white;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 1.5rem;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-}
-
-/* Tarjetas de plantas */
-.planta-card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  border: 2px solid;
-  min-width: max-content;
-  transition: all 0.2s;
-}
-
-.planta-card:hover {
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transform: scale(1.05);
-}
-
-.planta-activa {
-  background-color: #eff6ff;
-  border-color: #93c5fd;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.planta-inactiva {
-  background-color: #f9fafb;
-  border-color: #e5e7eb;
-}
-
-.planta-inactiva:hover {
-  background-color: #f3f4f6;
-  border-color: #d1d5db;
-}
-
-.planta-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-}
-
-.planta-nombre {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.planta-elementos {
-  font-size: 0.75rem;
-  color: #6b7280;
-  margin: 0;
-}
-
-.planta-dimensiones {
-  font-size: 0.65rem;
-  color: #9ca3af;
-  margin: 0;
-  font-weight: 500;
-}
-
-/* Botones de acción */
-.btn-action {
-  display: flex;
-  align-items: center;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: all 0.2s;
-  border: none;
-  cursor: pointer;
-}
-
-.btn-action:hover {
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.btn-action:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background-color: #2563eb;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background-color: #1d4ed8;
-}
-
-.btn-secondary {
-  background-color: #4b5563;
-  color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background-color: #374151;
-}
-
-.btn-danger {
-  background-color: #dc2626;
-  color: white;
-}
-
-.btn-danger:hover:not(:disabled) {
-  background-color: #b91c1c;
-}
-
-/* Modales */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-  max-width: 28rem;
-  width: 100%;
-  margin: 1rem;
-  max-height: 100vh;
-  overflow-y: auto;
-}
-
-.modal-small {
-  max-width: 24rem;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.modal-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.modal-close {
-  color: #9ca3af;
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.modal-close:hover {
-  color: #4b5563;
-}
-
-.modal-body {
-  padding: 1.5rem;
-}
-
-.modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 1rem 1.5rem;
-  border-top: 1px solid #e5e7eb;
-}
-
-/* Formularios */
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #374151;
-  margin-bottom: 0.5rem;
-}
-
-.form-label-small {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: #6b7280;
-}
-
-.grid {
-  display: grid;
-}
-
-.grid-cols-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.gap-3 {
-  gap: 0.75rem;
-}
-
-.form-input,
-.form-textarea {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
-}
-
-.form-input:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.form-textarea {
-  resize: none;
-}
-
-.btn-cancel {
-  padding: 0.5rem 1rem;
-  color: #374151;
-  background-color: #f3f4f6;
-  border: none;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.btn-cancel:hover {
-  background-color: #e5e7eb;
-}
-
-.btn-save {
-  padding: 0.5rem 1rem;
-  background-color: #2563eb;
-  color: white;
-  border: none;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.btn-save:hover {
-  background-color: #1d4ed8;
-}
-
-/* Utilidades */
-.flex {
-  display: flex;
-}
-
-.items-center {
-  align-items: center;
-}
-
-.justify-between {
-  justify-content: space-between;
-}
-
-.space-x-2 > * + * {
-  margin-left: 0.5rem;
-}
-
-.space-x-3 > * + * {
-  margin-left: 0.75rem;
-}
-
-.space-x-4 > * + * {
-  margin-left: 1rem;
-}
-
-.flex-1 {
-  flex: 1;
-}
-
-.overflow-x-auto {
-  overflow-x: auto;
-}
-
-.min-w-max {
-  min-width: max-content;
-}
-
-.ml-4 {
-  margin-left: 1rem;
-}
-
-.ml-1 {
-  margin-left: 0.25rem;
-}
-
-.mr-2 {
-  margin-right: 0.5rem;
-}
-
-.mb-4 {
-  margin-bottom: 1rem;
-}
-
-.w-4 {
-  width: 1rem;
-}
-
-.h-4 {
-  height: 1rem;
-}
-
-.w-5 {
-  width: 1.25rem;
-}
-
-.h-5 {
-  height: 1.25rem;
-}
-
-.w-3 {
-  width: 0.75rem;
-}
-
-.h-3 {
-  height: 0.75rem;
-}
-
-.absolute {
-  position: absolute;
-}
-
-.-top-1 {
-  top: -0.25rem;
-}
-
-.-right-1 {
-  right: -0.25rem;
-}
-
-.bg-green-500 {
-  background-color: #10b981;
-}
-
-.rounded-full {
-  border-radius: 50%;
-}
-
-.border-2 {
-  border-width: 2px;
-}
-
-.border-white {
-  border-color: white;
-}
-
-.hidden {
-  display: none;
-}
-
-@media (min-width: 640px) {
-  .sm\:inline {
-    display: inline;
-  }
-}
-
-.cursor-pointer {
-  cursor: pointer;
-}
-
-.text-red-600 {
-  color: #dc2626;
-}
-
-.text-gray-700 {
-  color: #374151;
-}
-
-.text-red-500 {
-  color: #ef4444;
-}
-
-.text-red-700 {
-  color: #b91c1c;
-}
-
-.font-medium {
-  font-weight: 500;
-}
-
-.bg-red-50 {
-  background-color: #fef2f2;
-}
-
-.border {
-  border-width: 1px;
-}
-
-.border-red-200 {
-  border-color: #fecaca;
-}
-
-.rounded-lg {
-  border-radius: 0.5rem;
-}
-
-.p-3 {
-  padding: 0.75rem;
-}
+/* Directiva personalizada para click outside - esencial para funcionalidad */
 </style>

@@ -9,9 +9,9 @@
     <!-- Header del tab -->
     <div class="tab-header">
       <div class="header-info">
-        <h3 class="tab-title">Buffer de Elementos</h3>
+        <h3 class="tab-title">Portapapeles de Elementos</h3>
         <div class="tab-subtitle">
-          {{ itemCount }} elemento{{ itemCount !== 1 ? 's' : '' }} en buffer
+          {{ itemCount }} elemento{{ itemCount !== 1 ? 's' : '' }} en portapapeles
         </div>
       </div>
       <div class="header-actions">
@@ -49,16 +49,16 @@
           </svg>
         </div>
 
-        <h4 class="empty-title">Buffer vacío</h4>
+        <h4 class="empty-title">Portapapeles vacío</h4>
         <p class="empty-description">Selecciona elementos en el canvas y usa:</p>
 
         <div class="shortcuts">
-          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>X</kbd> <span>Mover al buffer</span></div>
-          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>C</kbd> <span>Copiar al buffer</span></div>
+          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>X</kbd> <span>Mover al portapapeles</span></div>
+          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>C</kbd> <span>Copiar al portapapeles</span></div>
         </div>
       </div>
 
-      <!-- Lista de elementos en buffer -->
+      <!-- Lista de elementos en portapapeles -->
       <div v-else class="buffer-list">
         <div
           v-for="item in bufferItems"

@@ -12,12 +12,6 @@
 
 <template>
   <div class="capas-tab">
-    <!-- Header del tab -->
-    <div class="tab-header">
-      <h3 class="tab-title">Elementos del Canvas</h3>
-      <div class="tab-subtitle">{{ elementosFiltrados.length }} elementos en planta actual</div>
-    </div>
-
     <!-- Controles de filtro -->
     <div class="filtros-section">
       <!-- Filtro por categoría -->
@@ -345,7 +339,7 @@ const getIconoCategoria = (tipo) => {
   font-weight: 500;
   color: #374151;
   margin-bottom: 0.25rem;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.05em;
 }
 

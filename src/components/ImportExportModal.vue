@@ -342,7 +342,7 @@ const pegarPortapapeles = async () => {
 .modal-content {
   background: white;
   border-radius: 0.75rem;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
   max-width: 42rem;
   width: 90%;
   max-height: 90vh;
