@@ -1,6 +1,5 @@
 <template>
   <div class="border rounded-lg overflow-hidden relative flex-grow">
-    <!-- ANOTACIÓN: El stage ahora es más simple, sin lógica de modal. -->
     <v-stage ref="stageRef"
              :config="{
                width: canvasW,
@@ -13,35 +12,31 @@
              @dragend="onStageDragMove"
              @mousedown="onCanvasClick">
       <v-layer :config="{ listening: false }">
-        <!-- ELIMINADO: El rectángulo gris de fondo ha sido removido. -->
-
-        <!-- Rectángulo que define el área de trabajo -->
         <v-rect :config="{
           x: 0,
           y: 0,
           width: worldWidth,
           height: worldHeight,
-          fill: '#fff',
-          stroke: '#e2e8f0',
-          strokeWidth: 2
+          fill: '#f8fafc',
+          stroke: '#cbd5e1',
+          strokeWidth: 2 / stageScale
         }" />
-
         <GridLayer :width="canvasW" :height="canvasH" :scale="stageScale" :stageX="stagePosition.x" :stageY="stagePosition.y" :pixelsPerUnit="PIXELS_PER_CM * 100" unit="m" :bbox="gridBBox" />
       </v-layer>
 
       <v-layer>
-        <v-line :config="{ points: flatPoints, closed:true, stroke:'#0ea5e9', fill:'rgba(14,165,233,0.08)', strokeWidth:2 }" />
+        <v-line :config="{ points: flatPoints, closed:true, stroke:'#0ea5e9', fill:'rgba(14,165,233,0.08)', strokeWidth:2 / stageScale }" />
         <template v-for="(seg, i) in segments" :key="'seg-'+i">
-          <v-text :config="{ x: seg.mx, y: seg.my, text: seg.label, fontSize: 12, fill:'#334155' }" />
+          <v-text :config="{ x: seg.mx, y: seg.my, text: seg.label, fontSize: 9 / stageScale, fill:'#334155' }" />
         </template>
         <template v-if="dragging">
-          <v-line :config="{ points:[guidePos.x,0, guidePos.x, canvasH], stroke:'#94a3b8', dash:[4,4], strokeWidth:1 }" />
-          <v-line :config="{ points:[0,guidePos.y, canvasW, guidePos.y], stroke:'#94a3b8', dash:[4,4], strokeWidth:1 }" />
-          <v-rect :config="{ x: guidePos.x + 8, y: guidePos.y + 8, width: 110, height: 22, fill:'rgba(255,255,255,0.8)', stroke:'#cbd5e1', cornerRadius:4 }" />
-          <v-text :config="{ x: guidePos.x + 12, y: guidePos.y + 12, text: guideLabel, fontSize: 12, fill:'#0f172a' }" />
+          <v-line :config="{ points:[guidePos.x,0, guidePos.x, canvasH], stroke:'#94a3b8', dash:[4,4], strokeWidth:1 / stageScale }" />
+          <v-line :config="{ points:[0,guidePos.y, canvasW, guidePos.y], stroke:'#94a3b8', dash:[4,4], strokeWidth:1 / stageScale }" />
+          <v-rect :config="{ x: guidePos.x + 8 / stageScale, y: guidePos.y + 8 / stageScale, width: 110, height: 22, fill:'rgba(255,255,255,0.8)', stroke:'#cbd5e1', cornerRadius:4 }" />
+          <v-text :config="{ x: guidePos.x + 12 / stageScale, y: guidePos.y + 12 / stageScale, text: guideLabel, fontSize: 12, fill:'#0f172a' }" />
         </template>
         <template v-for="(p, idx) in polygon" :key="idx">
-          <v-circle :config="{ x:p.x, y:p.y, radius: selectedIdx===idx?7:6, fill:selectedIdx===idx?'#0284c7':'#0ea5e9', draggable:!deleting, stroke:selectedIdx===idx?'#0284c7':'#0ea5e9', strokeWidth:selectedIdx===idx?2:1, name: 'vertex' }"
+          <v-circle :config="{ x:p.x, y:p.y, radius: (selectedIdx === idx ? 8 : 6) / stageScale, fill:selectedIdx===idx?'#0284c7':'#0ea5e9', draggable:!deleting, stroke:selectedIdx===idx?'#0284c7':'#0ea5e9', strokeWidth: (selectedIdx === idx ? 2 : 1) / stageScale, name: 'vertex' }"
                     @click="evt => onVertexClick(idx, evt)"
                     @mousedown="evt => onVertexMouseDown(evt)"
                     @dragmove="e => onPointDrag(idx, e)"
@@ -60,13 +55,12 @@
     <RulersOverlay :width="canvasW" :height="canvasH" :scale="stageScale" :stageX="stagePosition.x" :stageY="stagePosition.y" :pixelsPerUnit="PIXELS_PER_CM * 100" unit="m"/>
   </div>
 </template>
-
+<!-- El script de DrawEditor.vue no necesita cambios adicionales -->
 <script setup>
 import { computed, reactive, ref, watch, onMounted, defineProps, defineEmits, toRefs } from 'vue'
 import GridLayer from './GridLayer.vue'
 import RulersOverlay from './RulersOverlay.vue'
 
-// ANOTACIÓN: Definimos las props que este componente recibe del padre.
 const props = defineProps({
   polygon: { type: Array, required: true },
   worldWidth: { type: Number, required: true },
@@ -75,7 +69,6 @@ const props = defineProps({
   deleting: { type: Boolean, default: false },
 });
 
-// ANOTACIÓN: Definimos los eventos que este componente puede emitir al padre.
 const emit = defineEmits(['update:polygon', 'notice']);
 
 const { polygon, worldWidth, worldHeight, adding, deleting } = toRefs(props);
@@ -125,13 +118,9 @@ function fitStageToPolygon() {
   stage.batchDraw()
 }
 
-// ANOTACIÓN: Exponemos la función para que el padre pueda llamarla.
 defineExpose({ fitStageToPolygon });
 
 onMounted(() => { fitStageToPolygon() })
-// ELIMINADO: Este watch causaba que la vista se recentrara al arrastrar un vértice.
-// watch(polygon, () => fitStageToPolygon(), { deep: true });
-
 
 function onWheel(e){
   e?.evt?.preventDefault?.()

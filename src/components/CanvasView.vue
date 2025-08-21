@@ -643,9 +643,9 @@ const gridLines = computed(() => {
   const vertical = []
   const horizontal = []
 
-  // Usar las dimensiones del layer según el contexto (planta o elemento)
-  const layerWidth = layerConfig.value.width
-  const layerHeight = layerConfig.value.height
+  // Usar las dimensiones del layer (planta) para el grid
+  const layerWidth = floorBoundary.value.width;
+  const layerHeight = floorBoundary.value.height;
 
   for (let i = 0; i <= layerWidth; i += gridSizePx) {
     vertical.push(i)
