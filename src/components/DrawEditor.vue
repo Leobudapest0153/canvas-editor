@@ -21,9 +21,9 @@
           y: 0,
           width: worldWidth,
           height: worldHeight,
-          fill: '#fff',
-          stroke: '#e2e8f0',
-          strokeWidth: 2
+          fill: '#f8fafc',
+          stroke: '#cbd5e1', 
+          strokeWidth: 2 / stageScale 
         }" />
 
         <GridLayer :width="canvasW" :height="canvasH" :scale="stageScale" :stageX="stagePosition.x" :stageY="stagePosition.y" :pixelsPerUnit="PIXELS_PER_CM * 100" unit="m" :bbox="gridBBox" />
@@ -41,13 +41,22 @@
           <v-text :config="{ x: guidePos.x + 12, y: guidePos.y + 12, text: guideLabel, fontSize: 12, fill:'#0f172a' }" />
         </template>
         <template v-for="(p, idx) in polygon" :key="idx">
-          <v-circle :config="{ x:p.x, y:p.y, radius: selectedIdx===idx?7:6, fill:selectedIdx===idx?'#0284c7':'#0ea5e9', draggable:!deleting, stroke:selectedIdx===idx?'#0284c7':'#0ea5e9', strokeWidth:selectedIdx===idx?2:1, name: 'vertex' }"
-                    @click="evt => onVertexClick(idx, evt)"
-                    @mousedown="evt => onVertexMouseDown(evt)"
-                    @dragmove="e => onPointDrag(idx, e)"
-                    @dragend="e => onPointDragEnd(idx, e)"
-                    @mouseover="onVertexMouseOver"
-                    @mouseout="onVertexMouseOut"/>
+          <v-circle :config="{ 
+            x:p.x, 
+            y:p.y, 
+            radius: (selectedIdx === idx ? 8 : 6) / stageScale, 
+            fill:selectedIdx===idx?'#0284c7':'#0ea5e9', 
+            draggable:!deleting, 
+            stroke:selectedIdx===idx?'#0284c7':'#0ea5e9', 
+            strokeWidth: (selectedIdx === idx ? 2 : 1) / stageScale, 
+            name: 'vertex' 
+          }"
+          @click="evt => onVertexClick(idx, evt)"
+          @mousedown="evt => onVertexMouseDown(evt)"
+          @dragmove="e => onPointDrag(idx, e)"
+          @dragend="e => onPointDragEnd(idx, e)"
+          @mouseover="onVertexMouseOver"
+          @mouseout="onVertexMouseOut"/>
         </template>
         <template v-if="adding">
           <v-text :config="{ x: 8, y: 8, text: 'Clic en un borde para añadir un vértice.', fontSize: 14, fill:'#0f172a' }" />

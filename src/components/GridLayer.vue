@@ -1,4 +1,3 @@
-
 <template>
   <v-shape :config="{ listening: false, versionKey }" :sceneFunc="draw"></v-shape>
 </template>
@@ -71,14 +70,15 @@ const draw = (ctx) => {
   const startY = Math.floor(worldY0 / stepPxWorld) * stepPxWorld
 
   const minorColor = '#e5e7eb'
-  const majorColor = '#cbd5e1'
+  const majorColor = '#d1d5db' // Ligeramente más oscuro para mejor contraste
 
   // Verticales
   ctx.beginPath()
   for (let xw = startX; xw <= worldX1; xw += stepPxWorld) {
     const isMajor = (Math.round(xw / majorPxWorld) === xw / majorPxWorld)
     ctx.strokeStyle = isMajor ? majorColor : minorColor
-    ctx.lineWidth = isMajor ? 1.2 : 0.6
+    // --- ¡CAMBIO CLAVE AQUÍ! ---
+    ctx.lineWidth = (isMajor ? 0.75 : 0.5) / scale
     ctx.moveTo(xw, worldY0)
     ctx.lineTo(xw, worldY1)
   }
@@ -89,7 +89,8 @@ const draw = (ctx) => {
   for (let yw = startY; yw <= worldY1; yw += stepPxWorld) {
     const isMajor = (Math.round(yw / majorPxWorld) === yw / majorPxWorld)
     ctx.strokeStyle = isMajor ? majorColor : minorColor
-    ctx.lineWidth = isMajor ? 1.2 : 0.6
+    // --- ¡Y CAMBIO CLAVE AQUÍ! ---
+    ctx.lineWidth = (isMajor ? 0.75 : 0.5) / scale
     ctx.moveTo(worldX0, yw)
     ctx.lineTo(worldX1, yw)
   }
