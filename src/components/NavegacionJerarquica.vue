@@ -56,16 +56,21 @@
       <!-- Información del contexto actual -->
       <div class="context-info">
         <div class="context-type">
-          {{ canvasStore.estaEnPlanta ? 'Planta' : 'Elemento' }}
+          {{ getTipoContextoNombre() }}
         </div>
         <div class="context-details">
           <span v-if="canvasStore.estaEnPlanta">
             {{ canvasStore.elementosVisibles.length }} elementos
           </span>
-          <span v-else-if="elementoActual">
-            Interior de {{ elementoActual.nombre }}
+          <span v-else-if="canvasStore.estaEnElemento">
+            {{ canvasStore.elementosVisibles.length }} contenedores
             <br />
-            <small>{{ elementoActual.width }}×{{ elementoActual.height }}px</small>
+            <small>Interior de {{ elementoActual?.nombre }}</small>
+          </span>
+          <span v-else-if="canvasStore.estaEnContenedor">
+            {{ canvasStore.elementosVisibles.length }} items (elementos + contenedores)
+            <br />
+            <small>Interior de {{ elementoActual?.nombre }}</small>
           </span>
         </div>
       </div>
@@ -82,21 +87,30 @@ const canvasStore = useCanvasStore()
 
 // Computed properties
 const elementoActual = computed(() => {
-  if (canvasStore.estaEnElemento) {
+  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
     return canvasStore.elementoContenedorActual
   }
   return null
 })
 
 // Métodos
+const getTipoContextoNombre = () => {
+  if (canvasStore.estaEnPlanta) return 'Planta'
+  if (canvasStore.estaEnElemento) return 'Elemento'
+  if (canvasStore.estaEnContenedor) return 'Contenedor'
+  return 'Desconocido'
+}
+
+// Métodos
+// Métodos
 const navegarACrumb = (crumb, index) => {
   // Si es el último crumb, no hacer nada (ya estamos ahí)
   if (index === canvasStore.breadcrumbs.length - 1) return
 
-  if (crumb.tipo === 'planta') {
+  if (crumb.tipo === 'plantas') {
     canvasStore.navegarAPlanta(crumb.id)
-  } else if (crumb.tipo === 'elemento') {
-    // Navegar específicamente a este elemento
+  } else if (crumb.tipo === 'elementos' || crumb.tipo === 'contenedores') {
+    // Navegar específicamente a este elemento/contenedor
     // Reconstruir el path hasta este elemento
     const nuevoPath = canvasStore.breadcrumbs.slice(0, index + 1).map((breadcrumb) => ({
       tipo: breadcrumb.tipo,
@@ -110,8 +124,8 @@ const navegarACrumb = (crumb, index) => {
       path: nuevoPath,
     }
 
-    // Calcular canvas adaptativo si es un elemento
-    if (crumb.tipo === 'elemento') {
+    // Calcular canvas adaptativo si es un elemento/contenedor
+    if (crumb.tipo === 'elementos' || crumb.tipo === 'contenedores') {
       const elemento = canvasStore.elementoPorId(crumb.id)
       if (elemento) {
         canvasStore.calcularCanvasAdaptativo(elemento)

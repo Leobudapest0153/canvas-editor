@@ -53,15 +53,26 @@
             </p>
           </div>
 
-          <!-- Tipo (solo lectura) -->
-          <div class="mb-4">
-            <label class="block text-xs font-medium text-gray-600 mb-1"> Tipo de Elemento </label>
-            <input
-              :value="elementoSeleccionado.tipo"
-              type="text"
-              disabled
-              class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed capitalize"
-            />
+          <!-- Tipo y Categoría -->
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+              <input
+                :value="getTipoNombre(elementoSeleccionado.tipo)"
+                type="text"
+                disabled
+                class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Categoría</label>
+              <input
+                :value="getCategoriaDisplay(elementoSeleccionado.categoria)"
+                type="text"
+                disabled
+                class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed capitalize"
+              />
+            </div>
           </div>
 
           <!-- Nombre editable -->
@@ -148,9 +159,10 @@
           </div>
 
           <p class="text-xs text-gray-500 mt-2">
-            Vista desde arriba: Ancho=X, Largo=Y. Las dimensiones se modifican directamente en el canvas
+            Vista desde arriba: Ancho=X, Largo=Y. Las dimensiones se modifican directamente en el
+            canvas
           </p>
-          
+
           <!-- Dimensiones físicas adicionales (si están disponibles) -->
           <div v-if="elementoSeleccionado.dimensiones" class="mt-3 pt-3 border-t border-gray-200">
             <h4 class="text-xs font-medium text-gray-600 mb-2">Dimensiones Físicas</h4>
@@ -160,9 +172,15 @@
               <div>Alto: {{ elementoSeleccionado.dimensiones.alto }}cm</div>
             </div>
           </div>
-          
+
           <!-- Información específica para elementos de pared -->
-          <div v-if="elementoSeleccionado.ubicacion === 'pared' && elementoSeleccionado.alturaRespectoAlSuelo !== undefined" class="mt-3 pt-3 border-t border-gray-200">
+          <div
+            v-if="
+              elementoSeleccionado.ubicacion === 'pared' &&
+              elementoSeleccionado.alturaRespectoAlSuelo !== undefined
+            "
+            class="mt-3 pt-3 border-t border-gray-200"
+          >
             <h4 class="text-xs font-medium text-gray-600 mb-2">Posicionamiento en Pared</h4>
             <div class="text-xs text-gray-500">
               <div>Altura del suelo: {{ elementoSeleccionado.alturaRespectoAlSuelo }}cm</div>
@@ -189,7 +207,9 @@
               <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span class="text-sm text-blue-700">{{ elementoSeleccionado.padre }}</span>
+              <span class="text-sm text-blue-700">{{
+                obtenerNombreElementoPorId(elementoSeleccionado.padre)
+              }}</span>
             </div>
           </div>
 
@@ -207,7 +227,7 @@
                 <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span class="text-sm text-green-700">{{ hijoId }}</span>
+                <span class="text-sm text-green-700">{{ obtenerNombreElementoPorId(hijoId) }}</span>
               </div>
             </div>
           </div>
@@ -242,6 +262,18 @@
 
     <!-- Footer fijo con acciones -->
     <div v-if="elementoSeleccionado" class="p-4 border-t border-gray-200 bg-white">
+      <!-- Botón de navegación (solo para elementos navegables) -->
+      <button
+        v-if="esNavegable(elementoSeleccionado)"
+        @click="navegarAElemento"
+        class="w-full mb-3 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+        Navegar al interior
+      </button>
+
       <div class="flex gap-2">
         <button
           @click="resetearPropiedades"
@@ -263,6 +295,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore.js'
+import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
 
 // Store
 const canvasStore = useCanvasStore()
@@ -292,6 +325,16 @@ watch(
 )
 
 // Métodos
+const getTipoNombre = (tipo) => {
+  const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
+  return tipoInfo?.nombre || tipo || 'Desconocido'
+}
+
+const getCategoriaDisplay = (categoria) => {
+  const categoriaInfo = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoria)
+  return categoriaInfo?.nombre || categoria || 'Sin categoría'
+}
+
 const generarNombrePorDefecto = (elemento) => {
   return `${elemento.tipo.charAt(0).toUpperCase() + elemento.tipo.slice(1)} ${elemento.id.split('_')[1] || ''}`
 }
@@ -322,6 +365,24 @@ const resetearPropiedades = () => {
 
 const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
+}
+
+// Nuevas funciones para navegación
+const esNavegable = (elemento) => {
+  // Solo elementos y contenedores son navegables
+  return elemento && (elemento.tipo === 'elementos' || elemento.tipo === 'contenedores')
+}
+
+const navegarAElemento = () => {
+  if (elementoSeleccionado.value && esNavegable(elementoSeleccionado.value)) {
+    canvasStore.navegarAElemento(elementoSeleccionado.value.id)
+  }
+}
+
+// Funciones para obtener nombres de elementos por ID
+const obtenerNombreElementoPorId = (elementoId) => {
+  const elemento = canvasStore.elementoPorId(elementoId)
+  return elemento ? elemento.nombre || generarNombrePorDefecto(elemento) : `ID: ${elementoId}`
 }
 </script>
 
