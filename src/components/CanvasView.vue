@@ -44,7 +44,7 @@
           }"
         />
         <v-line
-          v-if="!canvasStore.estaEnElemento"
+          v-if="!canvasStore.estaEnElemento && !canvasStore.estaEnContenedor"
           :config="{
             points: floorBoundary.points,
             closed: true,
@@ -58,9 +58,10 @@
           :config="{
             x: 10,
             y: 10,
-            text: canvasStore.estaEnElemento
-              ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${layerConfig.width}x${layerConfig.height}px (Adaptativo)`
-              : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
+            text:
+              canvasStore.estaEnElemento || canvasStore.estaEnContenedor
+                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${layerConfig.width}x${layerConfig.height}px (Adaptativo)`
+                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
             fontSize: 12,
             fontFamily: 'Arial',
             fill: '#3b82f6',
@@ -68,6 +69,7 @@
           }"
         />
         <v-text
+          v-if="canvasStore.estaEnPlanta"
           :config="{
             x: 10,
             y: 30,
@@ -82,8 +84,20 @@
           v-if="canvasStore.estaEnElemento"
           :config="{
             x: 10,
-            y: 50,
-            text: `Contenedores: ${contenedoresVisibles.length}`,
+            y: 30,
+            text: `Contenedores: ${elementosVisiblesEnCanvas.length}`,
+            fontSize: 11,
+            fontFamily: 'Arial',
+            fill: '#dc2626',
+            listening: false,
+          }"
+        />
+        <v-text
+          v-if="canvasStore.estaEnContenedor"
+          :config="{
+            x: 10,
+            y: 30,
+            text: `Items: ${elementosVisiblesEnCanvas.length} (elementos + contenedores)`,
             fontSize: 11,
             fontFamily: 'Arial',
             fill: '#dc2626',
@@ -235,41 +249,7 @@
           />
         </template>
 
-        <!-- Renderizado de contenedores (solo cuando estamos dentro de un elemento) -->
-        <template v-if="canvasStore.estaEnElemento && contenedoresVisibles.length > 0">
-          <template v-for="contenedor in contenedoresVisibles" :key="`contenedor-${contenedor.id}`">
-            <!-- Área del contenedor -->
-            <v-rect
-              :config="{
-                id: `contenedor-${contenedor.id}`,
-                x: (contenedor.posicion?.x || 0) * CM_TO_PX,
-                y: (contenedor.posicion?.y || 0) * CM_TO_PX,
-                width: (contenedor.dimensiones?.ancho || 50) * CM_TO_PX,
-                height: (contenedor.dimensiones?.largo || 50) * CM_TO_PX,
-                fill: 'rgba(229, 231, 235, 0.3)',
-                stroke: '#9ca3af',
-                strokeWidth: 2,
-                strokeDashArray: [5, 5],
-                opacity: 0.9,
-                listening: false,
-              }"
-            />
-
-            <!-- Etiqueta del contenedor -->
-            <v-text
-              :config="{
-                x: (contenedor.posicion?.x || 0) * CM_TO_PX + 5,
-                y: (contenedor.posicion?.y || 0) * CM_TO_PX + 5,
-                text: contenedor.nombre || `Contenedor ${contenedor.id}`,
-                fontSize: 12,
-                fontFamily: 'Arial',
-                fill: '#374151',
-                fontStyle: 'bold',
-                listening: false,
-              }"
-            />
-          </template>
-        </template>
+        <!-- Los contenedores se renderizan junto con los elementos en la sección principal -->
 
         <!-- Grid de referencia de la planta -->
         <v-line
@@ -305,8 +285,7 @@
             anchorFill: '#ffffff',
             anchorCornerRadius: 2,
             anchorSize: 8,
-            borderStroke: '#6366f1',
-            enabledAnchors: ['top-left','top-right','bottom-left','bottom-right'],
+            borderStroke: '#6366f1'
           }"
         />
       </v-layer>
@@ -331,7 +310,12 @@
           canvasStore.plantaActivaData.dimensiones.largo
         }}cm
       </span>
-      <span v-if="canvasStore.estaEnElemento && canvasStore.elementoContenedorActual">
+      <span
+        v-if="
+          (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) &&
+          canvasStore.elementoContenedorActual
+        "
+      >
         Elemento: {{ canvasStore.elementoContenedorActual.nombre }} ({{
           canvasStore.canvasAdaptativo.width
         }}×{{ canvasStore.canvasAdaptativo.height }}px)
@@ -517,6 +501,7 @@ const toggleLockElement = (elementId) => {
 }
 
 // Conflictos en vivo durante el arrastre
+// const liveConflicts = conflictsApi.conflicts
 const setLiveConflictsThrottled = throttle((movingEl) => {
   try {
     const list = detectConflictsFor(movingEl, canvasStore.elementosVisibles)
@@ -630,7 +615,7 @@ const floorBoundary = computed(() => {
   let height = layerConfig.value.height
   let points = []
 
-  if (canvasStore.estaEnElemento) {
+  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
     return { width, height, points }
   }
 
@@ -669,8 +654,8 @@ const gridLines = computed(() => {
   const horizontal = []
 
   // Usar las dimensiones del layer (planta) para el grid
-  const layerWidth = floorBoundary.value.width;
-  const layerHeight = floorBoundary.value.height;
+  const layerWidth = floorBoundary.value.width
+  const layerHeight = floorBoundary.value.height
 
   for (let i = 0; i <= layerWidth; i += gridSizePx) {
     vertical.push(i)
@@ -683,25 +668,13 @@ const gridLines = computed(() => {
   return { vertical, horizontal }
 })
 
-// Contenedores visibles del elemento actual
-const contenedoresVisibles = computed(() => {
-  if (!canvasStore.estaEnElemento || !canvasStore.elementoContenedorActual) {
-    return []
-  }
-
-  const elementoActual = canvasStore.elementoContenedorActual
-  const contenedores = elementoActual.contenedores || []
-
-  return contenedores
-})
-
 // Obtiene el contorno de la planta activa como rect o polígono
 const computeBoundary = () => {
   const W = layerConfig.value.width
   const H = layerConfig.value.height
 
-  // Si estamos en un elemento, usar todo el canvas adaptativo como boundary
-  if (canvasStore.estaEnElemento) {
+  // Si estamos en un elemento o contenedor, usar todo el canvas adaptativo como boundary
+  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
     return { type: 'rect', W, H }
   }
 
@@ -775,7 +748,7 @@ const handleElementDoubleClick = (elemento) => {
   console.log('Double-click en elemento:', elemento.nombre)
 
   // Verificar si el elemento puede tener hijos (contenedor)
-  const tiposContenedor = ['anaqueles', 'estantes', 'armarios', 'contenedores', 'mesas']
+  const tiposContenedor = ['elementos', 'contenedores']
 
   if (tiposContenedor.includes(elemento.tipo)) {
     console.log('Navegando al interior del elemento:', elemento.nombre)
@@ -836,18 +809,6 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
       )
       const finalCenter = { x: resolved.x + r, y: resolved.y + r }
 
-      // NUEVA VALIDACIÓN: Verificar contenedores en elementos para círculos
-      if (canvasStore.estaEnElemento) {
-        const validacion = validateDropInContainers(resolved.x, resolved.y, r * 2, r * 2)
-
-        if (!validacion.valido) {
-          // Si no es válido, mantener la última posición válida
-          const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
-          const centerPrev = { x: prev.x + r, y: prev.y + r }
-          return toStageCoords(centerPrev)
-        }
-      }
-
       // Edge feedback
       const toLeft = Math.abs(finalCenter.x - r)
       const toTop = Math.abs(finalCenter.y - r)
@@ -887,17 +848,6 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     let adjusted = { x: clamped.x, y: clamped.y }
     const res = resolveAgainstBlockingObstacles(clamped.x, clamped.y, elemento)
     adjusted = { x: res.x, y: res.y }
-
-    // NUEVA VALIDACIÓN: Verificar contenedores en elementos
-    if (canvasStore.estaEnElemento) {
-      const validacion = validateDropInContainers(adjusted.x, adjusted.y, w, h)
-
-      if (!validacion.valido) {
-        // Si no es válido, mantener la última posición válida
-        const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
-        return toStageCoords(prev)
-      }
-    }
 
     // Edge feedback basado en posición final
     const toLeft = Math.abs(adjusted.x)
@@ -973,19 +923,42 @@ const startElementDrag = (elementId) => {
       const getMovingShapeBBox = () => {
         if (!shape) return null
         if (shape.className === 'Circle') {
-          const r = shape.radius && shape.radius() ? shape.radius() : Math.min(shape.width?.() || 0, shape.height?.() || 0) / 2
+          const r =
+            shape.radius && shape.radius()
+              ? shape.radius()
+              : Math.min(shape.width?.() || 0, shape.height?.() || 0) / 2
           return { x: shape.x() - r, y: shape.y() - r, width: r * 2, height: r * 2 }
         }
-        return { x: shape.x(), y: shape.y(), width: shape.width?.() || 0, height: shape.height?.() || 0 }
+        return {
+          x: shape.x(),
+          y: shape.y(),
+          width: shape.width?.() || 0,
+          height: shape.height?.() || 0,
+        }
       }
 
       const onValidateLight = throttle2((bbox) => {
         const area = { type: 'rect', W: layerConfig.value.width, H: layerConfig.value.height }
-        const outside = bbox.x < 0 || bbox.y < 0 || bbox.x + bbox.width > area.W || bbox.y + bbox.height > area.H
-        const moving = { id: elementId, x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height }
-        const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles).filter((c) => c.bloqueante)
+        const outside =
+          bbox.x < 0 || bbox.y < 0 || bbox.x + bbox.width > area.W || bbox.y + bbox.height > area.H
+        const moving = {
+          id: elementId,
+          x: bbox.x,
+          y: bbox.y,
+          width: bbox.width,
+          height: bbox.height,
+        }
+        const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles).filter(
+          (c) => c.bloqueante,
+        )
         const warn = outside || conflicts.length > 0
-        try { shape.stroke(warn ? '#ef4444' : canvasStore.elementoSeleccionado === elementId ? '#000' : '#666') } catch { /* ignore */ }
+        try {
+          shape.stroke(
+            warn ? '#ef4444' : canvasStore.elementoSeleccionado === elementId ? '#000' : '#666',
+          )
+        } catch {
+          console.warn('Error al actualizar el color del borde del shape:', elementId)
+        }
       })
 
       const onCommitEnd = () => {}
@@ -994,7 +967,9 @@ const startElementDrag = (elementId) => {
       rafControllers.set(elementId, { ctrl, shape, layer })
       ctrl.start()
     }
-  } catch { /* ignore */ }
+  } catch {
+    console.warn('Error al iniciar el arrastre del elemento:', elementId)
+  }
 }
 
 const updateElementPosition = (e, elementId, forma = 'rectangular') => {
@@ -1010,8 +985,16 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   }
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (!elemento) return
+
+  // Feedback visual: bordes cuando está pegado o hay conflicto
+  // const warn = atEdgeMap.value.get(elementId)
+
+  // Detectar conflictos en tiempo real (no bloquea)
   const moving = { ...elemento, x, y }
   setLiveConflictsThrottled(moving)
+  // const hasAnyConflict = liveConflicts.value.length > 0
+
+  // Dejar feedback visual y draw al rAF loop; NO escribir en store
   const rec = rafControllers.get(elementId)
   if (rec && rec.ctrl) rec.ctrl.move({ x, y })
 }
@@ -1082,11 +1065,19 @@ const endElementDrag = (elementId) => {
   // Detener rAF y restaurar modo performance
   const rec = rafControllers.get(elementId)
   if (rec && rec.ctrl) {
-    try { rec.ctrl.end({ x: final.x, y: final.y, width: elemento.width, height: elemento.height }) } catch { /* ignore */ }
+    try {
+      rec.ctrl.end({ x: final.x, y: final.y, width: elemento.width, height: elemento.height })
+    } catch {
+      console.warn('Error al finalizar el arrastre del elemento:', elementId)
+    }
   }
   rafControllers.delete(elementId)
   const perf = perfContexts.get(elementId)
-  try { if (perf && perf.restore) perf.restore() } catch { /* ignore */ }
+  try {
+    if (perf && perf.restore) perf.restore()
+  } catch {
+    console.warn('Error al restaurar el contexto de rendimiento del elemento:', elementId)
+  }
   perfContexts.delete(elementId)
 
   // Snap/clamp final rápido y commit único + snapshot
@@ -1171,52 +1162,34 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   return { x: worldX, y: worldY }
 }
 
-// Validar si un elemento puede colocarse dentro de contenedores
-const validateDropInContainers = (candX, candY, elementWidth, elementHeight) => {
-  // Solo aplicar validación en vista de elemento
-  if (!canvasStore.estaEnElemento) {
-    return { valido: true } // En plantas permitir drop libre
-  }
-
-  const contenedores = contenedoresVisibles.value
-  if (!contenedores || contenedores.length === 0) {
-    return {
-      valido: false,
-      razon: 'No hay contenedores definidos en este elemento',
-    }
-  }
-
-  // Verificar si el elemento está completamente dentro de algún contenedor
-  for (const contenedor of contenedores) {
-    const contX = (contenedor.posicion?.x || 0) * CM_TO_PX
-    const contY = (contenedor.posicion?.y || 0) * CM_TO_PX
-    const contW = (contenedor.dimensiones?.ancho || 50) * CM_TO_PX
-    const contH = (contenedor.dimensiones?.largo || 50) * CM_TO_PX
-
-    // Verificar si el elemento cabe completamente dentro del contenedor
-    const elementoCabeEnContenedor =
-      candX >= contX &&
-      candY >= contY &&
-      candX + elementWidth <= contX + contW &&
-      candY + elementHeight <= contY + contH
-
-    if (elementoCabeEnContenedor) {
-      return {
-        valido: true,
-        contenedorId: contenedor.id,
-        contenedor: contenedor,
-      }
-    }
-  }
-
-  return {
-    valido: false,
-    razon: 'El elemento debe colocarse completamente dentro de un área contenedora',
-  }
-}
-
 const createElementFromDrop = (data, dropEvent) => {
   const elemento = data.elemento
+
+  // ===== VALIDACIÓN DE JERARQUÍA =====
+  const contextoActual = canvasStore.contextoActual.tipo
+  const tipoElemento = elemento.tipo
+
+  // Verificar si el tipo puede ser creado en el contexto actual
+  if (contextoActual === 'plantas' && tipoElemento !== 'elementos') {
+    showToast('En plantas solo se pueden agregar elementos', 'error')
+    return
+  }
+
+  if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
+    showToast('En elementos solo se pueden agregar contenedores', 'error')
+    return
+  }
+
+  if (
+    contextoActual === 'contenedores' &&
+    tipoElemento !== 'elementos' &&
+    tipoElemento !== 'contenedores'
+  ) {
+    showToast('En contenedores solo se pueden agregar elementos u otros contenedores', 'error')
+    return
+  }
+
+  // ===== CONTINUAR CON LA LÓGICA EXISTENTE =====
 
   // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
   const { width, height } = getElementPixelDimensions(elemento)
@@ -1263,16 +1236,6 @@ const createElementFromDrop = (data, dropEvent) => {
     }
   } else if (boundary.type === 'polygon') {
     isInsideArea = rectInsidePolygon(candX, candY, finalWidth, finalHeight, boundary.points)
-  }
-
-  // 5.5. NUEVA VALIDACIÓN: Verificar contenedores en elementos para círculos
-  if (canvasStore.estaEnElemento) {
-    const validacion = validateDropInContainers(candX, candY, finalWidth, finalHeight)
-
-    if (!validacion.valido) {
-      showToast(validacion.razon, 'error')
-      return // Cancelar drop
-    }
   }
 
   // 6. Crear elemento temporal para detectar conflictos
@@ -1334,7 +1297,8 @@ const createElementFromDrop = (data, dropEvent) => {
 
   const nuevoElemento = {
     id: `${elemento.tipo || elemento.categoria}_${Date.now()}`,
-    tipo: elemento.tipo || elemento.categoria || 'elemento',
+    tipo: elemento.tipo, // Usar el tipo del elemento del catálogo
+    categoria: elemento.categoria, // Mantener también la categoría
     nombre: elemento.nombre || 'Nuevo elemento',
 
     // Estructura correcta para posición
