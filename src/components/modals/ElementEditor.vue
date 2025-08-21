@@ -82,6 +82,25 @@
                 </select>
               </div>
             </div>
+            
+            <!-- Altura respecto al suelo (solo para elementos de pared) -->
+            <div v-if="localElemento.ubicacion === 'pared'" class="mb-6">
+              <h3 class="text-lg font-medium text-gray-800 mb-3">Posicionamiento en Pared</h3>
+              <div class="mb-2">
+                <label class="block text-sm font-medium text-gray-700">Altura respecto al suelo (cm)</label>
+                <input
+                  v-model.number="localElemento.alturaRespectoAlSuelo"
+                  type="number"
+                  min="0"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
+                  placeholder="Ej: 80"
+                />
+                <p class="text-xs text-gray-500 mt-1">
+                  Distancia desde el suelo hasta la base del elemento
+                </p>
+              </div>
+            </div>
+            
             <!-- Dimensiones -->
             <div class="mb-6">
               <h3 class="text-lg font-medium text-gray-800 mb-3">Dimensiones (cm)</h3>
@@ -232,6 +251,7 @@ const localElemento = ref({
   dimensiones: { ancho: 100, largo: 100, alto: 75 },
   pesoMaximo: 50,
   ubicacion: 'suelo',
+  alturaRespectoAlSuelo: 0,
   descripcion: '',
   icono: 'box',
   contenedores: [],
@@ -289,6 +309,7 @@ const restablecerFormulario = () => {
     dimensiones: { ancho: 100, largo: 100, alto: 75 },
     pesoMaximo: 50,
     ubicacion: 'suelo',
+    alturaRespectoAlSuelo: 0,
     descripcion: '',
     icono: 'box',
     contenedores: [],

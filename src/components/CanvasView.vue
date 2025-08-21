@@ -36,10 +36,10 @@
             y: 0,
             width: floorBoundary.width,
             height: floorBoundary.height,
-            fill: '#ffffff',
+            fill: 'rgba(14,165,233,0.08)',
             stroke: '#3b82f6',
             strokeWidth: 2,
-            opacity: 0.1,
+            opacity: 1,
             listening: false,
           }"
         />
@@ -52,12 +52,14 @@
             strokeWidth: 2,
           }"
         />
-        <!-- Debug: mostrar información de la planta -->
+        <!-- Debug: mostrar información según el contexto -->
         <v-text
           :config="{
             x: 10,
             y: 10,
-            text: `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
+            text: canvasStore.estaEnElemento 
+              ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${layerConfig.width}x${layerConfig.height}px (Adaptativo)`
+              : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
             fontSize: 12,
             fontFamily: 'Arial',
             fill: '#3b82f6',
@@ -202,93 +204,6 @@
             />
           </v-group>
 
-          <!-- Elementos triangulares -->
-          <template v-else-if="elemento.forma === 'triangular'">
-            <v-rect
-              :config="{
-                id: elemento.id + '_interaction',
-                x: elemento.x,
-                y: elemento.y,
-                width: elemento.width,
-                height: elemento.height,
-                fill: 'transparent',
-                stroke: 'transparent',
-                opacity: 0,
-                draggable: !isElementLocked(elemento.id),
-                dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
-              }"
-              @click="() => selectElement(elemento.id)"
-              @dblclick="() => handleElementDoubleClick(elemento)"
-              @dragstart="() => !isElementLocked(elemento.id) && startElementDrag(elemento.id)"
-              @dragmove="
-                (e) =>
-                  !isElementLocked(elemento.id) &&
-                  updateElementPosition(e, elemento.id, 'triangular')
-              "
-              @dragend="() => !isElementLocked(elemento.id) && endElementDrag(elemento.id)"
-            />
-            <!-- Icono de candado para elemento triangular bloqueado -->
-            <v-group
-              v-if="isElementLocked(elemento.id) && elemento.forma === 'triangular'"
-              :config="{
-                x: elemento.x,
-                y: elemento.y,
-                width: elemento.width,
-                height: elemento.height,
-                listening: false,
-              }"
-            >
-              <v-rect
-                :config="{
-                  x: 0,
-                  y: 0,
-                  width: elemento.width,
-                  height: elemento.height,
-                  fill: '#000',
-                  opacity: 0.12,
-                  cornerRadius: 8,
-                  listening: false,
-                }"
-              />
-              <v-text
-                :config="{
-                  x: elemento.width / 2 - 16,
-                  y: elemento.height / 2 - 16,
-                  text: '🔒',
-                  fontSize: 32,
-                  fontFamily: 'Arial',
-                  fill: '#f59e0b',
-                  listening: false,
-                }"
-              />
-            </v-group>
-            <v-line
-              :config="{
-                id: elemento.id + '_visual',
-                points: [
-                  elemento.x + elemento.width / 2,
-                  elemento.y,
-                  elemento.x,
-                  elemento.y + elemento.height,
-                  elemento.x + elemento.width,
-                  elemento.y + elemento.height,
-                  elemento.x + elemento.width / 2,
-                  elemento.y,
-                ],
-                fill: elemento.color,
-                stroke: getStrokeColor(elemento.id),
-                strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
-                opacity: 0.8,
-                draggable: false,
-                shadowColor: 'black',
-                shadowBlur: 4,
-                shadowOpacity: 0.3,
-                closed: true,
-                listening: false,
-              }"
-            />
-          </template>
-
           <!-- Texto con el nombre del elemento -->
           <v-text
             :config="{
@@ -336,10 +251,14 @@
     <div class="canvas-info">
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
       <span>Vista: {{ canvasStore.vistaActiva }}</span>
-      <span v-if="canvasStore.plantaActivaData">
+      <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
         Planta: {{ canvasStore.plantaActivaData.dimensiones.ancho }}×{{
           canvasStore.plantaActivaData.dimensiones.largo
         }}cm
+      </span>
+      <span v-if="canvasStore.estaEnElemento && canvasStore.elementoContenedorActual">
+        Elemento: {{ canvasStore.elementoContenedorActual.nombre }} 
+        ({{ canvasStore.canvasAdaptativo.width }}×{{ canvasStore.canvasAdaptativo.height }}px)
       </span>
       <span v-if="canvasStore.elementoSeleccionado">
         Seleccionado: {{ canvasStore.elementoSeleccionado }}
@@ -456,13 +375,12 @@ import {
 import {
   rectInsidePolygon,
   circleInsidePolygon,
-  boundedRectDrag,
   clampRectToRect,
   snapToGrid,
   safeSnapRect,
   nudgePlace,
 } from '@/utils/geometry'
-import { SNAP_EPS, GRID_SIZE } from '@/utils/constants'
+import { SNAP_EPS, GRID_SIZE, CM_TO_PX } from '@/utils/constants'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -477,13 +395,35 @@ const containerRef = ref(null)
 const stageRef = ref(null)
 const layerRef = ref(null)
 
-// Tamaño del área
-const maxWidth = ref(100)
-const maxHeight = ref(100)
-
 // Composable con historial integrado
 const { store: canvasStore, actions, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
+
+// === HELPERS DE CONVERSIÓN ===
+/**
+ * Obtiene las dimensiones de un elemento en píxeles, convirtiendo desde cm si es necesario
+ * @param {Object} elemento - El elemento del cual obtener dimensiones
+ * @returns {Object} - { width: number, height: number } en píxeles
+ */
+const getElementPixelDimensions = (elemento) => {
+  // Si ya tiene width/height en píxeles, usarlos
+  if (elemento.width && elemento.height) {
+    return { width: elemento.width, height: elemento.height }
+  }
+  
+  // Si solo tiene dimensiones en cm, convertir
+  if (elemento.dimensiones) {
+    const widthCm = elemento.dimensiones.ancho || 100
+    const heightCm = elemento.dimensiones.largo || 60
+    return {
+      width: widthCm * CM_TO_PX,
+      height: heightCm * CM_TO_PX
+    }
+  }
+  
+  // Fallback a valores por defecto
+  return { width: 100, height: 60 }
+}
 const conflictsApi = useConflicts()
 
 // === BLOQUEO DE ELEMENTOS ===
@@ -629,18 +569,12 @@ const floorBoundary = computed(() => {
   return { width, height, points }
 })
 
-// Configuración del layer - TAMAÑO DE LA PLANTA ACTIVA
+// Configuración del layer - SIEMPRE USA CANVAS ADAPTATIVO
 const layerConfig = computed(() => {
-  const planta = canvasStore.plantaActivaData
-  if (!planta) {
-    return { width: 800, height: 600 } // Fallback
-  }
-
-  // Convertir dimensiones de cm a pixels (1cm = 2px para buena visualización)
-  const escalaVisualizacion = 2
+  // Usar siempre canvasAdaptativo como fuente única de verdad
   return {
-    width: planta.dimensiones.ancho * escalaVisualizacion,
-    height: planta.dimensiones.largo * escalaVisualizacion,
+    width: canvasStore.canvasAdaptativo.width,
+    height: canvasStore.canvasAdaptativo.height,
   }
 })
 
@@ -649,15 +583,15 @@ const elementosVisiblesEnCanvas = computed(() => {
   return canvasStore.elementosVisibles.filter((elemento) => elemento.visible !== false)
 })
 
-// Grid de referencia - BASADO EN LAS DIMENSIONES DE LA PLANTA
+// Grid de referencia - BASADO EN LAS DIMENSIONES DEL LAYER
 const gridLines = computed(() => {
   const gridSizePx = canvasStore.gridSize || 50
   const vertical = []
   const horizontal = []
 
-  // Usar las dimensiones del layer (planta) para el grid
-  const layerWidth = maxWidth.value
-  const layerHeight = maxHeight.value
+  // Usar las dimensiones del layer según el contexto (planta o elemento)
+  const layerWidth = layerConfig.value.width
+  const layerHeight = layerConfig.value.height
 
   for (let i = 0; i <= layerWidth; i += gridSizePx) {
     vertical.push(i)
@@ -1093,22 +1027,25 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
 const createElementFromDrop = (data, dropEvent) => {
   const elemento = data.elemento
 
-  // Obtener dimensiones base
-  let width = elemento.width || elemento.dimensiones?.ancho || 100
-  let height = elemento.height || elemento.dimensiones?.alto || 60
+  // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
+  const { width, height } = getElementPixelDimensions(elemento)
+  
+  // Obtener dimensiones originales en cm para guardar
+  const widthCm = elemento.dimensiones?.ancho || 100
+  const heightCm = elemento.dimensiones?.largo || 60
 
   // Aplicar dimensiones mínimas para mejorar la interacción
   const MIN_WIDTH = 40
   const MIN_HEIGHT = 30
-  width = Math.max(width, MIN_WIDTH)
-  height = Math.max(height, MIN_HEIGHT)
+  const finalWidth = Math.max(width, MIN_WIDTH)
+  const finalHeight = Math.max(height, MIN_HEIGHT)
 
   // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
   const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
 
   // 2. Calcular posición candidata centrada en el puntero
-  let candX = worldCoords.x - width / 2
-  let candY = worldCoords.y - height / 2
+  let candX = worldCoords.x - finalWidth / 2
+  let candY = worldCoords.y - finalHeight / 2
 
   // 3. Aplicar snap a grilla ANTES de validar
   const snapped = snapToGrid(candX, candY, GRID_SIZE)
@@ -1122,16 +1059,16 @@ const createElementFromDrop = (data, dropEvent) => {
   let isInsideArea = true
   if (boundary.type === 'rect') {
     isInsideArea =
-      candX >= 0 && candY >= 0 && candX + width <= boundary.W && candY + height <= boundary.H
+      candX >= 0 && candY >= 0 && candX + finalWidth <= boundary.W && candY + finalHeight <= boundary.H
 
     // Si está fuera, intentar clamp
     if (!isInsideArea) {
-      const clamped = clampRectToRect(candX, candY, width, height, boundary.W, boundary.H)
+      const clamped = clampRectToRect(candX, candY, finalWidth, finalHeight, boundary.W, boundary.H)
       candX = clamped.x
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.points)
+    isInsideArea = rectInsidePolygon(candX, candY, finalWidth, finalHeight, boundary.points)
   }
 
   // 6. Crear elemento temporal para detectar conflictos
@@ -1139,8 +1076,8 @@ const createElementFromDrop = (data, dropEvent) => {
     id: '__temp_drop__',
     x: candX,
     y: candY,
-    width,
-    height,
+    width: finalWidth,
+    height: finalHeight,
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     tipo: elemento.tipo || elemento.categoria || 'elemento',
     forma: elemento.forma || 'rectangular',
@@ -1163,8 +1100,8 @@ const createElementFromDrop = (data, dropEvent) => {
     const nudgeResult = nudgePlace(
       candX,
       candY,
-      width,
-      height,
+      finalWidth,
+      finalHeight,
       boundary,
       allElements,
       tempElement,
@@ -1204,23 +1141,24 @@ const createElementFromDrop = (data, dropEvent) => {
       rotation: 0,
     },
 
-    // Estructura correcta para dimensiones
+    // Estructura correcta para dimensiones (mantener en cm los datos físicos)
     dimensiones: {
-      ancho: width,
-      largo: height,
+      ancho: widthCm,
+      largo: heightCm,
       alto: elemento.dimensiones?.alto || elemento.alto || 20,
     },
 
-    // Propiedades legacy para compatibilidad con Konva
+    // Propiedades legacy para compatibilidad con Konva (en px para renderizado)
     x: finalPosition.x,
     y: finalPosition.y,
-    width: width,
-    height: height,
+    width: finalWidth,
+    height: finalHeight,
 
     color: color,
     colorBase: color,
     forma: elemento.forma || 'rectangular',
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
+    alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
     descripcion: elemento.descripcion || '',
 
@@ -1251,8 +1189,9 @@ const createElementFromBuffer = (data, dropEvent) => {
   }
 
   const elemento = bufferItem.elemento
-  const width = elemento.width || elemento.dimensiones?.ancho || 100
-  const height = elemento.height || elemento.dimensiones?.alto || 60
+  
+  // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
+  const { width, height } = getElementPixelDimensions(elemento)
 
   // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
   const worldCoords = getWorldCoordinatesFromPointer(dropEvent)

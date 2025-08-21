@@ -75,6 +75,46 @@ export const ELEMENTOS_PREDEFINIDOS = [
       },
     ],
   },
+  
+  // Estante de pared
+  {
+    id: 'estante_pared_pequeno',
+    nombre: 'Estante de Pared',
+    categoria: 'estantes',
+    forma: 'rectangular',
+    colorBase: '#10b981',
+    dimensiones: {
+      ancho: 80,
+      largo: 25,
+      alto: 20,
+    },
+    pesoMaximo: 50, // kg
+    ubicacion: 'pared',
+    alturaRespectoAlSuelo: 150, // cm - altura típica para estantes de pared
+    descripcion: 'Estante montado en pared para almacenamiento ligero',
+    icono: 'shelf',
+    contenedores: [],
+  },
+  
+  // Armario de pared
+  {
+    id: 'armario_pared_alto',
+    nombre: 'Armario de Pared Alto',
+    categoria: 'armarios',
+    forma: 'rectangular',
+    colorBase: '#7c3aed',
+    dimensiones: {
+      ancho: 60,
+      largo: 30,
+      alto: 80,
+    },
+    pesoMaximo: 100, // kg
+    ubicacion: 'pared',
+    alturaRespectoAlSuelo: 50, // cm - altura moderada para armarios
+    descripcion: 'Armario montado en pared para almacenamiento vertical',
+    icono: 'cabinet',
+    contenedores: [],
+  },
 ]
 
 export const CATEGORIAS = [
@@ -110,7 +150,7 @@ export const COLORES_DISPONIBLES = [
 
 // === Escalas y tolerancias de interacción ===
 // Conversión de centímetros a pixeles en la visualización (usada para layer/planta)
-export const CM_TO_PX = 2
+export const CM_TO_PX = 10
 // Tolerancia para aplicar "pegado" al borde en px
 export const SNAP_EPS = 4
 // Tamaño de grilla para snap y búsqueda en espiral
