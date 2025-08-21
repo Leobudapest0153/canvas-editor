@@ -106,7 +106,7 @@
               stroke: getStrokeColor(elemento.id),
               strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
               opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
-              draggable: !isElementLocked(elemento.id),
+              draggable: canDragElement(elemento.id),
               shadowColor: 'black',
               shadowBlur: 4,
               shadowOpacity: 0.3,
@@ -114,11 +114,10 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => !isElementLocked(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="
-              (e) => !isElementLocked(elemento.id) && updateElementPosition(e, elemento.id)
-            "
-            @dragend="() => !isElementLocked(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
+            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
+            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
           />
           <!-- Icono de candado para elemento bloqueado -->
           <v-group
@@ -129,6 +128,8 @@
               width: elemento.width,
               height: elemento.height,
               listening: false,
+              rotation: elemento.rotation || 0,
+              opacity: 0.35,
             }"
           >
             <v-rect
@@ -168,7 +169,7 @@
               stroke: getStrokeColor(elemento.id),
               strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
               opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
-              draggable: !isElementLocked(elemento.id),
+              draggable: canDragElement(elemento.id),
               shadowColor: 'black',
               shadowBlur: 4,
               shadowOpacity: 0.3,
@@ -176,12 +177,10 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => !isElementLocked(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="
-              (e) =>
-                !isElementLocked(elemento.id) && updateElementPosition(e, elemento.id, 'circular')
-            "
-            @dragend="() => !isElementLocked(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
+            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id, 'circular')"
+            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @transformend="(e) => handleTransformEnd(e, elemento.id, 'circular')"
           />
           <!-- Icono de candado para elemento circular bloqueado -->
           <v-group
@@ -192,6 +191,8 @@
               width: elemento.width,
               height: elemento.height,
               listening: false,
+              rotation: elemento.rotation || 0,
+              opacity: 0.35,
             }"
           >
             <v-circle
@@ -293,6 +294,21 @@
             listening: false,
           }"
         />
+        <!-- Transformer para modo edición -->
+        <v-transformer
+          v-if="isEditingSelected && canvasStore.elementoSeleccionado && !selectedElementLocked"
+          ref="transformerRef"
+          :config="{
+            rotateEnabled: true,
+            ignoreStroke: true,
+            anchorStroke: '#6366f1',
+            anchorFill: '#ffffff',
+            anchorCornerRadius: 2,
+            anchorSize: 8,
+            borderStroke: '#6366f1',
+            enabledAnchors: ['top-left','top-right','bottom-left','bottom-right'],
+          }"
+        />
       </v-layer>
     </v-stage>
 
@@ -359,64 +375,62 @@
         </svg>
       </button>
 
-      <!-- Botón de bloqueo/desbloqueo -->
-      <button
-        v-if="canvasStore.elementoSeleccionado"
-        @click="toggleLockElement(canvasStore.elementoSeleccionado)"
-        class="floating-btn btn-lock"
-        :title="isElementLocked(canvasStore.elementoSeleccionado) ? 'Desbloquear' : 'Bloquear'"
-      >
-        <!-- Candado cerrado -->
-        <svg
-          v-if="isElementLocked(canvasStore.elementoSeleccionado)"
-          class="icon"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            d="M7 11V7a5 5 0 0110 0v4"
-            stroke="#f59e0b"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-          <rect
-            x="5"
-            y="11"
-            width="14"
-            height="8"
-            rx="2"
-            fill="#f59e0b"
-            opacity="0.5"
-            stroke="#f59e0b"
-            stroke-width="2"
-          />
-          <circle cx="12" cy="15" r="2" fill="#fff" />
-        </svg>
-        <!-- Candado abierto -->
-        <svg v-else class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            d="M7 11V7a5 5 0 0110 0v2"
-            stroke="#3b82f6"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-          <rect
-            x="5"
-            y="11"
-            width="14"
-            height="8"
-            rx="2"
-            fill="#3b82f6"
-            opacity="0.2"
-            stroke="#3b82f6"
-            stroke-width="2"
-          />
-          <circle cx="12" cy="15" r="2" fill="#fff" />
-        </svg>
-      </button>
+      <!-- Nuevo SpeedDial -->
+      <div v-if="canvasStore.elementoSeleccionado" class="relative">
+        <div class="relative">
+          <button @click="toggleSpeedDial" class="floating-btn focus:outline-none" :class="{ 'ring-2 ring-blue-500': speedDialOpen }" title="Acciones del elemento">
+            <!-- Gear/Tuerca construido con spans -->
+            <div class="relative w-6 h-6">
+              <div class="absolute inset-0 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 border border-gray-400"></div>
+              <div class="absolute inset-1 rounded-full bg-white"></div>
+              <div class="absolute inset-[6px] rounded-full bg-gray-300 border border-gray-400"></div>
+              <!-- Dientes -->
+              <span v-for="i in 8" :key="i" class="absolute left-1/2 top-1/2 w-1.5 h-2 bg-gray-400 origin-center rounded-sm" :style="{ transform: `translate(-50%, -50%) rotate(${(i-1)*45}deg) translateY(-11px)` }"></span>
+            </div>
+          </button>
+          <!-- Acciones -->
+          <transition-group name="fade-scale">
+            <!-- Acción Bloquear / Desbloquear siempre disponible -->
+            <button
+              v-if="speedDialOpen"
+              key="lock"
+              @mousedown.stop.prevent
+              @click.stop="() => { toggleLockElement(canvasStore.elementoSeleccionado); if (selectedElementLocked) { activeDragElementId = null; editingElementId = null } }"
+              class="speed-action group"
+              style="top:60px;"
+              :title="selectedElementLocked ? 'Desbloquear' : 'Bloquear'"
+            >
+              <span class="sr-only">Bloquear</span>
+              <svg v-if="selectedElementLocked" class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-amber-400/40 stroke-amber-500" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
+              <svg v-else class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-blue-400/20 stroke-blue-500" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
+            </button>
+            <!-- Acción Modo Arrastre (solo si NO está bloqueado) -->
+            <button
+              v-if="speedDialOpen && !selectedElementLocked"
+              key="hand"
+              @click="toggleDragMode"
+              class="speed-action"
+              style="top:116px;"
+              :class="{ 'ring-2 ring-emerald-500': isDragModeActive }"
+              :title="isDragModeActive ? 'Desactivar modo arrastre' : 'Activar modo arrastre'"
+            >
+              <svg class="w-5 h-5" :class="isDragModeActive ? 'text-emerald-600' : 'text-gray-500'" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11V6a1 1 0 012 0v5m2-3V6a1 1 0 112 0v5m2-2V9a1 1 0 112 0v4.5c0 3.59-2.91 6.5-6.5 6.5h-.55A6.95 6.95 0 019 19" /></svg>
+            </button>
+            <!-- Acción Editar (Transformer) solo si NO está bloqueado -->
+            <button
+              v-if="speedDialOpen && !selectedElementLocked"
+              key="edit"
+              @click="toggleEditMode"
+              class="speed-action"
+              style="top:172px;"
+              :class="{ 'ring-2 ring-purple-500': isEditingSelected }"
+              :title="isEditingSelected ? 'Salir de edición (Transformer)' : 'Editar dimensiones'"
+            >
+              <svg class="w-5 h-5" :class="isEditingSelected ? 'text-purple-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5h2m-1 0v14m-7 0h14" /></svg>
+            </button>
+          </transition-group>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -424,7 +438,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { setupRafDrag } from '@/composables/useRafDrag'
-import { enablePerfMode, disablePerfMode } from '@/composables/usePerfMode'
+import { enablePerfMode } from '@/composables/usePerfMode'
 import { clampToAreaFast, computeSnapFast, throttleEveryNFrames } from '@/utils/dragMath'
 import { useCanvasWithHistory } from '@/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/composables/useCanvasBuffer'
@@ -460,7 +474,7 @@ const stageRef = ref(null)
 const layerRef = ref(null)
 
 // Composable con historial integrado
-const { store: canvasStore, actions, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
+const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
 
 // === HELPERS DE CONVERSIÓN ===
@@ -503,14 +517,11 @@ const toggleLockElement = (elementId) => {
 }
 
 // Conflictos en vivo durante el arrastre
-const liveConflicts = conflictsApi.conflicts
 const setLiveConflictsThrottled = throttle((movingEl) => {
   try {
     const list = detectConflictsFor(movingEl, canvasStore.elementosVisibles)
     conflictsApi.setConflicts(list, movingEl.id)
-  } catch {
-    // noop: evitar romper el drag por errores transitorios
-  }
+  } catch { /* ignore */ }
 }, 32)
 
 // Resolver posición contra obstáculos bloqueantes (suelo–suelo) usando MTD AABB
@@ -969,16 +980,12 @@ const startElementDrag = (elementId) => {
       }
 
       const onValidateLight = throttle2((bbox) => {
-        // Área rápida rect: usar canvasAdaptativo
         const area = { type: 'rect', W: layerConfig.value.width, H: layerConfig.value.height }
-        const outside =
-          bbox.x < 0 || bbox.y < 0 || bbox.x + bbox.width > area.W || bbox.y + bbox.height > area.H
+        const outside = bbox.x < 0 || bbox.y < 0 || bbox.x + bbox.width > area.W || bbox.y + bbox.height > area.H
         const moving = { id: elementId, x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height }
         const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles).filter((c) => c.bloqueante)
         const warn = outside || conflicts.length > 0
-        try {
-          shape.stroke(warn ? '#ef4444' : canvasStore.elementoSeleccionado === elementId ? '#000' : '#666')
-        } catch {}
+        try { shape.stroke(warn ? '#ef4444' : canvasStore.elementoSeleccionado === elementId ? '#000' : '#666') } catch { /* ignore */ }
       })
 
       const onCommitEnd = () => {}
@@ -987,14 +994,13 @@ const startElementDrag = (elementId) => {
       rafControllers.set(elementId, { ctrl, shape, layer })
       ctrl.start()
     }
-  } catch {}
+  } catch { /* ignore */ }
 }
 
 const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   const target = e.target
   let x = target.x()
   let y = target.y()
-
   if (forma === 'circular') {
     const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
     if (elemento) {
@@ -1002,19 +1008,10 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
       y = y - elemento.height / 2
     }
   }
-
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (!elemento) return
-
-  // Feedback visual: bordes cuando está pegado o hay conflicto
-  const warn = atEdgeMap.value.get(elementId)
-
-  // Detectar conflictos en tiempo real (no bloquea)
   const moving = { ...elemento, x, y }
   setLiveConflictsThrottled(moving)
-  const hasAnyConflict = liveConflicts.value.length > 0
-
-  // Dejar feedback visual y draw al rAF loop; NO escribir en store
   const rec = rafControllers.get(elementId)
   if (rec && rec.ctrl) rec.ctrl.move({ x, y })
 }
@@ -1085,11 +1082,11 @@ const endElementDrag = (elementId) => {
   // Detener rAF y restaurar modo performance
   const rec = rafControllers.get(elementId)
   if (rec && rec.ctrl) {
-    try { rec.ctrl.end({ x: final.x, y: final.y, width: elemento.width, height: elemento.height }) } catch {}
+    try { rec.ctrl.end({ x: final.x, y: final.y, width: elemento.width, height: elemento.height }) } catch { /* ignore */ }
   }
   rafControllers.delete(elementId)
   const perf = perfContexts.get(elementId)
-  try { if (perf && perf.restore) perf.restore() } catch {}
+  try { if (perf && perf.restore) perf.restore() } catch { /* ignore */ }
   perfContexts.delete(elementId)
 
   // Snap/clamp final rápido y commit único + snapshot
@@ -1268,7 +1265,7 @@ const createElementFromDrop = (data, dropEvent) => {
     isInsideArea = rectInsidePolygon(candX, candY, finalWidth, finalHeight, boundary.points)
   }
 
-  // 5.5. NUEVA VALIDACIÓN: Verificar contenedores en elementos
+  // 5.5. NUEVA VALIDACIÓN: Verificar contenedores en elementos para círculos
   if (canvasStore.estaEnElemento) {
     const validacion = validateDropInContainers(candX, candY, finalWidth, finalHeight)
 
@@ -1497,149 +1494,205 @@ const createElementFromBuffer = (data, dropEvent) => {
   }
 }
 
-// === FUNCIONES DE RESIZE Y SETUP ===
-const updateStageSize = () => {
-  if (containerRef.value) {
-    const container = containerRef.value
-    const newSize = {
-      width: container.offsetWidth,
-      height: container.offsetHeight,
-    }
-    stageSize.value = newSize
+// === NUEVO: Estado SpeedDial & modos ===
+const speedDialOpen = ref(false)
+const activeDragElementId = ref(null)
+const editingElementId = ref(null)
+const transformerRef = ref(null)
 
-    // Centrar la planta en el canvas cuando cambia el tamaño
-    centrarPlantaEnCanvas()
+const toggleSpeedDial = () => { speedDialOpen.value = !speedDialOpen.value }
+
+const isDragModeActive = computed(() => activeDragElementId.value === canvasStore.elementoSeleccionado)
+const isEditingSelected = computed(() => editingElementId.value === canvasStore.elementoSeleccionado)
+const selectedElementLocked = computed(() => {
+  const id = canvasStore.elementoSeleccionado
+  return id ? isElementLocked(id) : false
+})
+
+// Limpiar modos si se bloquea el elemento
+watch(selectedElementLocked, (locked) => {
+  if (locked) {
+    // Si se bloquea el elemento mientras estaba en modos especiales, limpiar
+    activeDragElementId.value = null
+    editingElementId.value = null
+  }
+})
+
+const toggleDragMode = () => {
+  if (!canvasStore.elementoSeleccionado) return
+  if (activeDragElementId.value === canvasStore.elementoSeleccionado) {
+    activeDragElementId.value = null
+  } else {
+    activeDragElementId.value = canvasStore.elementoSeleccionado
+    // si estaba en edición, salir (mutuamente excluyente)
+    if (editingElementId.value === canvasStore.elementoSeleccionado) editingElementId.value = null
+  }
+}
+const toggleEditMode = () => {
+  if (!canvasStore.elementoSeleccionado || selectedElementLocked.value) return
+  if (editingElementId.value === canvasStore.elementoSeleccionado) {
+    // Salir de edición: quitar transformer y arrastre especial
+    editingElementId.value = null
+    activeDragElementId.value = null
+  } else {
+    // Entrar en edición: activar transformer y permitir drag mientras se ajusta
+    editingElementId.value = canvasStore.elementoSeleccionado
+    activeDragElementId.value = canvasStore.elementoSeleccionado
+  }
+  nextTick(setupTransformer)
+}
+
+const canDragElement = (id) => !isElementLocked(id) && (activeDragElementId.value === id || editingElementId.value === id)
+
+const setupTransformer = () => {
+  if (!isEditingSelected.value || selectedElementLocked.value) return
+  const trComp = transformerRef.value?.getNode?.()
+  const stage = stageRef.value?.getNode?.()
+  if (!trComp || !stage) return
+  const node = stage.findOne(`#${canvasStore.elementoSeleccionado}`)
+  if (node) {
+    trComp.nodes([node])
+    // Si es círculo, mantener aspecto 1:1
+    const elemento = canvasStore.elementosVisibles.find(e => e.id === canvasStore.elementoSeleccionado)
+    if (elemento?.forma === 'circular') {
+      trComp.boundBoxFunc((oldBox, newBox) => {
+        const size = Math.max(newBox.width, newBox.height)
+        return { ...newBox, width: size, height: size }
+      })
+    } else {
+      trComp.boundBoxFunc(null)
+    }
+    trComp.getLayer()?.batchDraw?.()
   }
 }
 
-const centrarPlantaEnCanvas = () => {
-  const stage = stageRef.value?.getNode()
-  if (!stage) return
-
-  const stageWidth = stageSize.value.width
-  const stageHeight = stageSize.value.height
-  const layerWidth = layerConfig.value.width
-  const layerHeight = layerConfig.value.height
-
-  // Calcular posición para centrar la planta
-  const centerX = (stageWidth - layerWidth * canvasStore.zoom) / 2
-  const centerY = (stageHeight - layerHeight * canvasStore.zoom) / 2
-
-  canvasStore.configurarPan(centerX, centerY)
+// Manejar fin de transformaciones (resize/rotate)
+const handleTransformEnd = (e, elementId, forma) => {
+  const node = e.target
+  let x = node.x()
+  let y = node.y()
+  let width
+  let height
+  let rotation = node.rotation?.() || 0
+  if (forma === 'circular') {
+    // Para círculos usamos radius y mantenemos proporción
+    const r = node.radius() * node.scaleX() // asumiendo escala uniforme
+    width = r * 2
+    height = r * 2
+    node.scaleX(1); node.scaleY(1)
+    // En render el círculo se posiciona usando centro, pero en store usamos top-left
+    x = node.x() - r
+    y = node.y() - r
+  } else {
+    width = node.width() * node.scaleX()
+    height = node.height() * node.scaleY()
+    node.scaleX(1); node.scaleY(1)
+  }
+  // Clamp mínimo para evitar tamaños cero
+  width = Math.max(8, width)
+  height = Math.max(8, height)
+  // Actualizar dimensiones físicas si existen
+  const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
+  let dimensiones = elemento?.dimensiones
+  let newDimensiones = dimensiones ? { ...dimensiones } : undefined
+  if (newDimensiones) {
+    // Asume que el canvas está en px y 1cm = CM_TO_PX
+    newDimensiones.ancho = Math.round(width / CM_TO_PX)
+    newDimensiones.largo = Math.round(height / CM_TO_PX)
+  }
+  canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones })
+  lastValidPositions.value.set(elementId, { x, y })
+  nextTick(() => setupTransformer())
 }
 
+// Ajustar startElementDrag para nuevo modo (ya no se necesita wrapper)
+// (Se elimina originalStartElementDrag no usado)
+
+
+// === UTILIDADES DE TAMAÑO Y CENTRADO (restauradas) ===
+const updateStageSize = () => {
+  if (!containerRef.value) return
+  const container = containerRef.value
+  stageSize.value = { width: container.offsetWidth, height: container.offsetHeight }
+  centrarPlantaEnCanvas()
+}
+function centrarPlantaEnCanvas() {
+  try {
+    const stage = stageRef.value?.getNode?.()
+    if (!stage) return
+    const stageWidth = stageSize.value.width
+    const stageHeight = stageSize.value.height
+    const layerWidth = layerConfig.value.width
+    const layerHeight = layerConfig.value.height
+    const centerX = (stageWidth - layerWidth * canvasStore.zoom) / 2
+    const centerY = (stageHeight - layerHeight * canvasStore.zoom) / 2
+    canvasStore.configurarPan(centerX, centerY)
+  } catch { /* ignore */ }
+}
 const handleGlobalClick = (e) => {
-  // No deseleccionar si es click en formularios o panel de propiedades
   const isFormElement = e.target.matches('input, button, select, textarea, [contenteditable]')
   const isInPropertiesPanel = e.target.closest('[data-properties-panel]')
-
   if (!containerRef.value?.contains(e.target) && !isFormElement && !isInPropertiesPanel) {
     canvasStore.seleccionarElemento(null)
   }
 }
-
-// Event listener para resize
 let resizeObserver = null
-
 onMounted(async () => {
   await nextTick()
   updateStageSize()
-
   if (containerRef.value) {
     resizeObserver = new ResizeObserver(updateStageSize)
     resizeObserver.observe(containerRef.value)
   }
-
-  // Centrar la planta cuando se monta el componente
   await nextTick()
   centrarPlantaEnCanvas()
-
   window.addEventListener('click', handleGlobalClick)
 })
-
 onUnmounted(() => {
-  if (resizeObserver) {
-    resizeObserver.disconnect()
-  }
+  if (resizeObserver) resizeObserver.disconnect()
   window.removeEventListener('click', handleGlobalClick)
-  if (typeof window !== 'undefined' && window.__canvasApi) {
-    // limpiar referencias globales al desmontar
-    if (window.__canvasApi.recomputeBoundsAndIndex === recomputeBoundsAndIndex) {
-      delete window.__canvasApi
-    }
-  }
 })
 
-// Método: recomputar bounds, grid y limpiar índices/estados volátiles
-const recomputeBoundsAndIndex = async () => {
+// Eliminar referencia originalStartElementDrag no usada
+
+function recomputeBoundsAndIndex() {
   try {
-    // Limpiar conflictos y estados transitorios
     conflictsApi.clear()
     lastValidPositions.value.clear()
     atEdgeMap.value.clear()
     isElementDragging.value = false
     stageDragEnabled.value = true
-
-    // Recentrar planta en canvas para evitar offsets tras cambios
-    await nextTick()
-    centrarPlantaEnCanvas()
-  } catch {
-    // noop
-  }
+    nextTick(() => centrarPlantaEnCanvas())
+  } catch { /* ignore */ }
 }
-
-// Método: forzar redraw del layer/stage y limpiar caches
-const forceRedraw = () => {
+function forceRedraw() {
   try {
     const layer = layerRef.value?.getNode?.()
     const stage = stageRef.value?.getNode?.()
     if (!layer || !stage) return
-    // clear caches si existiera cache en nodos
-    try {
-      layer.clearCache?.()
-    } catch (e) {
-      void e
-    }
-    try {
-      stage.clearCache?.()
-    } catch (e) {
-      void e
-    }
+    try { layer.clearCache?.() } catch { /* ignore */ }
+    try { stage.clearCache?.() } catch { /* ignore */ }
     layer.batchDraw?.()
     stage.batchDraw?.()
-  } catch (e) {
-    void e
-  }
+  } catch { /* ignore */ }
 }
-
-// Método: reset mínimo de estados volátiles
-const resetVolatileState = () => {
+function resetVolatileState() {
   try {
     lastValidPositions.value.clear()
     atEdgeMap.value.clear()
     conflictsApi.clear()
     isElementDragging.value = false
     stageDragEnabled.value = true
-  } catch (e) {
-    console.error('Error reseteando estado volátil:', e)
-  }
+  } catch (e) { console.error('Error reseteando estado volátil:', e) }
 }
-
-// Exponer API global para que otros componentes (p.ej. PlantasPanel) sin acceso por ref puedan sincronizar
 if (typeof window !== 'undefined') {
-  window.__canvasApi = {
-    recomputeBoundsAndIndex,
-    forceRedraw,
-    resetVolatileState,
-  }
+  window.__canvasApi = { recomputeBoundsAndIndex, forceRedraw, resetVolatileState }
 }
-
-// Watch: cuando cambia el tamaño del layer (planta), recomputar y redibujar
 watch(
   () => [layerConfig.value.width, layerConfig.value.height],
   async () => {
     await nextTick()
-    await recomputeBoundsAndIndex()
+    recomputeBoundsAndIndex()
     await nextTick()
     forceRedraw()
   },
@@ -1747,4 +1800,10 @@ watch(
   width: 20px;
   height: 20px;
 }
+
+.fade-scale-enter-active, .fade-scale-leave-active { transition: all 0.15s ease; }
+.fade-scale-enter-from, .fade-scale-leave-to { opacity: 0; transform: translateY(8px) scale(0.9); }
+
+.speed-action { position:absolute; right:0; width:48px; height:48px; margin-top:8px; border:1px solid #d1d5db; background:#fff; border-radius:9999px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px  12px rgba(0,0,0,.15); transition:all .15s ease; }
+.speed-action:hover { transform: translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,.2); background:#f8fafc; }
 </style>
