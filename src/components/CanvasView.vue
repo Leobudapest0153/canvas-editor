@@ -296,6 +296,16 @@
       </v-layer>
     </v-stage>
 
+    <rulers-overlay
+      :width="stageSize.width"
+      :height="stageSize.height"
+      :scale="canvasStore.zoom"
+      :stage-x="canvasStore.panX"
+      :stage-y="canvasStore.panY"
+      :pixels-per-unit="10 * 100"
+      unit="m"
+    />
+
     <!-- Información de zoom, vista y dimensiones -->
     <div class="canvas-info">
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
@@ -419,6 +429,7 @@ import { clampToAreaFast, computeSnapFast, throttleEveryNFrames } from '@/utils/
 import { useCanvasWithHistory } from '@/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/composables/useCanvasBuffer'
 import { useConflicts } from '@/composables/useConflicts'
+import RulersOverlay from './RulersOverlay.vue'
 import {
   detectConflictsFor,
   throttle,
@@ -1654,8 +1665,8 @@ watch(
 
 .canvas-info {
   position: absolute;
-  top: 10px;
-  left: 10px;
+  top: 36px;
+  left: 36px;
   background: rgba(255, 255, 255, 0.9);
   padding: 8px 12px;
   border-radius: 6px;
@@ -1674,8 +1685,8 @@ watch(
 /* Botones flotantes para undo/redo */
 .floating-controls {
   position: absolute;
-  top: 20px;
-  right: 20px; /* valor por defecto, será sobrescrito por :style */
+  top: 36px;
+  right: 36px; /* valor por defecto, será sobrescrito por :style */
   display: flex;
   gap: 8px;
   z-index: 10;
