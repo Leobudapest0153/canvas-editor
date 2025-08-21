@@ -44,13 +44,13 @@ export const ELEMENTOS_PREDEFINIDOS = [
         id: 'contenedor_1',
         nombre: 'Contenedor 1',
         dimensiones: {
-          ancho: 120,
-          largo: 95,
+          ancho: 100,  // Reducido para caber en el anaquel
+          largo: 90,   // Reducido para caber en el anaquel
           alto: 80,
         },
         posicion: {
-          x: 24,
-          y: 36,
+          x: 10,   // 10cm desde el borde izquierdo
+          y: 10,   // 10cm desde el borde superior
           z: 0,
         },
         pesoMaximo: 250,
@@ -63,9 +63,14 @@ export const ELEMENTOS_PREDEFINIDOS = [
         id: 'contenedor_2',
         nombre: 'Contenedor 2',
         dimensiones: {
-          ancho: 120,
-          largo: 95,
+          ancho: 100,  // Reducido para caber en el anaquel
+          largo: 90,   // Reducido para caber en el anaquel
           alto: 80,
+        },
+        posicion: {
+          x: 10,    // 10cm desde el borde izquierdo
+          y: 105,   // Debajo del primer contenedor (10 + 90 + 5 de separación)
+          z: 0,
         },
         pesoMaximo: 250,
         ubicacion: 'interior',

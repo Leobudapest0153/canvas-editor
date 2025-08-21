@@ -44,6 +44,7 @@
           }"
         />
         <v-line
+          v-if="!canvasStore.estaEnElemento"
           :config="{
             points: floorBoundary.points,
             closed: true,
@@ -74,6 +75,18 @@
             fontSize: 11,
             fontFamily: 'Arial',
             fill: '#6b7280',
+            listening: false,
+          }"
+        />
+        <v-text
+          v-if="canvasStore.estaEnElemento"
+          :config="{
+            x: 10,
+            y: 50,
+            text: `Contenedores: ${contenedoresVisibles.length}`,
+            fontSize: 11,
+            fontFamily: 'Arial',
+            fill: '#dc2626',
             listening: false,
           }"
         />
@@ -219,6 +232,42 @@
               listening: false,
             }"
           />
+        </template>
+
+        <!-- Renderizado de contenedores (solo cuando estamos dentro de un elemento) -->
+        <template v-if="canvasStore.estaEnElemento && contenedoresVisibles.length > 0">
+          <template v-for="contenedor in contenedoresVisibles" :key="`contenedor-${contenedor.id}`">
+            <!-- Área del contenedor -->
+            <v-rect
+              :config="{
+                id: `contenedor-${contenedor.id}`,
+                x: (contenedor.posicion?.x || 0) * CM_TO_PX,
+                y: (contenedor.posicion?.y || 0) * CM_TO_PX,
+                width: (contenedor.dimensiones?.ancho || 50) * CM_TO_PX,
+                height: (contenedor.dimensiones?.largo || 50) * CM_TO_PX,
+                fill: 'rgba(229, 231, 235, 0.3)',
+                stroke: '#9ca3af',
+                strokeWidth: 2,
+                strokeDashArray: [5, 5],
+                opacity: 0.9,
+                listening: false,
+              }"
+            />
+            
+            <!-- Etiqueta del contenedor -->
+            <v-text
+              :config="{
+                x: (contenedor.posicion?.x || 0) * CM_TO_PX + 5,
+                y: (contenedor.posicion?.y || 0) * CM_TO_PX + 5,
+                text: contenedor.nombre || `Contenedor ${contenedor.id}`,
+                fontSize: 12,
+                fontFamily: 'Arial',
+                fill: '#374151',
+                fontStyle: 'bold',
+                listening: false,
+              }"
+            />
+          </template>
         </template>
 
         <!-- Grid de referencia de la planta -->
@@ -604,10 +653,29 @@ const gridLines = computed(() => {
   return { vertical, horizontal }
 })
 
+// Contenedores visibles del elemento actual
+const contenedoresVisibles = computed(() => {
+  if (!canvasStore.estaEnElemento || !canvasStore.elementoContenedorActual) {
+    return []
+  }
+  
+  const elementoActual = canvasStore.elementoContenedorActual
+  const contenedores = elementoActual.contenedores || []
+  
+  return contenedores
+})
+
 // Obtiene el contorno de la planta activa como rect o polígono
 const computeBoundary = () => {
   const W = layerConfig.value.width
   const H = layerConfig.value.height
+  
+  // Si estamos en un elemento, usar todo el canvas adaptativo como boundary
+  if (canvasStore.estaEnElemento) {
+    return { type: 'rect', W, H }
+  }
+  
+  // Si estamos en una planta, verificar si tiene polígono
   const planta = canvasStore.plantaActivaData
   if (planta?.poligono && Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
     return { type: 'polygon', points: planta.poligono }
@@ -738,6 +806,18 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
       )
       const finalCenter = { x: resolved.x + r, y: resolved.y + r }
 
+      // NUEVA VALIDACIÓN: Verificar contenedores en elementos para círculos
+      if (canvasStore.estaEnElemento) {
+        const validacion = validateDropInContainers(resolved.x, resolved.y, r * 2, r * 2)
+        
+        if (!validacion.valido) {
+          // Si no es válido, mantener la última posición válida
+          const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+          const centerPrev = { x: prev.x + r, y: prev.y + r }
+          return toStageCoords(centerPrev)
+        }
+      }
+
       // Edge feedback
       const toLeft = Math.abs(finalCenter.x - r)
       const toTop = Math.abs(finalCenter.y - r)
@@ -777,6 +857,17 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     let adjusted = { x: clamped.x, y: clamped.y }
     const res = resolveAgainstBlockingObstacles(clamped.x, clamped.y, elemento)
     adjusted = { x: res.x, y: res.y }
+
+    // NUEVA VALIDACIÓN: Verificar contenedores en elementos
+    if (canvasStore.estaEnElemento) {
+      const validacion = validateDropInContainers(adjusted.x, adjusted.y, w, h)
+      
+      if (!validacion.valido) {
+        // Si no es válido, mantener la última posición válida
+        const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+        return toStageCoords(prev)
+      }
+    }
 
     // Edge feedback basado en posición final
     const toLeft = Math.abs(adjusted.x)
@@ -1024,6 +1115,51 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   return { x: worldX, y: worldY }
 }
 
+// Validar si un elemento puede colocarse dentro de contenedores
+const validateDropInContainers = (candX, candY, elementWidth, elementHeight) => {
+  // Solo aplicar validación en vista de elemento
+  if (!canvasStore.estaEnElemento) {
+    return { valido: true } // En plantas permitir drop libre
+  }
+  
+  const contenedores = contenedoresVisibles.value
+  if (!contenedores || contenedores.length === 0) {
+    return { 
+      valido: false, 
+      razon: 'No hay contenedores definidos en este elemento'
+    }
+  }
+  
+  // Verificar si el elemento está completamente dentro de algún contenedor
+  for (const contenedor of contenedores) {
+    const contX = (contenedor.posicion?.x || 0) * CM_TO_PX
+    const contY = (contenedor.posicion?.y || 0) * CM_TO_PX  
+    const contW = (contenedor.dimensiones?.ancho || 50) * CM_TO_PX
+    const contH = (contenedor.dimensiones?.largo || 50) * CM_TO_PX
+    
+    // Verificar si el elemento cabe completamente dentro del contenedor
+    const elementoCabeEnContenedor = (
+      candX >= contX &&
+      candY >= contY &&
+      candX + elementWidth <= contX + contW &&
+      candY + elementHeight <= contY + contH
+    )
+    
+    if (elementoCabeEnContenedor) {
+      return { 
+        valido: true, 
+        contenedorId: contenedor.id,
+        contenedor: contenedor
+      }
+    }
+  }
+  
+  return { 
+    valido: false, 
+    razon: 'El elemento debe colocarse completamente dentro de un área contenedora'
+  }
+}
+
 const createElementFromDrop = (data, dropEvent) => {
   const elemento = data.elemento
 
@@ -1069,6 +1205,16 @@ const createElementFromDrop = (data, dropEvent) => {
     }
   } else if (boundary.type === 'polygon') {
     isInsideArea = rectInsidePolygon(candX, candY, finalWidth, finalHeight, boundary.points)
+  }
+
+  // 5.5. NUEVA VALIDACIÓN: Verificar contenedores en elementos
+  if (canvasStore.estaEnElemento) {
+    const validacion = validateDropInContainers(candX, candY, finalWidth, finalHeight)
+    
+    if (!validacion.valido) {
+      showToast(validacion.razon, 'error')
+      return // Cancelar drop
+    }
   }
 
   // 6. Crear elemento temporal para detectar conflictos
@@ -1161,6 +1307,9 @@ const createElementFromDrop = (data, dropEvent) => {
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
     descripcion: elemento.descripcion || '',
+
+    // Copiar contenedores del elemento original si los tiene
+    contenedores: elemento.contenedores ? [...elemento.contenedores] : [],
 
     hijos: [],
     metadata: {
