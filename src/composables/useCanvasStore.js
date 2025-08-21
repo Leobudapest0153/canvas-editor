@@ -66,6 +66,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const vistaActiva = ref('XY') // XY, ZX, ZY
   const zoom = ref(1)
   const crearPlanta = ref(false)
+  const plantaEnEdicion = ref(null);
   const panX = ref(0)
   const panY = ref(0)
 
@@ -1171,8 +1172,20 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
-  const abrirEditor = () => {
-    crearPlanta.value = true
+  const abrirEditor = (plantaId = null) => {
+    if (plantaId) {
+      const plantaAEditar = plantas.value.find(p => p.id === plantaId);
+      if (plantaAEditar) {
+        plantaEnEdicion.value = plantaAEditar;
+      } else {
+        console.error(`No se encontró la planta con id: ${plantaId}`);
+        plantaEnEdicion.value = null;
+        return;
+      }
+    } else {
+      plantaEnEdicion.value = null;
+    }
+  crearPlanta.value = true;
   }
 
   const cerrarEditor = () => {
@@ -1222,6 +1235,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     gridSize,
     snapGridEps,
     crearPlanta,
+    plantaEnEdicion,
 
     // Getters
     elementosVisibles,

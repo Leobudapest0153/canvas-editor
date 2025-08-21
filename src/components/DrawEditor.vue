@@ -1,10 +1,10 @@
 <template>
-  <div class="border rounded-lg overflow-hidden relative flex-grow">
+  <div ref="containerRef" class="border rounded-lg overflow-hidden relative flex-grow">
     <v-stage ref="stageRef"
              :config="{
                width: canvasW,
                height: canvasH,
-               draggable: true,
+               draggable: !deleting,
                scale: {x: stageScale, y: stageScale}
              }"
              @wheel="onWheel"
@@ -24,16 +24,47 @@
         <GridLayer :width="canvasW" :height="canvasH" :scale="stageScale" :stageX="stagePosition.x" :stageY="stagePosition.y" :pixelsPerUnit="PIXELS_PER_CM * 100" unit="m" :bbox="gridBBox" />
       </v-layer>
 
+      <v-layer :config="{ listening: false }">
+        <template v-for="el in elements" :key="el.id">
+          <v-rect :config="{
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+            fill: '#94a3b8',
+            opacity: 0.5,
+            stroke: '#64748b',
+            strokeWidth: 1 / stageScale
+          }" />
+          <v-text :config="{
+            x: el.x + 4,
+            y: el.y + 4,
+            text: el.nombre || el.id,
+            fontSize: 10 / stageScale,
+            fill: '#334155'
+          }" />
+        </template>
+      </v-layer>
+
       <v-layer>
         <v-line :config="{ points: flatPoints, closed:true, stroke:'#0ea5e9', fill:'rgba(14,165,233,0.08)', strokeWidth:2 / stageScale }" />
         <template v-for="(seg, i) in segments" :key="'seg-'+i">
           <v-text :config="{ x: seg.mx, y: seg.my, text: seg.label, fontSize: 9 / stageScale, fill:'#334155' }" />
         </template>
         <template v-if="dragging">
-          <v-line :config="{ points:[guidePos.x,0, guidePos.x, canvasH], stroke:'#94a3b8', dash:[4,4], strokeWidth:1 / stageScale }" />
-          <v-line :config="{ points:[0,guidePos.y, canvasW, guidePos.y], stroke:'#94a3b8', dash:[4,4], strokeWidth:1 / stageScale }" />
-          <v-rect :config="{ x: guidePos.x + 8 / stageScale, y: guidePos.y + 8 / stageScale, width: 110, height: 22, fill:'rgba(255,255,255,0.8)', stroke:'#cbd5e1', cornerRadius:4 }" />
-          <v-text :config="{ x: guidePos.x + 12 / stageScale, y: guidePos.y + 12 / stageScale, text: guideLabel, fontSize: 12, fill:'#0f172a' }" />
+          <v-line :config="{ points:[guidePos.x, worldViewRect.y1, guidePos.x, worldViewRect.y2], stroke:'#94a3b8', dash:[4,4], strokeWidth:2 / stageScale }" />
+          <v-line :config="{ points:[worldViewRect.x1, guidePos.y, worldViewRect.x2, guidePos.y], stroke:'#94a3b8', dash:[4,4], strokeWidth:2 / stageScale }" />
+          <v-rect :config="{ 
+            x: guidePos.x + 8 / stageScale, 
+            y: guidePos.y + 8 / stageScale, 
+            width: 110 / stageScale, 
+            height: 22 / stageScale, 
+            fill:'rgba(255,255,255,0.8)', 
+            stroke:'#cbd5e1', 
+            strokeWidth: 1 / stageScale, 
+            cornerRadius: 4 / stageScale 
+          }" />
+          <v-text :config="{ x: guidePos.x + 12 / stageScale, y: guidePos.y + 12 / stageScale, text: guideLabel, fontSize: 12 / stageScale, fill:'#0f172a' }" />
         </template>
         <template v-for="(p, idx) in polygon" :key="idx">
           <v-circle :config="{ x:p.x, y:p.y, radius: (selectedIdx === idx ? 8 : 6) / stageScale, fill:selectedIdx===idx?'#0284c7':'#0ea5e9', draggable:!deleting, stroke:selectedIdx===idx?'#0284c7':'#0ea5e9', strokeWidth: (selectedIdx === idx ? 2 : 1) / stageScale, name: 'vertex' }"
@@ -55,14 +86,15 @@
     <RulersOverlay :width="canvasW" :height="canvasH" :scale="stageScale" :stageX="stagePosition.x" :stageY="stagePosition.y" :pixelsPerUnit="PIXELS_PER_CM * 100" unit="m"/>
   </div>
 </template>
-<!-- El script de DrawEditor.vue no necesita cambios adicionales -->
+
 <script setup>
-import { computed, reactive, ref, watch, onMounted, defineProps, defineEmits, toRefs } from 'vue'
+import { computed, reactive, ref, watch, onMounted, defineProps, defineEmits, toRefs, onUnmounted } from 'vue'
 import GridLayer from './GridLayer.vue'
 import RulersOverlay from './RulersOverlay.vue'
 
 const props = defineProps({
   polygon: { type: Array, required: true },
+  elements: { type: Array, default: () => [] },
   worldWidth: { type: Number, required: true },
   worldHeight: { type: Number, required: true },
   adding: { type: Boolean, default: false },
@@ -71,15 +103,30 @@ const props = defineProps({
 
 const emit = defineEmits(['update:polygon', 'notice']);
 
-const { polygon, worldWidth, worldHeight, adding, deleting } = toRefs(props);
+const { polygon, elements, worldWidth, worldHeight, adding, deleting } = toRefs(props);
 
 const PIXELS_PER_CM = 10
-const canvasW = ref(1200)
+const canvasW = ref(1400)
 const canvasH = ref(450)
+
+let resizeObserver = null;
 
 const selectedIdx = ref(-1)
 const dragging = ref(false)
 const guidePos = reactive({ x: 0, y: 0 })
+
+const worldViewRect = computed(() => {
+  const stage = stageRef.value?.getNode?.()
+  if (!stage) return { x1: 0, y1: 0, x2: 0, y2: 0 }
+  const { x, y } = stage.position()
+  const scale = stageScale.value
+  return {
+    x1: -x / scale,
+    y1: -y / scale,
+    x2: (canvasW.value - x) / scale,
+    y2: (canvasH.value - y) / scale,
+  }
+})
 
 const gridBBox = computed(() => {
   const pts = polygon.value
@@ -93,6 +140,7 @@ const gridBBox = computed(() => {
 })
 
 const stageRef = ref(null)
+const containerRef = ref(null);
 const stageScale = ref(1)
 const stagePosition = ref({ x: 0, y: 0 })
 
@@ -120,7 +168,24 @@ function fitStageToPolygon() {
 
 defineExpose({ fitStageToPolygon });
 
-onMounted(() => { fitStageToPolygon() })
+onMounted(() => { 
+  if (containerRef.value) {
+    resizeObserver = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        canvasW.value = entry.contentRect.width
+        canvasH.value = entry.contentRect.height
+      }
+    })
+    resizeObserver.observe(containerRef.value)
+  }
+  fitStageToPolygon() 
+});
+
+onUnmounted(() => {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+  }
+});
 
 function onWheel(e){
   e?.evt?.preventDefault?.()
@@ -174,7 +239,47 @@ const segments = computed(() => {
   return segs
 })
 
+function isPointInPolygon(point, vs) {
+  const x = point.x, y = point.y;
+  let inside = false;
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    const xi = vs[i].x, yi = vs[i].y;
+    const xj = vs[j].x, yj = vs[j].y;
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function isPolygonValid(newPolygon, fixedElements) {
+  if (!fixedElements || fixedElements.length === 0) {
+    return true;
+  }
+
+  for (const el of fixedElements) {
+    const corners = [
+      { x: el.x, y: el.y },
+      { x: el.x + el.width, y: el.y },
+      { x: el.x + el.width, y: el.y + el.height },
+      { x: el.x, y: el.y + el.height },
+    ];
+
+    for (const corner of corners) {
+      if (!isPointInPolygon(corner, newPolygon)) {
+        emit('notice', `El área no puede excluir el elemento "${el.nombre || el.id}"`);
+        return false;
+      }
+    }
+  }
+
+  emit('notice', '');
+  return true;
+}
+
 function onPointDrag(idx, e) {
+  // MODIFICADO: Cambiar cursor a 'grabbing' al arrastrar
+  document.body.style.cursor = 'grabbing';
+
   dragging.value = true
   selectedIdx.value = idx
   const p = { x: e.target.x(), y: e.target.y() }
@@ -184,18 +289,27 @@ function onPointDrag(idx, e) {
 
   const newPolygon = [...polygon.value];
   newPolygon[idx] = { x: Math.round(clampedX), y: Math.round(clampedY) };
-  emit('update:polygon', newPolygon);
 
-  e.target.x(clampedX)
-  e.target.y(clampedY)
+  if (isPolygonValid(newPolygon, elements.value)) {
+    emit('update:polygon', newPolygon);
+    e.target.x(clampedX);
+    e.target.y(clampedY);
+  } else {
+    const lastValidPoint = polygon.value[idx];
+    e.target.x(lastValidPoint.x);
+    e.target.y(lastValidPoint.y);
+  }
 
-  guidePos.x = Math.round(clampedX)
-  guidePos.y = Math.round(clampedY)
+  guidePos.x = Math.round(e.target.x())
+  guidePos.y = Math.round(e.target.y())
 }
 
 function onPointDragEnd(idx, e) {
   onPointDrag(idx, e)
   dragging.value = false
+  emit('notice', '');
+  // MODIFICADO: Cambiar cursor de vuelta a 'grab' al soltar
+  document.body.style.cursor = 'grab';
 }
 
 function stageToLocal(pos){
@@ -248,8 +362,11 @@ function onCanvasClick(e){
   }
 }
 
+// MODIFICADO: Detener la propagación del evento mousedown en modo eliminar
 function onVertexMouseDown(evt) {
-  if (deleting.value) evt.evt.stopPropagation();
+  if (deleting.value) {
+    evt.evt.stopPropagation();
+  }
 }
 
 function onVertexClick(idx, evt) {
@@ -270,9 +387,15 @@ function onVertexClick(idx, evt) {
   }
 }
 
+// MODIFICADO: Cambiar el cursor a 'grab' si no se está eliminando
 function onVertexMouseOver() {
-  if (deleting.value) document.body.style.cursor = 'crosshair';
+  if (deleting.value) {
+    document.body.style.cursor = 'crosshair';
+  } else {
+    document.body.style.cursor = 'grab';
+  }
 }
+
 function onVertexMouseOut() {
   document.body.style.cursor = 'default';
 }
