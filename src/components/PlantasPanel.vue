@@ -13,83 +13,97 @@
 -->
 
 <template>
-  <div class="bg-white border-b border-gray-200 p-4 shadow-sm" style="overflow: visible;">
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center" style="overflow: visible;">
+  <div class="bg-white border-b border-gray-200 p-4 shadow-sm" style="overflow: visible">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center" style="overflow: visible">
       <!-- Lista de plantas con scroll horizontal -->
-      <div class="flex flex-row overflow-x-auto space-x-4 col-span-1 lg:col-span-8" style="overflow-y: visible;">
-          <!-- Tarjetas de plantas -->
-          <div
-            v-for="planta in canvasStore.plantas"
-            :key="planta.id"
-            :class="[
-              'relative flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-blue-400',
-              {
-                'bg-blue-50 border-blue-300 shadow-md': planta.id === canvasStore.plantaActiva,
-                'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300': planta.id !== canvasStore.plantaActiva,
-              },
-            ]"
-            style="overflow: visible;"
-          >
-            <div class="flex items-center space-x-3" @click="seleccionarPlanta(planta.id)">
-              <div class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-gradient-to-br from-blue-500 to-blue-600">
-                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path
-                    d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"
-                  />
-                </svg>
-              </div>
-              <div>
-                <h3 class="text-sm font-semibold text-gray-800">{{ planta.nombre }}</h3>
-                <p class="text-xs text-gray-500 m-0">{{ contarElementosEnPlanta(planta.id) }} elementos</p>
-                <p class="text-xs text-gray-400 m-0 font-medium">
-                  {{ planta.dimensiones?.ancho || 800 }}×{{ planta.dimensiones?.largo || 1000 }}×{{
-                    planta.dimensiones?.alto || 280
-                  }}cm
-                </p>
-              </div>
-            </div>
-
-            <!-- Menú desplegable de acciones -->
-            <div class="relative ml-2">
-              <button
-                @click.stop="toggleMenuPlanta(planta.id, $event)"
-                class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-                title="Opciones de planta"
-              >
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
-                </svg>
-              </button>
-            </div>
-
-            <!-- Indicador de planta activa -->
+      <div
+        class="flex flex-row overflow-x-auto space-x-4 col-span-1 lg:col-span-8"
+        style="overflow-y: visible"
+      >
+        <!-- Tarjetas de plantas -->
+        <div
+          v-for="planta in canvasStore.plantas"
+          :key="planta.id"
+          :class="[
+            'relative flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-blue-400',
+            {
+              'bg-blue-50 border-blue-300 shadow-md': planta.id === canvasStore.plantaActiva,
+              'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300':
+                planta.id !== canvasStore.plantaActiva,
+            },
+          ]"
+          style="overflow: visible"
+        >
+          <div class="flex items-center space-x-3" @click="seleccionarPlanta(planta.id)">
             <div
-              v-if="planta.id === canvasStore.plantaActiva"
-              class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
-            ></div>
-          </div>
-                <!-- Botón de agregar planta (siempre visible al hacer scroll) -->
-          <div class="sticky right-0 z-10 pl-2 -mr-2 bg-gradient-to-l from-white via-white/70 to-transparent flex items-center pointer-events-none">
-            <button
-              @click="canvasStore.abrirEditor"
-              class="pointer-events-auto inline-flex items-center justify-center w-10 h-10 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-md hover:shadow-lg cursor-pointer"
-              title="Agregar nueva planta"
-              type="button"
+              class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-gradient-to-br from-blue-500 to-blue-600"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 4v16m8-8H4"
+                  d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"
+                />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold text-gray-800">{{ planta.nombre }}</h3>
+              <p class="text-xs text-gray-500 m-0">
+                {{ contarElementosEnPlanta(planta.id) }} elementos
+              </p>
+              <p class="text-xs text-gray-400 m-0 font-medium">
+                {{ planta.dimensiones?.ancho || 800 }}×{{ planta.dimensiones?.largo || 1000 }}×{{
+                  planta.dimensiones?.alto || 280
+                }}cm
+              </p>
+            </div>
+          </div>
+
+          <!-- Menú desplegable de acciones -->
+          <div class="relative ml-2">
+            <button
+              @click.stop="toggleMenuPlanta(planta.id, $event)"
+              class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              title="Opciones de planta"
+            >
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"
                 />
               </svg>
             </button>
           </div>
+
+          <!-- Indicador de planta activa -->
+          <div
+            v-if="planta.id === canvasStore.plantaActiva"
+            class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
+          ></div>
+        </div>
+        <!-- Botón de agregar planta (siempre visible al hacer scroll) -->
+        <div
+          class="sticky right-0 z-10 pl-2 -mr-2 bg-gradient-to-l from-white via-white/70 to-transparent flex items-center pointer-events-none"
+        >
+          <button
+            @click="canvasStore.abrirEditor"
+            class="pointer-events-auto inline-flex items-center justify-center w-10 h-10 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-md hover:shadow-lg cursor-pointer"
+            title="Agregar nueva planta"
+            type="button"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <!-- Acciones (Historial e Import/Export) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 col-span-1 lg:col-span-4 lg:justify-self-end">
+      <div
+        class="grid grid-cols-1 sm:grid-cols-2 gap-2 col-span-1 lg:col-span-4 lg:justify-self-end"
+      >
         <button
           type="button"
           class="inline-flex items-center gap-2 w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
@@ -132,12 +146,18 @@
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       @click="cerrarModales"
     >
-      <div class="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4 max-h-screen overflow-y-auto" @click.stop>
+      <div
+        class="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4 max-h-screen overflow-y-auto"
+        @click.stop
+      >
         <div class="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 class="text-lg font-semibold text-gray-800">
             {{ mostrarModalEditar ? 'Editar Planta' : 'Nueva Planta' }}
           </h2>
-          <button @click="cerrarModales" class="text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer transition-colors">
+          <button
+            @click="cerrarModales"
+            class="text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer transition-colors"
+          >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
@@ -151,7 +171,9 @@
 
         <form @submit.prevent="guardarPlanta" class="p-6">
           <div class="mb-4">
-            <label for="nombre" class="block text-sm font-medium text-gray-700 mb-2">Nombre de la planta</label>
+            <label for="nombre" class="block text-sm font-medium text-gray-700 mb-2"
+              >Nombre de la planta</label
+            >
             <input
               id="nombre"
               v-model="formularioPlanta.nombre"
@@ -163,7 +185,9 @@
           </div>
 
           <div class="mb-4">
-            <label for="descripcion" class="block text-sm font-medium text-gray-700 mb-2">Descripción (opcional)</label>
+            <label for="descripcion" class="block text-sm font-medium text-gray-700 mb-2"
+              >Descripción (opcional)</label
+            >
             <textarea
               id="descripcion"
               v-model="formularioPlanta.descripcion"
@@ -178,7 +202,9 @@
             <label class="block text-sm font-medium text-gray-700 mb-2">Dimensiones (cm)</label>
             <div class="grid grid-cols-3 gap-3">
               <div>
-                <label for="ancho" class="block mb-1 text-xs font-medium text-gray-600">Ancho</label>
+                <label for="ancho" class="block mb-1 text-xs font-medium text-gray-600"
+                  >Ancho</label
+                >
                 <input
                   id="ancho"
                   v-model.number="formularioPlanta.dimensiones.ancho"
@@ -192,7 +218,9 @@
                 />
               </div>
               <div>
-                <label for="largo" class="block mb-1 text-xs font-medium text-gray-600">Largo</label>
+                <label for="largo" class="block mb-1 text-xs font-medium text-gray-600"
+                  >Largo</label
+                >
                 <input
                   id="largo"
                   v-model.number="formularioPlanta.dimensiones.largo"
@@ -224,10 +252,12 @@
               <div
                 :class="[
                   'px-3 py-2 rounded text-sm',
-                  preview.status === 'block' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-800 border border-amber-200',
+                  preview.status === 'block'
+                    ? 'bg-red-50 text-red-700 border border-red-200'
+                    : 'bg-amber-50 text-amber-800 border border-amber-200',
                 ]"
               >
-                <strong v-if="preview.status==='block'">No es posible reducir</strong>
+                <strong v-if="preview.status === 'block'">No es posible reducir</strong>
                 <strong v-else>Se requiere reacomodo</strong>
                 <span class="ml-1">{{ preview.message }}</span>
               </div>
@@ -236,7 +266,9 @@
 
           <!-- Peso máximo soportado -->
           <div class="mb-6">
-            <label for="pesoMaximo" class="block text-sm font-medium text-gray-700 mb-2">Peso máximo soportado (kg)</label>
+            <label for="pesoMaximo" class="block text-sm font-medium text-gray-700 mb-2"
+              >Peso máximo soportado (kg)</label
+            >
             <input
               id="pesoMaximo"
               v-model.number="formularioPlanta.pesoMaximoSoportado"
@@ -250,8 +282,17 @@
           </div>
 
           <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
-            <button type="button" @click="cerrarModales" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 border-none rounded-lg cursor-pointer transition-colors">Cancelar</button>
-            <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white border-none rounded-lg cursor-pointer transition-colors">
+            <button
+              type="button"
+              @click="cerrarModales"
+              class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 border-none rounded-lg cursor-pointer transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white border-none rounded-lg cursor-pointer transition-colors"
+            >
               {{ mostrarModalEditar ? 'Guardar Cambios' : 'Crear Planta' }}
             </button>
           </div>
@@ -297,7 +338,12 @@
         </div>
 
         <div class="flex items-center justify-end gap-3 p-4 border-t border-gray-200">
-          <button @click="mostrarConfirmacionEliminar = false" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 border-none rounded-lg cursor-pointer transition-colors">Cancelar</button>
+          <button
+            @click="mostrarConfirmacionEliminar = false"
+            class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 border-none rounded-lg cursor-pointer transition-colors"
+          >
+            Cancelar
+          </button>
           <button
             v-if="elementosEnPlantaAEliminar === 0"
             @click="eliminarPlantaConfirmada"
@@ -420,9 +466,17 @@ const onDimChange = () => {
     if (!Number.isFinite(ancho) || !Number.isFinite(largo)) return
     const res = guard.simulateResize(ancho, largo)
     if (res.status === 'block') {
-      preview.value = { status: 'block', message: 'elementos no caben con las nuevas dimensiones', placements: [] }
+      preview.value = {
+        status: 'block',
+        message: 'elementos no caben con las nuevas dimensiones',
+        placements: [],
+      }
     } else if (res.status === 'auto_adjust') {
-      preview.value = { status: 'auto_adjust', message: `Se reacomodarán ${res.placements.length} elementos`, placements: res.placements }
+      preview.value = {
+        status: 'auto_adjust',
+        message: `Se reacomodarán ${res.placements.length} elementos`,
+        placements: res.placements,
+      }
     } else {
       preview.value = { status: 'ok', message: '', placements: [] }
     }
@@ -563,7 +617,10 @@ const isInside = (el, W, H, margin) => {
   const right = left + orientedW
   const bottom = top + orientedH
   return (
-    left >= margin - EPS && top >= margin - EPS && right <= W - margin + EPS && bottom <= H - margin + EPS
+    left >= margin - EPS &&
+    top >= margin - EPS &&
+    right <= W - margin + EPS &&
+    bottom <= H - margin + EPS
   )
 }
 const gridPxToCm = (gridPx) => (gridPx > 0 ? gridPx / CM_TO_PX : 0)
@@ -606,7 +663,10 @@ const guardarPlanta = async () => {
     const res = guard.simulateResize(dims.ancho, dims.largo)
 
     if (res.status === 'block') {
-      window.__toasts?.show?.('No es posible reducir: elementos no caben con las nuevas dimensiones', { type: 'error' })
+      window.__toasts?.show?.(
+        'No es posible reducir: elementos no caben con las nuevas dimensiones',
+        { type: 'error' },
+      )
       return
     }
 
@@ -633,22 +693,34 @@ const guardarPlanta = async () => {
       const plantaId = canvasStore.plantaActiva
       const gridCm = gridPxToCm(canvasStore.gridSize)
 
-      // Candidatos: raíz + suelo (incluso invisibles), excluir suelo decorativo si existiera
+      // Candidatos: solo elementos de nivel raíz (sin padre) que van en suelo
       const candidates = canvasStore.elementos.filter(
-        (e) => e.plantaId === plantaId && !e.padre && (e.ubicacion || 'suelo') === 'suelo' && !(e.decorativo && (e.tipo === 'suelo' || /\bsuelo\b/i.test(e.nombre || ''))),
+        (e) =>
+          e.plantaId === plantaId &&
+          !e.padre &&
+          e.tipo === 'elementos' &&
+          (e.ubicacion || 'suelo') === 'suelo' &&
+          !(e.decorativo && /\bsuelo\b/i.test(e.nombre || '')),
       )
 
       const anyOut = candidates.some((e) => !isInside(e, W, H, MARGIN_CM))
 
       if (anyOut) {
         // Ejecutar pack determinista
-        const placements = packShelf(candidates, { W, H }, { grid: gridCm, margin: MARGIN_CM, rotPerm: true })
+        const placements = packShelf(
+          candidates,
+          { W, H },
+          { grid: gridCm, margin: MARGIN_CM, rotPerm: true },
+        )
         if (!placements) {
           // Revertir dimensiones
           canvasStore.editarPlanta(canvasStore.plantaActiva, {
             dimensiones: { ...prevDims },
           })
-          window.__toasts?.show?.('No fue posible reacomodar elementos; se revierte la redimensión', { type: 'error' })
+          window.__toasts?.show?.(
+            'No fue posible reacomodar elementos; se revierte la redimensión',
+            { type: 'error' },
+          )
           // Secuencia de sync para reflejar reversión inmediatamente
           await runCanvasSyncSequence()
           return
@@ -671,7 +743,10 @@ const guardarPlanta = async () => {
 
           const dx = Math.abs((el.posicion?.x ?? el.x ?? 0) - pos.x)
           const dy = Math.abs((el.posicion?.y ?? el.y ?? 0) - pos.y)
-          const drot = Math.abs((((el.posicion?.rotation ?? el.rotation ?? 0) % 360) + 360) % 360 - (((p.rotation ?? 0) % 360) + 360) % 360)
+          const drot = Math.abs(
+            ((((el.posicion?.rotation ?? el.rotation ?? 0) % 360) + 360) % 360) -
+              ((((p.rotation ?? 0) % 360) + 360) % 360),
+          )
           if (dx > EPS || dy > EPS || drot > EPS) moved++
 
           el.x = pos.x
@@ -738,14 +813,14 @@ const cerrarModales = () => {
 // Directiva personalizada para cerrar el menú al hacer clic fuera
 const vClickOutside = {
   beforeMount: (el, binding) => {
-    el.clickOutsideEvent = event => {
+    el.clickOutsideEvent = (event) => {
       if (!(el === event.target || el.contains(event.target))) {
         binding.value()
       }
     }
     document.addEventListener('click', el.clickOutsideEvent)
   },
-  unmounted: el => {
+  unmounted: (el) => {
     document.removeEventListener('click', el.clickOutsideEvent)
   },
 }
