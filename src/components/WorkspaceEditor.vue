@@ -1,14 +1,13 @@
 <template>
   <div v-if="canvasStore.crearPlanta" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
     <div class="relative bg-white rounded-lg shadow-xl w-[85vw] h-[85vh] p-4 overflow-hidden flex flex-col">
-      <button @click="canvasStore.cerrarEditor" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 z-10">
+      <button @click="closeModal" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 z-10">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
       </button>
       <h3 class="text-lg font-semibold mb-3 flex-shrink-0">Área de Trabajo</h3>
 
       <div class="grid gap-4 md:grid-cols-5 flex-grow min-h-0">
         <div class="md:col-span-3 flex flex-col">
-          <!-- MODIFICADO: Se pasa la prop 'elements' -->
           <DrawEditor ref="canvasEditorRef"
                         :polygon="local.polygon"
                         :elements="local.elements"
@@ -95,13 +94,12 @@ const rectL = ref(500)
 const worldWidth = computed(() => rectW.value * PIXELS_PER_CM)
 const worldHeight = computed(() => rectL.value * PIXELS_PER_CM)
 
-// MODIFICADO: Se añade 'elements' al estado local
 const local = reactive({
   id: null,
   name: '',
   shape: 'rectangle',
   polygon: [],
-  elements: [], // NUEVO: Lista para los elementos fijos
+  elements: [],
   unit: 'cm',
   pixelsPerUnit: PIXELS_PER_CM,
   height: 500,
@@ -111,6 +109,7 @@ const local = reactive({
 const notice = ref('')
 const errors = reactive({ name: false, dimensions: false })
 const isManuallyEdited = ref(false)
+const isLoadingData = ref(false); // NUEVO: El "cerrojo" para evitar conflictos
 
 function defaultRect() {
   const w = rectW.value * PIXELS_PER_CM
@@ -118,44 +117,52 @@ function defaultRect() {
   return [ { x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: l }, { x: 0, y: l } ]
 }
 
-// NUEVO: Lógica para cargar datos en modo edición.
-// Este watch simula cómo reaccionarías cuando el store indica que hay una planta para editar.
-// Deberás adaptar `canvasStore.plantaEnEdicion` y `canvasStore.elementosDeLaPlanta`
-// a las propiedades reales de tu store.
+const closeModal = () => {
+  resetLocalState();
+  canvasStore.cerrarEditor();
+}
+
+function resetLocalState() {
+  local.id = null;
+  local.name = '';
+  local.polygon = defaultRect();
+  local.elements = [];
+  local.shape = 'rectangle';
+  rectW.value = 500;
+  rectL.value = 500;
+  local.height = 500;
+  local.maxWeight = 1000;
+  isManuallyEdited.value = false;
+
+  errors.name = false;
+  errors.dimensions = false;
+  notice.value = '';
+}
+
+// MODIFICADO: El watch principal ahora maneja el caso de creación y usa el cerrojo
 watch(() => canvasStore.plantaEnEdicion, (planta) => {
+  isLoadingData.value = true; // <-- Activamos el cerrojo
+
   if (planta) {
-    // Modo Edición: Cargar datos de la planta existente
+    // Modo Edición
     local.id = planta.id;
     local.name = planta.nombre;
     local.polygon = planta.poligono;
     local.shape = planta.forma;
     local.elements = planta.elementos || [];
-
-    // Cargar dimensiones y otras propiedades
     rectW.value = planta.dimensiones.ancho;
     rectL.value = planta.dimensiones.largo;
     local.height = planta.dimensiones.alto;
     local.maxWeight = planta.pesoMaximoSoportado;
-
-    // Marcar como editado manualmente para que no se sobreescriba la forma
     isManuallyEdited.value = true;
-
   } else {
-    // Modo Creación: Resetear a valores por defecto
-    local.id = null;
-    local.name = '';
-    local.polygon = defaultRect();
-    local.elements = [];
-    rectW.value = 500;
-    rectL.value = 500;
-    local.height = 500;
-    local.maxWeight = 1000;
-    isManuallyEdited.value = false;
+    // MODO CREACIÓN: Usamos la función de reseteo para asegurar un estado limpio
+    resetLocalState();
   }
 
-  // Ajustar la vista del canvas a la forma cargada
   nextTick(() => {
     canvasEditorRef.value?.fitStageToPolygon();
+    isLoadingData.value = false; // <-- Liberamos el cerrojo después de renderizar
   });
 
 }, { immediate: true, deep: true });
@@ -210,7 +217,10 @@ function applyCircle() {
   nextTick(() => { canvasEditorRef.value?.fitStageToPolygon() })
 }
 
+// MODIFICADO: El watch de reescalado ahora respeta el cerrojo
 watch([rectW, rectL], ([newW_cm, newL_cm], [oldW_cm, oldL_cm]) => {
+  if (isLoadingData.value) return; // <-- Si estamos cargando, no hacer nada
+
   if (oldW_cm === undefined || oldL_cm === undefined) {
     if (local.shape === 'rectangle') applyRect()
     else if (local.shape === 'circle') applyCircle()
@@ -286,7 +296,7 @@ function onSave(){
   }
 
   const plantaData = {
-    id: local.id, // Será null si es nueva, o tendrá un valor si se está editando
+    id: local.id,
     nombre: local.name.trim(),
     pesoMaximoSoportado: local.maxWeight,
     dimensiones: {
@@ -298,7 +308,6 @@ function onSave(){
     poligono: local.polygon,
   }
 
-  // NUEVO: Lógica para diferenciar entre crear y actualizar
   if (plantaData.id) {
     canvasStore.editarPlanta(plantaData.id, plantaData);
   } else {
@@ -306,6 +315,8 @@ function onSave(){
     canvasStore.agregarPlanta(plantaData);
   }
 
+  // Es bueno limpiar aquí también, aunque el watch del store lo haría
+  resetLocalState();
   canvasStore.cerrarEditor();
 }
 </script>
