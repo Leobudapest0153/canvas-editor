@@ -413,6 +413,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { setupRafDrag } from '@/composables/useRafDrag'
+import { enablePerfMode, disablePerfMode } from '@/composables/usePerfMode'
+import { clampToAreaFast, computeSnapFast, throttleEveryNFrames } from '@/utils/dragMath'
 import { useCanvasWithHistory } from '@/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/composables/useCanvasBuffer'
 import { useConflicts } from '@/composables/useConflicts'
@@ -908,6 +911,11 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
   return pos
 }
 
+// RAF + Perf mode state per element
+const rafControllers = new Map()
+const perfContexts = new Map()
+const throttle2 = throttleEveryNFrames(2)
+
 const startElementDrag = (elementId) => {
   if (isElementLocked(elementId)) {
     // Si está bloqueado, no iniciar drag ni mover el layer
@@ -930,6 +938,45 @@ const startElementDrag = (elementId) => {
 
   // Limpiar conflictos previos al iniciar un nuevo arrastre
   conflictsApi.clear()
+
+  // Habilitar modo performance en layer y arrancar rAF loop
+  try {
+    const stage = stageRef.value.getNode()
+    const layer = layerRef.value.getNode()
+    const shape = stage.findOne(`#${elementId}`)
+    if (layer && shape) {
+      const ctx = enablePerfMode(layer, { shape })
+      perfContexts.set(elementId, ctx)
+
+      const getMovingShapeBBox = () => {
+        if (!shape) return null
+        if (shape.className === 'Circle') {
+          const r = shape.radius && shape.radius() ? shape.radius() : Math.min(shape.width?.() || 0, shape.height?.() || 0) / 2
+          return { x: shape.x() - r, y: shape.y() - r, width: r * 2, height: r * 2 }
+        }
+        return { x: shape.x(), y: shape.y(), width: shape.width?.() || 0, height: shape.height?.() || 0 }
+      }
+
+      const onValidateLight = throttle2((bbox) => {
+        // Área rápida rect: usar canvasAdaptativo
+        const area = { type: 'rect', W: layerConfig.value.width, H: layerConfig.value.height }
+        const outside =
+          bbox.x < 0 || bbox.y < 0 || bbox.x + bbox.width > area.W || bbox.y + bbox.height > area.H
+        const moving = { id: elementId, x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height }
+        const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles).filter((c) => c.bloqueante)
+        const warn = outside || conflicts.length > 0
+        try {
+          shape.stroke(warn ? '#ef4444' : canvasStore.elementoSeleccionado === elementId ? '#000' : '#666')
+        } catch {}
+      })
+
+      const onCommitEnd = () => {}
+
+      const ctrl = setupRafDrag({ stage, layer, getMovingShapeBBox, onValidateLight, onCommitEnd })
+      rafControllers.set(elementId, { ctrl, shape, layer })
+      ctrl.start()
+    }
+  } catch {}
 }
 
 const updateElementPosition = (e, elementId, forma = 'rectangular') => {
@@ -956,34 +1003,13 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   setLiveConflictsThrottled(moving)
   const hasAnyConflict = liveConflicts.value.length > 0
 
-  try {
-    const strokeColor = hasAnyConflict
-      ? '#ef4444'
-      : warn
-        ? '#f59e0b'
-        : canvasStore.elementoSeleccionado === elementId
-          ? '#000'
-          : '#666'
-    target.stroke(strokeColor)
-    if (hasAnyConflict) {
-      target.shadowColor('#ef4444')
-      target.shadowBlur(8)
-      target.shadowOpacity(0.6)
-    } else {
-      target.shadowColor('black')
-      target.shadowBlur(4)
-      target.shadowOpacity(0.3)
-    }
-    target.getLayer()?.batchDraw()
-  } catch {
-    // noop
-  }
-
-  canvasStore.actualizarPosicion(elementId, x, y)
+  // Dejar feedback visual y draw al rAF loop; NO escribir en store
+  const rec = rafControllers.get(elementId)
+  if (rec && rec.ctrl) rec.ctrl.move({ x, y })
 }
 
 const endElementDrag = (elementId) => {
-  console.log('Finalizando arrastre del elemento:', elementId)
+  // console.log('Finalizando arrastre del elemento:', elementId)
   isElementDragging.value = false
   stageDragEnabled.value = true // Rehabilitar arrastre del canvas
 
@@ -1045,11 +1071,28 @@ const endElementDrag = (elementId) => {
   const conflicts = detectConflictsFor(movingNow, canvasStore.elementosVisibles)
   conflictsApi.setConflicts(conflicts, elementId)
 
-  // Actualizar posición final
-  canvasStore.actualizarPosicion(elementId, final.x, final.y)
+  // Detener rAF y restaurar modo performance
+  const rec = rafControllers.get(elementId)
+  if (rec && rec.ctrl) {
+    try { rec.ctrl.end({ x: final.x, y: final.y, width: elemento.width, height: elemento.height }) } catch {}
+  }
+  rafControllers.delete(elementId)
+  const perf = perfContexts.get(elementId)
+  try { if (perf && perf.restore) perf.restore() } catch {}
+  perfContexts.delete(elementId)
 
-  // Persistir en historial (único punto)
-  actions.actualizarPosicion(elementId, final.x, final.y, true)
+  // Snap/clamp final rápido y commit único + snapshot
+  const area = { type: 'rect', W: layerConfig.value.width, H: layerConfig.value.height }
+  const snapped = computeSnapFast(final.x, final.y, canvasStore.gridSize || 50)
+  const clamped = clampToAreaFast(snapped.x, snapped.y, elemento.width, elemento.height, area)
+
+  // Actualizar posición final y guardar historial una sola vez
+  canvasStore.actualizarPosicionConHistorial(
+    elementId,
+    clamped.x,
+    clamped.y,
+    `Elemento movido: ${elemento.nombre || elemento.tipo || elementId}`,
+  )
 
   // No mostrar toasts ni abrir modales
 
