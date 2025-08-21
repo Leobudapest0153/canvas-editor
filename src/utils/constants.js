@@ -44,43 +44,24 @@ export const ELEMENTOS_PREDEFINIDOS = [
         id: 'contenedor_1',
         nombre: 'Contenedor 1',
         dimensiones: {
-          ancho: 100,  // Reducido para caber en el anaquel
-          largo: 90,   // Reducido para caber en el anaquel
-          alto: 80,
+          ancho: 110, // Reducido para caber en el anaquel
+          largo: 190, // Reducido para caber en el anaquel
+          alto: 170,
         },
         posicion: {
-          x: 10,   // 10cm desde el borde izquierdo
-          y: 10,   // 10cm desde el borde superior
+          x: 5, // 5cm desde el borde izquierdo
+          y: 5, // 5cm desde el borde superior
           z: 0,
         },
         pesoMaximo: 250,
         ubicacion: 'interior',
         descripcion: 'Contenedor 1 del anaquel',
         icono: 'box',
-        hijos: ['elemento_1221'],
-      },
-      {
-        id: 'contenedor_2',
-        nombre: 'Contenedor 2',
-        dimensiones: {
-          ancho: 100,  // Reducido para caber en el anaquel
-          largo: 90,   // Reducido para caber en el anaquel
-          alto: 80,
-        },
-        posicion: {
-          x: 10,    // 10cm desde el borde izquierdo
-          y: 105,   // Debajo del primer contenedor (10 + 90 + 5 de separación)
-          z: 0,
-        },
-        pesoMaximo: 250,
-        ubicacion: 'interior',
-        descripcion: 'Contenedor 2 del anaquel',
-        icono: 'box',
-        hijos: ['elemento_43421'],
+        hijos: [],
       },
     ],
   },
-  
+
   // Estante de pared
   {
     id: 'estante_pared_pequeno',
@@ -100,7 +81,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     icono: 'shelf',
     contenedores: [],
   },
-  
+
   // Armario de pared
   {
     id: 'armario_pared_alto',

@@ -58,7 +58,7 @@
           :config="{
             x: 10,
             y: 10,
-            text: canvasStore.estaEnElemento 
+            text: canvasStore.estaEnElemento
               ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${layerConfig.width}x${layerConfig.height}px (Adaptativo)`
               : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
             fontSize: 12,
@@ -253,7 +253,7 @@
                 listening: false,
               }"
             />
-            
+
             <!-- Etiqueta del contenedor -->
             <v-text
               :config="{
@@ -306,8 +306,9 @@
         }}cm
       </span>
       <span v-if="canvasStore.estaEnElemento && canvasStore.elementoContenedorActual">
-        Elemento: {{ canvasStore.elementoContenedorActual.nombre }} 
-        ({{ canvasStore.canvasAdaptativo.width }}×{{ canvasStore.canvasAdaptativo.height }}px)
+        Elemento: {{ canvasStore.elementoContenedorActual.nombre }} ({{
+          canvasStore.canvasAdaptativo.width
+        }}×{{ canvasStore.canvasAdaptativo.height }}px)
       </span>
       <span v-if="canvasStore.elementoSeleccionado">
         Seleccionado: {{ canvasStore.elementoSeleccionado }}
@@ -459,17 +460,17 @@ const getElementPixelDimensions = (elemento) => {
   if (elemento.width && elemento.height) {
     return { width: elemento.width, height: elemento.height }
   }
-  
+
   // Si solo tiene dimensiones en cm, convertir
   if (elemento.dimensiones) {
     const widthCm = elemento.dimensiones.ancho || 100
     const heightCm = elemento.dimensiones.largo || 60
     return {
       width: widthCm * CM_TO_PX,
-      height: heightCm * CM_TO_PX
+      height: heightCm * CM_TO_PX,
     }
   }
-  
+
   // Fallback a valores por defecto
   return { width: 100, height: 60 }
 }
@@ -604,6 +605,10 @@ const floorBoundary = computed(() => {
   let height = layerConfig.value.height
   let points = []
 
+  if (canvasStore.estaEnElemento) {
+    return { width, height, points }
+  }
+
   const poligono = canvasStore.plantaActivaData?.poligono
 
   // Si hay un polígono, lo usamos para expandir los límites y obtener los puntos
@@ -658,10 +663,10 @@ const contenedoresVisibles = computed(() => {
   if (!canvasStore.estaEnElemento || !canvasStore.elementoContenedorActual) {
     return []
   }
-  
+
   const elementoActual = canvasStore.elementoContenedorActual
   const contenedores = elementoActual.contenedores || []
-  
+
   return contenedores
 })
 
@@ -669,12 +674,12 @@ const contenedoresVisibles = computed(() => {
 const computeBoundary = () => {
   const W = layerConfig.value.width
   const H = layerConfig.value.height
-  
+
   // Si estamos en un elemento, usar todo el canvas adaptativo como boundary
   if (canvasStore.estaEnElemento) {
     return { type: 'rect', W, H }
   }
-  
+
   // Si estamos en una planta, verificar si tiene polígono
   const planta = canvasStore.plantaActivaData
   if (planta?.poligono && Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
@@ -809,7 +814,7 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
       // NUEVA VALIDACIÓN: Verificar contenedores en elementos para círculos
       if (canvasStore.estaEnElemento) {
         const validacion = validateDropInContainers(resolved.x, resolved.y, r * 2, r * 2)
-        
+
         if (!validacion.valido) {
           // Si no es válido, mantener la última posición válida
           const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
@@ -861,7 +866,7 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     // NUEVA VALIDACIÓN: Verificar contenedores en elementos
     if (canvasStore.estaEnElemento) {
       const validacion = validateDropInContainers(adjusted.x, adjusted.y, w, h)
-      
+
       if (!validacion.valido) {
         // Si no es válido, mantener la última posición válida
         const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
@@ -1121,42 +1126,41 @@ const validateDropInContainers = (candX, candY, elementWidth, elementHeight) => 
   if (!canvasStore.estaEnElemento) {
     return { valido: true } // En plantas permitir drop libre
   }
-  
+
   const contenedores = contenedoresVisibles.value
   if (!contenedores || contenedores.length === 0) {
-    return { 
-      valido: false, 
-      razon: 'No hay contenedores definidos en este elemento'
+    return {
+      valido: false,
+      razon: 'No hay contenedores definidos en este elemento',
     }
   }
-  
+
   // Verificar si el elemento está completamente dentro de algún contenedor
   for (const contenedor of contenedores) {
     const contX = (contenedor.posicion?.x || 0) * CM_TO_PX
-    const contY = (contenedor.posicion?.y || 0) * CM_TO_PX  
+    const contY = (contenedor.posicion?.y || 0) * CM_TO_PX
     const contW = (contenedor.dimensiones?.ancho || 50) * CM_TO_PX
     const contH = (contenedor.dimensiones?.largo || 50) * CM_TO_PX
-    
+
     // Verificar si el elemento cabe completamente dentro del contenedor
-    const elementoCabeEnContenedor = (
+    const elementoCabeEnContenedor =
       candX >= contX &&
       candY >= contY &&
       candX + elementWidth <= contX + contW &&
       candY + elementHeight <= contY + contH
-    )
-    
+
     if (elementoCabeEnContenedor) {
-      return { 
-        valido: true, 
+      return {
+        valido: true,
         contenedorId: contenedor.id,
-        contenedor: contenedor
+        contenedor: contenedor,
       }
     }
   }
-  
-  return { 
-    valido: false, 
-    razon: 'El elemento debe colocarse completamente dentro de un área contenedora'
+
+  return {
+    valido: false,
+    razon: 'El elemento debe colocarse completamente dentro de un área contenedora',
   }
 }
 
@@ -1165,7 +1169,7 @@ const createElementFromDrop = (data, dropEvent) => {
 
   // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
   const { width, height } = getElementPixelDimensions(elemento)
-  
+
   // Obtener dimensiones originales en cm para guardar
   const widthCm = elemento.dimensiones?.ancho || 100
   const heightCm = elemento.dimensiones?.largo || 60
@@ -1195,7 +1199,10 @@ const createElementFromDrop = (data, dropEvent) => {
   let isInsideArea = true
   if (boundary.type === 'rect') {
     isInsideArea =
-      candX >= 0 && candY >= 0 && candX + finalWidth <= boundary.W && candY + finalHeight <= boundary.H
+      candX >= 0 &&
+      candY >= 0 &&
+      candX + finalWidth <= boundary.W &&
+      candY + finalHeight <= boundary.H
 
     // Si está fuera, intentar clamp
     if (!isInsideArea) {
@@ -1210,7 +1217,7 @@ const createElementFromDrop = (data, dropEvent) => {
   // 5.5. NUEVA VALIDACIÓN: Verificar contenedores en elementos
   if (canvasStore.estaEnElemento) {
     const validacion = validateDropInContainers(candX, candY, finalWidth, finalHeight)
-    
+
     if (!validacion.valido) {
       showToast(validacion.razon, 'error')
       return // Cancelar drop
@@ -1338,7 +1345,7 @@ const createElementFromBuffer = (data, dropEvent) => {
   }
 
   const elemento = bufferItem.elemento
-  
+
   // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
   const { width, height } = getElementPixelDimensions(elemento)
 
