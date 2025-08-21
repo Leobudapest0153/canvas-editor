@@ -24,6 +24,29 @@
         <GridLayer :width="canvasW" :height="canvasH" :scale="stageScale" :stageX="stagePosition.x" :stageY="stagePosition.y" :pixelsPerUnit="PIXELS_PER_CM * 100" unit="m" :bbox="gridBBox" />
       </v-layer>
 
+      <!-- NUEVO: Capa para renderizar los elementos fijos -->
+      <v-layer :config="{ listening: false }">
+        <template v-for="el in elements" :key="el.id">
+          <v-rect :config="{
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+            fill: '#94a3b8',
+            opacity: 0.5,
+            stroke: '#64748b',
+            strokeWidth: 1 / stageScale
+          }" />
+          <v-text :config="{
+            x: el.x + 4,
+            y: el.y + 4,
+            text: el.nombre || el.id,
+            fontSize: 10 / stageScale,
+            fill: '#334155'
+          }" />
+        </template>
+      </v-layer>
+
       <v-layer>
         <v-line :config="{ points: flatPoints, closed:true, stroke:'#0ea5e9', fill:'rgba(14,165,233,0.08)', strokeWidth:2 / stageScale }" />
         <template v-for="(seg, i) in segments" :key="'seg-'+i">
@@ -55,14 +78,16 @@
     <RulersOverlay :width="canvasW" :height="canvasH" :scale="stageScale" :stageX="stagePosition.x" :stageY="stagePosition.y" :pixelsPerUnit="PIXELS_PER_CM * 100" unit="m"/>
   </div>
 </template>
-<!-- El script de DrawEditor.vue no necesita cambios adicionales -->
+
 <script setup>
 import { computed, reactive, ref, watch, onMounted, defineProps, defineEmits, toRefs } from 'vue'
 import GridLayer from './GridLayer.vue'
 import RulersOverlay from './RulersOverlay.vue'
 
+// MODIFICADO: Se añade la prop 'elements'
 const props = defineProps({
   polygon: { type: Array, required: true },
+  elements: { type: Array, default: () => [] },
   worldWidth: { type: Number, required: true },
   worldHeight: { type: Number, required: true },
   adding: { type: Boolean, default: false },
@@ -71,7 +96,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:polygon', 'notice']);
 
-const { polygon, worldWidth, worldHeight, adding, deleting } = toRefs(props);
+// MODIFICADO: Se desestructura 'elements' de las props
+const { polygon, elements, worldWidth, worldHeight, adding, deleting } = toRefs(props);
 
 const PIXELS_PER_CM = 10
 const canvasW = ref(1200)
@@ -174,6 +200,55 @@ const segments = computed(() => {
   return segs
 })
 
+// NUEVO: Lógica de validación del polígono
+/**
+ * Verifica si un punto (x, y) está dentro de un polígono.
+ * Usa el algoritmo de Ray Casting.
+ */
+function isPointInPolygon(point, vs) {
+  const x = point.x, y = point.y;
+  let inside = false;
+  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+    const xi = vs[i].x, yi = vs[i].y;
+    const xj = vs[j].x, yj = vs[j].y;
+    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Verifica si un polígono propuesto es válido, asegurando que todos los
+ * elementos fijos permanezcan dentro de él.
+ */
+function isPolygonValid(newPolygon, fixedElements) {
+  if (!fixedElements || fixedElements.length === 0) {
+    return true; // No hay elementos, cualquier polígono es válido.
+  }
+
+  for (const el of fixedElements) {
+    // Para cada elemento, verificamos sus 4 esquinas.
+    const corners = [
+      { x: el.x, y: el.y },
+      { x: el.x + el.width, y: el.y },
+      { x: el.x + el.width, y: el.y + el.height },
+      { x: el.x, y: el.y + el.height },
+    ];
+
+    // Si CUALQUIER esquina está fuera del nuevo polígono, no es válido.
+    for (const corner of corners) {
+      if (!isPointInPolygon(corner, newPolygon)) {
+        emit('notice', `El área no puede excluir el elemento "${el.nombre || el.id}"`);
+        return false;
+      }
+    }
+  }
+
+  emit('notice', ''); // Limpiar aviso si es válido
+  return true;
+}
+
+// MODIFICADO: onPointDrag ahora valida antes de actualizar
 function onPointDrag(idx, e) {
   dragging.value = true
   selectedIdx.value = idx
@@ -184,18 +259,27 @@ function onPointDrag(idx, e) {
 
   const newPolygon = [...polygon.value];
   newPolygon[idx] = { x: Math.round(clampedX), y: Math.round(clampedY) };
-  emit('update:polygon', newPolygon);
 
-  e.target.x(clampedX)
-  e.target.y(clampedY)
+  // Añadir validación aquí
+  if (isPolygonValid(newPolygon, elements.value)) {
+    emit('update:polygon', newPolygon);
+    e.target.x(clampedX);
+    e.target.y(clampedY);
+  } else {
+    // Si no es válido, revertimos la posición del target a la última válida.
+    const lastValidPoint = polygon.value[idx];
+    e.target.x(lastValidPoint.x);
+    e.target.y(lastValidPoint.y);
+  }
 
-  guidePos.x = Math.round(clampedX)
-  guidePos.y = Math.round(clampedY)
+  guidePos.x = Math.round(e.target.x()) // Actualizamos la guía con la posición final
+  guidePos.y = Math.round(e.target.y())
 }
 
 function onPointDragEnd(idx, e) {
   onPointDrag(idx, e)
   dragging.value = false
+  emit('notice', ''); // Limpiar el aviso al soltar
 }
 
 function stageToLocal(pos){

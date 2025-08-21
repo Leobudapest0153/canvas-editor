@@ -71,7 +71,7 @@
                 <!-- Botón de agregar planta (siempre visible al hacer scroll) -->
           <div class="sticky right-0 z-10 pl-2 -mr-2 bg-gradient-to-l from-white via-white/70 to-transparent flex items-center pointer-events-none">
             <button
-              @click="canvasStore.abrirEditor"
+              @click="canvasStore.abrirEditor()"
               class="pointer-events-auto inline-flex items-center justify-center w-10 h-10 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-md hover:shadow-lg cursor-pointer"
               title="Agregar nueva planta"
               type="button"
@@ -510,6 +510,9 @@ const cerrarMenuPlanta = () => {
 
 const editarPlanta = (plantaId) => {
   const planta = canvasStore.plantaPorId(plantaId)
+  canvasStore.abrirEditor(planta.id);
+  /*const planta = canvasStore.plantaPorId(plantaId)
+
   if (planta) {
     formularioPlanta.value = {
       nombre: planta.nombre,
@@ -523,7 +526,7 @@ const editarPlanta = (plantaId) => {
     }
     mostrarModalEditar.value = true
     cerrarMenuPlanta()
-  }
+  }*/
 }
 
 const confirmarEliminarPlantaMenu = (plantaId) => {

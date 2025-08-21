@@ -8,8 +8,10 @@
 
       <div class="grid gap-4 md:grid-cols-5 flex-grow min-h-0">
         <div class="md:col-span-3 flex flex-col">
+          <!-- MODIFICADO: Se pasa la prop 'elements' -->
           <DrawEditor ref="canvasEditorRef"
                         :polygon="local.polygon"
+                        :elements="local.elements"
                         :worldWidth="worldWidth"
                         :worldHeight="worldHeight"
                         :adding="adding"
@@ -93,11 +95,13 @@ const rectL = ref(500)
 const worldWidth = computed(() => rectW.value * PIXELS_PER_CM)
 const worldHeight = computed(() => rectL.value * PIXELS_PER_CM)
 
+// MODIFICADO: Se añade 'elements' al estado local
 const local = reactive({
   id: null,
   name: '',
   shape: 'rectangle',
   polygon: [],
+  elements: [], // NUEVO: Lista para los elementos fijos
   unit: 'cm',
   pixelsPerUnit: PIXELS_PER_CM,
   height: 500,
@@ -114,7 +118,48 @@ function defaultRect() {
   return [ { x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: l }, { x: 0, y: l } ]
 }
 
-local.polygon = defaultRect()
+// NUEVO: Lógica para cargar datos en modo edición.
+// Este watch simula cómo reaccionarías cuando el store indica que hay una planta para editar.
+// Deberás adaptar `canvasStore.plantaEnEdicion` y `canvasStore.elementosDeLaPlanta`
+// a las propiedades reales de tu store.
+watch(() => canvasStore.plantaEnEdicion, (planta) => {
+  if (planta) {
+    // Modo Edición: Cargar datos de la planta existente
+    local.id = planta.id;
+    local.name = planta.nombre;
+    local.polygon = planta.poligono;
+    local.shape = planta.forma;
+    local.elements = planta.elementos || [];
+
+    // Cargar dimensiones y otras propiedades
+    rectW.value = planta.dimensiones.ancho;
+    rectL.value = planta.dimensiones.largo;
+    local.height = planta.dimensiones.alto;
+    local.maxWeight = planta.pesoMaximoSoportado;
+
+    // Marcar como editado manualmente para que no se sobreescriba la forma
+    isManuallyEdited.value = true;
+
+  } else {
+    // Modo Creación: Resetear a valores por defecto
+    local.id = null;
+    local.name = '';
+    local.polygon = defaultRect();
+    local.elements = [];
+    rectW.value = 500;
+    rectL.value = 500;
+    local.height = 500;
+    local.maxWeight = 1000;
+    isManuallyEdited.value = false;
+  }
+
+  // Ajustar la vista del canvas a la forma cargada
+  nextTick(() => {
+    canvasEditorRef.value?.fitStageToPolygon();
+  });
+
+}, { immediate: true, deep: true });
+
 
 const adding = ref(false)
 const deleting = ref(false)
@@ -240,7 +285,8 @@ function onSave(){
     return;
   }
 
-  const nuevaPlanta = {
+  const plantaData = {
+    id: local.id, // Será null si es nueva, o tendrá un valor si se está editando
     nombre: local.name.trim(),
     pesoMaximoSoportado: local.maxWeight,
     dimensiones: {
@@ -248,10 +294,18 @@ function onSave(){
       ancho: rectW.value,
       largo: rectL.value
     },
+    forma: local.shape,
     poligono: local.polygon,
   }
 
-  canvasStore.agregarPlanta(nuevaPlanta)
+  // NUEVO: Lógica para diferenciar entre crear y actualizar
+  if (plantaData.id) {
+    canvasStore.editarPlanta(plantaData.id, plantaData);
+  } else {
+    delete plantaData.id;
+    canvasStore.agregarPlanta(plantaData);
+  }
+
   canvasStore.cerrarEditor();
 }
 </script>
