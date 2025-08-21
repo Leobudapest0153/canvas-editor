@@ -39,7 +39,6 @@
               <option value="custom">Personalizada</option>
             </select>
             <div class="grid grid-cols-2 gap-2 mt-2">
-              <!-- MODIFICADO: Ahora se muestra para rectángulo y círculo -->
               <template v-if="local.shape === 'rectangle' || local.shape === 'circle'">
                 <div>
                   <label class="text-xs text-slate-600">Ancho (m)</label>
@@ -51,7 +50,6 @@
                 </div>
               </template>
             </div>
-            <!-- MODIFICADO: Ahora se muestra para rectángulo y círculo -->
             <div v-if="local.shape === 'rectangle' || local.shape === 'circle'" class="mt-2">
               <label class="text-xs text-slate-600">Alto (m)</label>
               <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="heightMeters" />
@@ -85,16 +83,13 @@ import DrawEditor from './DrawEditor.vue';
 const canvasStore = useCanvasStore();
 const canvasEditorRef = ref(null);
 
-// NUEVO: Helper para generar puntos de un óvalo
 const ovalSamplePoints = (cx, cy, rx, ry, n) => Array.from({length:n},(_,i)=>{const a=i/n*2*Math.PI;return{x:cx+rx*Math.cos(a),y:cy+ry*Math.sin(a)}})
 
 const PIXELS_PER_CM = 10
 
-// MODIFICADO: Estos valores ahora definen el tamaño del ÁREA DE TRABAJO (el fondo gris)
-const rectW = ref(500) // 5m
-const rectL = ref(500) // 5m
+const rectW = ref(500)
+const rectL = ref(500)
 
-// MODIFICADO: El tamaño del mundo ahora SIEMPRE depende de rectW y rectL
 const worldWidth = computed(() => rectW.value * PIXELS_PER_CM)
 const worldHeight = computed(() => rectL.value * PIXELS_PER_CM)
 
@@ -111,6 +106,7 @@ const local = reactive({
 
 const notice = ref('')
 const errors = reactive({ name: false, dimensions: false })
+const isManuallyEdited = ref(false)
 
 function defaultRect() {
   const w = rectW.value * PIXELS_PER_CM
@@ -133,7 +129,10 @@ function toggleDeleteMode(){
   if (!deleting.value) { notice.value = ''; document.body.style.cursor = 'default'; }
 }
 
-const onPolygonUpdate = (newPolygon) => { local.polygon = newPolygon; };
+const onPolygonUpdate = (newPolygon) => {
+  local.polygon = newPolygon;
+  isManuallyEdited.value = true;
+};
 
 const rectWMeters = computed({
   get: () => rectW.value / 100,
@@ -155,7 +154,6 @@ function applyRect(){
   nextTick(() => { canvasEditorRef.value?.fitStageToPolygon() })
 }
 
-// MODIFICADO: La función del círculo ahora crea un óvalo que llena el área
 function applyCircle() {
   const wPx = worldWidth.value
   const lPx = worldHeight.value
@@ -167,15 +165,39 @@ function applyCircle() {
   nextTick(() => { canvasEditorRef.value?.fitStageToPolygon() })
 }
 
-// MODIFICADO: El watcher ahora redibuja la forma activa (rect o círculo)
-watch([rectW, rectL], () => {
-  if (local.shape === 'rectangle') applyRect()
-  else if (local.shape === 'circle') applyCircle()
+watch([rectW, rectL], ([newW_cm, newL_cm], [oldW_cm, oldL_cm]) => {
+  if (oldW_cm === undefined || oldL_cm === undefined) {
+    if (local.shape === 'rectangle') applyRect()
+    else if (local.shape === 'circle') applyCircle()
+    return
+  }
+
+  if (isManuallyEdited.value) {
+    const oldWorldWidth = oldW_cm * PIXELS_PER_CM;
+    const oldWorldHeight = oldL_cm * PIXELS_PER_CM;
+    const newWorldWidth = worldWidth.value;
+    const newWorldHeight = worldHeight.value;
+    if (oldWorldWidth === 0 || oldWorldHeight === 0) return;
+    const scaleX = newWorldWidth / oldWorldWidth;
+    const scaleY = newWorldHeight / oldWorldHeight;
+    const scaledPolygon = local.polygon.map(p => ({
+      x: Math.round(p.x * scaleX),
+      y: Math.round(p.y * scaleY)
+    }));
+    local.polygon = scaledPolygon;
+    nextTick(() => { canvasEditorRef.value?.fitStageToPolygon() });
+  } else {
+    if (local.shape === 'rectangle') applyRect()
+    else if (local.shape === 'circle') applyCircle()
+  }
 })
 
 function onShapeChange() {
   if (local.shape === 'rectangle') applyRect()
   else if (local.shape === 'circle') applyCircle()
+  if (local.shape === 'rectangle' || local.shape === 'circle') {
+    isManuallyEdited.value = false
+  }
   adding.value = false
   deleting.value = false
 }
@@ -191,7 +213,6 @@ function onSave(){
     return
   }
 
-  // MODIFICADO: La validación de dimensiones ahora aplica a rect y círculo
   if (local.shape === 'rectangle' || local.shape === 'circle') {
     if (rectWMeters.value <= 0 || rectLMeters.value <= 0 || heightMeters.value <= 0) {
       errors.dimensions = true
@@ -203,6 +224,20 @@ function onSave(){
   if ((local.polygon?.length || 0) < 3){
     notice.value = 'El polígono debe tener al menos 3 vértices.'
     return
+  }
+
+  const wPx = worldWidth.value;
+  const lPx = worldHeight.value;
+  let touchesTop = false, touchesBottom = false, touchesLeft = false, touchesRight = false;
+  for (const p of local.polygon) {
+    if (p.x === 0) touchesLeft = true;
+    if (p.x === wPx) touchesRight = true;
+    if (p.y === 0) touchesTop = true;
+    if (p.y === lPx) touchesBottom = true;
+  }
+  if (!touchesTop || !touchesBottom || !touchesLeft || !touchesRight) {
+    notice.value = 'La forma dibujada debe tocar los 4 bordes del área de trabajo.';
+    return;
   }
 
   const nuevaPlanta = {
