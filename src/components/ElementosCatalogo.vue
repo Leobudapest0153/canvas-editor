@@ -18,8 +18,9 @@
     <!-- Header del catálogo -->
     <div class="catalogo-header p-4 border-b border-gray-200">
       <div class="flex items-center justify-between mb-3">
-        <h2 class="text-base font-semibold text-gray-800 m-0">Catálogo de Elementos</h2>
+        <h2 class="text-base font-semibold text-gray-800 m-0">{{ tituloContextual }}</h2>
         <button
+          v-if="puedeCrearElementosPersonalizados"
           @click="mostrarModalCrear = true"
           type="button"
           class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
@@ -70,7 +71,11 @@
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100"
           >
             <option :value="null">Todas las categorías</option>
-            <option v-for="categoria in CATEGORIAS" :key="categoria.id" :value="categoria.id">
+            <option
+              v-for="categoria in categoriasDisponibles"
+              :key="categoria.id"
+              :value="categoria.id"
+            >
               {{ categoria.nombre }}
             </option>
           </select>
@@ -136,12 +141,15 @@
               </div>
             </div>
 
-            <!-- Badge de categoría -->
-            <div class="mt-2">
+            <!-- Badge de tipo y categoría -->
+            <div class="mt-2 flex gap-1">
               <span
                 class="inline-block px-2 py-1 text-xs rounded-full text-white"
-                :style="{ backgroundColor: getCategoriaColor(elemento.categoria) }"
+                :style="{ backgroundColor: getColorPorTipo(elemento.tipo) }"
               >
+                {{ getTipoNombre(elemento.tipo) }}
+              </span>
+              <span class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
                 {{ getCategoriaName(elemento.categoria) }}
               </span>
             </div>
@@ -192,7 +200,7 @@
 
     <ElementEditor
       :visible="mostrarModalCrear"
-      :categorias="CATEGORIAS"
+      :categorias="categoriasDisponibles"
       :formas="FORMAS_DISPONIBLES"
       :ubicaciones="UBICACIONES_DISPONIBLES"
       :value="nuevoElemento"
@@ -204,19 +212,27 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useCanvasStore } from '@/composables/useCanvasStore'
 import {
   ELEMENTOS_PREDEFINIDOS,
-  CATEGORIAS,
+  TODAS_LAS_CATEGORIAS,
+  TIPOS_ENTIDAD,
+  getColorPorTipo,
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
 } from '@/utils/constants'
 
 import ElementEditor from './modals/ElementEditor.vue'
+
+// Store
+const canvasStore = useCanvasStore()
+
 // Estado local
 const filtroTexto = ref('')
 const categoriaSeleccionada = ref(null)
 const mostrarModalCrear = ref(false)
 const elementosPersonalizados = ref([])
+
 // Formulario para nuevo elemento
 const nuevoElemento = ref({
   nombre: '',
@@ -234,27 +250,63 @@ const nuevoElemento = ref({
   icono: 'box',
 })
 
-const onGuardarElemento = (elemento) => {
-  const elementoNuevo = {
-    ...elemento,
-    id: `custom_${Date.now()}`,
-    icono: 'box',
-    personalizado: true,
-  }
-  elementosPersonalizados.value.push(elementoNuevo)
-  cerrarModal()
-  categoriaSeleccionada.value = elementoNuevo.categoria
-  filtroTexto.value = ''
-}
+// Computed: título dinámico según el contexto
+const tituloContextual = computed(() => {
+  const contexto = canvasStore.contextoActual.tipo
 
-// Todos los elementos (predefinidos + personalizados)
-const todosLosElementos = computed(() => {
-  return [...ELEMENTOS_PREDEFINIDOS, ...elementosPersonalizados.value]
+  if (contexto === 'plantas') {
+    return 'Catálogo de Elementos'
+  } else if (contexto === 'elementos') {
+    return 'Catálogo de Contenedores'
+  } else if (contexto === 'contenedores') {
+    return 'Catálogo (Elementos + Contenedores)'
+  }
+
+  return 'Catálogo de Elementos'
 })
 
-// Elementos filtrados
+// Computed: determina si se pueden crear elementos personalizados
+const puedeCrearElementosPersonalizados = computed(() => {
+  const contexto = canvasStore.contextoActual.tipo
+  // Solo permitir creación personalizada en plantas (elementos)
+  // Los contenedores son solo predefinidos
+  return contexto === 'plantas'
+})
+
+// Computed: categorías disponibles según el contexto
+const categoriasDisponibles = computed(() => {
+  const contexto = canvasStore.contextoActual.tipo
+
+  if (contexto === 'plantas') {
+    // En plantas solo se pueden crear elementos
+    return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'elementos')
+  } else if (contexto === 'elementos') {
+    // En elementos solo se pueden crear contenedores
+    return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'contenedores')
+  } else if (contexto === 'contenedores') {
+    // En contenedores se pueden crear elementos Y contenedores
+    return TODAS_LAS_CATEGORIAS.filter(
+      (cat) => cat.tipo === 'elementos' || cat.tipo === 'contenedores',
+    )
+  }
+
+  return TODAS_LAS_CATEGORIAS
+})
+
+// Computed: elementos filtrados según contexto y filtros
 const elementosFiltrados = computed(() => {
-  let elementos = todosLosElementos.value
+  let elementos = [...ELEMENTOS_PREDEFINIDOS, ...elementosPersonalizados.value]
+
+  // Filtrar por contexto (solo mostrar elementos apropiados)
+  const contexto = canvasStore.contextoActual.tipo
+  if (contexto === 'plantas') {
+    elementos = elementos.filter((el) => el.tipo === 'elementos')
+  } else if (contexto === 'elementos') {
+    elementos = elementos.filter((el) => el.tipo === 'contenedores')
+  } else if (contexto === 'contenedores') {
+    // Los contenedores pueden contener elementos Y otros contenedores
+    elementos = elementos.filter((el) => el.tipo === 'elementos' || el.tipo === 'contenedores')
+  }
 
   // Filtrar por texto
   if (filtroTexto.value) {
@@ -275,14 +327,27 @@ const elementosFiltrados = computed(() => {
   return elementos
 })
 
+const onGuardarElemento = (elemento) => {
+  const elementoNuevo = {
+    ...elemento,
+    id: `custom_${Date.now()}`,
+    icono: 'box',
+    personalizado: true,
+  }
+  elementosPersonalizados.value.push(elementoNuevo)
+  cerrarModal()
+  categoriaSeleccionada.value = elementoNuevo.categoria
+  filtroTexto.value = ''
+}
+
 // Métodos
-const getCategoriaColor = (categoriaId) => {
-  const categoria = CATEGORIAS.find((c) => c.id === categoriaId)
-  return categoria ? categoria.color : '#6b7280'
+const getTipoNombre = (tipo) => {
+  const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
+  return tipoInfo?.nombre || 'Desconocido'
 }
 
 const getCategoriaName = (categoriaId) => {
-  const categoria = CATEGORIAS.find((c) => c.id === categoriaId)
+  const categoria = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
   return categoria ? categoria.nombre : 'Sin categoría'
 }
 

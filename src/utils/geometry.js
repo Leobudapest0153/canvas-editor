@@ -69,7 +69,7 @@ export const polygonEdges = (poly) => {
 
 // Check if rectangle (axis-aligned) fully inside polygon
 export const rectInsidePolygon = (x, y, w, h, polygon) => {
-  console.log('Checking rect inside polygon:', { x, y, w, h, polygon })
+  // console.log('Checking rect inside polygon:', { x, y, w, h, polygon })
   const corners = rectCorners(x, y, w, h)
   // All corners inside
   const allInside = corners.every((c) => pointInPolygon(c, polygon))

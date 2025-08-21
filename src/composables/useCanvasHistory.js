@@ -105,13 +105,13 @@ export const useCanvasHistory = () => {
       currentIndex.value = Math.max(0, currentIndex.value - 1)
     }
 
-    console.log('💾 Estado guardado en historial:', {
-      description,
-      position: currentPosition.value,
-      total: historySize.value,
-      canUndo: canUndo.value,
-      canRedo: canRedo.value,
-    })
+    // console.log('💾 Estado guardado en historial:', {
+    //   description,
+    //   position: currentPosition.value,
+    //   total: historySize.value,
+    //   canUndo: canUndo.value,
+    //   canRedo: canRedo.value,
+    // })
   }
 
   /**

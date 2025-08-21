@@ -4,29 +4,27 @@
  * Constantes y elementos predefinidos para el catálogo del editor.
  */
 
-// Elemento base para representar espacios dentro de los demás elementos
-export const CONTENEDOR_BASE = {
-  id: 'contenedor',
-  nombre: 'Contenedor Base',
-  categoria: 'contenedores',
-  forma: 'rectangular',
-  colorBase: '#3b82f6',
-  dimensiones: {
-    ancho: 10,
-    largo: 10,
-    alto: 10,
-  },
-  pesoMaximo: 10,
-  ubicacion: 'interior',
-  descripcion: 'Contenedor para almacenamiento',
-  icono: 'box',
+export const TIPOS_ENTIDAD = [
+  { id: 'plantas', nombre: 'Plantas', color: '#10b981', icono: '🏢' },
+  { id: 'elementos', nombre: 'Elementos', color: '#3b82f6', icono: '📦' },
+  { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', icono: '🗃️' },
+]
+
+// === REGLAS DE JERARQUÍA ===
+export const JERARQUIA_PERMITIDA = {
+  plantas: ['elementos'], // Las plantas pueden contener elementos
+  elementos: ['contenedores'], // Los elementos pueden contener contenedores
+  contenedores: ['elementos', 'contenedores'], // Los contenedores pueden contener elementos Y otros contenedores
 }
 
 export const ELEMENTOS_PREDEFINIDOS = [
+  // === ELEMENTOS (solo pueden ir en plantas) ===
+
   // Anaqueles
   {
     id: 'anaquel_metalico_grande',
     nombre: 'Anaquel 2 x 2',
+    tipo: 'elementos', // NUEVO CAMPO
     categoria: 'anaqueles',
     forma: 'rectangular',
     colorBase: '#3b82f6',
@@ -39,33 +37,13 @@ export const ELEMENTOS_PREDEFINIDOS = [
     ubicacion: 'suelo',
     descripcion: 'Anaquel metálico de alta capacidad para almacenamiento pesado',
     icono: 'rack',
-    contenedores: [
-      {
-        id: 'contenedor_1',
-        nombre: 'Contenedor 1',
-        dimensiones: {
-          ancho: 110, // Reducido para caber en el anaquel
-          largo: 190, // Reducido para caber en el anaquel
-          alto: 170,
-        },
-        posicion: {
-          x: 5, // 5cm desde el borde izquierdo
-          y: 5, // 5cm desde el borde superior
-          z: 0,
-        },
-        pesoMaximo: 250,
-        ubicacion: 'interior',
-        descripcion: 'Contenedor 1 del anaquel',
-        icono: 'box',
-        hijos: [],
-      },
-    ],
   },
 
   // Estante de pared
   {
     id: 'estante_pared_pequeno',
     nombre: 'Estante de Pared',
+    tipo: 'elementos', // NUEVO CAMPO
     categoria: 'estantes',
     forma: 'rectangular',
     colorBase: '#10b981',
@@ -79,13 +57,13 @@ export const ELEMENTOS_PREDEFINIDOS = [
     alturaRespectoAlSuelo: 150, // cm - altura típica para estantes de pared
     descripcion: 'Estante montado en pared para almacenamiento ligero',
     icono: 'shelf',
-    contenedores: [],
   },
 
   // Armario de pared
   {
     id: 'armario_pared_alto',
     nombre: 'Armario de Pared Alto',
+    tipo: 'elementos', // NUEVO CAMPO
     categoria: 'armarios',
     forma: 'rectangular',
     colorBase: '#7c3aed',
@@ -99,10 +77,43 @@ export const ELEMENTOS_PREDEFINIDOS = [
     alturaRespectoAlSuelo: 50, // cm - altura moderada para armarios
     descripcion: 'Armario montado en pared para almacenamiento vertical',
     icono: 'cabinet',
-    contenedores: [],
+  },
+
+  // === CONTENEDORES (solo pueden ir en elementos) ===
+
+  // Contenedor básico (único disponible)
+  {
+    id: 'contenedor_base',
+    nombre: 'Contenedor Base',
+    tipo: 'contenedores',
+    categoria: 'contenedores',
+    forma: 'rectangular',
+    colorBase: '#dc2626',
+    dimensiones: {
+      ancho: 30,
+      largo: 40,
+      alto: 20,
+    },
+    pesoMaximo: 25,
+    ubicacion: 'interior',
+    descripcion: 'Contenedor básico para almacenamiento organizado (redimensionable)',
+    icono: 'box',
   },
 ]
 
+// === CATEGORÍAS POR TIPO ===
+export const CATEGORIAS_ELEMENTOS = [
+  { id: 'anaqueles', nombre: 'Anaqueles', color: '#3b82f6', tipo: 'elementos' },
+  { id: 'estantes', nombre: 'Estantes', color: '#10b981', tipo: 'elementos' },
+  { id: 'mesas', nombre: 'Mesas', color: '#f59e0b', tipo: 'elementos' },
+  { id: 'armarios', nombre: 'Armarios', color: '#7c3aed', tipo: 'elementos' },
+]
+
+export const CATEGORIAS_CONTENEDORES = [
+  { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', tipo: 'contenedores' },
+]
+
+// === CATEGORÍAS LEGACY (mantener por compatibilidad temporal) ===
 export const CATEGORIAS = [
   { id: 'anaqueles', nombre: 'Anaqueles', color: '#3b82f6' },
   { id: 'estantes', nombre: 'Estantes', color: '#10b981' },
@@ -111,15 +122,58 @@ export const CATEGORIAS = [
   { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626' },
 ]
 
+// === TODAS LAS CATEGORÍAS UNIFICADAS ===
+export const TODAS_LAS_CATEGORIAS = [...CATEGORIAS_ELEMENTOS, ...CATEGORIAS_CONTENEDORES]
+
 export const FORMAS_DISPONIBLES = [
   { id: 'rectangular', nombre: 'Rectangular' },
   { id: 'circular', nombre: 'Circular' },
 ]
 
 export const UBICACIONES_DISPONIBLES = [
-  { id: 'suelo', nombre: 'Suelo' },
-  { id: 'pared', nombre: 'Pared' },
+  { id: 'suelo', nombre: 'Suelo', aplicaA: ['elementos'] },
+  { id: 'pared', nombre: 'Pared', aplicaA: ['elementos'] },
+  { id: 'interior', nombre: 'Interior', aplicaA: ['contenedores'] },
 ]
+
+// === FUNCIONES DE UTILIDAD ===
+
+/**
+ * Obtiene las categorías permitidas según el tipo de entidad
+ */
+export const getCategoriasPorTipo = (tipo) => {
+  switch (tipo) {
+    case 'elementos':
+      return CATEGORIAS_ELEMENTOS
+    case 'contenedores':
+      return CATEGORIAS_CONTENEDORES
+    default:
+      return []
+  }
+}
+
+/**
+ * Verifica si un tipo puede contener otro según la jerarquía
+ */
+export const puedeContener = (tipoPadre, tipoHijo) => {
+  return JERARQUIA_PERMITIDA[tipoPadre]?.includes(tipoHijo) || false
+}
+
+/**
+ * Obtiene el color por defecto para un tipo
+ */
+export const getColorPorTipo = (tipo) => {
+  const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
+  return tipoInfo?.color || '#6b7280'
+}
+
+/**
+ * Obtiene el icono por defecto para un tipo
+ */
+export const getIconoPorTipo = (tipo) => {
+  const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
+  return tipoInfo?.icono || '📦'
+}
 
 export const COLORES_DISPONIBLES = [
   '#3b82f6',
