@@ -135,9 +135,9 @@
               />
             </div>
 
-            <!-- Alto -->
+            <!-- Largo -->
             <div>
-              <label class="block text-xs font-medium text-gray-600 mb-1"> Alto (px) </label>
+              <label class="block text-xs font-medium text-gray-600 mb-1"> Largo (px) </label>
               <input
                 :value="elementoSeleccionado.height"
                 type="number"
@@ -148,8 +148,29 @@
           </div>
 
           <p class="text-xs text-gray-500 mt-2">
-            Las dimensiones y posición se modifican directamente en el canvas
+            Vista desde arriba: Ancho=X, Largo=Y. Las dimensiones se modifican directamente en el canvas
           </p>
+          
+          <!-- Dimensiones físicas adicionales (si están disponibles) -->
+          <div v-if="elementoSeleccionado.dimensiones" class="mt-3 pt-3 border-t border-gray-200">
+            <h4 class="text-xs font-medium text-gray-600 mb-2">Dimensiones Físicas</h4>
+            <div class="grid grid-cols-3 gap-2 text-xs text-gray-500">
+              <div>Ancho: {{ elementoSeleccionado.dimensiones.ancho }}cm</div>
+              <div>Largo: {{ elementoSeleccionado.dimensiones.largo }}cm</div>
+              <div>Alto: {{ elementoSeleccionado.dimensiones.alto }}cm</div>
+            </div>
+          </div>
+          
+          <!-- Información específica para elementos de pared -->
+          <div v-if="elementoSeleccionado.ubicacion === 'pared' && elementoSeleccionado.alturaRespectoAlSuelo !== undefined" class="mt-3 pt-3 border-t border-gray-200">
+            <h4 class="text-xs font-medium text-gray-600 mb-2">Posicionamiento en Pared</h4>
+            <div class="text-xs text-gray-500">
+              <div>Altura del suelo: {{ elementoSeleccionado.alturaRespectoAlSuelo }}cm</div>
+              <div class="text-xs text-gray-400 mt-1">
+                Base del elemento a {{ elementoSeleccionado.alturaRespectoAlSuelo }}cm del suelo
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Jerarquía -->

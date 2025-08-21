@@ -15,7 +15,8 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { CM_TO_PX } from '@/utils/constants'
 
 // Variable para evitar circular import - será inicializada por el composable de historial
 let historyComposable = null
@@ -36,32 +37,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       },
       pesoMaximoSoportado: 5000, // kg
     },
-    {
-      id: 'planta_2',
-      nombre: 'Primer Piso',
-      descripcion: 'Segundo nivel del edificio',
-      elementos: [], // Los elementos se calculan dinámicamente
-      activa: false,
-      dimensiones: {
-        alto: 280,
-        ancho: 1000,
-        largo: 1200,
-      },
-      pesoMaximoSoportado: 4500,
-    },
-    {
-      id: 'planta_3',
-      nombre: 'Segundo Piso',
-      descripcion: 'Tercer nivel del edificio',
-      elementos: [], // Los elementos se calculan dinámicamente
-      activa: false,
-      dimensiones: {
-        alto: 280,
-        ancho: 800,
-        largo: 1000,
-      },
-      pesoMaximoSoportado: 4000,
-    },
   ])
 
   const plantaActiva = ref('planta_1')
@@ -72,6 +47,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const elementoSeleccionado = ref(null)
   const vistaActiva = ref('XY') // XY, ZX, ZY
   const zoom = ref(1)
+  const crearPlanta = ref(false);
   const panX = ref(0)
   const panY = ref(0)
 
@@ -308,12 +284,9 @@ export const useCanvasStore = defineStore('canvas', () => {
         path: nuevoPath,
       }
 
-      // Reset canvas a tamaño por defecto
-      canvasAdaptativo.value = {
-        width: 800,
-        height: 600,
-        escala: 1,
-      }
+      // Calcular canvas adaptativo para la planta
+      const planta = plantaPorId.value(ultimoElemento.id)
+      calcularCanvasAdaptativoPlanta(planta)
     } else {
       // Regresar a elemento padre
       contextoNavegacion.value = {
@@ -368,12 +341,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Actualizar planta activa
     plantaActiva.value = plantaId
 
-    // Reset canvas a tamaño por defecto
-    canvasAdaptativo.value = {
-      width: 800,
-      height: 600,
-      escala: 1,
-    }
+    // Calcular canvas adaptativo para la planta
+    calcularCanvasAdaptativoPlanta(planta)
 
     // Reset zoom y pan
     zoom.value = 1
@@ -393,17 +362,58 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   const calcularCanvasAdaptativo = (elemento) => {
-    // Calcular tamaño proporcional del canvas basado en las dimensiones del elemento
-    const factorEscala = 10 // Factor para hacer el canvas más grande que el elemento
+    // Calcular tamaño del canvas basado en las dimensiones del elemento
+    let elementWidthPx, elementHeightPx
 
-    canvasAdaptativo.value = {
-      width: Math.max(elemento.width * factorEscala, 400), // Mínimo 400px
-      height: Math.max(elemento.height * factorEscala, 300), // Mínimo 300px
-      escala: factorEscala,
+    if (elemento.width && elemento.height) {
+      // Ya están en píxeles (convertidos cuando se creó el elemento)
+      elementWidthPx = elemento.width
+      elementHeightPx = elemento.height
+    } else if (elemento.dimensiones) {
+      // Solo tiene dimensiones en cm, convertir a píxeles
+      elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
+      elementHeightPx = elemento.dimensiones.largo * CM_TO_PX
+    } else {
+      // Fallback con conversión
+      elementWidthPx = 100 * CM_TO_PX  // 100cm → 1000px
+      elementHeightPx = 60 * CM_TO_PX   // 60cm → 600px
     }
 
-    console.log('Canvas adaptativo calculado:', {
-      elemento: { width: elemento.width, height: elemento.height },
+    // El canvas muestra el espacio real del elemento sin factores adicionales
+    canvasAdaptativo.value = {
+      width: elementWidthPx,
+      height: elementHeightPx,
+      escala: CM_TO_PX, // La escala es la conversión cm→px
+    }
+
+    console.log('Canvas adaptativo calculado para elemento:', {
+      elemento: { widthPx: elementWidthPx, heightPx: elementHeightPx },
+      canvas: canvasAdaptativo.value,
+    })
+  }
+
+  const calcularCanvasAdaptativoPlanta = (planta) => {
+    // Calcular tamaño del canvas basado en las dimensiones de la planta
+    if (!planta) {
+      // Fallback por defecto
+      canvasAdaptativo.value = {
+        width: 800,
+        height: 600,
+        escala: 1,
+      }
+      return
+    }
+
+    // Convertir dimensiones de cm a pixels usando la constante CM_TO_PX
+    // Para plantas, usamos la conversión directa 1:1 (sin factor de escala adicional)
+    canvasAdaptativo.value = {
+      width: planta.dimensiones.ancho * CM_TO_PX, // ancho = x
+      height: planta.dimensiones.largo * CM_TO_PX, // largo = y
+      escala: CM_TO_PX, // La escala es la conversión cm->px
+    }
+
+    console.log('Canvas adaptativo calculado para planta:', {
+      planta: { anchoCm: planta.dimensiones.ancho, largoCm: planta.dimensiones.largo },
       canvas: canvasAdaptativo.value,
     })
   }
@@ -461,11 +471,15 @@ export const useCanvasStore = defineStore('canvas', () => {
           },
         ],
       }
+      
+      // Calcular canvas adaptativo para la planta seleccionada
+      calcularCanvasAdaptativoPlanta(planta)
     }
   }
 
   const agregarPlanta = (nuevaPlanta) => {
     const id = `planta_${Date.now()}`
+    
     plantas.value.push({
       id,
       nombre: nuevaPlanta.nombre || 'Nueva Planta',
@@ -473,9 +487,9 @@ export const useCanvasStore = defineStore('canvas', () => {
       elementos: [],
       activa: false,
       dimensiones: {
-        alto: nuevaPlanta.dimensiones?.alto || 280,
-        ancho: nuevaPlanta.dimensiones?.ancho || 800,
-        largo: nuevaPlanta.dimensiones?.largo || 1000,
+        alto: nuevaPlanta.dimensiones?.alto || 0,
+        ancho: nuevaPlanta.dimensiones?.ancho || 0,
+        largo: nuevaPlanta.dimensiones?.largo || 0,
       },
       pesoMaximoSoportado: nuevaPlanta.pesoMaximoSoportado || 3000,
       ...nuevaPlanta,
@@ -639,6 +653,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const eliminarPlantaConHistorial = (plantaId) => {
     const planta = plantas.value.find((p) => p.id === plantaId)
 
+    // eslint-disable-next-line no-useless-catch
     try {
       eliminarPlanta(plantaId)
       saveToHistory(`Planta eliminada: ${planta?.nombre || plantaId}`)
@@ -938,6 +953,17 @@ export const useCanvasStore = defineStore('canvas', () => {
       // Guardar en historial
       saveToHistory('Estado deserializado desde JSON')
 
+      // Recalcular canvas adaptativo según el contexto actual
+      if (contextoNavegacion.value.tipo === 'planta') {
+        const planta = plantaPorId.value(contextoNavegacion.value.id)
+        calcularCanvasAdaptativoPlanta(planta)
+      } else if (contextoNavegacion.value.tipo === 'elemento') {
+        const elemento = elementoPorId.value(contextoNavegacion.value.id)
+        if (elemento) {
+          calcularCanvasAdaptativo(elemento)
+        }
+      }
+
       console.log('Estado deserializado exitosamente:', {
         plantas: plantas.value.length,
         elementos: elementos.value.length,
@@ -956,7 +982,32 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+  const abrirEditor = () => {
+    crearPlanta.value = true;
+  }
+
+  const cerrarEditor = () => {
+    crearPlanta.value = false;
+  }
+
   // === FIN FUNCIONES DE SERIALIZACIÓN ===
+
+  // Watcher para recalcular canvas adaptativo cuando cambia el contexto
+  watch(
+    () => [contextoNavegacion.value.tipo, contextoNavegacion.value.id],
+    ([tipo, id]) => {
+      if (tipo === 'planta') {
+        const planta = plantaPorId.value(id)
+        calcularCanvasAdaptativoPlanta(planta)
+      } else if (tipo === 'elemento') {
+        const elemento = elementoPorId.value(id)
+        if (elemento) {
+          calcularCanvasAdaptativo(elemento)
+        }
+      }
+    },
+    { immediate: true }
+  )
 
   return {
     // State
@@ -970,6 +1021,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     panY,
     gridSize,
     snapGridEps,
+    crearPlanta,
 
     // Getters
     elementosVisibles,
@@ -1015,6 +1067,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     navegarAlPadre,
     navegarAPlanta,
     calcularCanvasAdaptativo,
+    calcularCanvasAdaptativoPlanta,
 
     // === INTEGRACIÓN CON HISTORIAL ===
     initializeHistory,
@@ -1030,5 +1083,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     // === FUNCIONES DE SERIALIZACIÓN ===
     serialize,
     deserialize,
+
+    // == Editor de planta
+    abrirEditor,
+    cerrarEditor
   }
 })

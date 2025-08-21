@@ -34,22 +34,33 @@
           :config="{
             x: 0,
             y: 0,
-            width: layerConfig.width,
-            height: layerConfig.height,
-            fill: '#ffffff',
+            width: floorBoundary.width,
+            height: floorBoundary.height,
+            fill: 'rgba(14,165,233,0.08)',
             stroke: '#3b82f6',
             strokeWidth: 2,
-            opacity: 0.1,
+            opacity: 1,
             listening: false,
           }"
         />
-
-        <!-- Debug: mostrar información de la planta -->
+        <v-line
+          v-if="!canvasStore.estaEnElemento"
+          :config="{
+            points: floorBoundary.points,
+            closed: true,
+            stroke: '#0ea5e9',
+            fill: 'rgba(14,165,233,0.08)',
+            strokeWidth: 2,
+          }"
+        />
+        <!-- Debug: mostrar información según el contexto -->
         <v-text
           :config="{
             x: 10,
             y: 10,
-            text: `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
+            text: canvasStore.estaEnElemento 
+              ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${layerConfig.width}x${layerConfig.height}px (Adaptativo)`
+              : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
             fontSize: 12,
             fontFamily: 'Arial',
             fill: '#3b82f6',
@@ -67,12 +78,24 @@
             listening: false,
           }"
         />
+        <v-text
+          v-if="canvasStore.estaEnElemento"
+          :config="{
+            x: 10,
+            y: 50,
+            text: `Contenedores: ${contenedoresVisibles.length}`,
+            fontSize: 11,
+            fontFamily: 'Arial',
+            fill: '#dc2626',
+            listening: false,
+          }"
+        />
 
         <!-- Renderizado de elementos del store -->
         <template v-for="elemento in elementosVisiblesEnCanvas" :key="elemento.id">
           <!-- Elementos rectangulares (anaqueles, mesas, armarios, contenedores) -->
           <v-rect
-            v-if="elemento.forma === 'rectangular' || elemento.forma === 'cuadrado' || !elemento.forma"
+            v-if="elemento.forma === 'rectangular' || !elemento.forma"
             :config="{
               id: elemento.id,
               x: elemento.x,
@@ -92,7 +115,9 @@
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
             @dragstart="() => !isElementLocked(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => !isElementLocked(elemento.id) && updateElementPosition(e, elemento.id)"
+            @dragmove="
+              (e) => !isElementLocked(elemento.id) && updateElementPosition(e, elemento.id)
+            "
             @dragend="() => !isElementLocked(elemento.id) && endElementDrag(elemento.id)"
           />
           <!-- Icono de candado para elemento bloqueado -->
@@ -152,7 +177,10 @@
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
             @dragstart="() => !isElementLocked(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => !isElementLocked(elemento.id) && updateElementPosition(e, elemento.id, 'circular')"
+            @dragmove="
+              (e) =>
+                !isElementLocked(elemento.id) && updateElementPosition(e, elemento.id, 'circular')
+            "
             @dragend="() => !isElementLocked(elemento.id) && endElementDrag(elemento.id)"
           />
           <!-- Icono de candado para elemento circular bloqueado -->
@@ -189,89 +217,6 @@
             />
           </v-group>
 
-          <!-- Elementos triangulares -->
-          <template v-else-if="elemento.forma === 'triangular'">
-            <v-rect
-              :config="{
-                id: elemento.id + '_interaction',
-                x: elemento.x,
-                y: elemento.y,
-                width: elemento.width,
-                height: elemento.height,
-                fill: 'transparent',
-                stroke: 'transparent',
-                opacity: 0,
-                draggable: !isElementLocked(elemento.id),
-                dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
-              }"
-              @click="() => selectElement(elemento.id)"
-              @dblclick="() => handleElementDoubleClick(elemento)"
-              @dragstart="() => !isElementLocked(elemento.id) && startElementDrag(elemento.id)"
-              @dragmove="(e) => !isElementLocked(elemento.id) && updateElementPosition(e, elemento.id, 'triangular')"
-              @dragend="() => !isElementLocked(elemento.id) && endElementDrag(elemento.id)"
-            />
-            <!-- Icono de candado para elemento triangular bloqueado -->
-            <v-group
-              v-if="isElementLocked(elemento.id) && elemento.forma === 'triangular'"
-              :config="{
-                x: elemento.x,
-                y: elemento.y,
-                width: elemento.width,
-                height: elemento.height,
-                listening: false,
-              }"
-            >
-              <v-rect
-                :config="{
-                  x: 0,
-                  y: 0,
-                  width: elemento.width,
-                  height: elemento.height,
-                  fill: '#000',
-                  opacity: 0.12,
-                  cornerRadius: 8,
-                  listening: false,
-                }"
-              />
-              <v-text
-                :config="{
-                  x: elemento.width / 2 - 16,
-                  y: elemento.height / 2 - 16,
-                  text: '🔒',
-                  fontSize: 32,
-                  fontFamily: 'Arial',
-                  fill: '#f59e0b',
-                  listening: false,
-                }"
-              />
-            </v-group>
-            <v-line
-              :config="{
-                id: elemento.id + '_visual',
-                points: [
-                  elemento.x + elemento.width / 2,
-                  elemento.y,
-                  elemento.x,
-                  elemento.y + elemento.height,
-                  elemento.x + elemento.width,
-                  elemento.y + elemento.height,
-                  elemento.x + elemento.width / 2,
-                  elemento.y,
-                ],
-                fill: elemento.color,
-                stroke: getStrokeColor(elemento.id),
-                strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
-                opacity: 0.8,
-                draggable: false,
-                shadowColor: 'black',
-                shadowBlur: 4,
-                shadowOpacity: 0.3,
-                closed: true,
-                listening: false,
-              }"
-            />
-          </template>
-
           <!-- Texto con el nombre del elemento -->
           <v-text
             :config="{
@@ -289,12 +234,48 @@
           />
         </template>
 
+        <!-- Renderizado de contenedores (solo cuando estamos dentro de un elemento) -->
+        <template v-if="canvasStore.estaEnElemento && contenedoresVisibles.length > 0">
+          <template v-for="contenedor in contenedoresVisibles" :key="`contenedor-${contenedor.id}`">
+            <!-- Área del contenedor -->
+            <v-rect
+              :config="{
+                id: `contenedor-${contenedor.id}`,
+                x: (contenedor.posicion?.x || 0) * CM_TO_PX,
+                y: (contenedor.posicion?.y || 0) * CM_TO_PX,
+                width: (contenedor.dimensiones?.ancho || 50) * CM_TO_PX,
+                height: (contenedor.dimensiones?.largo || 50) * CM_TO_PX,
+                fill: 'rgba(229, 231, 235, 0.3)',
+                stroke: '#9ca3af',
+                strokeWidth: 2,
+                strokeDashArray: [5, 5],
+                opacity: 0.9,
+                listening: false,
+              }"
+            />
+            
+            <!-- Etiqueta del contenedor -->
+            <v-text
+              :config="{
+                x: (contenedor.posicion?.x || 0) * CM_TO_PX + 5,
+                y: (contenedor.posicion?.y || 0) * CM_TO_PX + 5,
+                text: contenedor.nombre || `Contenedor ${contenedor.id}`,
+                fontSize: 12,
+                fontFamily: 'Arial',
+                fill: '#374151',
+                fontStyle: 'bold',
+                listening: false,
+              }"
+            />
+          </template>
+        </template>
+
         <!-- Grid de referencia de la planta -->
         <v-line
           v-for="i in gridLines.vertical"
           :key="`v-${i}`"
           :config="{
-            points: [i, 0, i, layerConfig.height],
+            points: [i, 0, i, floorBoundary.height],
             stroke: '#e5e7eb',
             strokeWidth: 1,
             opacity: 0.5,
@@ -305,7 +286,7 @@
           v-for="i in gridLines.horizontal"
           :key="`h-${i}`"
           :config="{
-            points: [0, i, layerConfig.width, i],
+            points: [0, i, floorBoundary.width, i],
             stroke: '#e5e7eb',
             strokeWidth: 1,
             opacity: 0.5,
@@ -319,10 +300,14 @@
     <div class="canvas-info">
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
       <span>Vista: {{ canvasStore.vistaActiva }}</span>
-      <span v-if="canvasStore.plantaActivaData">
+      <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
         Planta: {{ canvasStore.plantaActivaData.dimensiones.ancho }}×{{
           canvasStore.plantaActivaData.dimensiones.largo
         }}cm
+      </span>
+      <span v-if="canvasStore.estaEnElemento && canvasStore.elementoContenedorActual">
+        Elemento: {{ canvasStore.elementoContenedorActual.nombre }} 
+        ({{ canvasStore.canvasAdaptativo.width }}×{{ canvasStore.canvasAdaptativo.height }}px)
       </span>
       <span v-if="canvasStore.elementoSeleccionado">
         Seleccionado: {{ canvasStore.elementoSeleccionado }}
@@ -371,15 +356,53 @@
         :title="isElementLocked(canvasStore.elementoSeleccionado) ? 'Desbloquear' : 'Bloquear'"
       >
         <!-- Candado cerrado -->
-        <svg v-if="isElementLocked(canvasStore.elementoSeleccionado)" class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path d="M7 11V7a5 5 0 0110 0v4" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <rect x="5" y="11" width="14" height="8" rx="2" fill="#f59e0b" opacity="0.5" stroke="#f59e0b" stroke-width="2"/>
+        <svg
+          v-if="isElementLocked(canvasStore.elementoSeleccionado)"
+          class="icon"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            d="M7 11V7a5 5 0 0110 0v4"
+            stroke="#f59e0b"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <rect
+            x="5"
+            y="11"
+            width="14"
+            height="8"
+            rx="2"
+            fill="#f59e0b"
+            opacity="0.5"
+            stroke="#f59e0b"
+            stroke-width="2"
+          />
           <circle cx="12" cy="15" r="2" fill="#fff" />
         </svg>
         <!-- Candado abierto -->
         <svg v-else class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path d="M7 11V7a5 5 0 0110 0v2" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <rect x="5" y="11" width="14" height="8" rx="2" fill="#3b82f6" opacity="0.2" stroke="#3b82f6" stroke-width="2"/>
+          <path
+            d="M7 11V7a5 5 0 0110 0v2"
+            stroke="#3b82f6"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <rect
+            x="5"
+            y="11"
+            width="14"
+            height="8"
+            rx="2"
+            fill="#3b82f6"
+            opacity="0.2"
+            stroke="#3b82f6"
+            stroke-width="2"
+          />
           <circle cx="12" cy="15" r="2" fill="#fff" />
         </svg>
       </button>
@@ -392,17 +415,21 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useCanvasWithHistory } from '@/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/composables/useCanvasBuffer'
 import { useConflicts } from '@/composables/useConflicts'
-import { detectConflictsFor, throttle, computeMTD, projectMTDAgainstBoundary } from '@/utils/collision'
+import {
+  detectConflictsFor,
+  throttle,
+  computeMTD,
+  projectMTDAgainstBoundary,
+} from '@/utils/collision'
 import {
   rectInsidePolygon,
   circleInsidePolygon,
-  boundedRectDrag,
   clampRectToRect,
   snapToGrid,
   safeSnapRect,
   nudgePlace,
 } from '@/utils/geometry'
-import { SNAP_EPS, GRID_SIZE } from '@/utils/constants'
+import { SNAP_EPS, GRID_SIZE, CM_TO_PX } from '@/utils/constants'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -420,6 +447,32 @@ const layerRef = ref(null)
 // Composable con historial integrado
 const { store: canvasStore, actions, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
+
+// === HELPERS DE CONVERSIÓN ===
+/**
+ * Obtiene las dimensiones de un elemento en píxeles, convirtiendo desde cm si es necesario
+ * @param {Object} elemento - El elemento del cual obtener dimensiones
+ * @returns {Object} - { width: number, height: number } en píxeles
+ */
+const getElementPixelDimensions = (elemento) => {
+  // Si ya tiene width/height en píxeles, usarlos
+  if (elemento.width && elemento.height) {
+    return { width: elemento.width, height: elemento.height }
+  }
+  
+  // Si solo tiene dimensiones en cm, convertir
+  if (elemento.dimensiones) {
+    const widthCm = elemento.dimensiones.ancho || 100
+    const heightCm = elemento.dimensiones.largo || 60
+    return {
+      width: widthCm * CM_TO_PX,
+      height: heightCm * CM_TO_PX
+    }
+  }
+  
+  // Fallback a valores por defecto
+  return { width: 100, height: 60 }
+}
 const conflictsApi = useConflicts()
 
 // === BLOQUEO DE ELEMENTOS ===
@@ -511,7 +564,9 @@ const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
   const movingEnd = { ...elemento, x, y }
   const endConf = detectConflictsFor(movingEnd, all).filter((c) => c.bloqueante)
   const outsideRect =
-    boundary.type === 'rect' ? x < -1e-6 || y < -1e-6 || x + w > W + 1e-6 || y + h > H + 1e-6 : false
+    boundary.type === 'rect'
+      ? x < -1e-6 || y < -1e-6 || x + w > W + 1e-6 || y + h > H + 1e-6
+      : false
   if (endConf.length > 0 || outsideRect) {
     const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
     return { x: prev.x, y: prev.y, fellBack: true }
@@ -543,18 +598,32 @@ const stageConfig = computed(() => {
   }
 })
 
-// Configuración del layer - TAMAÑO DE LA PLANTA ACTIVA
-const layerConfig = computed(() => {
-  const planta = canvasStore.plantaActivaData
-  if (!planta) {
-    return { width: 800, height: 600 } // Fallback
+const floorBoundary = computed(() => {
+  // Empezamos con las dimensiones base del layer
+  let width = layerConfig.value.width
+  let height = layerConfig.value.height
+  let points = []
+
+  const poligono = canvasStore.plantaActivaData?.poligono
+
+  // Si hay un polígono, lo usamos para expandir los límites y obtener los puntos
+  if (poligono && Array.isArray(poligono) && poligono.length > 0) {
+    poligono.forEach((coord) => {
+      width = Math.max(coord.x, width)
+      height = Math.max(coord.y, height)
+    })
+    points = poligono.flatMap((p) => [p.x, p.y])
   }
 
-  // Convertir dimensiones de cm a pixels (1cm = 2px para buena visualización)
-  const escalaVisualizacion = 2
+  return { width, height, points }
+})
+
+// Configuración del layer - SIEMPRE USA CANVAS ADAPTATIVO
+const layerConfig = computed(() => {
+  // Usar siempre canvasAdaptativo como fuente única de verdad
   return {
-    width: planta.dimensiones.ancho * escalaVisualizacion,
-    height: planta.dimensiones.largo * escalaVisualizacion,
+    width: canvasStore.canvasAdaptativo.width,
+    height: canvasStore.canvasAdaptativo.height,
   }
 })
 
@@ -563,13 +632,13 @@ const elementosVisiblesEnCanvas = computed(() => {
   return canvasStore.elementosVisibles.filter((elemento) => elemento.visible !== false)
 })
 
-// Grid de referencia - BASADO EN LAS DIMENSIONES DE LA PLANTA
+// Grid de referencia - BASADO EN LAS DIMENSIONES DEL LAYER
 const gridLines = computed(() => {
   const gridSizePx = canvasStore.gridSize || 50
   const vertical = []
   const horizontal = []
 
-  // Usar las dimensiones del layer (planta) para el grid
+  // Usar las dimensiones del layer según el contexto (planta o elemento)
   const layerWidth = layerConfig.value.width
   const layerHeight = layerConfig.value.height
 
@@ -584,10 +653,29 @@ const gridLines = computed(() => {
   return { vertical, horizontal }
 })
 
+// Contenedores visibles del elemento actual
+const contenedoresVisibles = computed(() => {
+  if (!canvasStore.estaEnElemento || !canvasStore.elementoContenedorActual) {
+    return []
+  }
+  
+  const elementoActual = canvasStore.elementoContenedorActual
+  const contenedores = elementoActual.contenedores || []
+  
+  return contenedores
+})
+
 // Obtiene el contorno de la planta activa como rect o polígono
 const computeBoundary = () => {
   const W = layerConfig.value.width
   const H = layerConfig.value.height
+  
+  // Si estamos en un elemento, usar todo el canvas adaptativo como boundary
+  if (canvasStore.estaEnElemento) {
+    return { type: 'rect', W, H }
+  }
+  
+  // Si estamos en una planta, verificar si tiene polígono
   const planta = canvasStore.plantaActivaData
   if (planta?.poligono && Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
     return { type: 'polygon', points: planta.poligono }
@@ -718,12 +806,25 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
       )
       const finalCenter = { x: resolved.x + r, y: resolved.y + r }
 
+      // NUEVA VALIDACIÓN: Verificar contenedores en elementos para círculos
+      if (canvasStore.estaEnElemento) {
+        const validacion = validateDropInContainers(resolved.x, resolved.y, r * 2, r * 2)
+        
+        if (!validacion.valido) {
+          // Si no es válido, mantener la última posición válida
+          const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+          const centerPrev = { x: prev.x + r, y: prev.y + r }
+          return toStageCoords(centerPrev)
+        }
+      }
+
       // Edge feedback
       const toLeft = Math.abs(finalCenter.x - r)
       const toTop = Math.abs(finalCenter.y - r)
       const toRight = Math.abs(boundary.W - (finalCenter.x + r))
       const toBottom = Math.abs(boundary.H - (finalCenter.y + r))
-      const atEdge = toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
+      const atEdge =
+        toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
       atEdgeMap.value.set(elemento.id, atEdge)
 
       lastValidPositions.value.set(elemento.id, { x: finalCenter.x - r, y: finalCenter.y - r })
@@ -743,7 +844,7 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     }
   }
 
-  // Rectangular / triangular usan bbox axis-aligned
+  // Rectangular usan bbox axis-aligned
   const w = elemento.width
   const h = elemento.height
 
@@ -754,16 +855,17 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
 
     // (2-4) resolver bloqueantes no-expansivo con prioridad de contorno
     let adjusted = { x: clamped.x, y: clamped.y }
-    if (forma !== 'triangular') {
-      const res = resolveAgainstBlockingObstacles(clamped.x, clamped.y, elemento)
-      adjusted = { x: res.x, y: res.y }
-    } else {
-      // Triángulo: fallback a última válida si hay bloqueantes
-      const moving = { ...elemento, x: clamped.x, y: clamped.y }
-      const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles)
-      if (conflicts.some((c) => c.bloqueante)) {
+    const res = resolveAgainstBlockingObstacles(clamped.x, clamped.y, elemento)
+    adjusted = { x: res.x, y: res.y }
+
+    // NUEVA VALIDACIÓN: Verificar contenedores en elementos
+    if (canvasStore.estaEnElemento) {
+      const validacion = validateDropInContainers(adjusted.x, adjusted.y, w, h)
+      
+      if (!validacion.valido) {
+        // Si no es válido, mantener la última posición válida
         const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
-        adjusted = prev
+        return toStageCoords(prev)
       }
     }
 
@@ -772,7 +874,8 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     const toTop = Math.abs(adjusted.y)
     const toRight = Math.abs(boundary.W - (adjusted.x + w))
     const toBottom = Math.abs(boundary.H - (adjusted.y + h))
-    const atEdge = toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
+    const atEdge =
+      toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
 
     atEdgeMap.value.set(elemento.id, atEdge)
     lastValidPositions.value.set(elemento.id, { x: adjusted.x, y: adjusted.y })
@@ -890,7 +993,7 @@ const endElementDrag = (elementId) => {
   if (boundary.type === 'rect') {
     const neighbors = canvasStore.elementosVisibles.filter((el) => el.id !== elementId)
     // Aplicar snap seguro para rectángulos; círculos mantienen posición final para no romper radios
-    if (elemento.forma === 'rectangular' || elemento.forma === 'cuadrado' || !elemento.forma) {
+    if (elemento.forma === 'rectangular' || !elemento.forma) {
       const snapped = safeSnapRect(
         final.x,
         final.y,
@@ -905,7 +1008,9 @@ const endElementDrag = (elementId) => {
       )
       // Validar que el snap no introduzca bloqueos; si lo hace, mantener final
       const test = { ...elemento, x: snapped.x, y: snapped.y }
-      const conflicts = detectConflictsFor(test, canvasStore.elementosVisibles).filter((c) => c.bloqueante)
+      const conflicts = detectConflictsFor(test, canvasStore.elementosVisibles).filter(
+        (c) => c.bloqueante,
+      )
       if (conflicts.length === 0) {
         final = { x: snapped.x, y: snapped.y }
       }
@@ -939,12 +1044,7 @@ const endElementDrag = (elementId) => {
   canvasStore.actualizarPosicion(elementId, final.x, final.y)
 
   // Persistir en historial (único punto)
-  actions.actualizarPosicion(
-    elementId,
-    final.x,
-    final.y,
-    true,
-  )
+  actions.actualizarPosicion(elementId, final.x, final.y, true)
 
   // No mostrar toasts ni abrir modales
 
@@ -1005,7 +1105,7 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   // Obtener posición del puntero considerando zoom y pan
   const pointerPos = {
     x: dropEvent.clientX - rect.left,
-    y: dropEvent.clientY - rect.top
+    y: dropEvent.clientY - rect.top,
   }
 
   // Convertir a coordenadas de mundo (layer) considerando transformación del stage
@@ -1015,25 +1115,73 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   return { x: worldX, y: worldY }
 }
 
+// Validar si un elemento puede colocarse dentro de contenedores
+const validateDropInContainers = (candX, candY, elementWidth, elementHeight) => {
+  // Solo aplicar validación en vista de elemento
+  if (!canvasStore.estaEnElemento) {
+    return { valido: true } // En plantas permitir drop libre
+  }
+  
+  const contenedores = contenedoresVisibles.value
+  if (!contenedores || contenedores.length === 0) {
+    return { 
+      valido: false, 
+      razon: 'No hay contenedores definidos en este elemento'
+    }
+  }
+  
+  // Verificar si el elemento está completamente dentro de algún contenedor
+  for (const contenedor of contenedores) {
+    const contX = (contenedor.posicion?.x || 0) * CM_TO_PX
+    const contY = (contenedor.posicion?.y || 0) * CM_TO_PX  
+    const contW = (contenedor.dimensiones?.ancho || 50) * CM_TO_PX
+    const contH = (contenedor.dimensiones?.largo || 50) * CM_TO_PX
+    
+    // Verificar si el elemento cabe completamente dentro del contenedor
+    const elementoCabeEnContenedor = (
+      candX >= contX &&
+      candY >= contY &&
+      candX + elementWidth <= contX + contW &&
+      candY + elementHeight <= contY + contH
+    )
+    
+    if (elementoCabeEnContenedor) {
+      return { 
+        valido: true, 
+        contenedorId: contenedor.id,
+        contenedor: contenedor
+      }
+    }
+  }
+  
+  return { 
+    valido: false, 
+    razon: 'El elemento debe colocarse completamente dentro de un área contenedora'
+  }
+}
+
 const createElementFromDrop = (data, dropEvent) => {
   const elemento = data.elemento
 
-  // Obtener dimensiones base
-  let width = elemento.width || elemento.dimensiones?.ancho || 100
-  let height = elemento.height || elemento.dimensiones?.alto || 60
+  // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
+  const { width, height } = getElementPixelDimensions(elemento)
+  
+  // Obtener dimensiones originales en cm para guardar
+  const widthCm = elemento.dimensiones?.ancho || 100
+  const heightCm = elemento.dimensiones?.largo || 60
 
   // Aplicar dimensiones mínimas para mejorar la interacción
   const MIN_WIDTH = 40
   const MIN_HEIGHT = 30
-  width = Math.max(width, MIN_WIDTH)
-  height = Math.max(height, MIN_HEIGHT)
+  const finalWidth = Math.max(width, MIN_WIDTH)
+  const finalHeight = Math.max(height, MIN_HEIGHT)
 
   // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
   const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
 
   // 2. Calcular posición candidata centrada en el puntero
-  let candX = worldCoords.x - width / 2
-  let candY = worldCoords.y - height / 2
+  let candX = worldCoords.x - finalWidth / 2
+  let candY = worldCoords.y - finalHeight / 2
 
   // 3. Aplicar snap a grilla ANTES de validar
   const snapped = snapToGrid(candX, candY, GRID_SIZE)
@@ -1046,18 +1194,27 @@ const createElementFromDrop = (data, dropEvent) => {
   // 5. Verificar que esté dentro del área (clampToArea)
   let isInsideArea = true
   if (boundary.type === 'rect') {
-    isInsideArea = candX >= 0 && candY >= 0 &&
-                   candX + width <= boundary.W &&
-                   candY + height <= boundary.H
+    isInsideArea =
+      candX >= 0 && candY >= 0 && candX + finalWidth <= boundary.W && candY + finalHeight <= boundary.H
 
     // Si está fuera, intentar clamp
     if (!isInsideArea) {
-      const clamped = clampRectToRect(candX, candY, width, height, boundary.W, boundary.H)
+      const clamped = clampRectToRect(candX, candY, finalWidth, finalHeight, boundary.W, boundary.H)
       candX = clamped.x
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.polygon)
+    isInsideArea = rectInsidePolygon(candX, candY, finalWidth, finalHeight, boundary.points)
+  }
+
+  // 5.5. NUEVA VALIDACIÓN: Verificar contenedores en elementos
+  if (canvasStore.estaEnElemento) {
+    const validacion = validateDropInContainers(candX, candY, finalWidth, finalHeight)
+    
+    if (!validacion.valido) {
+      showToast(validacion.razon, 'error')
+      return // Cancelar drop
+    }
   }
 
   // 6. Crear elemento temporal para detectar conflictos
@@ -1065,36 +1222,38 @@ const createElementFromDrop = (data, dropEvent) => {
     id: '__temp_drop__',
     x: candX,
     y: candY,
-    width,
-    height,
+    width: finalWidth,
+    height: finalHeight,
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     tipo: elemento.tipo || elemento.categoria || 'elemento',
-    forma: elemento.forma || 'rectangular'
+    forma: elemento.forma || 'rectangular',
   }
 
   // 7. Ejecutar detectConflictsFor contra elementos existentes
   const allElements = canvasStore.elementosVisibles
   const conflicts = detectConflictsFor(tempElement, allElements)
-  const blockingConflicts = conflicts.filter(c => c.bloqueante)
+  const blockingConflicts = conflicts.filter((c) => c.bloqueante)
 
   // 8. Si hay conflicto BLOQUEANTE o queda fuera de área, intentar nudgePlace
   let finalPosition = { x: candX, y: candY }
   let placementSuccessful = blockingConflicts.length === 0 && isInsideArea
 
   if (!placementSuccessful) {
-    console.log('🔍 Posición inicial tiene conflictos o está fuera de área, intentando nudgePlace...')
+    console.log(
+      '🔍 Posición inicial tiene conflictos o está fuera de área, intentando nudgePlace...',
+    )
 
     const nudgeResult = nudgePlace(
       candX,
       candY,
-      width,
-      height,
+      finalWidth,
+      finalHeight,
       boundary,
       allElements,
       tempElement,
       GRID_SIZE,
       16, // máximo 16 intentos
-      detectConflictsFor // Pasar la función como parámetro
+      detectConflictsFor, // Pasar la función como parámetro
     )
 
     if (nudgeResult.found) {
@@ -1128,25 +1287,29 @@ const createElementFromDrop = (data, dropEvent) => {
       rotation: 0,
     },
 
-    // Estructura correcta para dimensiones
+    // Estructura correcta para dimensiones (mantener en cm los datos físicos)
     dimensiones: {
-      ancho: width,
-      largo: height,
+      ancho: widthCm,
+      largo: heightCm,
       alto: elemento.dimensiones?.alto || elemento.alto || 20,
     },
 
-    // Propiedades legacy para compatibilidad con Konva
+    // Propiedades legacy para compatibilidad con Konva (en px para renderizado)
     x: finalPosition.x,
     y: finalPosition.y,
-    width: width,
-    height: height,
+    width: finalWidth,
+    height: finalHeight,
 
     color: color,
     colorBase: color,
     forma: elemento.forma || 'rectangular',
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
+    alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
     descripcion: elemento.descripcion || '',
+
+    // Copiar contenedores del elemento original si los tiene
+    contenedores: elemento.contenedores ? [...elemento.contenedores] : [],
 
     hijos: [],
     metadata: {
@@ -1175,8 +1338,9 @@ const createElementFromBuffer = (data, dropEvent) => {
   }
 
   const elemento = bufferItem.elemento
-  const width = elemento.width || elemento.dimensiones?.ancho || 100
-  const height = elemento.height || elemento.dimensiones?.alto || 60
+  
+  // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
+  const { width, height } = getElementPixelDimensions(elemento)
 
   // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
   const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
@@ -1195,9 +1359,8 @@ const createElementFromBuffer = (data, dropEvent) => {
 
   let isInsideArea = true
   if (boundary.type === 'rect') {
-    isInsideArea = candX >= 0 && candY >= 0 &&
-                   candX + width <= boundary.W &&
-                   candY + height <= boundary.H
+    isInsideArea =
+      candX >= 0 && candY >= 0 && candX + width <= boundary.W && candY + height <= boundary.H
 
     if (!isInsideArea) {
       const clamped = clampRectToRect(candX, candY, width, height, boundary.W, boundary.H)
@@ -1205,7 +1368,7 @@ const createElementFromBuffer = (data, dropEvent) => {
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.polygon)
+    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.points)
   }
 
   // 5. Crear elemento temporal y detectar conflictos
@@ -1217,12 +1380,12 @@ const createElementFromBuffer = (data, dropEvent) => {
     height,
     ubicacion: elemento.ubicacion || 'suelo',
     tipo: elemento.tipo || 'elemento',
-    forma: elemento.forma || 'rectangular'
+    forma: elemento.forma || 'rectangular',
   }
 
   const allElements = canvasStore.elementosVisibles
   const conflicts = detectConflictsFor(tempElement, allElements)
-  const blockingConflicts = conflicts.filter(c => c.bloqueante)
+  const blockingConflicts = conflicts.filter((c) => c.bloqueante)
 
   // 6. Si hay conflictos o está fuera de área, intentar nudgePlace
   let finalPosition = { x: candX, y: candY }
@@ -1241,7 +1404,7 @@ const createElementFromBuffer = (data, dropEvent) => {
       tempElement,
       GRID_SIZE,
       16,
-      detectConflictsFor // Pasar la función como parámetro
+      detectConflictsFor, // Pasar la función como parámetro
     )
 
     if (nudgeResult.found) {
@@ -1263,7 +1426,11 @@ const createElementFromBuffer = (data, dropEvent) => {
   const newElementId = buffer.pasteFromBuffer(data.bufferItemId, finalPosition)
 
   if (newElementId) {
-    console.log('✅ Elemento pegado desde buffer al canvas en posición válida:', newElementId, finalPosition)
+    console.log(
+      '✅ Elemento pegado desde buffer al canvas en posición válida:',
+      newElementId,
+      finalPosition,
+    )
     // Seleccionar el elemento recién pegado
     canvasStore.seleccionarElemento(newElementId)
   }
@@ -1367,8 +1534,16 @@ const forceRedraw = () => {
     const stage = stageRef.value?.getNode?.()
     if (!layer || !stage) return
     // clear caches si existiera cache en nodos
-    try { layer.clearCache?.() } catch (e) { void e }
-    try { stage.clearCache?.() } catch (e) { void e }
+    try {
+      layer.clearCache?.()
+    } catch (e) {
+      void e
+    }
+    try {
+      stage.clearCache?.()
+    } catch (e) {
+      void e
+    }
     layer.batchDraw?.()
     stage.batchDraw?.()
   } catch (e) {
@@ -1384,7 +1559,7 @@ const resetVolatileState = () => {
     conflictsApi.clear()
     isElementDragging.value = false
     stageDragEnabled.value = true
-  } catch(e) {
+  } catch (e) {
     console.error('Error reseteando estado volátil:', e)
   }
 }

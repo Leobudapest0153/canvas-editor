@@ -30,9 +30,9 @@
         <PropiedadesPanel />
       </div>
     </main>
-
     <!-- Contenedor de toasts -->
     <ToastContainer />
+    <WorkspaceEditor/>
   </div>
 </template>
 
@@ -43,6 +43,7 @@ import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
 import PropiedadesPanel from './components/PropiedadesPanel.vue'
 import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
+import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
 import ToastContainer from './components/ToastContainer.vue'

@@ -55,7 +55,7 @@ Definir un catálogo de elementos predefinidos como:
 3. Barril
 4. Pila de barriles (3).
 
-Estos deben poseer nombre, forma (circular, cuadrado, rectangulo), color base, ancho, largo, alto, y peso máximo soportado. Además debe permitir crear nuevos elementos predefinidos y guardarlos.
+Estos deben poseer nombre, forma (circular, rectangulo), color base, ancho, largo, alto, y peso máximo soportado. Además debe permitir crear nuevos elementos predefinidos y guardarlos.
 
 Definir propiedad de ubicación: suelo o pared para ver qué elementos pueden moverse en su eje Z
 

@@ -19,8 +19,10 @@ export const pointInPolygon = (pt, polygon) => {
   const { x, y } = pt
   let inside = false
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x, yi = polygon[i].y
-    const xj = polygon[j].x, yj = polygon[j].y
+    const xi = polygon[i].x,
+      yi = polygon[i].y
+    const xj = polygon[j].x,
+      yj = polygon[j].y
     const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi + EPSILON) + xi
     if (intersect) inside = !inside
   }
@@ -67,6 +69,7 @@ export const polygonEdges = (poly) => {
 
 // Check if rectangle (axis-aligned) fully inside polygon
 export const rectInsidePolygon = (x, y, w, h, polygon) => {
+  console.log('Checking rect inside polygon:', { x, y, w, h, polygon })
   const corners = rectCorners(x, y, w, h)
   // All corners inside
   const allInside = corners.every((c) => pointInPolygon(c, polygon))
@@ -267,7 +270,18 @@ export const aabbTouchingAxes = (ax, ay, aw, ah, bx, by, bw, bh, eps = EPSILON) 
 }
 
 // Snap-to-grid que preserva ejes en contacto con vecinos para no abrir margen
-export const safeSnapRect = (x, y, w, h, boundaryRect, neighbors = [], gridSize = 50, eps = EPSILON, axes = { snapX: true, snapY: true }, gridEps = 6) => {
+export const safeSnapRect = (
+  x,
+  y,
+  w,
+  h,
+  boundaryRect,
+  neighbors = [],
+  gridSize = 50,
+  eps = EPSILON,
+  axes = { snapX: true, snapY: true },
+  gridEps = 6,
+) => {
   const { W, H } = boundaryRect
   // Detectar si hay contacto en X/Y con algún vecino
   let preserveX = false
@@ -283,8 +297,8 @@ export const safeSnapRect = (x, y, w, h, boundaryRect, neighbors = [], gridSize 
   const nearX = Math.abs(snapped.x - x) <= gridEps
   const nearY = Math.abs(snapped.y - y) <= gridEps
 
-  let nx = preserveX ? x : (axes?.snapX && nearX ? snapped.x : x)
-  let ny = preserveY ? y : (axes?.snapY && nearY ? snapped.y : y)
+  let nx = preserveX ? x : axes?.snapX && nearX ? snapped.x : x
+  let ny = preserveY ? y : axes?.snapY && nearY ? snapped.y : y
 
   // Clamp final y validar que no se alteró el eje preservado
   const c = clampRectToRect(nx, ny, w, h, W, H)
@@ -314,7 +328,7 @@ export const nudgePlace = (
   elementToPlace,
   gridSize = 20,
   maxAttempts = 16,
-  detectConflictsFn = null // Función para detectar conflictos pasada como parámetro
+  detectConflictsFn = null, // Función para detectar conflictos pasada como parámetro
 ) => {
   // Función auxiliar para verificar si una posición es válida
   const isValidPosition = (testX, testY) => {
@@ -337,11 +351,11 @@ export const nudgePlace = (
         x: testX,
         y: testY,
         width,
-        height
+        height,
       }
 
       const conflicts = detectConflictsFn(tempElement, allElements)
-      const blockingConflicts = conflicts.filter(c => c.bloqueante)
+      const blockingConflicts = conflicts.filter((c) => c.bloqueante)
 
       return blockingConflicts.length === 0
     }
