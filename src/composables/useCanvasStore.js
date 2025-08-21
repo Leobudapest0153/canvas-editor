@@ -31,11 +31,29 @@ export const useCanvasStore = defineStore('canvas', () => {
       elementos: [], // Los elementos se calculan dinámicamente
       activa: true,
       dimensiones: {
-        alto: 300, // cm
-        ancho: 1000, // cm
-        largo: 1200, // cm
+        alto: 500, // cm
+        ancho: 500, // cm
+        largo: 500, // cm
       },
       pesoMaximoSoportado: 5000, // kg
+      poligono: [
+        {
+          x: 0,
+          y: 0,
+        },
+        {
+          x: 5000,
+          y: 0,
+        },
+        {
+          x: 5000,
+          y: 5000,
+        },
+        {
+          x: 0,
+          y: 5000,
+        },
+      ],
     },
   ])
 
@@ -47,7 +65,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const elementoSeleccionado = ref(null)
   const vistaActiva = ref('XY') // XY, ZX, ZY
   const zoom = ref(1)
-  const crearPlanta = ref(false);
+  const crearPlanta = ref(false)
   const panX = ref(0)
   const panY = ref(0)
 
@@ -375,8 +393,8 @@ export const useCanvasStore = defineStore('canvas', () => {
       elementHeightPx = elemento.dimensiones.largo * CM_TO_PX
     } else {
       // Fallback con conversión
-      elementWidthPx = 100 * CM_TO_PX  // 100cm → 1000px
-      elementHeightPx = 60 * CM_TO_PX   // 60cm → 600px
+      elementWidthPx = 100 * CM_TO_PX // 100cm → 1000px
+      elementHeightPx = 60 * CM_TO_PX // 60cm → 600px
     }
 
     // El canvas muestra el espacio real del elemento sin factores adicionales
@@ -471,7 +489,7 @@ export const useCanvasStore = defineStore('canvas', () => {
           },
         ],
       }
-      
+
       // Calcular canvas adaptativo para la planta seleccionada
       calcularCanvasAdaptativoPlanta(planta)
     }
@@ -479,7 +497,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const agregarPlanta = (nuevaPlanta) => {
     const id = `planta_${Date.now()}`
-    
+
     plantas.value.push({
       id,
       nombre: nuevaPlanta.nombre || 'Nueva Planta',
@@ -704,7 +722,11 @@ export const useCanvasStore = defineStore('canvas', () => {
       // Estado de elementos con propiedades estáticas y personalizadas
       elementos: elementos.value.map((elemento) => ({
         // Elevación y tolerancias
-        elevacion: elemento.elevacion || { zBase: 0, altura: elemento.dimensiones?.alto || elemento.alto || 0, espesor: elemento.elevacion?.espesor || 0 },
+        elevacion: elemento.elevacion || {
+          zBase: 0,
+          altura: elemento.dimensiones?.alto || elemento.alto || 0,
+          espesor: elemento.elevacion?.espesor || 0,
+        },
         tolerancias: elemento.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
         id: elemento.id,
         nombre: elemento.nombre,
@@ -983,11 +1005,11 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   const abrirEditor = () => {
-    crearPlanta.value = true;
+    crearPlanta.value = true
   }
 
   const cerrarEditor = () => {
-    crearPlanta.value = false;
+    crearPlanta.value = false
   }
 
   // === FIN FUNCIONES DE SERIALIZACIÓN ===
@@ -1006,7 +1028,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
       }
     },
-    { immediate: true }
+    { immediate: true },
   )
 
   return {
@@ -1086,6 +1108,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // == Editor de planta
     abrirEditor,
-    cerrarEditor
+    cerrarEditor,
   }
 })
