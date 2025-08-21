@@ -26,7 +26,12 @@
           title="Crear nuevo elemento"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 4v16m8-8H4"
+            />
           </svg>
         </button>
       </div>
@@ -99,7 +104,10 @@
               }"
             >
               <component :is="getIconComponent(elemento.icono)" class="w-4 h-4 text-white" />
-              <span v-if="elemento.ubicacion === 'pared'" class="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full"></span>
+              <span
+                v-if="elemento.ubicacion === 'pared'"
+                class="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full"
+              ></span>
             </div>
           </div>
 
@@ -140,7 +148,9 @@
           </div>
 
           <!-- Indicador de arrastre -->
-          <div class="drag-indicator absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100">
+          <div
+            class="drag-indicator absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
+          >
             <svg
               class="w-4 h-4 text-gray-400"
               fill="none"
@@ -180,193 +190,15 @@
       </div>
     </div>
 
-    <!-- Modal para crear nuevo elemento -->
-    <div v-if="mostrarModalCrear" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click="cerrarModal">
-      <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
-        <div class="flex justify-between items-center p-6 border-b border-gray-200">
-          <h2 class="text-xl font-semibold text-gray-800">Crear Nuevo Elemento</h2>
-          <button @click="cerrarModal" class="text-gray-400 hover:text-gray-600">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-
-        <form @submit.prevent="crearElemento" class="p-6">
-          <!-- Información básica -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700">Nombre</label>
-              <input
-                v-model="nuevoElemento.nombre"
-                type="text"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Ej: Mesa de trabajo personalizada"
-                required
-              />
-            </div>
-
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700">Categoría</label>
-              <select v-model="nuevoElemento.categoria" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
-                <option value="">Seleccionar categoría</option>
-                <option v-for="categoria in CATEGORIAS" :key="categoria.id" :value="categoria.id">
-                  {{ categoria.nombre }}
-                </option>
-              </select>
-            </div>
-
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700">Forma</label>
-              <select v-model="nuevoElemento.forma" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
-                <option value="">Seleccionar forma</option>
-                <option v-for="forma in FORMAS_DISPONIBLES" :key="forma.id" :value="forma.id">
-                  {{ forma.nombre }}
-                </option>
-              </select>
-            </div>
-
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700">Ubicación</label>
-              <select v-model="nuevoElemento.ubicacion" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required>
-                <option value="">Seleccionar ubicación</option>
-                <option
-                  v-for="ubicacion in UBICACIONES_DISPONIBLES"
-                  :key="ubicacion.id"
-                  :value="ubicacion.id"
-                >
-                  {{ ubicacion.nombre }}
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Dimensiones -->
-          <div class="mb-6">
-            <h3 class="text-lg font-medium text-gray-800 mb-3">Dimensiones (cm)</h3>
-            <div class="grid grid-cols-3 gap-4">
-              <div class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700">Ancho</label>
-                <input
-                  v-model.number="nuevoElemento.dimensiones.ancho"
-                  type="number"
-                  min="1"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-              </div>
-              <div class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700">Largo</label>
-                <input
-                  v-model.number="nuevoElemento.dimensiones.largo"
-                  type="number"
-                  min="1"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-              </div>
-              <div class="space-y-1">
-                <label class="block text-sm font-medium text-gray-700">Alto</label>
-                <input
-                  v-model.number="nuevoElemento.dimensiones.alto"
-                  type="number"
-                  min="1"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Especificaciones -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700">Peso Máximo (kg)</label>
-              <input
-                v-model.number="nuevoElemento.pesoMaximo"
-                type="number"
-                min="0"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-            </div>
-
-            <div class="space-y-1">
-              <label class="block text-sm font-medium text-gray-700">Color Base</label>
-              <div class="flex gap-2">
-                <input
-                  v-model="nuevoElemento.colorBase"
-                  type="color"
-                  class="w-12 h-10 border border-gray-300 rounded cursor-pointer"
-                />
-                <input
-                  v-model="nuevoElemento.colorBase"
-                  type="text"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="#3b82f6"
-                />
-              </div>
-            </div>
-          </div>
-
-          <!-- Descripción -->
-          <div class="mb-6 space-y-1">
-            <label class="block text-sm font-medium text-gray-700">Descripción</label>
-            <textarea
-              v-model="nuevoElemento.descripcion"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              rows="3"
-              placeholder="Descripción del elemento..."
-            ></textarea>
-          </div>
-
-          <!-- Preview del nuevo elemento -->
-          <div class="bg-gray-50 rounded-lg p-4 mb-6">
-            <h3 class="text-lg font-medium text-gray-800 mb-3">Vista Previa</h3>
-            <div class="flex items-center p-3 bg-white rounded border">
-              <div
-                class="preview-shape w-12 h-8 rounded flex items-center justify-center relative shadow-sm border border-white/20"
-                :class="getShapeClass(nuevoElemento.forma)"
-                :style="{ backgroundColor: nuevoElemento.colorBase || '#6b7280' }"
-              >
-                <component :is="getIconComponent('box')" class="w-4 h-4 text-white" />
-                <span v-if="nuevoElemento.ubicacion === 'pared'" class="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full"></span>
-              </div>
-              <div class="ml-3">
-                <p class="font-medium">{{ nuevoElemento.nombre || 'Nuevo Elemento' }}</p>
-                <p class="text-sm text-gray-500">
-                  {{ nuevoElemento.dimensiones.ancho || 0 }}×{{
-                    nuevoElemento.dimensiones.largo || 0
-                  }}×{{ nuevoElemento.dimensiones.alto || 0 }} cm
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Botones del formulario -->
-          <div class="flex justify-end gap-3">
-            <button
-              type="button"
-              @click="cerrarModal"
-              class="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Crear Elemento
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <ElementEditor
+      :visible="mostrarModalCrear"
+      :categorias="CATEGORIAS"
+      :formas="FORMAS_DISPONIBLES"
+      :ubicaciones="UBICACIONES_DISPONIBLES"
+      :value="nuevoElemento"
+      @cancel="cerrarModal"
+      @save="onGuardarElemento"
+    />
   </div>
 </template>
 
@@ -379,12 +211,12 @@ import {
   UBICACIONES_DISPONIBLES,
 } from '@/utils/constants'
 
+import ElementEditor from './modals/ElementEditor.vue'
 // Estado local
 const filtroTexto = ref('')
 const categoriaSeleccionada = ref(null)
 const mostrarModalCrear = ref(false)
 const elementosPersonalizados = ref([])
-
 // Formulario para nuevo elemento
 const nuevoElemento = ref({
   nombre: '',
@@ -401,6 +233,19 @@ const nuevoElemento = ref({
   descripcion: '',
   icono: 'box',
 })
+
+const onGuardarElemento = (elemento) => {
+  const elementoNuevo = {
+    ...elemento,
+    id: `custom_${Date.now()}`,
+    icono: 'box',
+    personalizado: true,
+  }
+  elementosPersonalizados.value.push(elementoNuevo)
+  cerrarModal()
+  categoriaSeleccionada.value = elementoNuevo.categoria
+  filtroTexto.value = ''
+}
 
 // Todos los elementos (predefinidos + personalizados)
 const todosLosElementos = computed(() => {
@@ -459,10 +304,6 @@ const getShapeClass = (forma) => {
       return 'rounded-sm'
     case 'circular':
       return 'rounded-full'
-    case 'triangular':
-      return 'rounded-sm [clip-path:polygon(50%_0%,_0%_100%,_100%_100%)]'
-    case 'cuadrado':
-      return 'rounded-sm h-12'
     default:
       return 'rounded-sm'
   }
@@ -501,95 +342,9 @@ const finalizarArrastre = (event) => {
   if (card && card.classList) card.classList.remove('opacity-50', 'scale-95')
 }
 
-// Crear nuevo elemento
-const crearElemento = () => {
-  if (!validarFormulario()) {
-    return
-  }
-
-  const elementoNuevo = {
-    id: `custom_${Date.now()}`,
-    nombre: nuevoElemento.value.nombre,
-    categoria: nuevoElemento.value.categoria,
-    forma: nuevoElemento.value.forma,
-    colorBase: nuevoElemento.value.colorBase,
-    dimensiones: { ...nuevoElemento.value.dimensiones },
-    pesoMaximo: nuevoElemento.value.pesoMaximo,
-    ubicacion: nuevoElemento.value.ubicacion,
-    descripcion: nuevoElemento.value.descripcion,
-    icono: 'box',
-    personalizado: true,
-  }
-
-  elementosPersonalizados.value.push(elementoNuevo)
-  cerrarModal()
-
-  // Mostrar el nuevo elemento (limpiar filtros)
-  categoriaSeleccionada.value = elementoNuevo.categoria
-  filtroTexto.value = ''
-}
-
-const validarFormulario = () => {
-  const elemento = nuevoElemento.value
-
-  if (!elemento.nombre.trim()) {
-    alert('El nombre es requerido')
-    return false
-  }
-
-  if (!elemento.categoria) {
-    alert('La categoría es requerida')
-    return false
-  }
-
-  if (!elemento.forma) {
-    alert('La forma es requerida')
-    return false
-  }
-
-  if (!elemento.ubicacion) {
-    alert('La ubicación es requerida')
-    return false
-  }
-
-  if (
-    elemento.dimensiones.ancho <= 0 ||
-    elemento.dimensiones.largo <= 0 ||
-    elemento.dimensiones.alto <= 0
-  ) {
-    alert('Las dimensiones deben ser mayores a 0')
-    return false
-  }
-
-  if (elemento.pesoMaximo <= 0) {
-    alert('El peso máximo debe ser mayor a 0')
-    return false
-  }
-
-  return true
-}
-
 const cerrarModal = () => {
   mostrarModalCrear.value = false
-  resetearFormulario()
-}
-
-const resetearFormulario = () => {
-  nuevoElemento.value = {
-    nombre: '',
-    categoria: '',
-    forma: '',
-    colorBase: '#3b82f6',
-    dimensiones: {
-      ancho: 100,
-      largo: 100,
-      alto: 75,
-    },
-    pesoMaximo: 50,
-    ubicacion: 'suelo',
-    descripcion: '',
-    icono: 'box',
-  }
+  // El formulario se resetea automáticamente al abrir el modal
 }
 
 // Cargar elementos personalizados del localStorage

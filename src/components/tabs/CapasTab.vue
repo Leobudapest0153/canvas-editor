@@ -475,11 +475,6 @@ const getIconoCategoria = (tipo) => {
   border-radius: 50%;
 }
 
-.elemento-preview.triangular {
-  border-radius: 0.125rem;
-  background: linear-gradient(45deg, transparent 45%, currentColor 50%, transparent 55%);
-}
-
 .elemento-icon {
   font-size: 1rem;
   filter: brightness(0) invert(1);
