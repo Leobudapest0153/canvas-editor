@@ -333,6 +333,8 @@ const onGuardarElemento = (elemento) => {
     id: `custom_${Date.now()}`,
     icono: 'box',
     personalizado: true,
+    // Asegurar que tenga la propiedad tipo basada en la categoría
+    tipo: elemento.categoria === 'contenedores' ? 'contenedores' : 'elementos',
   }
   elementosPersonalizados.value.push(elementoNuevo)
   cerrarModal()
