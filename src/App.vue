@@ -32,6 +32,8 @@
     </main>
     <!-- Contenedor de toasts -->
     <ToastContainer />
+    <!-- Modal de confirmación global -->
+    <ConfirmModal />
     <WorkspaceEditor/>
   </div>
 </template>
@@ -46,12 +48,15 @@ import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
+import { useDeleteElement } from './composables/useDeleteElement'
 import ToastContainer from './components/ToastContainer.vue'
+import ConfirmModal from './components/ConfirmModal.vue'
 
 
 // Composable para undo/redo global
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
+const { deleteSelected } = useDeleteElement()
 
 const showPropiedadesPanel = computed(() => canvasStore.elementoSeleccionadoCompleto)
 
@@ -75,6 +80,11 @@ const handleKeydown = (e) => {
     return
   }
 
+  // Bloquear si hay drag global activo
+  if (typeof window !== 'undefined' && window.__dvCanvasDragActive) {
+    return
+  }
+
   if (e.ctrlKey || e.metaKey) {
     if (e.key === 'z' && !e.shiftKey) {
       e.preventDefault()
@@ -88,6 +98,14 @@ const handleKeydown = (e) => {
     } else if (e.key === 'x') {
       e.preventDefault()
       handleMoveToBuffer()
+    }
+  } else if (e.key === 'Delete' || e.key === 'Backspace') {
+    // Supr o Retroceso -> eliminar seleccionado
+    const hasSelection = !!canvasStore.elementoSeleccionado
+    if (hasSelection) {
+      e.preventDefault()
+      // No es necesario await; el modal gestiona la interacción
+      deleteSelected({ withConfirm: true })
     }
   }
 }

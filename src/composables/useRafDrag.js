@@ -1,7 +1,9 @@
 // Lightweight rAF-based drag loop. Keeps local state only and
 // ensures at most one update + one batchDraw per frame.
 
-export function setupRafDrag({ stage, layer, getMovingShapeBBox, onValidateLight, onCommitEnd }) {
+export function setupRafDrag({ stage: _stage, layer, getMovingShapeBBox, onValidateLight, onCommitEnd }) {
+  // Marcar _stage como usado para ESLint
+  void _stage
   let running = false
   let rafId = 0
   let lastFrameTime = 0
@@ -32,9 +34,7 @@ export function setupRafDrag({ stage, layer, getMovingShapeBBox, onValidateLight
       if (typeof onValidateLight === 'function') {
         try {
           onValidateLight(bbox)
-        } catch (_) {
-          // ignore validation errors in perf mode
-        }
+        } catch (e) { void e }
       }
       // Only draw if bbox changed to avoid extra renders
       if (!lastDrawnBBox || !shallowEqualBBoxFast(lastDrawnBBox, bbox)) {
@@ -51,6 +51,7 @@ export function setupRafDrag({ stage, layer, getMovingShapeBBox, onValidateLight
     running = true
     dirty = true
     lastDrawnBBox = null
+    try { if (typeof window !== 'undefined') window.__dvCanvasDragActive = true } catch (e) { void e }
     rafId = requestAnimationFrame(loop)
   }
 
@@ -67,9 +68,10 @@ export function setupRafDrag({ stage, layer, getMovingShapeBBox, onValidateLight
     rafId = 0
     try {
       if (typeof onCommitEnd === 'function') onCommitEnd(finalBBox)
-    } catch (_) {}
+    } catch (e) { void e }
     desiredPos = null
     lastDrawnBBox = null
+    try { if (typeof window !== 'undefined') window.__dvCanvasDragActive = false } catch (e) { void e }
   }
 
   return {
@@ -84,4 +86,3 @@ function shallowEqualBBoxFast(a, b) {
   if (!a || !b) return false
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height
 }
-

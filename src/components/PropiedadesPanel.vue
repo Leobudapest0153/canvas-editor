@@ -262,18 +262,16 @@
 
     <!-- Footer fijo con acciones -->
     <div v-if="elementoSeleccionado" class="p-4 border-t border-gray-200 bg-white">
-      <!-- Botón de navegación (solo para elementos navegables) -->
-      <!-- <button
-        v-if="esNavegable(elementoSeleccionado)"
-        @click="navegarAElemento"
-        class="w-full mb-3 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center justify-center gap-2"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-        </svg>
-        Navegar al interior
-      </button> -->
-
+      <div class="flex gap-2 mb-2">
+        <button
+          @click="onDeleteClick"
+          class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+          :aria-label="isLockedSelected ? 'Elemento bloqueado — desbloquéalo para eliminar' : 'Eliminar (Supr)'"
+          :title="isLockedSelected ? 'Elemento bloqueado — desbloquéalo para eliminar' : 'Eliminar (Supr)'"
+        >
+          Eliminar
+        </button>
+      </div>
       <div class="flex gap-2">
         <button
           @click="resetearPropiedades"
@@ -296,9 +294,11 @@
 import { ref, watch, computed } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore.js'
 import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
+import { useDeleteElement } from '@/composables/useDeleteElement'
 
 // Store
 const canvasStore = useCanvasStore()
+const { deleteSelected } = useDeleteElement()
 
 // Referencias reactivas
 const propiedadesEditables = ref({
@@ -308,6 +308,10 @@ const propiedadesEditables = ref({
 
 // Computed
 const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoCompleto)
+const isLockedSelected = computed(() => {
+  const el = elementoSeleccionado.value
+  return !!(el && (el.bloqueado === true || el.locked === true))
+})
 
 // Watchers
 watch(
@@ -367,17 +371,9 @@ const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
 }
 
-// Nuevas funciones para navegación
-// const esNavegable = (elemento) => {
-//   // Solo elementos y contenedores son navegables
-//   return elemento && (elemento.tipo === 'elementos' || elemento.tipo === 'contenedores')
-// }
-
-// const navegarAElemento = () => {
-//   if (elementoSeleccionado.value && esNavegable(elementoSeleccionado.value)) {
-//     canvasStore.navegarAElemento(elementoSeleccionado.value.id)
-//   }
-// }
+const onDeleteClick = () => {
+  deleteSelected({ withConfirm: true })
+}
 
 // Funciones para obtener nombres de elementos por ID
 const obtenerNombreElementoPorId = (elementoId) => {
