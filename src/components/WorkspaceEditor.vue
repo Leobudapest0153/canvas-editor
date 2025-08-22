@@ -142,14 +142,14 @@ function resetLocalState() {
 // MODIFICADO: El watch principal ahora maneja el caso de creación y usa el cerrojo
 watch(() => canvasStore.plantaEnEdicion, (planta) => {
   isLoadingData.value = true; // <-- Activamos el cerrojo
-
   if (planta) {
     // Modo Edición
     local.id = planta.id;
     local.name = planta.nombre;
     local.polygon = planta.poligono;
     local.shape = planta.forma;
-    local.elements = planta.elementos || [];
+    const todosLosElementos = canvasStore.elementos || [];
+    local.elements = todosLosElementos.filter(el => el.plantaId === planta.id && !el.padre);
     rectW.value = planta.dimensiones.ancho;
     rectL.value = planta.dimensiones.largo;
     local.height = planta.dimensiones.alto;

@@ -1190,6 +1190,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const cerrarEditor = () => {
     crearPlanta.value = false
+    plantaEnEdicion.value = null;
   }
 
   // === FIN FUNCIONES DE SERIALIZACIÓN ===
