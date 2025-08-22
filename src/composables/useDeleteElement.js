@@ -91,6 +91,104 @@ export function useDeleteElement() {
     } catch (e) { void e }
   }
 
+  // Eliminación en cascada O(n), atómica, con un solo repaint y snapshot
+  const deleteCascade = (idsRaiz) => {
+    const roots = Array.isArray(idsRaiz) ? idsRaiz : [idsRaiz]
+    if (!roots.length) return false
+
+    // Map O(1) de id->elemento
+    const idToEl = new Map()
+    for (const el of store.elementos) idToEl.set(el.id, el)
+
+    // BFS/DFS para recolectar todos los descendientes en Set
+    const idsABorrar = new Set()
+    const queue = [...roots]
+    while (queue.length) {
+      const id = queue.pop()
+      if (!id || idsABorrar.has(id)) continue
+      const el = idToEl.get(id)
+      if (!el) continue
+      idsABorrar.add(id)
+      const hijos = Array.isArray(el.hijos) ? el.hijos : []
+      for (let i = 0; i < hijos.length; i++) queue.push(hijos[i])
+    }
+    if (idsABorrar.size === 0) return false
+
+    // Protección: si algún id está bloqueado, abortar
+    for (const id of idsABorrar) {
+      const el = idToEl.get(id)
+      if (isLocked(el)) {
+        confirmDialog.confirm({
+          title: 'Acción no permitida',
+          message: 'No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero.',
+          confirmLabel: 'Entendido',
+          cancelLabel: 'Cerrar',
+        })
+        return false
+      }
+    }
+
+    // Suspender pintado pesado
+    const prevSuspend = typeof window !== 'undefined' ? window.__suspendPaint : undefined
+    if (typeof window !== 'undefined') window.__suspendPaint = true
+
+    try {
+      // Quitar referencias de padres externos y de plantas en un solo pase
+      // Construir Map padreId -> hijos para acceso O(1) y Set de padres externos
+      for (const id of idsABorrar) {
+        const el = idToEl.get(id)
+        if (!el) continue
+        // Remover del padre si el padre NO se elimina
+        if (el.padre && !idsABorrar.has(el.padre)) {
+          const p = idToEl.get(el.padre)
+          if (p && Array.isArray(p.hijos)) p.hijos = p.hijos.filter((cid) => cid !== id)
+        }
+        // Remover de planta si es raíz
+        if (!el.padre && el.plantaId) {
+          const planta = store.plantas.find((p) => p.id === el.plantaId)
+          if (planta && Array.isArray(planta.elementos)) {
+            planta.elementos = planta.elementos.filter((eid) => eid !== id)
+          }
+        }
+      }
+
+      // Reemplazar elementos con los restantes en un único splice
+      const remaining = []
+      for (const el of store.elementos) {
+        if (!idsABorrar.has(el.id)) remaining.push(el)
+      }
+      store.elementos.splice(0, store.elementos.length, ...remaining)
+
+      // Limpiar selección si apunta a eliminados
+      if (store.elementoSeleccionado && idsABorrar.has(store.elementoSeleccionado)) {
+        store.seleccionarElemento(null)
+      }
+
+      // Limpiar buffer por id en O(1) con Set
+      try {
+        const items = buffer.getBufferItems()
+        for (const it of items.slice()) if (idsABorrar.has(it.originalId)) buffer.removeFromBuffer(it.id)
+      } catch (e) { void e }
+
+      // Un solo snapshot
+      history.pushState('Eliminar en cascada')
+    } finally {
+      // Rehabilitar pintado y hacer un único batchDraw explícito si existe
+      if (typeof window !== 'undefined') {
+        window.__suspendPaint = !!prevSuspend
+        try {
+          if (window.__konvaLayer && typeof window.__konvaLayer.batchDraw === 'function') {
+            window.__konvaLayer.batchDraw()
+          } else if (window.__konvaStage && typeof window.__konvaStage.draw === 'function') {
+            window.__konvaStage.draw()
+          }
+        } catch (e) { void e }
+      }
+    }
+
+    return true
+  }
+
   const deleteSelected = async ({ withConfirm = true } = {}) => {
     // No eliminar si hay drag global activo
     if (typeof window !== 'undefined' && window.__dvCanvasDragActive) return false
@@ -116,8 +214,6 @@ export function useDeleteElement() {
       return false
     }
 
-    console.log(isLocked(selected), 'verificar si esta bloqueado')
-
     // Bloqueo: impedir borrar elementos bloqueados (selección)
     if (isLocked(selected)) {
       await confirmDialog.confirm({
@@ -129,25 +225,24 @@ export function useDeleteElement() {
       return false
     }
 
-    // Calcular hijos en cascada
+    // Construir descendientes para referencias y confirmación
     const descendants = new Set()
     collectDescendants(selectedId, descendants)
 
-    // Verificar referencias bloqueantes antes de confirmar
+    // Referencias bloqueantes (buffer y vínculos)
     const idsToAffect = new Set([selectedId, ...descendants])
     const refs = findBlockingReferences(idsToAffect)
     if (refs.length > 0) {
       const K = refs.length
       const list = refs.slice(0, 5).map((r) => `• ${r.label}`).join('\n') + (K > 5 ? `\n… (+${K - 5} más)` : '')
-      const msg = `Este elemento contiene elementos hijos dentro del portapapeles: ${K}.\n\n${list}\n\nPara poder eliminarlo ahora, podemos quitar esas referencias por ti.\n\n¿Quieres que quitemos y continuemos con la eliminación?`
-      const ok = await confirmDialog.confirm({
+      const msg = `Este elemento está siendo usado por ${K} elemento(s):\n\n${list}\n\nPara poder eliminarlo ahora, podemos quitar esas referencias por ti.\n\n¿Quieres que quitemos las referencias y continuemos con la eliminación?`
+      const okRefs = await confirmDialog.confirm({
         title: 'No se puede eliminar aún',
         message: msg,
         confirmLabel: 'Quitar referencias y continuar',
         cancelLabel: 'Cancelar',
       })
-      if (!ok) return false
-      // Limpiar y continuar
+      if (!okRefs) return false
       cleanReferences(idsToAffect)
     }
 
@@ -165,71 +260,17 @@ export function useDeleteElement() {
       if (!ok) return false
     }
 
-    // IDs a eliminar (seleccionado + todos sus descendientes)
-    const idsToDelete = new Set([selectedId, ...descendants])
+    // Ejecutar eliminación en cascada optimizada
+    const okCascade = deleteCascade([selectedId])
+    if (!okCascade) return false
 
-    // 1) Quitar referencias desde padres que NO se eliminan
-    for (const id of idsToDelete) {
-      const el = store.elementoPorId(id)
-      if (!el) continue
-      if (el.padre && !idsToDelete.has(el.padre)) {
-        const parent = store.elementoPorId(el.padre)
-        if (parent && Array.isArray(parent.hijos)) {
-          const idx = parent.hijos.indexOf(id)
-          if (idx !== -1) parent.hijos.splice(idx, 1)
-        }
-      }
-    }
-
-    // 2) Quitar referencias desde plantas (elementos raíz)
-    for (const id of idsToDelete) {
-      const el = store.elementoPorId(id)
-      if (!el) continue
-      if (!el.padre && el.plantaId) {
-        const planta = store.plantaPorId(el.plantaId)
-        if (planta && Array.isArray(planta.elementos)) {
-          const i = planta.elementos.indexOf(id)
-          if (i !== -1) planta.elementos.splice(i, 1)
-        }
-      }
-    }
-
-    // 3) Filtrar elementos del store de una sola vez
-    const remaining = store.elementos.filter((e) => !idsToDelete.has(e.id))
-    store.elementos.splice(0, store.elementos.length, ...remaining)
-
-    // 4) Limpiar selección si hace referencia a eliminados
-    if (store.elementoSeleccionado && idsToDelete.has(store.elementoSeleccionado)) {
-      store.seleccionarElemento(null)
-    }
-
-    // 5) Limpiar buffer si hace referencia a elementos eliminados
-    try {
-      const items = buffer.getBufferItems()
-      if (Array.isArray(items)) {
-        for (const item of items.slice()) {
-          if (idsToDelete.has(item.originalId)) {
-            buffer.removeFromBuffer(item.id)
-          }
-        }
-      }
-    } catch (e) { void e }
-
-    // 6) Empujar un único snapshot al historial
-    history.pushState('Eliminar elemento')
-
-    // 7) Snackbar con opción de deshacer (5s)
+    // Snackbar con deshacer (5s)
     try {
       if (typeof window !== 'undefined' && window.__toasts?.show) {
         window.__toasts.show('Elemento(s) eliminados — Deshacer (5s)', {
           type: 'info',
           timeout: 5000,
-          cta: {
-            label: 'Deshacer',
-            onClick: () => {
-              try { history.undo() } catch (e) { /* noop */ }
-            },
-          },
+          cta: { label: 'Deshacer', onClick: () => { try { history.undo() } catch (err) { void err } } },
         })
       }
     } catch (e) { void e }
@@ -237,5 +278,5 @@ export function useDeleteElement() {
     return true
   }
 
-  return { deleteSelected }
+  return { deleteSelected, deleteCascade }
 }
