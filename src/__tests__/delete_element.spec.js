@@ -29,7 +29,7 @@ describe('deleteSelected', () => {
     if (typeof window !== 'undefined') window.__dvCanvasDragActive = false
   })
 
-  it('(a) elimina elemento simple y empuja snapshot', () => {
+  it('(a) elimina elemento simple y empuja snapshot', async () => {
     const store = useCanvasStore()
     const history = useCanvasHistory()
     const { deleteSelected } = useDeleteElement()
@@ -41,7 +41,7 @@ describe('deleteSelected', () => {
     const beforeSize = history.historySize.value
 
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const ok = deleteSelected({ withConfirm: true })
+    const ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(true)
     confirmSpy.mockRestore()
 
@@ -49,7 +49,7 @@ describe('deleteSelected', () => {
     expect(history.historySize.value).toBe(beforeSize + 1)
   })
 
-  it('(b) elimina contenedor con hijos tras confirmación en cascada', () => {
+  it('(b) elimina contenedor con hijos tras confirmación en cascada', async () => {
     const store = useCanvasStore()
     const history = useCanvasHistory()
     const { deleteSelected } = useDeleteElement()
@@ -66,7 +66,7 @@ describe('deleteSelected', () => {
       return true
     })
 
-    const ok = deleteSelected({ withConfirm: true })
+    const ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(true)
     confirmSpy.mockRestore()
 
@@ -75,7 +75,7 @@ describe('deleteSelected', () => {
     expect(store.elementos.find((e) => e.id === 'h_2')).toBeUndefined()
   })
 
-  it('(c) undo restaura estado previo', () => {
+  it('(c) undo restaura estado previo', async () => {
     const store = useCanvasStore()
     const history = useCanvasHistory()
     const { deleteSelected } = useDeleteElement()
@@ -86,7 +86,7 @@ describe('deleteSelected', () => {
     history.initializeHistory('pre')
 
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const ok = deleteSelected({ withConfirm: true })
+    const ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(true)
     expect(store.elementos.find((e) => e.id === 'el_2')).toBeUndefined()
 
@@ -96,7 +96,7 @@ describe('deleteSelected', () => {
     confirmSpy.mockRestore()
   })
 
-  it('(d) sin selección no hace nada', () => {
+  it('(d) sin selección no hace nada', async () => {
     const store = useCanvasStore()
     const history = useCanvasHistory()
     const { deleteSelected } = useDeleteElement()
@@ -106,13 +106,13 @@ describe('deleteSelected', () => {
     const before = store.elementos.length
     const hBefore = history.historySize.value
 
-    const ok = deleteSelected({ withConfirm: true })
+    const ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(false)
     expect(store.elementos.length).toBe(before)
     expect(history.historySize.value).toBe(hBefore)
   })
 
-  it('(e) durante drag no elimina', () => {
+  it('(e) durante drag no elimina', async () => {
     const store = useCanvasStore()
     const history = useCanvasHistory()
     const { deleteSelected } = useDeleteElement()
@@ -123,12 +123,12 @@ describe('deleteSelected', () => {
 
     window.__dvCanvasDragActive = true
 
-    const ok = deleteSelected({ withConfirm: true })
+    const ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(false)
     expect(store.elementos.find((e) => e.id === 'el_4')).toBeTruthy()
   })
 
-  it('limpia buffer si referencia al elemento eliminado', () => {
+  it('limpia buffer si referencia al elemento eliminado', async () => {
     const store = useCanvasStore()
     const history = useCanvasHistory()
     const { deleteSelected } = useDeleteElement()
@@ -141,7 +141,7 @@ describe('deleteSelected', () => {
     history.initializeHistory('pre')
 
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const ok = deleteSelected({ withConfirm: true })
+    const ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(true)
     confirmSpy.mockRestore()
 

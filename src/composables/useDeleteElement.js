@@ -8,11 +8,13 @@
 import { useCanvasStore } from './useCanvasStore'
 import { useCanvasHistory } from './useCanvasHistory'
 import { useCanvasBuffer } from './useCanvasBuffer'
+import { useConfirmDialog } from './useConfirmDialog'
 
 export function useDeleteElement() {
   const store = useCanvasStore()
   const history = useCanvasHistory()
   const buffer = useCanvasBuffer()
+  const confirmDialog = useConfirmDialog()
 
   const collectDescendants = (rootId, accSet) => {
     const el = store.elementoPorId(rootId)
@@ -25,7 +27,7 @@ export function useDeleteElement() {
     }
   }
 
-  const deleteSelected = ({ withConfirm = true } = {}) => {
+  const deleteSelected = async ({ withConfirm = true } = {}) => {
     // No eliminar si hay drag global activo
     if (typeof window !== 'undefined' && window.__dvCanvasDragActive) return false
 
@@ -48,7 +50,12 @@ export function useDeleteElement() {
       const msg = descendants.size > 0
         ? `Se eliminará también ${descendants.size} elemento(s) dentro`
         : '¿Seguro que deseas eliminar este elemento?'
-      const ok = typeof window !== 'undefined' && typeof window.confirm === 'function' ? window.confirm(msg) : true
+      const ok = await confirmDialog.confirm({
+        title: 'Eliminar elemento',
+        message: msg,
+        confirmLabel: 'Eliminar',
+        cancelLabel: 'Cancelar',
+      })
       if (!ok) return false
     }
 

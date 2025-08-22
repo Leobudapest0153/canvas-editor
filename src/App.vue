@@ -32,6 +32,8 @@
     </main>
     <!-- Contenedor de toasts -->
     <ToastContainer />
+    <!-- Modal de confirmación global -->
+    <ConfirmModal />
     <WorkspaceEditor/>
   </div>
 </template>
@@ -48,6 +50,7 @@ import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
 import { useDeleteElement } from './composables/useDeleteElement'
 import ToastContainer from './components/ToastContainer.vue'
+import ConfirmModal from './components/ConfirmModal.vue'
 
 
 // Composable para undo/redo global
@@ -101,6 +104,7 @@ const handleKeydown = (e) => {
     const hasSelection = !!canvasStore.elementoSeleccionado
     if (hasSelection) {
       e.preventDefault()
+      // No es necesario await; el modal gestiona la interacción
       deleteSelected({ withConfirm: true })
     }
   }
