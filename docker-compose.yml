@@ -5,8 +5,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: face-recognition-ui:latest
+    image: inventory-smart:latest
     ports:
-      - "3050:80"
-    container_name: face-recognition-ui
+      - "3090:80"
+    container_name: inventory-smart
     restart: unless-stopped
