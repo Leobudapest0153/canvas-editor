@@ -158,17 +158,18 @@
                 listening: false,
               }"
             />
-            <v-text
-              :config="{
-                x: elemento.width / 2 - 16,
-                y: elemento.height / 2 - 16,
-                text: '🔒',
-                fontSize: 32,
-                fontFamily: 'Arial',
-                fill: '#f59e0b',
-                listening: false,
-              }"
-            />
+            <!-- Icono de candado para elemento bloqueado -->
+              <v-text
+                :config="{
+                  x: elemento.width / 2 - 16,
+                  y: elemento.height / 2 - 16,
+                  text: '🔒',
+                  fontSize: 32,
+                  fontFamily: 'Arial',
+                  fill: '#f59e0b',
+                  listening: false,
+                }"
+              />
           </v-group>
 
           <!-- Elementos circulares -->
@@ -219,6 +220,7 @@
                 listening: false,
               }"
             />
+            <!-- Icono de candado para elemento circular bloqueado -->
             <v-text
               :config="{
                 x: elemento.width / 2 - 16,
@@ -359,18 +361,30 @@
         </svg>
       </button>
 
+      <!-- Botón ajustar a planta activa -->
+      <button
+        @click="fitToPlanta"
+        @mouseenter="speedDialOpen = false"
+        :disabled="!canvasStore.estaEnPlanta || !canvasStore.plantaActivaData"
+        class="floating-btn btn-fit"
+        title="Ajustar vista a la planta activa"
+      >
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35" />
+          <circle cx="11" cy="11" r="6" stroke-width="2" />
+        </svg>
+      </button>
+
   <!-- Nuevo SpeedDial -->
   <div class="relative">
         <div class="relative">
-          <button @click="toggleSpeedDial" class="floating-btn focus:outline-none" :class="{ 'ring-2 ring-blue-500': speedDialOpen }" title="Acciones del elemento">
-            <!-- Gear/Tuerca construido con spans -->
-            <div class="relative w-6 h-6">
-              <div class="absolute inset-0 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 border border-gray-400"></div>
-              <div class="absolute inset-1 rounded-full bg-white"></div>
-              <div class="absolute inset-[6px] rounded-full bg-gray-300 border border-gray-400"></div>
-              <!-- Dientes -->
-              <span v-for="i in 8" :key="i" class="absolute left-1/2 top-1/2 w-1.5 h-2 bg-gray-400 origin-center rounded-sm" :style="{ transform: `translate(-50%, -50%) rotate(${(i-1)*45}deg) translateY(-11px)` }"></span>
-            </div>
+          <button @click="toggleSpeedDial" class="floating-btn btn-gear focus:outline-none" :class="{ 'ring-2 ring-blue-500': speedDialOpen }" title="Acciones del elemento">
+            <!-- Icono de acciones (tres puntos verticales) -->
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="12" cy="5" r="1.75" />
+              <circle cx="12" cy="12" r="1.75" />
+              <circle cx="12" cy="19" r="1.75" />
+            </svg>
           </button>
             <!-- Acciones -->
           <transition-group name="fade-scale">
@@ -771,60 +785,45 @@ const getStrokeColor = (elementId) => {
   return canvasStore.elementoSeleccionado === elementId ? '#000' : '#666'
 }
 
-// Convierte posición stage->layer considerando zoom/pan
-const toLayerCoords = (pos) => {
-  const stage = stageRef.value.getNode()
-  const scale = stage.scaleX() || 1
-  const x = (pos.x - stage.x()) / scale
-  const y = (pos.y - stage.y()) / scale
-  return { x, y }
-}
+// Lock icon helpers removed: reverted to emoji-based rendering.
 
-// Convierte posición layer->stage considerando zoom/pan
-const toStageCoords = (pos) => {
-  const stage = stageRef.value.getNode()
-  const scale = stage.scaleX() || 1
-  return { x: pos.x * scale + stage.x(), y: pos.y * scale + stage.y() }
-}
-
-// Drag bound para cada elemento y forma
 const dragBoundForElement = (pos, elemento, forma = 'rect') => {
-  const layerPos = toLayerCoords(pos)
+  // Convierte coordenadas del pointer (stage coords) a coords del layer y aplica restricciones
+  const toStageCoords = (p) => {
+    // aquí p está en coords de layer; Konva espera coords de stage en dragBoundFunc
+    return { x: p.x, y: p.y }
+  }
+
   const boundary = computeBoundary()
 
-  if (forma === 'circle') {
-    // pos viene como centro
+  // Coordenadas de layer (ya vienen como pos)
+  const layerPos = pos
+
+  if (forma === 'circular') {
+    // Para círculos, usar centro y mantener radio
     const r = Math.min(elemento.width, elemento.height) / 2
+    // Clamp simple al rect boundary
     if (boundary.type === 'rect') {
-      // Orden: clamp → colisiones → clamp → validar (sin snap en drag)
       const clampedCenter = {
         x: Math.max(r, Math.min(layerPos.x, boundary.W - r)),
         y: Math.max(r, Math.min(layerPos.y, boundary.H - r)),
       }
       const asRect = { ...elemento, width: r * 2, height: r * 2 }
-      const resolved = resolveAgainstBlockingObstacles(
-        clampedCenter.x - r,
-        clampedCenter.y - r,
-        asRect,
-      )
+      const resolved = resolveAgainstBlockingObstacles(clampedCenter.x - r, clampedCenter.y - r, asRect)
       const finalCenter = { x: resolved.x + r, y: resolved.y + r }
-
       // Edge feedback
       const toLeft = Math.abs(finalCenter.x - r)
       const toTop = Math.abs(finalCenter.y - r)
       const toRight = Math.abs(boundary.W - (finalCenter.x + r))
       const toBottom = Math.abs(boundary.H - (finalCenter.y + r))
-      const atEdge =
-        toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
+      const atEdge = toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
       atEdgeMap.value.set(elemento.id, atEdge)
-
       lastValidPositions.value.set(elemento.id, { x: finalCenter.x - r, y: finalCenter.y - r })
       return toStageCoords(finalCenter)
     }
     if (boundary.type === 'polygon') {
       const inside = circleInsidePolygon(layerPos.x, layerPos.y, r, boundary.points)
       if (!inside) {
-        // Mantener último válido
         const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
         const centerPrev = { x: prev.x + r, y: prev.y + r }
         return toStageCoords(centerPrev)
@@ -835,28 +834,18 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     }
   }
 
-  // Rectangular usan bbox axis-aligned
+  // Rectangular
   const w = elemento.width
   const h = elemento.height
-
   if (boundary.type === 'rect') {
-    // Orden: clamp → colisiones → clamp → snap → validar
-    // (1) clamp inicial sin snap
     const clamped = clampRectToRect(layerPos.x, layerPos.y, w, h, boundary.W, boundary.H)
-
-    // (2-4) resolver bloqueantes no-expansivo con prioridad de contorno
-    let adjusted = { x: clamped.x, y: clamped.y }
     const res = resolveAgainstBlockingObstacles(clamped.x, clamped.y, elemento)
-    adjusted = { x: res.x, y: res.y }
-
-    // Edge feedback basado en posición final
+    const adjusted = { x: res.x, y: res.y }
     const toLeft = Math.abs(adjusted.x)
     const toTop = Math.abs(adjusted.y)
     const toRight = Math.abs(boundary.W - (adjusted.x + w))
     const toBottom = Math.abs(boundary.H - (adjusted.y + h))
-    const atEdge =
-      toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
-
+    const atEdge = toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
     atEdgeMap.value.set(elemento.id, atEdge)
     lastValidPositions.value.set(elemento.id, { x: adjusted.x, y: adjusted.y })
     return toStageCoords({ x: adjusted.x, y: adjusted.y })
@@ -868,7 +857,6 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
       const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
       return toStageCoords(prev)
     }
-    // En polígono, no resolvemos contra obstáculos complejos: fallback si bloquea
     const moving = { ...elemento, x: layerPos.x, y: layerPos.y }
     const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles)
     if (conflicts.some((c) => c.bloqueante)) {
@@ -1686,6 +1674,56 @@ watch(
     forceRedraw()
   },
 )
+
+// Ajustar la vista para encuadrar la planta activa (usa polígono si existe)
+const fitToPlanta = () => {
+  try {
+    const stage = stageRef.value?.getNode?.()
+    if (!stage) return
+
+    const margin = 40 // píxeles de margen visual
+    const planta = canvasStore.plantaActivaData
+    let bbox = null
+
+    if (planta) {
+      if (planta.poligono && Array.isArray(planta.poligono) && planta.poligono.length > 0) {
+        const xs = planta.poligono.map((p) => p.x)
+        const ys = planta.poligono.map((p) => p.y)
+        const minX = Math.min(...xs)
+        const maxX = Math.max(...xs)
+        const minY = Math.min(...ys)
+        const maxY = Math.max(...ys)
+        bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+      } else if (layerConfig.value && layerConfig.value.width && layerConfig.value.height) {
+        bbox = { x: 0, y: 0, width: layerConfig.value.width, height: layerConfig.value.height }
+      }
+    }
+
+    if (!bbox) {
+      // Si no hay planta, centrar por defecto
+      centrarPlantaEnCanvas()
+      return
+    }
+
+    // Calcular escala para encuadrar bbox con margen
+    const vw = stageSize.value.width - margin * 2
+    const vh = stageSize.value.height - margin * 2
+    if (vw <= 0 || vh <= 0) return
+
+    const scaleX = vw / bbox.width
+    const scaleY = vh / bbox.height
+    const targetScale = Math.max(0.1, Math.min(5, Math.min(scaleX, scaleY)))
+
+    // Calcular pan para centrar bbox en viewport
+    const stageX = (stageSize.value.width - bbox.width * targetScale) / 2 - bbox.x * targetScale
+    const stageY = (stageSize.value.height - bbox.height * targetScale) / 2 - bbox.y * targetScale
+
+    canvasStore.configurarZoom(targetScale)
+    canvasStore.configurarPan(stageX, stageY)
+  } catch (e) {
+    console.error('fitToPlanta error', e)
+  }
+}
 </script>
 
 <style scoped>
@@ -1785,6 +1823,24 @@ watch(
   border-color: #059669;
 }
 
+/* Ajuste visual del botón de 'fit' para que coincida con el botón Deshacer */
+.btn-fit:not(:disabled) {
+  color: #3b82f6;
+}
+.btn-fit:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+/* Gear button style to match Undo */
+.btn-gear {
+  color: #3b82f6;
+}
+.btn-gear:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
 .floating-btn .icon {
   width: 20px;
   height: 20px;
@@ -1795,4 +1851,6 @@ watch(
 
 .speed-action { position:absolute; right:0; width:48px; height:48px; margin-top:8px; border:1px solid #d1d5db; border-radius:9999px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px  12px rgba(0,0,0,.15); transition:all .15s ease; }
 .speed-action:hover { transform: translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,.2); }
+
+.btn-fit { position: relative; z-index: 30; }
 </style>
