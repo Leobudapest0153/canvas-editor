@@ -94,7 +94,7 @@
           type="button"
           class="inline-flex items-center gap-2 w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
           title="Ver historial completo"
-          @click="canvasStore.abrirEditor"
+          @click="openHistorialModal"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -510,7 +510,10 @@ const cerrarMenuPlanta = () => {
 
 const editarPlanta = (plantaId) => {
   const planta = canvasStore.plantaPorId(plantaId)
-  canvasStore.abrirEditor(planta.id);
+  if (planta) {
+    canvasStore.abrirEditor(planta.id)
+    cerrarMenuPlanta()
+  }
   /*const planta = canvasStore.plantaPorId(plantaId)
 
   if (planta) {
@@ -755,5 +758,4 @@ const vClickOutside = {
 </script>
 
 <style scoped>
-/* Directiva personalizada para click outside - esencial para funcionalidad */
 </style>
