@@ -27,6 +27,9 @@
       @wheel="handleWheel"
       @mousedown="handleStageMouseDown"
       @click="handleStageClick"
+      @dragstart="handleStageDragStart"
+      @dragmove="handleStageDragMove"
+      @dragend="handleStageDragEnd"
     >
       <v-layer ref="layerRef">
         <!-- Fondo de la planta - área delimitada -->
@@ -132,6 +135,10 @@
             @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
             @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
+            @contextmenu="(e) => onShapeContextMenu(e, elemento)"
+            @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
+            @pointerup.passive="onShapePointerUp"
+            @pointercancel.passive="onShapePointerUp"
           />
           <!-- Icono de candado para elemento bloqueado -->
           <v-group
@@ -196,6 +203,10 @@
             @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id, 'circular')"
             @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'circular')"
+            @contextmenu="(e) => onShapeContextMenu(e, elemento)"
+            @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
+            @pointerup.passive="onShapePointerUp"
+            @pointercancel.passive="onShapePointerUp"
           />
 
           <!-- Elementos circulares en vista XZ se muestran como rectángulos (cilindro visto de frente) -->
@@ -223,6 +234,10 @@
             @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
             @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
+            @contextmenu="(e) => onShapeContextMenu(e, elemento)"
+            @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
+            @pointerup.passive="onShapePointerUp"
+            @pointercancel.passive="onShapePointerUp"
           />
           <!-- Icono de candado para elemento circular bloqueado en vista XY -->
           <v-group
@@ -366,6 +381,18 @@
       :stage-y="canvasStore.panY"
       :pixels-per-unit="10 * 100"
       unit="m"
+    />
+
+    <!-- Menú contextual -->
+    <SpeedDialContext
+      v-if="ctxVisible"
+      :visible="ctxVisible"
+      :x="ctxX"
+      :y="ctxY"
+      :isLocked="ctxIsLocked"
+      @lockToggle="() => toggleLock(ctxElementId)"
+      @delete="() => onDelete(ctxElementId)"
+      @close="ctx.close()"
     />
 
     <!-- Información de zoom, vista y dimensiones -->
@@ -516,6 +543,10 @@ import {
   nudgePlace,
 } from '@/utils/geometry'
 import { SNAP_EPS, GRID_SIZE, CM_TO_PX } from '@/utils/constants'
+import SpeedDialContext from '@/components/SpeedDialContext.vue'
+import { useContextMenu } from '@/composables/useContextMenu'
+import { useDeleteElement } from '@/composables/useDeleteElement'
+import { useConfirmDialog } from '@/composables/useConfirmDialog'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -533,6 +564,10 @@ const layerRef = ref(null)
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
+const ctx = useContextMenu()
+const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId: ctxElementId } = ctx
+const { deleteSelected } = useDeleteElement()
+const confirmDialog = useConfirmDialog()
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -797,6 +832,7 @@ const handleWheel = (e) => {
 
   canvasStore.configurarZoom(clampedScale)
   canvasStore.configurarPan(newPos.x, newPos.y)
+  try { canvasStore.view.hasUserZoomPan = true } catch { /* ignore */ }
 }
 
 // === FUNCIONES DE CANVAS/STAGE ===
@@ -894,7 +930,7 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     // pos viene como centro
     const r = Math.min(elemento.width, elemento.height) / 2
     if (boundary.type === 'rect') {
-      // Orden: clamp → colisiones → clamp → validar (sin snap en drag)
+      // Orden: clamp → colisiones → clamp ��� validar (sin snap en drag)
       const clampedCenter = {
         x: Math.max(r, Math.min(layerPos.x, boundary.W - r)),
         y: Math.max(r, Math.min(layerPos.y, boundary.H - r)),
@@ -1892,7 +1928,7 @@ const fitToPlanta = () => {
       return
     }
 
-    // Calcular tamaño del viewport disponible
+    // Calcular tama��o del viewport disponible
     const vw = Math.max(16, stageSize.value.width - margin * 2)
     const vh = Math.max(16, stageSize.value.height - margin * 2)
 
@@ -1941,6 +1977,92 @@ const fitToPlanta = () => {
   } catch (e) {
     console.error('fitToPlanta error', e)
   }
+}
+
+// === CONTEXT MENU HANDLERS ===
+// Stubs de stage drag para evitar warnings
+const handleStageDragStart = () => {}
+const handleStageDragMove = () => {}
+const handleStageDragEnd = () => {}
+
+// Normaliza coordenadas de evento (Konva: e.evt; nativo: e)
+const getClientXY = (e) => {
+  const ev = e && e.evt ? e.evt : e
+  const x = Number(ev && (ev.clientX ?? ev.x))
+  const y = Number(ev && (ev.clientY ?? ev.y))
+  return {
+    x: Number.isFinite(x) ? x : 0,
+    y: Number.isFinite(y) ? y : 0,
+  }
+}
+
+const onShapeContextMenu = (evt, elemento) => {
+  try { (evt?.evt || evt)?.preventDefault?.() } catch { /* ignore */ }
+  // No abrir si hay drag activo
+  if (isElementDragging.value || (typeof window !== 'undefined' && window.__dvCanvasDragActive)) {
+    return
+  }
+  // Asegurar selección del shape antes de abrir
+  if (canvasStore.elementoSeleccionado !== elemento.id) {
+    canvasStore.seleccionarElemento(elemento.id)
+  }
+  const { x, y } = getClientXY(evt)
+  ctx.openAt({ x, y, elementId: elemento.id })
+}
+
+let longPressTimer = null
+let lastPointerDown = { x: 0, y: 0, elId: null }
+const onShapePointerDown = (evt, elemento) => {
+  // Guardar posición del puntero (si existe)
+  const { x, y } = getClientXY(evt)
+  lastPointerDown = { x, y, elId: elemento?.id ?? null }
+  if (isElementDragging.value || (typeof window !== 'undefined' && window.__dvCanvasDragActive)) {
+    return
+  }
+  // Seleccionar si aún no lo está
+  if (elemento?.id && canvasStore.elementoSeleccionado !== elemento.id) {
+    canvasStore.seleccionarElemento(elemento.id)
+  }
+  // Long press (600ms) en mobile/puntero
+  clearTimeout(longPressTimer)
+  longPressTimer = setTimeout(() => {
+    if (!isElementDragging.value && lastPointerDown.elId) {
+      ctx.openAt({ x: lastPointerDown.x, y: lastPointerDown.y, elementId: lastPointerDown.elId })
+    }
+  }, 600)
+}
+const onShapePointerUp = () => {
+  clearTimeout(longPressTimer)
+}
+
+// Acción bloquear/desbloquear desde el menú contextual
+const toggleLock = async (id) => {
+  if (!id) return
+  toggleLockElement(id)
+  ctx.close()
+}
+
+// Acción eliminar desde el menú contextual
+const onDelete = async (id) => {
+  if (!id) return
+  const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
+  if (el && (el.bloqueado === true || el.locked === true)) {
+    try {
+      if (typeof window !== 'undefined' && window.__toasts?.show) {
+        window.__toasts.show('Elemento bloqueado — desbloquéalo para eliminar', { type: 'warning', timeout: 3000 })
+      } else {
+        await confirmDialog.confirm({ title: 'Elemento bloqueado', message: 'Elemento bloqueado — desbloquéalo para eliminar', confirmLabel: 'Entendido', cancelLabel: 'Cerrar' })
+      }
+    } catch { /* ignore */ }
+    ctx.close()
+    return
+  }
+  // Si no está seleccionado, seleccionarlo primero
+  if (canvasStore.elementoSeleccionado !== id) {
+    canvasStore.seleccionarElemento(id)
+  }
+  await deleteSelected({ withConfirm: true })
+  ctx.close()
 }
 </script>
 
