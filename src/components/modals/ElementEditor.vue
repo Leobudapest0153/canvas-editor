@@ -1,7 +1,7 @@
 <template>
   <div v-if="visible" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
     <div
-      class="bg-white rounded-lg shadow-xl max-w-[96vw] w-[1200px] max-h-[95vh] overflow-y-auto"
+      class="bg-white rounded-lg shadow-xl max-w-[96vw] w-[1000px] max-h-[95vh] overflow-y-auto"
       @click.stop
     >
       <div class="flex justify-between items-center p-6 border-b border-gray-200">
@@ -19,12 +19,11 @@
       </div>
       <div class="flex flex-col md:flex-row gap-6 p-6">
         <!-- Columna izquierda: Canvas Vue-Konva -->
-        <div class="w-full md:w-2/3 flex flex-col items-center justify-start relative">
+        <!-- <div class="w-full md:w-2/3 flex flex-col items-center justify-start relative">
           <h3 class="text-lg font-medium text-gray-800 mb-3">Vista de frente</h3>
-          <!-- vue-konva -->
-        </div>
+        </div> -->
         <!-- Columna derecha: Formulario y preview -->
-        <form @submit.prevent="handleSubmit" class="w-full md:w-1/3">
+        <form @submit.prevent="handleSubmit" class="w-full">
           <div class="max-h-[70vh] overflow-y-auto pr-2">
             <!-- Información básica -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -82,12 +81,14 @@
                 </select>
               </div>
             </div>
-            
+
             <!-- Altura respecto al suelo (solo para elementos de pared) -->
             <div v-if="localElemento.ubicacion === 'pared'" class="mb-6">
               <h3 class="text-lg font-medium text-gray-800 mb-3">Posicionamiento en Pared</h3>
               <div class="mb-2">
-                <label class="block text-sm font-medium text-gray-700">Altura respecto al suelo (cm)</label>
+                <label class="block text-sm font-medium text-gray-700"
+                  >Altura respecto al suelo (cm)</label
+                >
                 <input
                   v-model.number="localElemento.alturaRespectoAlSuelo"
                   type="number"
@@ -100,7 +101,7 @@
                 </p>
               </div>
             </div>
-            
+
             <!-- Dimensiones -->
             <div class="mb-6">
               <h3 class="text-lg font-medium text-gray-800 mb-3">Dimensiones (cm)</h3>
@@ -183,7 +184,8 @@
               <div class="flex items-center p-3 bg-white rounded border">
                 <div
                   :class="[
-                    'w-12 h-8 rounded flex items-center justify-center relative shadow-sm border border-white/20',
+                    localElemento.forma === 'circular' ? 'w-10 h-10' : 'w-12 h-8',
+                    'rounded flex items-center justify-center relative shadow-sm border border-white/20',
                     `shape-${localElemento.forma}`,
                     localElemento.ubicacion === 'pared' ? 'wall-mounted' : '',
                   ]"
