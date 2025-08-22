@@ -107,7 +107,7 @@ const { polygon, elements, worldWidth, worldHeight, adding, deleting } = toRefs(
 
 const PIXELS_PER_CM = 10
 const canvasW = ref(1400)
-const canvasH = ref(450)
+const canvasH = ref(500)
 
 let resizeObserver = null;
 

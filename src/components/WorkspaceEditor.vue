@@ -1,6 +1,6 @@
 <template>
   <div v-if="canvasStore.crearPlanta" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-    <div class="relative bg-white rounded-lg shadow-xl w-[85vw] h-[85vh] p-4 overflow-hidden flex flex-col">
+    <div class="relative bg-white rounded-lg shadow-xl w-[85vw] h-[90vh] p-4 overflow-hidden flex flex-col">
       <button @click="closeModal" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 z-10">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
       </button>
@@ -29,18 +29,20 @@
 
         <div class="md:col-span-2 space-y-3">
           <div class="border rounded-lg p-3">
-            <label class="text-xs text-slate-600">Nombre</label>
+            <h4 class="font-medium mb-1">Nombre</h4>
             <input class="w-full border rounded-lg px-3 py-2" :class="{'border-rose-500 ring-1 ring-rose-500': errors.name}" v-model="local.name" placeholder="Ej. Bodega A" />
           </div>
           <div class="border rounded-lg p-3">
-            <h4 class="font-medium mb-2">Forma</h4>
+            <h4 class="font-medium mb-1">Plantilla</h4>
             <select class="w-full border rounded-lg px-3 py-2" v-model="local.shape" @change="onShapeChange">
+              <option value="none" disabled>Sin definir</option>
               <option value="rectangle">Rectángulo</option>
               <option value="circle">Círculo</option>
-              <option value="custom">Personalizada</option>
             </select>
-            <div class="grid grid-cols-2 gap-2 mt-2">
-              <template v-if="local.shape === 'rectangle' || local.shape === 'circle'">
+          </div>
+          <div class="border rounded-lg p-3">
+            <h4 class="font-medium mb-0">Dimensiones</h4>
+            <div class="grid grid-cols-2 gap-x-2 gap-y-1">
                 <div>
                   <label class="text-xs text-slate-600">Ancho (m)</label>
                   <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="localRectWMeters" />
@@ -49,18 +51,14 @@
                   <label class="text-xs text-slate-600">Largo (m)</label>
                   <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="localRectLMeters" />
                 </div>
-              </template>
-            </div>
-            <div v-if="local.shape === 'rectangle' || local.shape === 'circle'" class="mt-2">
-              <label class="text-xs text-slate-600">Alto (m)</label>
-              <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="heightMeters" />
-            </div>
-            <div v-if="local.shape==='custom'" class="mt-2 space-y-2">
-              <p class="text-xs text-slate-600">Edita los vértices directamente en el lienzo.</p>
+                <div class="mt-2">
+                  <label class="text-xs text-slate-600">Alto (m)</label>
+                  <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="heightMeters" />
+                </div>
             </div>
           </div>
           <div class="border rounded-lg p-3 space-y-3">
-            <h4 class="font-medium">Extras</h4>
+            <h4 class="font-medium mb-0">Extras</h4>
             <div>
               <label class="text-xs text-slate-600">Peso máximo (kg)</label>
               <input type="number" class="w-full border rounded-lg px-2 py-1" v-model.number="local.maxWeight" placeholder="Ej. 1000" />
@@ -153,7 +151,7 @@ watch(() => canvasStore.plantaEnEdicion, (planta) => {
     local.id = planta.id;
     local.name = planta.nombre;
     local.polygon = planta.poligono;
-    local.shape = planta.forma;
+    local.shape = planta.forma ?? "none";
 
     const todosLosElementos = canvasStore.elementos || [];
     local.elements = todosLosElementos.filter(el => el.plantaId === planta.id && !el.padre);
