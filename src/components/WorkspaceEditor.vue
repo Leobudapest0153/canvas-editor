@@ -43,11 +43,13 @@
               <template v-if="local.shape === 'rectangle' || local.shape === 'circle'">
                 <div>
                   <label class="text-xs text-slate-600">Ancho (m)</label>
-                  <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="rectWMeters" />
+                  <!-- MODIFICADO: v-model apunta al estado local/borrador -->
+                  <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="localRectWMeters" />
                 </div>
                 <div>
                   <label class="text-xs text-slate-600">Largo (m)</label>
-                  <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="rectLMeters" />
+                  <!-- MODIFICADO: v-model apunta al estado local/borrador -->
+                  <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="localRectLMeters" />
                 </div>
               </template>
             </div>
@@ -88,8 +90,15 @@ const ovalSamplePoints = (cx, cy, rx, ry, n) => Array.from({length:n},(_,i)=>{co
 
 const PIXELS_PER_CM = 10
 
+// --- ESTADO REAL ---
+// Representa el estado válido y confirmado del canvas.
 const rectW = ref(500)
 const rectL = ref(500)
+
+// --- NUEVO: ESTADO LOCAL PARA INPUTS ---
+// Vinculado a los inputs, actúa como un borrador pendiente de validación.
+const localRectWMeters = ref(5);
+const localRectLMeters = ref(5);
 
 const worldWidth = computed(() => rectW.value * PIXELS_PER_CM)
 const worldHeight = computed(() => rectL.value * PIXELS_PER_CM)
@@ -109,11 +118,12 @@ const local = reactive({
 const notice = ref('')
 const errors = reactive({ name: false, dimensions: false })
 const isManuallyEdited = ref(false)
-const isLoadingData = ref(false); // NUEVO: El "cerrojo" para evitar conflictos
+const isLoadingData = ref(false);
+let dimensionChangeDebounce = null;
 
-function defaultRect() {
-  const w = rectW.value * PIXELS_PER_CM
-  const l = rectL.value * PIXELS_PER_CM
+function defaultRect(w_cm, l_cm) {
+  const w = w_cm * PIXELS_PER_CM
+  const l = l_cm * PIXELS_PER_CM
   return [ { x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: l }, { x: 0, y: l } ]
 }
 
@@ -125,44 +135,52 @@ const closeModal = () => {
 function resetLocalState() {
   local.id = null;
   local.name = '';
-  local.polygon = defaultRect();
-  local.elements = [];
   local.shape = 'rectangle';
   rectW.value = 500;
   rectL.value = 500;
+  local.polygon = defaultRect(500, 500);
+  local.elements = [];
   local.height = 500;
   local.maxWeight = 1000;
   isManuallyEdited.value = false;
+
+  // Sincronizamos el estado local con el real
+  localRectWMeters.value = rectW.value / 100;
+  localRectLMeters.value = rectL.value / 100;
 
   errors.name = false;
   errors.dimensions = false;
   notice.value = '';
 }
 
-// MODIFICADO: El watch principal ahora maneja el caso de creación y usa el cerrojo
 watch(() => canvasStore.plantaEnEdicion, (planta) => {
-  isLoadingData.value = true; // <-- Activamos el cerrojo
+  isLoadingData.value = true;
+
   if (planta) {
-    // Modo Edición
     local.id = planta.id;
     local.name = planta.nombre;
     local.polygon = planta.poligono;
     local.shape = planta.forma;
+
     const todosLosElementos = canvasStore.elementos || [];
     local.elements = todosLosElementos.filter(el => el.plantaId === planta.id && !el.padre);
+
+    // Sincronizamos ambos estados al cargar datos
     rectW.value = planta.dimensiones.ancho;
     rectL.value = planta.dimensiones.largo;
+    localRectWMeters.value = planta.dimensiones.ancho / 100;
+    localRectLMeters.value = planta.dimensiones.largo / 100;
+
     local.height = planta.dimensiones.alto;
     local.maxWeight = planta.pesoMaximoSoportado;
     isManuallyEdited.value = true;
   } else {
-    // MODO CREACIÓN: Usamos la función de reseteo para asegurar un estado limpio
     resetLocalState();
   }
 
   nextTick(() => {
     canvasEditorRef.value?.fitStageToPolygon();
-    isLoadingData.value = false; // <-- Liberamos el cerrojo después de renderizar
+    isLoadingData.value = false;
   });
 
 }, { immediate: true, deep: true });
@@ -186,79 +204,108 @@ const onPolygonUpdate = (newPolygon) => {
   isManuallyEdited.value = true;
 };
 
-const rectWMeters = computed({
-  get: () => rectW.value / 100,
-  set: (val) => { rectW.value = Math.max(0.1, val) * 100 }
-})
-const rectLMeters = computed({
-  get: () => rectL.value / 100,
-  set: (val) => { rectL.value = Math.max(0.1, val) * 100 }
-})
+// Este computed ya no necesita un 'set' complejo, solo actualiza el modelo local.
 const heightMeters = computed({
   get: () => local.height / 100,
   set: (val) => { local.height = Math.max(0, val) * 100 }
 })
 
-function applyRect(){
-  const wPx = worldWidth.value
-  const lPx = worldHeight.value
-  local.polygon = [ { x: 0, y: 0 }, { x: wPx, y: 0 }, { x: wPx, y: lPx }, { x: 0, y: lPx } ]
-  nextTick(() => { canvasEditorRef.value?.fitStageToPolygon() })
+function applyRect(w_cm, l_cm){
+  const wPx = w_cm * PIXELS_PER_CM
+  const lPx = l_cm * PIXELS_PER_CM
+  return [ { x: 0, y: 0 }, { x: wPx, y: 0 }, { x: wPx, y: lPx }, { x: 0, y: lPx } ];
 }
 
-function applyCircle() {
-  const wPx = worldWidth.value
-  const lPx = worldHeight.value
+function applyCircle(w_cm, l_cm) {
+  const wPx = w_cm * PIXELS_PER_CM
+  const lPx = l_cm * PIXELS_PER_CM
   const rx = wPx / 2
   const ry = lPx / 2
   const cx = rx
   const cy = ry
-  local.polygon = ovalSamplePoints(cx, cy, rx, ry, 32).map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }))
-  nextTick(() => { canvasEditorRef.value?.fitStageToPolygon() })
+  return ovalSamplePoints(cx, cy, rx, ry, 32).map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }));
 }
 
-// MODIFICADO: El watch de reescalado ahora respeta el cerrojo
-watch([rectW, rectL], ([newW_cm, newL_cm], [oldW_cm, oldL_cm]) => {
-  if (isLoadingData.value) return; // <-- Si estamos cargando, no hacer nada
+// --- WATCH REHECHO ---
+// Observamos las variables locales de los inputs.
+watch([localRectWMeters, localRectLMeters], () => {
+  if (isLoadingData.value) return;
 
-  if (oldW_cm === undefined || oldL_cm === undefined) {
-    if (local.shape === 'rectangle') applyRect()
-    else if (local.shape === 'circle') applyCircle()
-    return
-  }
+  clearTimeout(dimensionChangeDebounce);
 
-  if (isManuallyEdited.value) {
+  dimensionChangeDebounce = setTimeout(() => {
+    const oldW_cm = rectW.value;
+    const oldL_cm = rectL.value;
+
+    const newW_cm = localRectWMeters.value * 100;
+    const newL_cm = localRectLMeters.value * 100;
+
     const oldWorldWidth = oldW_cm * PIXELS_PER_CM;
     const oldWorldHeight = oldL_cm * PIXELS_PER_CM;
-    const newWorldWidth = worldWidth.value;
-    const newWorldHeight = worldHeight.value;
     if (oldWorldWidth === 0 || oldWorldHeight === 0) return;
+
+    const newWorldWidth = newW_cm * PIXELS_PER_CM;
+    const newWorldHeight = newL_cm * PIXELS_PER_CM;
+
     const scaleX = newWorldWidth / oldWorldWidth;
     const scaleY = newWorldHeight / oldWorldHeight;
+
     const scaledPolygon = local.polygon.map(p => ({
       x: Math.round(p.x * scaleX),
       y: Math.round(p.y * scaleY)
     }));
+
+    const validation = canvasEditorRef.value?.isPolygonValid(scaledPolygon, local.elements);
+    if (validation && !validation.valid) {
+      notice.value = validation.message;
+      return; // Si no es válido, mostramos el error y no hacemos nada más.
+    }
+
+    // Si es válido, actualizamos el modelo real.
+    rectW.value = newW_cm;
+    rectL.value = newL_cm;
     local.polygon = scaledPolygon;
+    notice.value = '';
+
     nextTick(() => { canvasEditorRef.value?.fitStageToPolygon() });
-  } else {
-    if (local.shape === 'rectangle') applyRect()
-    else if (local.shape === 'circle') applyCircle()
-  }
+  }, 400);
 })
 
-function onShapeChange() {
-  if (local.shape === 'rectangle') applyRect()
-  else if (local.shape === 'circle') applyCircle()
-  if (local.shape === 'rectangle' || local.shape === 'circle') {
-    isManuallyEdited.value = false
+function onShapeChange(event) {
+  const oldShape = local.shape;
+  const newShape = event.target.value;
+  let newPolygon;
+
+  // Usamos las dimensiones válidas del estado real
+  if (newShape === 'rectangle') newPolygon = applyRect(rectW.value, rectL.value);
+  else if (newShape === 'circle') newPolygon = applyCircle(rectW.value, rectL.value);
+  else {
+    isManuallyEdited.value = true;
+    return;
   }
-  adding.value = false
-  deleting.value = false
+
+  const validation = canvasEditorRef.value?.isPolygonValid(newPolygon, local.elements);
+  if (validation && !validation.valid) {
+    notice.value = validation.message;
+    local.shape = oldShape;
+    event.target.value = oldShape;
+    return;
+  }
+
+  notice.value = '';
+  local.shape = newShape;
+  local.polygon = newPolygon;
+  isManuallyEdited.value = false;
+  adding.value = false;
+  deleting.value = false;
+  nextTick(() => { canvasEditorRef.value?.fitStageToPolygon() });
 }
 
 function onSave(){
-  notice.value = ''
+  if (notice.value) {
+    return;
+  }
+
   errors.name = false
   errors.dimensions = false
 
@@ -269,7 +316,7 @@ function onSave(){
   }
 
   if (local.shape === 'rectangle' || local.shape === 'circle') {
-    if (rectWMeters.value <= 0 || rectLMeters.value <= 0 || heightMeters.value <= 0) {
+    if (localRectWMeters.value <= 0 || localRectLMeters.value <= 0 || heightMeters.value <= 0) {
       errors.dimensions = true
       notice.value = 'Las dimensiones deben ser mayores a cero.'
       return
@@ -281,28 +328,14 @@ function onSave(){
     return
   }
 
-  const wPx = worldWidth.value;
-  const lPx = worldHeight.value;
-  let touchesTop = false, touchesBottom = false, touchesLeft = false, touchesRight = false;
-  for (const p of local.polygon) {
-    if (p.x === 0) touchesLeft = true;
-    if (p.x === wPx) touchesRight = true;
-    if (p.y === 0) touchesTop = true;
-    if (p.y === lPx) touchesBottom = true;
-  }
-  if (!touchesTop || !touchesBottom || !touchesLeft || !touchesRight) {
-    notice.value = 'La forma dibujada debe tocar los 4 bordes del área de trabajo.';
-    return;
-  }
-
   const plantaData = {
     id: local.id,
     nombre: local.name.trim(),
     pesoMaximoSoportado: local.maxWeight,
     dimensiones: {
       alto: local.height,
-      ancho: rectW.value,
-      largo: rectL.value
+      ancho: rectW.value, // Guardamos el valor real y validado
+      largo: rectL.value,  // Guardamos el valor real y validado
     },
     forma: local.shape,
     poligono: local.polygon,
@@ -315,7 +348,6 @@ function onSave(){
     canvasStore.agregarPlanta(plantaData);
   }
 
-  // Es bueno limpiar aquí también, aunque el watch del store lo haría
   resetLocalState();
   canvasStore.cerrarEditor();
 }

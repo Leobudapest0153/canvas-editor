@@ -54,15 +54,15 @@
         <template v-if="dragging">
           <v-line :config="{ points:[guidePos.x, worldViewRect.y1, guidePos.x, worldViewRect.y2], stroke:'#94a3b8', dash:[4,4], strokeWidth:2 / stageScale }" />
           <v-line :config="{ points:[worldViewRect.x1, guidePos.y, worldViewRect.x2, guidePos.y], stroke:'#94a3b8', dash:[4,4], strokeWidth:2 / stageScale }" />
-          <v-rect :config="{ 
-            x: guidePos.x + 8 / stageScale, 
-            y: guidePos.y + 8 / stageScale, 
-            width: 110 / stageScale, 
-            height: 22 / stageScale, 
-            fill:'rgba(255,255,255,0.8)', 
-            stroke:'#cbd5e1', 
-            strokeWidth: 1 / stageScale, 
-            cornerRadius: 4 / stageScale 
+          <v-rect :config="{
+            x: guidePos.x + 8 / stageScale,
+            y: guidePos.y + 8 / stageScale,
+            width: 110 / stageScale,
+            height: 22 / stageScale,
+            fill:'rgba(255,255,255,0.8)',
+            stroke:'#cbd5e1',
+            strokeWidth: 1 / stageScale,
+            cornerRadius: 4 / stageScale
           }" />
           <v-text :config="{ x: guidePos.x + 12 / stageScale, y: guidePos.y + 12 / stageScale, text: guideLabel, fontSize: 12 / stageScale, fill:'#0f172a' }" />
         </template>
@@ -166,9 +166,7 @@ function fitStageToPolygon() {
   stage.batchDraw()
 }
 
-defineExpose({ fitStageToPolygon });
-
-onMounted(() => { 
+onMounted(() => {
   if (containerRef.value) {
     resizeObserver = new ResizeObserver(entries => {
       for (let entry of entries) {
@@ -178,7 +176,7 @@ onMounted(() => {
     })
     resizeObserver.observe(containerRef.value)
   }
-  fitStageToPolygon() 
+  fitStageToPolygon()
 });
 
 onUnmounted(() => {
@@ -253,8 +251,10 @@ function isPointInPolygon(point, vs) {
 
 function isPolygonValid(newPolygon, fixedElements) {
   if (!fixedElements || fixedElements.length === 0) {
-    return true;
+    return { valid: true, message: '' };
   }
+
+  const excludedElements = new Set();
 
   for (const el of fixedElements) {
     const corners = [
@@ -266,20 +266,28 @@ function isPolygonValid(newPolygon, fixedElements) {
 
     for (const corner of corners) {
       if (!isPointInPolygon(corner, newPolygon)) {
-        emit('notice', `El área no puede excluir el elemento "${el.nombre || el.id}"`);
-        return false;
+        excludedElements.add(el.nombre || el.id);
+        break; // Si una esquina está fuera, todo el elemento lo está. Pasamos al siguiente.
       }
     }
   }
 
-  emit('notice', '');
-  return true;
+  if (excludedElements.size > 0) {
+    const elementNames = Array.from(excludedElements).join(', ');
+    const messagePrefix = excludedElements.size === 1
+      ? `La modificación dejaría fuera al elemento: ${elementNames}.`
+      : `La modificación dejaría fuera a los elementos: ${elementNames}.`;
+    const message = `${messagePrefix} Por favor, ajusta el área para incluirlos.`;
+    return { valid: false, message };
+  }
+
+  return { valid: true, message: '' };
 }
 
-function onPointDrag(idx, e) {
-  // MODIFICADO: Cambiar cursor a 'grabbing' al arrastrar
-  document.body.style.cursor = 'grabbing';
+defineExpose({ fitStageToPolygon, isPolygonValid });
 
+function onPointDrag(idx, e) {
+  document.body.style.cursor = 'grabbing';
   dragging.value = true
   selectedIdx.value = idx
   const p = { x: e.target.x(), y: e.target.y() }
@@ -290,7 +298,9 @@ function onPointDrag(idx, e) {
   const newPolygon = [...polygon.value];
   newPolygon[idx] = { x: Math.round(clampedX), y: Math.round(clampedY) };
 
-  if (isPolygonValid(newPolygon, elements.value)) {
+  const validation = isPolygonValid(newPolygon, elements.value);
+
+  if (validation.valid) {
     emit('update:polygon', newPolygon);
     e.target.x(clampedX);
     e.target.y(clampedY);
@@ -308,7 +318,6 @@ function onPointDragEnd(idx, e) {
   onPointDrag(idx, e)
   dragging.value = false
   emit('notice', '');
-  // MODIFICADO: Cambiar cursor de vuelta a 'grab' al soltar
   document.body.style.cursor = 'grab';
 }
 
@@ -362,8 +371,8 @@ function onCanvasClick(e){
   }
 }
 
-// MODIFICADO: Detener la propagación del evento mousedown en modo eliminar
 function onVertexMouseDown(evt) {
+  emit('notice', '');
   if (deleting.value) {
     evt.evt.stopPropagation();
   }
@@ -387,7 +396,6 @@ function onVertexClick(idx, evt) {
   }
 }
 
-// MODIFICADO: Cambiar el cursor a 'grab' si no se está eliminando
 function onVertexMouseOver() {
   if (deleting.value) {
     document.body.style.cursor = 'crosshair';
