@@ -869,45 +869,60 @@ const getStrokeColor = (elementId) => {
   return canvasStore.elementoSeleccionado === elementId ? '#000' : '#666'
 }
 
-// Lock icon helpers removed: reverted to emoji-based rendering.
+// Convierte posición stage->layer considerando zoom/pan
+const toLayerCoords = (pos) => {
+  const stage = stageRef.value.getNode()
+  const scale = stage.scaleX() || 1
+  const x = (pos.x - stage.x()) / scale
+  const y = (pos.y - stage.y()) / scale
+  return { x, y }
+}
 
+// Convierte posición layer->stage considerando zoom/pan
+const toStageCoords = (pos) => {
+  const stage = stageRef.value.getNode()
+  const scale = stage.scaleX() || 1
+  return { x: pos.x * scale + stage.x(), y: pos.y * scale + stage.y() }
+}
+
+// Drag bound para cada elemento y forma
 const dragBoundForElement = (pos, elemento, forma = 'rect') => {
-  // Convierte coordenadas del pointer (stage coords) a coords del layer y aplica restricciones
-  const toStageCoords = (p) => {
-    // aquí p está en coords de layer; Konva espera coords de stage en dragBoundFunc
-    return { x: p.x, y: p.y }
-  }
-
+  const layerPos = toLayerCoords(pos)
   const boundary = computeBoundary()
 
-  // Coordenadas de layer (ya vienen como pos)
-  const layerPos = pos
-
-  if (forma === 'circular') {
-    // Para círculos, usar centro y mantener radio
+  if (forma === 'circle') {
+    // pos viene como centro
     const r = Math.min(elemento.width, elemento.height) / 2
-    // Clamp simple al rect boundary
     if (boundary.type === 'rect') {
+      // Orden: clamp → colisiones → clamp → validar (sin snap en drag)
       const clampedCenter = {
         x: Math.max(r, Math.min(layerPos.x, boundary.W - r)),
         y: Math.max(r, Math.min(layerPos.y, boundary.H - r)),
       }
       const asRect = { ...elemento, width: r * 2, height: r * 2 }
-      const resolved = resolveAgainstBlockingObstacles(clampedCenter.x - r, clampedCenter.y - r, asRect)
+      const resolved = resolveAgainstBlockingObstacles(
+        clampedCenter.x - r,
+        clampedCenter.y - r,
+        asRect,
+      )
       const finalCenter = { x: resolved.x + r, y: resolved.y + r }
+
       // Edge feedback
       const toLeft = Math.abs(finalCenter.x - r)
       const toTop = Math.abs(finalCenter.y - r)
       const toRight = Math.abs(boundary.W - (finalCenter.x + r))
       const toBottom = Math.abs(boundary.H - (finalCenter.y + r))
-      const atEdge = toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
+      const atEdge =
+        toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
       atEdgeMap.value.set(elemento.id, atEdge)
+
       lastValidPositions.value.set(elemento.id, { x: finalCenter.x - r, y: finalCenter.y - r })
       return toStageCoords(finalCenter)
     }
     if (boundary.type === 'polygon') {
       const inside = circleInsidePolygon(layerPos.x, layerPos.y, r, boundary.points)
       if (!inside) {
+        // Mantener último válido
         const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
         const centerPrev = { x: prev.x + r, y: prev.y + r }
         return toStageCoords(centerPrev)
@@ -918,18 +933,28 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     }
   }
 
-  // Rectangular
+  // Rectangular usan bbox axis-aligned
   const w = elemento.width
   const h = elemento.height
+
   if (boundary.type === 'rect') {
+    // Orden: clamp → colisiones → clamp → snap → validar
+    // (1) clamp inicial sin snap
     const clamped = clampRectToRect(layerPos.x, layerPos.y, w, h, boundary.W, boundary.H)
+
+    // (2-4) resolver bloqueantes no-expansivo con prioridad de contorno
+    let adjusted = { x: clamped.x, y: clamped.y }
     const res = resolveAgainstBlockingObstacles(clamped.x, clamped.y, elemento)
-    const adjusted = { x: res.x, y: res.y }
+    adjusted = { x: res.x, y: res.y }
+
+    // Edge feedback basado en posición final
     const toLeft = Math.abs(adjusted.x)
     const toTop = Math.abs(adjusted.y)
     const toRight = Math.abs(boundary.W - (adjusted.x + w))
     const toBottom = Math.abs(boundary.H - (adjusted.y + h))
-    const atEdge = toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
+    const atEdge =
+      toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
+
     atEdgeMap.value.set(elemento.id, atEdge)
     lastValidPositions.value.set(elemento.id, { x: adjusted.x, y: adjusted.y })
     return toStageCoords({ x: adjusted.x, y: adjusted.y })
@@ -941,6 +966,7 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
       const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
       return toStageCoords(prev)
     }
+    // En polígono, no resolvemos contra obstáculos complejos: fallback si bloquea
     const moving = { ...elemento, x: layerPos.x, y: layerPos.y }
     const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles)
     if (conflicts.some((c) => c.bloqueante)) {
@@ -1369,8 +1395,8 @@ const createElementFromDrop = (data, dropEvent) => {
   const color = elemento.color || elemento.colorBase || '#3B82F6'
 
   const nuevoElemento = {
-    id: `${elemento.tipo || elemento.categoria}_${Date.now()}`,
-    tipo: elemento.tipo, // Usar el tipo del elemento del catálogo
+    id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
+    tipo: elemento.tipo || (elemento.categoria === 'contenedores' ? 'contenedores' : 'elementos'), // Asegurar que siempre tenga tipo
     categoria: elemento.categoria, // Mantener también la categoría
     nombre: elemento.nombre || 'Nuevo elemento',
 
