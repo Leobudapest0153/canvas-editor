@@ -148,4 +148,90 @@ describe('deleteSelected', () => {
     const any = buffer.getBufferItems().some((it) => it.originalId === 'el_buf')
     expect(any).toBe(false)
   })
+
+  it('(lock a) intento de borrar elemento bloqueado → bloquea y muestra aviso', async () => {
+    const store = useCanvasStore()
+    const history = useCanvasHistory()
+    const { deleteSelected } = useDeleteElement()
+
+    addElement(store, { id: 'lock_1', tipo: 'elementos' })
+    // marcar bloqueado
+    const el = store.elementos.find((e) => e.id === 'lock_1')
+    el.locked = true
+    store.seleccionarElemento('lock_1')
+    history.initializeHistory('pre')
+    const hBefore = history.historySize.value
+
+    const toasts = { show: vi.fn() }
+    // stub toasts
+    global.window.__toasts = toasts
+
+    const ok = await deleteSelected({ withConfirm: true })
+    expect(ok).toBe(false)
+    expect(toasts.show).toHaveBeenCalled()
+    expect(store.elementos.find((e) => e.id === 'lock_1')).toBeTruthy()
+    expect(history.historySize.value).toBe(hBefore)
+  })
+
+  it('(lock b) desbloquear y borrar → elimina y empuja snapshot', async () => {
+    const store = useCanvasStore()
+    const history = useCanvasHistory()
+    const { deleteSelected } = useDeleteElement()
+
+    addElement(store, { id: 'lock_2', tipo: 'elementos' })
+    const el = store.elementos.find((e) => e.id === 'lock_2')
+    el.bloqueado = true
+    store.seleccionarElemento('lock_2')
+
+    history.initializeHistory('pre')
+
+    // Primero intenta y bloquea
+    global.window.__toasts = { show: vi.fn() }
+    let ok = await deleteSelected({ withConfirm: true })
+    expect(ok).toBe(false)
+
+    // Desbloquear y eliminar
+    el.bloqueado = false
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const before = history.historySize.value
+    ok = await deleteSelected({ withConfirm: true })
+    expect(ok).toBe(true)
+    confirmSpy.mockRestore()
+
+    expect(store.elementos.find((e) => e.id === 'lock_2')).toBeUndefined()
+    expect(history.historySize.value).toBe(before + 1)
+  })
+
+  it('(lock c) contenedor con al menos un descendiente bloqueado → bloquea sin borrar', async () => {
+    const store = useCanvasStore()
+    const history = useCanvasHistory()
+    const { deleteSelected } = useDeleteElement()
+
+    // contenedor con dos hijos, uno bloqueado
+    addElement(store, { id: 'c_lock', tipo: 'contenedores', hijos: ['a1', 'a2'] })
+    addElement(store, { id: 'a1', tipo: 'elementos', padre: 'c_lock' })
+    addElement(store, { id: 'a2', tipo: 'elementos', padre: 'c_lock' })
+    // marcar a1 como bloqueado
+    const a1 = store.elementos.find((e) => e.id === 'a1')
+    a1.locked = true
+
+    store.seleccionarElemento('c_lock')
+    history.initializeHistory('pre')
+    const hBefore = history.historySize.value
+
+    const toasts = { show: vi.fn() }
+    global.window.__toasts = toasts
+
+    const ok = await deleteSelected({ withConfirm: true })
+    expect(ok).toBe(false)
+    expect(toasts.show).toHaveBeenCalled()
+
+    // Ninguno debe haberse borrado
+    expect(store.elementos.find((e) => e.id === 'c_lock')).toBeTruthy()
+    expect(store.elementos.find((e) => e.id === 'a1')).toBeTruthy()
+    expect(store.elementos.find((e) => e.id === 'a2')).toBeTruthy()
+
+    // Historial no cambia
+    expect(history.historySize.value).toBe(hBefore)
+  })
 })

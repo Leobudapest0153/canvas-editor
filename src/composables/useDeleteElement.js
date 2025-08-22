@@ -27,6 +27,15 @@ export function useDeleteElement() {
     }
   }
 
+  const isProtected = (el) => {
+    // Elementos protegidos: tipo 'suelo' o marcados como raíz de planta
+    return el?.tipo === 'suelo' || el?.esRaizPlanta === true
+  }
+
+  const isLocked = (el) => {
+    return el?.locked === true || el?.bloqueado === true
+  }
+
   const deleteSelected = async ({ withConfirm = true } = {}) => {
     // No eliminar si hay drag global activo
     if (typeof window !== 'undefined' && window.__dvCanvasDragActive) return false
@@ -41,9 +50,50 @@ export function useDeleteElement() {
       return false
     }
 
+    // Protección: impedir borrar elementos protegidos
+    if (isProtected(selected)) {
+      await confirmDialog.confirm({
+        title: 'Acción no permitida',
+        message: 'Este elemento está protegido y no puede eliminarse.',
+        confirmLabel: 'Entendido',
+        cancelLabel: 'Cerrar',
+      })
+      return false
+    }
+
+    console.log(isLocked(selected), 'verificar si esta bloqueado')
+
+    // Bloqueo: impedir borrar elementos bloqueados (selección)
+    if (isLocked(selected)) {
+      await confirmDialog.confirm({
+        title: 'Acción no permitida',
+        message: 'No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero.',
+        confirmLabel: 'Entendido',
+        cancelLabel: 'Cerrar',
+      })
+      return false
+    }
+
     // Calcular hijos en cascada
     const descendants = new Set()
     collectDescendants(selectedId, descendants)
+
+    // Bloqueo: impedir borrar si algún descendiente está bloqueado
+    for (const id of descendants) {
+      const el = store.elementoPorId(id)
+      if (isLocked(el)) {
+        if (typeof window !== 'undefined' && window.__toasts?.show) {
+          window.__toasts.show('No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero.', { type: 'warn' })
+        }
+        await confirmDialog.confirm({
+          title: 'Acción no permitida',
+          message: 'No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero.',
+          confirmLabel: 'Entendido',
+          cancelLabel: 'Cerrar',
+        })
+        return false
+      }
+    }
 
     // Confirmación siempre que se solicite
     if (withConfirm) {
