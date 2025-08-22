@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  vue-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: face-recognition-ui:latest
+    ports:
+      - "3050:80"
+    container_name: face-recognition-ui
+    restart: unless-stopped
