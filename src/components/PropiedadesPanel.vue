@@ -263,7 +263,7 @@
     <!-- Footer fijo con acciones -->
     <div v-if="elementoSeleccionado" class="p-4 border-t border-gray-200 bg-white">
       <!-- Botón de navegación (solo para elementos navegables) -->
-      <button
+      <!-- <button
         v-if="esNavegable(elementoSeleccionado)"
         @click="navegarAElemento"
         class="w-full mb-3 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center justify-center gap-2"
@@ -272,7 +272,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
         </svg>
         Navegar al interior
-      </button>
+      </button> -->
 
       <div class="flex gap-2">
         <button
@@ -368,16 +368,16 @@ const deseleccionarElemento = () => {
 }
 
 // Nuevas funciones para navegación
-const esNavegable = (elemento) => {
-  // Solo elementos y contenedores son navegables
-  return elemento && (elemento.tipo === 'elementos' || elemento.tipo === 'contenedores')
-}
+// const esNavegable = (elemento) => {
+//   // Solo elementos y contenedores son navegables
+//   return elemento && (elemento.tipo === 'elementos' || elemento.tipo === 'contenedores')
+// }
 
-const navegarAElemento = () => {
-  if (elementoSeleccionado.value && esNavegable(elementoSeleccionado.value)) {
-    canvasStore.navegarAElemento(elementoSeleccionado.value.id)
-  }
-}
+// const navegarAElemento = () => {
+//   if (elementoSeleccionado.value && esNavegable(elementoSeleccionado.value)) {
+//     canvasStore.navegarAElemento(elementoSeleccionado.value.id)
+//   }
+// }
 
 // Funciones para obtener nombres de elementos por ID
 const obtenerNombreElementoPorId = (elementoId) => {

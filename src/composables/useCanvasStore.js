@@ -63,7 +63,15 @@ export const useCanvasStore = defineStore('canvas', () => {
   const elementos = ref([])
 
   const elementoSeleccionado = ref(null)
-  const vistaActiva = ref('XY') // XY, ZX, ZY
+  const vistaActiva = computed(() => {
+    // Vista automática según el contexto
+    if (estaEnPlanta.value) {
+      return 'XY' // Vista superior para plantas
+    } else if (estaEnElemento.value || estaEnContenedor.value) {
+      return 'XZ' // Vista frontal para elementos y contenedores
+    }
+    return 'XY' // Fallback por defecto
+  })
   const zoom = ref(1)
   const crearPlanta = ref(false)
   const plantaEnEdicion = ref(null);
@@ -440,12 +448,13 @@ export const useCanvasStore = defineStore('canvas', () => {
     let elementWidthPx, elementHeightPx
 
     if (elemento.dimensiones) {
-      // Preferir dimensiones en estructura nueva (cm)
+      // Para elementos/contenedores usamos vista XZ: ancho × alto
+      // (ya que navegamos "dentro" del elemento, vemos su vista frontal)
       elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
-      elementHeightPx = elemento.dimensiones.largo * CM_TO_PX
-      console.log('Usando dimensiones en cm:', {
+      elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
+      console.log('Usando dimensiones en cm (Vista XZ - ancho × alto):', {
         anchoCm: elemento.dimensiones.ancho,
-        largoCm: elemento.dimensiones.largo,
+        altoCm: elemento.dimensiones.alto,
         widthPx: elementWidthPx,
         heightPx: elementHeightPx,
       })
@@ -469,11 +478,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     // Asegurar dimensiones mínimas para navegación
-    const MIN_CANVAS_WIDTH = 200 // px mínimos para el canvas
-    const MIN_CANVAS_HEIGHT = 150 // px mínimos para el canvas
+    // const MIN_CANVAS_WIDTH = 200 // px mínimos para el canvas
+    // const MIN_CANVAS_HEIGHT = 150 // px mínimos para el canvas
 
-    elementWidthPx = Math.max(elementWidthPx, MIN_CANVAS_WIDTH)
-    elementHeightPx = Math.max(elementHeightPx, MIN_CANVAS_HEIGHT)
+    // elementWidthPx = Math.max(elementWidthPx, MIN_CANVAS_WIDTH)
+    // elementHeightPx = Math.max(elementHeightPx, MIN_CANVAS_HEIGHT)
 
     // El canvas muestra el espacio real del elemento
     canvasAdaptativo.value = {
@@ -537,10 +546,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (elemento) {
       Object.assign(elemento, propiedades)
     }
-  }
-
-  const cambiarVista = (nuevaVista) => {
-    vistaActiva.value = nuevaVista
   }
 
   const configurarZoom = (nuevoZoom) => {
@@ -1111,7 +1116,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const config = state.configuracion
       plantaActiva.value = config.plantaActiva || plantas.value[0]?.id || null
       elementoSeleccionado.value = config.elementoSeleccionado || null
-      vistaActiva.value = config.vistaActiva || 'XY'
+      // vistaActiva ahora es computed y se calcula automáticamente
       zoom.value = config.zoom || 1
       panX.value = config.panX || 0
       panY.value = config.panY || 0
@@ -1261,7 +1266,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     seleccionarElemento,
     actualizarPosicion,
     actualizarElemento,
-    cambiarVista,
     configurarZoom,
     configurarPan,
     setGridSize,

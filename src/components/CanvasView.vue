@@ -5,7 +5,7 @@
   - Manejar eventos de interacción (drag, drop, select, etc.)
   - Renderizar elementos del catálogo en las plantas
   - Gestionar transformaciones y zoom del canvas
-  - Coordinar las vistas XY/ZX/ZY según el modo seleccionado
+  - Coordinar las vistas XY/XZ según el modo seleccionado
   - Manejar la jerarquía padre-hijo de elementos
   - Integrar detección de colisiones durante el movimiento
   - Sincronizar con el estado global del canvas
@@ -158,22 +158,23 @@
                 listening: false,
               }"
             />
-            <v-text
-              :config="{
-                x: elemento.width / 2 - 16,
-                y: elemento.height / 2 - 16,
-                text: '🔒',
-                fontSize: 32,
-                fontFamily: 'Arial',
-                fill: '#f59e0b',
-                listening: false,
-              }"
-            />
+            <!-- Icono de candado para elemento bloqueado -->
+              <v-text
+                :config="{
+                  x: elemento.width / 2 - 16,
+                  y: elemento.height / 2 - 16,
+                  text: '🔒',
+                  fontSize: 32,
+                  fontFamily: 'Arial',
+                  fill: '#f59e0b',
+                  listening: false,
+                }"
+              />
           </v-group>
 
-          <!-- Elementos circulares -->
+          <!-- Elementos circulares: en vista XY son círculos, en vista XZ son rectángulos -->
           <v-circle
-            v-else-if="elemento.forma === 'circular'"
+            v-else-if="elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
             :config="{
               id: elemento.id,
               x: elemento.x + elemento.width / 2,
@@ -196,9 +197,36 @@
             @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'circular')"
           />
-          <!-- Icono de candado para elemento circular bloqueado -->
+
+          <!-- Elementos circulares en vista XZ se muestran como rectángulos (cilindro visto de frente) -->
+          <v-rect
+            v-else-if="elemento.forma === 'circular' && canvasStore.vistaActiva === 'XZ'"
+            :config="{
+              id: elemento.id,
+              x: elemento.x,
+              y: elemento.y,
+              width: elemento.width,
+              height: elemento.height,
+              fill: elemento.color,
+              stroke: getStrokeColor(elemento.id),
+              strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
+              opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
+              draggable: canDragElement(elemento.id),
+              shadowColor: 'black',
+              shadowBlur: 4,
+              shadowOpacity: 0.3,
+              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
+            }"
+            @click="() => selectElement(elemento.id)"
+            @dblclick="() => handleElementDoubleClick(elemento)"
+            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
+            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
+            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
+          />
+          <!-- Icono de candado para elemento circular bloqueado en vista XY -->
           <v-group
-            v-if="isElementLocked(elemento.id) && elemento.forma === 'circular'"
+            v-if="isElementLocked(elemento.id) && elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
             :config="{
               x: elemento.x,
               y: elemento.y,
@@ -216,6 +244,45 @@
                 radius: Math.min(elemento.width, elemento.height) / 2,
                 fill: '#000',
                 opacity: 0.12,
+                listening: false,
+              }"
+            />
+            <!-- Icono de candado para elemento circular bloqueado -->
+            <v-text
+              :config="{
+                x: elemento.width / 2 - 16,
+                y: elemento.height / 2 - 16,
+                text: '🔒',
+                fontSize: 32,
+                fontFamily: 'Arial',
+                fill: '#f59e0b',
+                listening: false,
+              }"
+            />
+          </v-group>
+
+          <!-- Icono de candado para elemento circular bloqueado en vista XZ (rectangular) -->
+          <v-group
+            v-if="isElementLocked(elemento.id) && elemento.forma === 'circular' && canvasStore.vistaActiva === 'XZ'"
+            :config="{
+              x: elemento.x,
+              y: elemento.y,
+              width: elemento.width,
+              height: elemento.height,
+              listening: false,
+              rotation: elemento.rotation || 0,
+              opacity: 0.35,
+            }"
+          >
+            <v-rect
+              :config="{
+                x: 0,
+                y: 0,
+                width: elemento.width,
+                height: elemento.height,
+                fill: '#000',
+                opacity: 0.12,
+                cornerRadius: 8,
                 listening: false,
               }"
             />
@@ -308,7 +375,7 @@
       <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
         Planta: {{ canvasStore.plantaActivaData.dimensiones.ancho }}×{{
           canvasStore.plantaActivaData.dimensiones.largo
-        }}cm
+        }}cm (Vista desde arriba)
       </span>
       <span
         v-if="
@@ -316,9 +383,14 @@
           canvasStore.elementoContenedorActual
         "
       >
-        Elemento: {{ canvasStore.elementoContenedorActual.nombre }} ({{
-          canvasStore.canvasAdaptativo.width
-        }}×{{ canvasStore.canvasAdaptativo.height }}px)
+        {{ canvasStore.estaEnElemento ? 'Elemento' : 'Contenedor' }}:
+        {{ canvasStore.elementoContenedorActual.nombre }}
+        <template v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones">
+          ({{ canvasStore.elementoContenedorActual.dimensiones.ancho }}×{{ canvasStore.elementoContenedorActual.dimensiones.alto }}cm - Vista de frente)
+        </template>
+        <template v-else>
+          ({{ canvasStore.canvasAdaptativo.width }}×{{ canvasStore.canvasAdaptativo.height }}px)
+        </template>
       </span>
       <span v-if="canvasStore.elementoSeleccionado">
         Seleccionado: {{ canvasStore.elementoSeleccionado }}
@@ -359,58 +431,59 @@
         </svg>
       </button>
 
-      <!-- Nuevo SpeedDial -->
-      <div v-if="canvasStore.elementoSeleccionado" class="relative">
+      <!-- Botón ajustar a planta activa -->
+      <button
+        @click="fitToPlanta"
+        @mouseenter="speedDialOpen = false"
+        :disabled="!canvasStore.estaEnPlanta || !canvasStore.plantaActivaData"
+        class="floating-btn btn-fit"
+        title="Ajustar vista a la planta activa"
+      >
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35" />
+          <circle cx="11" cy="11" r="6" stroke-width="2" />
+        </svg>
+      </button>
+
+  <!-- Nuevo SpeedDial -->
+  <div class="relative">
         <div class="relative">
-          <button @click="toggleSpeedDial" class="floating-btn focus:outline-none" :class="{ 'ring-2 ring-blue-500': speedDialOpen }" title="Acciones del elemento">
-            <!-- Gear/Tuerca construido con spans -->
-            <div class="relative w-6 h-6">
-              <div class="absolute inset-0 rounded-full bg-gradient-to-br from-gray-200 to-gray-300 border border-gray-400"></div>
-              <div class="absolute inset-1 rounded-full bg-white"></div>
-              <div class="absolute inset-[6px] rounded-full bg-gray-300 border border-gray-400"></div>
-              <!-- Dientes -->
-              <span v-for="i in 8" :key="i" class="absolute left-1/2 top-1/2 w-1.5 h-2 bg-gray-400 origin-center rounded-sm" :style="{ transform: `translate(-50%, -50%) rotate(${(i-1)*45}deg) translateY(-11px)` }"></span>
-            </div>
+          <button @click="toggleSpeedDial" class="floating-btn btn-gear focus:outline-none" :class="{ 'ring-2 ring-blue-500': speedDialOpen }" title="Acciones del elemento">
+            <!-- Icono de acciones (tres puntos verticales) -->
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="12" cy="5" r="1.75" />
+              <circle cx="12" cy="12" r="1.75" />
+              <circle cx="12" cy="19" r="1.75" />
+            </svg>
           </button>
-          <!-- Acciones -->
+            <!-- Acciones -->
           <transition-group name="fade-scale">
-            <!-- Acción Bloquear / Desbloquear siempre disponible -->
+            <!-- Acción Modo Arrastre (siempre visible cuando el speedDial está abierto) -->
             <button
               v-if="speedDialOpen"
+              key="hand"
+              @click="toggleDragMode"
+              class="speed-action"
+              :style="{ top: canvasStore.elementoSeleccionado ? '116px' : '60px' }"
+              :class="isDragModeActive ? 'bg-emerald-600': 'bg-white'"
+              :title="isDragModeActive ? 'Desactivar modo edición' : 'Activar modo edición'"
+            >
+              <svg class="w-5 h-5" :class="isDragModeActive ? 'text-white' : 'text-emerald-600'" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11V6a1 1 0 012 0v5m2-3V6a1 1 0 112 0v5m2-2V9a1 1 0 112 0v4.5c0 3.59-2.91 6.5-6.5 6.5h-.55A6.95 6.95 0 019 19" /></svg>
+            </button>
+            <!-- Acción Bloquear / Desbloquear solo si hay elemento seleccionado -->
+            <button
+              v-if="speedDialOpen && canvasStore.elementoSeleccionado"
               key="lock"
               @mousedown.stop.prevent
-              @click.stop="() => { toggleLockElement(canvasStore.elementoSeleccionado); if (selectedElementLocked) { activeDragElementId = null; editingElementId = null } }"
+              @click.stop="() => toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
               class="speed-action group"
+              :class="selectedElementLocked ? 'bg-amber-500': 'bg-blue-500'"
               style="top:60px;"
               :title="selectedElementLocked ? 'Desbloquear' : 'Bloquear'"
             >
               <span class="sr-only">Bloquear</span>
-              <svg v-if="selectedElementLocked" class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-amber-400/40 stroke-amber-500" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
-              <svg v-else class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-blue-400/20 stroke-blue-500" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
-            </button>
-            <!-- Acción Modo Arrastre (solo si NO está bloqueado) -->
-            <button
-              v-if="speedDialOpen && !selectedElementLocked"
-              key="hand"
-              @click="toggleDragMode"
-              class="speed-action"
-              style="top:116px;"
-              :class="{ 'ring-2 ring-emerald-500': isDragModeActive }"
-              :title="isDragModeActive ? 'Desactivar modo arrastre' : 'Activar modo arrastre'"
-            >
-              <svg class="w-5 h-5" :class="isDragModeActive ? 'text-emerald-600' : 'text-gray-500'" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11V6a1 1 0 012 0v5m2-3V6a1 1 0 112 0v5m2-2V9a1 1 0 112 0v4.5c0 3.59-2.91 6.5-6.5 6.5h-.55A6.95 6.95 0 019 19" /></svg>
-            </button>
-            <!-- Acción Editar (Transformer) solo si NO está bloqueado -->
-            <button
-              v-if="speedDialOpen && !selectedElementLocked"
-              key="edit"
-              @click="toggleEditMode"
-              class="speed-action"
-              style="top:172px;"
-              :class="{ 'ring-2 ring-purple-500': isEditingSelected }"
-              :title="isEditingSelected ? 'Salir de edición (Transformer)' : 'Editar dimensiones'"
-            >
-              <svg class="w-5 h-5" :class="isEditingSelected ? 'text-purple-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5h2m-1 0v14m-7 0h14" /></svg>
+              <svg v-if="selectedElementLocked" class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-amber-400/40 stroke-white" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
+              <svg v-else class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-blue-400/20 stroke-white" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
             </button>
           </transition-group>
         </div>
@@ -473,10 +546,24 @@ const getElementPixelDimensions = (elemento) => {
     return { width: elemento.width, height: elemento.height }
   }
 
-  // Si solo tiene dimensiones en cm, convertir
+  // Si solo tiene dimensiones en cm, convertir según la vista
   if (elemento.dimensiones) {
-    const widthCm = elemento.dimensiones.ancho || 100
-    const heightCm = elemento.dimensiones.largo || 60
+    let widthCm, heightCm
+
+    if (canvasStore.vistaActiva === 'XY') {
+      // Vista superior (XY): width = ancho, height = largo
+      widthCm = elemento.dimensiones.ancho || 100
+      heightCm = elemento.dimensiones.largo || 60
+    } else if (canvasStore.vistaActiva === 'XZ') {
+      // Vista frontal (XZ): width = ancho, height = alto
+      widthCm = elemento.dimensiones.ancho || 100
+      heightCm = elemento.dimensiones.alto || 20
+    } else {
+      // Fallback a vista XY
+      widthCm = elemento.dimensiones.ancho || 100
+      heightCm = elemento.dimensiones.largo || 60
+    }
+
     return {
       width: widthCm * CM_TO_PX,
       height: heightCm * CM_TO_PX,
@@ -729,7 +816,10 @@ const handleStageMouseDown = (e) => {
 const handleStageClick = (e) => {
   // Deseleccionar elemento si click en área vacía
   if (e.target === e.target.getStage()) {
-    canvasStore.seleccionarElemento(null)
+  canvasStore.seleccionarElemento(null)
+  // Cerrar controles y edición cuando se hace click en el stage vacío
+  speedDialOpen.value = false
+  editingElementId.value = null
   }
 }
 
@@ -741,6 +831,14 @@ const selectElement = (elementId) => {
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (elemento) {
     emit('select', elemento)
+  }
+
+  // Si el modo arrastre global está activado y el elemento NO está bloqueado, activar edición (transformer)
+  if (dragModeGlobal.value && elementId && !isElementLocked(elementId)) {
+    editingElementId.value = elementId
+    nextTick(setupTransformer)
+  } else {
+    editingElementId.value = null
   }
 }
 
@@ -1194,9 +1292,10 @@ const createElementFromDrop = (data, dropEvent) => {
   // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
   const { width, height } = getElementPixelDimensions(elemento)
 
-  // Obtener dimensiones originales en cm para guardar
-  const widthCm = elemento.dimensiones?.ancho || 100
-  const heightCm = elemento.dimensiones?.largo || 60
+  // Obtener dimensiones originales en cm para guardar (preservar todas las dimensiones)
+  const anchoCm = elemento.dimensiones?.ancho || 100
+  const largoCm = elemento.dimensiones?.largo || 60
+  const altoCm = elemento.dimensiones?.alto || 20
 
   // Aplicar dimensiones mínimas para mejorar la interacción
   const MIN_WIDTH = 40
@@ -1296,8 +1395,8 @@ const createElementFromDrop = (data, dropEvent) => {
   const color = elemento.color || elemento.colorBase || '#3B82F6'
 
   const nuevoElemento = {
-    id: `${elemento.tipo || elemento.categoria}_${Date.now()}`,
-    tipo: elemento.tipo, // Usar el tipo del elemento del catálogo
+    id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
+    tipo: elemento.tipo || (elemento.categoria === 'contenedores' ? 'contenedores' : 'elementos'), // Asegurar que siempre tenga tipo
     categoria: elemento.categoria, // Mantener también la categoría
     nombre: elemento.nombre || 'Nuevo elemento',
 
@@ -1309,11 +1408,11 @@ const createElementFromDrop = (data, dropEvent) => {
       rotation: 0,
     },
 
-    // Estructura correcta para dimensiones (mantener en cm los datos físicos)
+    // Estructura correcta para dimensiones (preservar todas las dimensiones independientemente de la vista)
     dimensiones: {
-      ancho: widthCm,
-      largo: heightCm,
-      alto: elemento.dimensiones?.alto || elemento.alto || 20,
+      ancho: anchoCm,
+      largo: largoCm,
+      alto: altoCm,
     },
 
     // Propiedades legacy para compatibilidad con Konva (en px para renderizado)
@@ -1460,13 +1559,16 @@ const createElementFromBuffer = (data, dropEvent) => {
 
 // === NUEVO: Estado SpeedDial & modos ===
 const speedDialOpen = ref(false)
-const activeDragElementId = ref(null)
+// Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
+// Por defecto activado (true) para que el modo edición esté disponible al iniciar
+const dragModeGlobal = ref(true)
+// Id del elemento actualmente en modo edición (transformer). Se activa al seleccionar un elemento cuando dragModeGlobal está ON
 const editingElementId = ref(null)
 const transformerRef = ref(null)
 
 const toggleSpeedDial = () => { speedDialOpen.value = !speedDialOpen.value }
 
-const isDragModeActive = computed(() => activeDragElementId.value === canvasStore.elementoSeleccionado)
+const isDragModeActive = computed(() => dragModeGlobal.value)
 const isEditingSelected = computed(() => editingElementId.value === canvasStore.elementoSeleccionado)
 const selectedElementLocked = computed(() => {
   const id = canvasStore.elementoSeleccionado
@@ -1476,37 +1578,44 @@ const selectedElementLocked = computed(() => {
 // Limpiar modos si se bloquea el elemento
 watch(selectedElementLocked, (locked) => {
   if (locked) {
-    // Si se bloquea el elemento mientras estaba en modos especiales, limpiar
-    activeDragElementId.value = null
-    editingElementId.value = null
+    // Si el elemento seleccionado se bloquea, cerrar el transformer para ese elemento
+    // pero no desactivar el modo arrastre global (debe permanecer visible/activo)
+    if (editingElementId.value === canvasStore.elementoSeleccionado) {
+      editingElementId.value = null
+    }
   }
 })
 
-const toggleDragMode = () => {
-  if (!canvasStore.elementoSeleccionado) return
-  if (activeDragElementId.value === canvasStore.elementoSeleccionado) {
-    activeDragElementId.value = null
-  } else {
-    activeDragElementId.value = canvasStore.elementoSeleccionado
-    // si estaba en edición, salir (mutuamente excluyente)
-    if (editingElementId.value === canvasStore.elementoSeleccionado) editingElementId.value = null
+// Al hacer lock/unlock desde el UI, mantener el estado de modo global y solo cerrar
+// la edición si el elemento queda bloqueado.
+const toggleLockAndPreserveDrag = async (elementId) => {
+  if (!elementId) return
+  toggleLockElement(elementId)
+  await nextTick()
+  if (isElementLocked(elementId)) {
+    if (editingElementId.value === elementId) editingElementId.value = null
   }
 }
-const toggleEditMode = () => {
-  if (!canvasStore.elementoSeleccionado || selectedElementLocked.value) return
-  if (editingElementId.value === canvasStore.elementoSeleccionado) {
-    // Salir de edición: quitar transformer y arrastre especial
+const toggleDragMode = () => {
+  // Alterna el modo arrastre global. Cuando se activa y hay un elemento seleccionado y no bloqueado,
+  // se activa también la edición (transformer) para permitir cambiar dimensiones.
+  dragModeGlobal.value = !dragModeGlobal.value
+  if (!dragModeGlobal.value) {
     editingElementId.value = null
-    activeDragElementId.value = null
   } else {
-    // Entrar en edición: activar transformer y permitir drag mientras se ajusta
-    editingElementId.value = canvasStore.elementoSeleccionado
-    activeDragElementId.value = canvasStore.elementoSeleccionado
+    const sel = canvasStore.elementoSeleccionado
+    if (sel && !isElementLocked(sel)) {
+      editingElementId.value = sel
+      nextTick(setupTransformer)
+    }
   }
-  nextTick(setupTransformer)
 }
 
-const canDragElement = (id) => !isElementLocked(id) && (activeDragElementId.value === id || editingElementId.value === id)
+const canDragElement = (id) => {
+  // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
+  if (isElementLocked(id)) return false
+  return dragModeGlobal.value
+}
 
 const setupTransformer = () => {
   if (!isEditingSelected.value || selectedElementLocked.value) return
@@ -1555,15 +1664,30 @@ const handleTransformEnd = (e, elementId, forma) => {
   // Clamp mínimo para evitar tamaños cero
   width = Math.max(8, width)
   height = Math.max(8, height)
+
   // Actualizar dimensiones físicas si existen
   const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
   let dimensiones = elemento?.dimensiones
   let newDimensiones = dimensiones ? { ...dimensiones } : undefined
+
   if (newDimensiones) {
-    // Asume que el canvas está en px y 1cm = CM_TO_PX
-    newDimensiones.ancho = Math.round(width / CM_TO_PX)
-    newDimensiones.largo = Math.round(height / CM_TO_PX)
+    // Actualizar las dimensiones correctas según la vista
+    const widthCm = Math.round(width / CM_TO_PX)
+    const heightCm = Math.round(height / CM_TO_PX)
+
+    if (canvasStore.vistaActiva === 'XY') {
+      // Vista superior (XY): width = ancho, height = largo
+      newDimensiones.ancho = widthCm
+      newDimensiones.largo = heightCm
+      // Mantener alto sin cambios
+    } else if (canvasStore.vistaActiva === 'XZ') {
+      // Vista frontal (XZ): width = ancho, height = alto
+      newDimensiones.ancho = widthCm
+      newDimensiones.alto = heightCm
+      // Mantener largo sin cambios
+    }
   }
+
   canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones })
   lastValidPositions.value.set(elementId, { x, y })
   nextTick(() => setupTransformer())
@@ -1597,7 +1721,20 @@ const handleGlobalClick = (e) => {
   const isFormElement = e.target.matches('input, button, select, textarea, [contenteditable]')
   const isInPropertiesPanel = e.target.closest('[data-properties-panel]')
   if (!containerRef.value?.contains(e.target) && !isFormElement && !isInPropertiesPanel) {
+  canvasStore.seleccionarElemento(null)
+  speedDialOpen.value = false
+  editingElementId.value = null
+  }
+}
+
+// Deseleccionar al presionar Escape
+const handleKeyDown = (e) => {
+  if (!e) return
+  if (e.key === 'Escape' || e.key === 'Esc') {
     canvasStore.seleccionarElemento(null)
+    // Asegurar que el transformer/edición se cierre
+  editingElementId.value = null
+  speedDialOpen.value = false
   }
 }
 let resizeObserver = null
@@ -1611,10 +1748,12 @@ onMounted(async () => {
   await nextTick()
   centrarPlantaEnCanvas()
   window.addEventListener('click', handleGlobalClick)
+  window.addEventListener('keydown', handleKeyDown)
 })
 onUnmounted(() => {
   if (resizeObserver) resizeObserver.disconnect()
   window.removeEventListener('click', handleGlobalClick)
+  window.removeEventListener('keydown', handleKeyDown)
 })
 
 // Eliminar referencia originalStartElementDrag no usada
@@ -1661,6 +1800,56 @@ watch(
     forceRedraw()
   },
 )
+
+// Ajustar la vista para encuadrar la planta activa (usa polígono si existe)
+const fitToPlanta = () => {
+  try {
+    const stage = stageRef.value?.getNode?.()
+    if (!stage) return
+
+    const margin = 40 // píxeles de margen visual
+    const planta = canvasStore.plantaActivaData
+    let bbox = null
+
+    if (planta) {
+      if (planta.poligono && Array.isArray(planta.poligono) && planta.poligono.length > 0) {
+        const xs = planta.poligono.map((p) => p.x)
+        const ys = planta.poligono.map((p) => p.y)
+        const minX = Math.min(...xs)
+        const maxX = Math.max(...xs)
+        const minY = Math.min(...ys)
+        const maxY = Math.max(...ys)
+        bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+      } else if (layerConfig.value && layerConfig.value.width && layerConfig.value.height) {
+        bbox = { x: 0, y: 0, width: layerConfig.value.width, height: layerConfig.value.height }
+      }
+    }
+
+    if (!bbox) {
+      // Si no hay planta, centrar por defecto
+      centrarPlantaEnCanvas()
+      return
+    }
+
+    // Calcular escala para encuadrar bbox con margen
+    const vw = stageSize.value.width - margin * 2
+    const vh = stageSize.value.height - margin * 2
+    if (vw <= 0 || vh <= 0) return
+
+    const scaleX = vw / bbox.width
+    const scaleY = vh / bbox.height
+    const targetScale = Math.max(0.1, Math.min(5, Math.min(scaleX, scaleY)))
+
+    // Calcular pan para centrar bbox en viewport
+    const stageX = (stageSize.value.width - bbox.width * targetScale) / 2 - bbox.x * targetScale
+    const stageY = (stageSize.value.height - bbox.height * targetScale) / 2 - bbox.y * targetScale
+
+    canvasStore.configurarZoom(targetScale)
+    canvasStore.configurarPan(stageX, stageY)
+  } catch (e) {
+    console.error('fitToPlanta error', e)
+  }
+}
 </script>
 
 <style scoped>
@@ -1760,6 +1949,24 @@ watch(
   border-color: #059669;
 }
 
+/* Ajuste visual del botón de 'fit' para que coincida con el botón Deshacer */
+.btn-fit:not(:disabled) {
+  color: #3b82f6;
+}
+.btn-fit:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+/* Gear button style to match Undo */
+.btn-gear {
+  color: #3b82f6;
+}
+.btn-gear:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
 .floating-btn .icon {
   width: 20px;
   height: 20px;
@@ -1768,6 +1975,8 @@ watch(
 .fade-scale-enter-active, .fade-scale-leave-active { transition: all 0.15s ease; }
 .fade-scale-enter-from, .fade-scale-leave-to { opacity: 0; transform: translateY(8px) scale(0.9); }
 
-.speed-action { position:absolute; right:0; width:48px; height:48px; margin-top:8px; border:1px solid #d1d5db; background:#fff; border-radius:9999px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px  12px rgba(0,0,0,.15); transition:all .15s ease; }
-.speed-action:hover { transform: translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,.2); background:#f8fafc; }
+.speed-action { position:absolute; right:0; width:48px; height:48px; margin-top:8px; border:1px solid #d1d5db; border-radius:9999px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px  12px rgba(0,0,0,.15); transition:all .15s ease; }
+.speed-action:hover { transform: translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,.2); }
+
+.btn-fit { position: relative; z-index: 30; }
 </style>
