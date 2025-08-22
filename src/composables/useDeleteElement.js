@@ -36,6 +36,61 @@ export function useDeleteElement() {
     return el?.locked === true || el?.bloqueado === true
   }
 
+  const findBlockingReferences = (idsSet) => {
+    const refs = []
+    // Buffer
+    try {
+      const items = buffer.getBufferItems()
+      for (const it of items) {
+        if (idsSet.has(it.originalId)) {
+          refs.push({ type: 'buffer', label: it.elemento?.nombre || it.originalId, raw: it })
+        }
+      }
+    } catch (e) { void e }
+
+    // Element links: referencias / vinculos arrays si existen
+    try {
+      for (const el of store.elementos) {
+        const arrs = []
+        if (Array.isArray(el.referencias)) arrs.push({ key: 'referencias', arr: el.referencias })
+        if (Array.isArray(el.vinculos)) arrs.push({ key: 'vinculos', arr: el.vinculos })
+        for (const { key, arr } of arrs) {
+          for (const rid of arr) {
+            if (idsSet.has(rid)) {
+              refs.push({ type: key, label: el.nombre || el.id, raw: { el, key, rid } })
+            }
+          }
+        }
+      }
+    } catch (e) { void e }
+
+    return refs
+  }
+
+  const cleanReferences = (idsSet) => {
+    // Remove from buffer
+    try {
+      const items = buffer.getBufferItems()
+      for (const it of items.slice()) {
+        if (idsSet.has(it.originalId)) {
+          buffer.removeFromBuffer(it.id)
+        }
+      }
+    } catch (e) { void e }
+
+    // Remove from elementos.referencias / vinculos
+    try {
+      for (const el of store.elementos) {
+        if (Array.isArray(el.referencias)) {
+          el.referencias = el.referencias.filter((rid) => !idsSet.has(rid))
+        }
+        if (Array.isArray(el.vinculos)) {
+          el.vinculos = el.vinculos.filter((rid) => !idsSet.has(rid))
+        }
+      }
+    } catch (e) { void e }
+  }
+
   const deleteSelected = async ({ withConfirm = true } = {}) => {
     // No eliminar si hay drag global activo
     if (typeof window !== 'undefined' && window.__dvCanvasDragActive) return false
@@ -78,21 +133,22 @@ export function useDeleteElement() {
     const descendants = new Set()
     collectDescendants(selectedId, descendants)
 
-    // Bloqueo: impedir borrar si algún descendiente está bloqueado
-    for (const id of descendants) {
-      const el = store.elementoPorId(id)
-      if (isLocked(el)) {
-        if (typeof window !== 'undefined' && window.__toasts?.show) {
-          window.__toasts.show('No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero.', { type: 'warn' })
-        }
-        await confirmDialog.confirm({
-          title: 'Acción no permitida',
-          message: 'No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero.',
-          confirmLabel: 'Entendido',
-          cancelLabel: 'Cerrar',
-        })
-        return false
-      }
+    // Verificar referencias bloqueantes antes de confirmar
+    const idsToAffect = new Set([selectedId, ...descendants])
+    const refs = findBlockingReferences(idsToAffect)
+    if (refs.length > 0) {
+      const K = refs.length
+      const list = refs.slice(0, 5).map((r) => `• ${r.label}`).join('\n') + (K > 5 ? `\n… (+${K - 5} más)` : '')
+      const msg = `Este elemento contiene elementos hijos dentro del portapapeles: ${K}.\n\n${list}\n\nPara poder eliminarlo ahora, podemos quitar esas referencias por ti.\n\n¿Quieres que quitemos y continuemos con la eliminación?`
+      const ok = await confirmDialog.confirm({
+        title: 'No se puede eliminar aún',
+        message: msg,
+        confirmLabel: 'Quitar referencias y continuar',
+        cancelLabel: 'Cancelar',
+      })
+      if (!ok) return false
+      // Limpiar y continuar
+      cleanReferences(idsToAffect)
     }
 
     // Confirmación siempre que se solicite

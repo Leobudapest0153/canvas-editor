@@ -278,4 +278,109 @@ describe('deleteSelected', () => {
 
     confirmSpy.mockRestore()
   })
+
+  it('referencias: cancelar limpieza → no borra ni limpia', async () => {
+    const store = useCanvasStore()
+    const history = useCanvasHistory()
+    const { deleteSelected } = useDeleteElement()
+    const buffer = useCanvasBuffer()
+
+    // Crear objetivo y un referenciador
+    addElement(store, { id: 'ref_target', tipo: 'elementos' })
+    addElement(store, { id: 'ref_src', tipo: 'elementos' })
+    // Agregar referencias y vinculos en la fuente hacia el target
+    const src = store.elementos.find(e => e.id === 'ref_src')
+    src.referencias = ['ref_target']
+    src.vinculos = ['ref_target']
+
+    // Copiar target al buffer
+    store.seleccionarElemento('ref_target')
+    buffer.copyToBuffer('ref_target')
+
+    history.initializeHistory('pre')
+    const hBefore = history.historySize.value
+
+    // Primera confirmación (limpieza): cancelar
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    const ok = await deleteSelected({ withConfirm: true })
+    expect(ok).toBe(false)
+
+    // Elemento sigue, buffer sigue conteniéndolo, y referencias no fueron limpiadas
+    expect(store.elementos.find(e => e.id === 'ref_target')).toBeTruthy()
+    expect(buffer.getBufferItems().some(it => it.originalId === 'ref_target')).toBe(true)
+    expect(src.referencias.includes('ref_target')).toBe(true)
+    expect(src.vinculos.includes('ref_target')).toBe(true)
+    expect(history.historySize.value).toBe(hBefore)
+
+    confirmSpy.mockRestore()
+  })
+
+  it('referencias: limpiar y continuar → limpia y borra con snapshot', async () => {
+    const store = useCanvasStore()
+    const history = useCanvasHistory()
+    const { deleteSelected } = useDeleteElement()
+    const buffer = useCanvasBuffer()
+
+    // Crear objetivo y dos referenciadores
+    addElement(store, { id: 'ref_target2', tipo: 'elementos' })
+    addElement(store, { id: 'ref_srcA', tipo: 'elementos' })
+    addElement(store, { id: 'ref_srcB', tipo: 'elementos' })
+    const srcA = store.elementos.find(e => e.id === 'ref_srcA')
+    const srcB = store.elementos.find(e => e.id === 'ref_srcB')
+    srcA.referencias = ['ref_target2']
+    srcB.vinculos = ['ref_target2']
+
+    store.seleccionarElemento('ref_target2')
+    buffer.copyToBuffer('ref_target2')
+
+    history.initializeHistory('pre')
+    const hBefore = history.historySize.value
+
+    // Secuencia de confirmaciones: 1) limpiar (true), 2) borrar (true)
+    const confirmSpy = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true)
+
+    const ok = await deleteSelected({ withConfirm: true })
+    expect(ok).toBe(true)
+
+    // Se limpian referencias y buffer; y se elimina
+    expect(store.elementos.find(e => e.id === 'ref_target2')).toBeUndefined()
+    expect(srcA.referencias?.includes('ref_target2')).toBeFalsy()
+    expect(srcB.vinculos?.includes('ref_target2')).toBeFalsy()
+    expect(buffer.getBufferItems().some(it => it.originalId === 'ref_target2')).toBe(false)
+    expect(history.historySize.value).toBe(hBefore + 1)
+
+    confirmSpy.mockRestore()
+  })
+
+  it('referencias: lista truncada en mensaje (>5) incluye contador', async () => {
+    const store = useCanvasStore()
+    const { deleteSelected } = useDeleteElement()
+
+    addElement(store, { id: 'ref_target3', tipo: 'elementos' })
+    // Crear 7 referenciadores que apunten al target
+    for (let i = 1; i <= 7; i++) {
+      addElement(store, { id: `src_${i}`, tipo: 'elementos' })
+      const s = store.elementos.find(e => e.id === `src_${i}`)
+      s.referencias = ['ref_target3']
+    }
+
+    store.seleccionarElemento('ref_target3')
+
+    // Capturar mensaje de confirmación para truncado
+    const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation((msg) => {
+      // Debe mencionar … (+2 más)
+      expect(msg).toMatch(/\(\+2 más\)/)
+      // Cancelamos para no continuar
+      return false
+    })
+
+    const ok = await deleteSelected({ withConfirm: true })
+    expect(ok).toBe(false)
+
+    confirmSpy.mockRestore()
+  })
 })
