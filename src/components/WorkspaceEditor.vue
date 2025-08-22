@@ -43,12 +43,10 @@
               <template v-if="local.shape === 'rectangle' || local.shape === 'circle'">
                 <div>
                   <label class="text-xs text-slate-600">Ancho (m)</label>
-                  <!-- MODIFICADO: v-model apunta al estado local/borrador -->
                   <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="localRectWMeters" />
                 </div>
                 <div>
                   <label class="text-xs text-slate-600">Largo (m)</label>
-                  <!-- MODIFICADO: v-model apunta al estado local/borrador -->
                   <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="localRectLMeters" />
                 </div>
               </template>
@@ -90,13 +88,9 @@ const ovalSamplePoints = (cx, cy, rx, ry, n) => Array.from({length:n},(_,i)=>{co
 
 const PIXELS_PER_CM = 10
 
-// --- ESTADO REAL ---
-// Representa el estado válido y confirmado del canvas.
 const rectW = ref(500)
 const rectL = ref(500)
 
-// --- NUEVO: ESTADO LOCAL PARA INPUTS ---
-// Vinculado a los inputs, actúa como un borrador pendiente de validación.
 const localRectWMeters = ref(5);
 const localRectLMeters = ref(5);
 
@@ -144,7 +138,6 @@ function resetLocalState() {
   local.maxWeight = 1000;
   isManuallyEdited.value = false;
 
-  // Sincronizamos el estado local con el real
   localRectWMeters.value = rectW.value / 100;
   localRectLMeters.value = rectL.value / 100;
 
@@ -165,7 +158,6 @@ watch(() => canvasStore.plantaEnEdicion, (planta) => {
     const todosLosElementos = canvasStore.elementos || [];
     local.elements = todosLosElementos.filter(el => el.plantaId === planta.id && !el.padre);
 
-    // Sincronizamos ambos estados al cargar datos
     rectW.value = planta.dimensiones.ancho;
     rectL.value = planta.dimensiones.largo;
     localRectWMeters.value = planta.dimensiones.ancho / 100;
@@ -204,7 +196,6 @@ const onPolygonUpdate = (newPolygon) => {
   isManuallyEdited.value = true;
 };
 
-// Este computed ya no necesita un 'set' complejo, solo actualiza el modelo local.
 const heightMeters = computed({
   get: () => local.height / 100,
   set: (val) => { local.height = Math.max(0, val) * 100 }
@@ -226,8 +217,6 @@ function applyCircle(w_cm, l_cm) {
   return ovalSamplePoints(cx, cy, rx, ry, 32).map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }));
 }
 
-// --- WATCH REHECHO ---
-// Observamos las variables locales de los inputs.
 watch([localRectWMeters, localRectLMeters], () => {
   if (isLoadingData.value) return;
 
@@ -258,10 +247,9 @@ watch([localRectWMeters, localRectLMeters], () => {
     const validation = canvasEditorRef.value?.isPolygonValid(scaledPolygon, local.elements);
     if (validation && !validation.valid) {
       notice.value = validation.message;
-      return; // Si no es válido, mostramos el error y no hacemos nada más.
+      return;
     }
 
-    // Si es válido, actualizamos el modelo real.
     rectW.value = newW_cm;
     rectL.value = newL_cm;
     local.polygon = scaledPolygon;
@@ -276,7 +264,6 @@ function onShapeChange(event) {
   const newShape = event.target.value;
   let newPolygon;
 
-  // Usamos las dimensiones válidas del estado real
   if (newShape === 'rectangle') newPolygon = applyRect(rectW.value, rectL.value);
   else if (newShape === 'circle') newPolygon = applyCircle(rectW.value, rectL.value);
   else {
@@ -301,14 +288,21 @@ function onShapeChange(event) {
   nextTick(() => { canvasEditorRef.value?.fitStageToPolygon() });
 }
 
+// --- onSave CORREGIDO ---
 function onSave(){
-  if (notice.value) {
-    return;
-  }
-
+  // 1. Limpiamos errores y avisos anteriores para empezar de cero.
+  notice.value = ''
   errors.name = false
   errors.dimensions = false
 
+  // 2. RESTAURADO: Se ejecuta una validación final del polígono. Esta es la parte crucial.
+  const finalValidation = canvasEditorRef.value?.isPolygonValid(local.polygon, local.elements);
+  if (finalValidation && !finalValidation.valid) {
+    notice.value = finalValidation.message;
+    return; // Si el polígono es inválido, nos detenemos aquí.
+  }
+
+  // 3. Se ejecutan las demás validaciones secuencialmente.
   if (!local.name.trim()) {
     errors.name = true
     notice.value = 'El campo "Nombre" es obligatorio.'
@@ -328,14 +322,15 @@ function onSave(){
     return
   }
 
+  // 4. Si todo es válido, se procede a guardar.
   const plantaData = {
     id: local.id,
     nombre: local.name.trim(),
     pesoMaximoSoportado: local.maxWeight,
     dimensiones: {
       alto: local.height,
-      ancho: rectW.value, // Guardamos el valor real y validado
-      largo: rectL.value,  // Guardamos el valor real y validado
+      ancho: rectW.value,
+      largo: rectL.value,
     },
     forma: local.shape,
     poligono: local.polygon,
