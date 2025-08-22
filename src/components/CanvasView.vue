@@ -359,8 +359,8 @@
         </svg>
       </button>
 
-      <!-- Nuevo SpeedDial -->
-      <div v-if="canvasStore.elementoSeleccionado" class="relative">
+  <!-- Nuevo SpeedDial -->
+  <div class="relative">
         <div class="relative">
           <button @click="toggleSpeedDial" class="floating-btn focus:outline-none" :class="{ 'ring-2 ring-blue-500': speedDialOpen }" title="Acciones del elemento">
             <!-- Gear/Tuerca construido con spans -->
@@ -372,45 +372,34 @@
               <span v-for="i in 8" :key="i" class="absolute left-1/2 top-1/2 w-1.5 h-2 bg-gray-400 origin-center rounded-sm" :style="{ transform: `translate(-50%, -50%) rotate(${(i-1)*45}deg) translateY(-11px)` }"></span>
             </div>
           </button>
-          <!-- Acciones -->
+            <!-- Acciones -->
           <transition-group name="fade-scale">
-            <!-- Acción Bloquear / Desbloquear siempre disponible -->
+            <!-- Acción Modo Arrastre (siempre visible cuando el speedDial está abierto) -->
             <button
               v-if="speedDialOpen"
+              key="hand"
+              @click="toggleDragMode"
+              class="speed-action"
+              :style="{ top: canvasStore.elementoSeleccionado ? '116px' : '60px' }"
+              :class="isDragModeActive ? 'bg-emerald-600': 'bg-white'"
+              :title="isDragModeActive ? 'Desactivar modo edición' : 'Activar modo edición'"
+            >
+              <svg class="w-5 h-5" :class="isDragModeActive ? 'text-white' : 'text-emerald-600'" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11V6a1 1 0 012 0v5m2-3V6a1 1 0 112 0v5m2-2V9a1 1 0 112 0v4.5c0 3.59-2.91 6.5-6.5 6.5h-.55A6.95 6.95 0 019 19" /></svg>
+            </button>
+            <!-- Acción Bloquear / Desbloquear solo si hay elemento seleccionado -->
+            <button
+              v-if="speedDialOpen && canvasStore.elementoSeleccionado"
               key="lock"
               @mousedown.stop.prevent
-              @click.stop="() => { toggleLockElement(canvasStore.elementoSeleccionado); if (selectedElementLocked) { activeDragElementId = null; editingElementId = null } }"
+              @click.stop="() => toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
               class="speed-action group"
+              :class="selectedElementLocked ? 'bg-amber-500': 'bg-blue-500'"
               style="top:60px;"
               :title="selectedElementLocked ? 'Desbloquear' : 'Bloquear'"
             >
               <span class="sr-only">Bloquear</span>
-              <svg v-if="selectedElementLocked" class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-amber-400/40 stroke-amber-500" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
-              <svg v-else class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-blue-400/20 stroke-blue-500" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
-            </button>
-            <!-- Acción Modo Arrastre (solo si NO está bloqueado) -->
-            <button
-              v-if="speedDialOpen && !selectedElementLocked"
-              key="hand"
-              @click="toggleDragMode"
-              class="speed-action"
-              style="top:116px;"
-              :class="{ 'ring-2 ring-emerald-500': isDragModeActive }"
-              :title="isDragModeActive ? 'Desactivar modo arrastre' : 'Activar modo arrastre'"
-            >
-              <svg class="w-5 h-5" :class="isDragModeActive ? 'text-emerald-600' : 'text-gray-500'" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11V6a1 1 0 012 0v5m2-3V6a1 1 0 112 0v5m2-2V9a1 1 0 112 0v4.5c0 3.59-2.91 6.5-6.5 6.5h-.55A6.95 6.95 0 019 19" /></svg>
-            </button>
-            <!-- Acción Editar (Transformer) solo si NO está bloqueado -->
-            <button
-              v-if="speedDialOpen && !selectedElementLocked"
-              key="edit"
-              @click="toggleEditMode"
-              class="speed-action"
-              style="top:172px;"
-              :class="{ 'ring-2 ring-purple-500': isEditingSelected }"
-              :title="isEditingSelected ? 'Salir de edición (Transformer)' : 'Editar dimensiones'"
-            >
-              <svg class="w-5 h-5" :class="isEditingSelected ? 'text-purple-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5h2m-1 0v14m-7 0h14" /></svg>
+              <svg v-if="selectedElementLocked" class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-amber-400/40 stroke-white" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
+              <svg v-else class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-blue-400/20 stroke-white" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
             </button>
           </transition-group>
         </div>
@@ -729,7 +718,10 @@ const handleStageMouseDown = (e) => {
 const handleStageClick = (e) => {
   // Deseleccionar elemento si click en área vacía
   if (e.target === e.target.getStage()) {
-    canvasStore.seleccionarElemento(null)
+  canvasStore.seleccionarElemento(null)
+  // Cerrar controles y edición cuando se hace click en el stage vacío
+  speedDialOpen.value = false
+  editingElementId.value = null
   }
 }
 
@@ -741,6 +733,14 @@ const selectElement = (elementId) => {
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (elemento) {
     emit('select', elemento)
+  }
+
+  // Si el modo arrastre global está activado y el elemento NO está bloqueado, activar edición (transformer)
+  if (dragModeGlobal.value && elementId && !isElementLocked(elementId)) {
+    editingElementId.value = elementId
+    nextTick(setupTransformer)
+  } else {
+    editingElementId.value = null
   }
 }
 
@@ -1460,13 +1460,16 @@ const createElementFromBuffer = (data, dropEvent) => {
 
 // === NUEVO: Estado SpeedDial & modos ===
 const speedDialOpen = ref(false)
-const activeDragElementId = ref(null)
+// Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
+// Por defecto activado (true) para que el modo edición esté disponible al iniciar
+const dragModeGlobal = ref(true)
+// Id del elemento actualmente en modo edición (transformer). Se activa al seleccionar un elemento cuando dragModeGlobal está ON
 const editingElementId = ref(null)
 const transformerRef = ref(null)
 
 const toggleSpeedDial = () => { speedDialOpen.value = !speedDialOpen.value }
 
-const isDragModeActive = computed(() => activeDragElementId.value === canvasStore.elementoSeleccionado)
+const isDragModeActive = computed(() => dragModeGlobal.value)
 const isEditingSelected = computed(() => editingElementId.value === canvasStore.elementoSeleccionado)
 const selectedElementLocked = computed(() => {
   const id = canvasStore.elementoSeleccionado
@@ -1476,37 +1479,44 @@ const selectedElementLocked = computed(() => {
 // Limpiar modos si se bloquea el elemento
 watch(selectedElementLocked, (locked) => {
   if (locked) {
-    // Si se bloquea el elemento mientras estaba en modos especiales, limpiar
-    activeDragElementId.value = null
-    editingElementId.value = null
+    // Si el elemento seleccionado se bloquea, cerrar el transformer para ese elemento
+    // pero no desactivar el modo arrastre global (debe permanecer visible/activo)
+    if (editingElementId.value === canvasStore.elementoSeleccionado) {
+      editingElementId.value = null
+    }
   }
 })
 
-const toggleDragMode = () => {
-  if (!canvasStore.elementoSeleccionado) return
-  if (activeDragElementId.value === canvasStore.elementoSeleccionado) {
-    activeDragElementId.value = null
-  } else {
-    activeDragElementId.value = canvasStore.elementoSeleccionado
-    // si estaba en edición, salir (mutuamente excluyente)
-    if (editingElementId.value === canvasStore.elementoSeleccionado) editingElementId.value = null
+// Al hacer lock/unlock desde el UI, mantener el estado de modo global y solo cerrar
+// la edición si el elemento queda bloqueado.
+const toggleLockAndPreserveDrag = async (elementId) => {
+  if (!elementId) return
+  toggleLockElement(elementId)
+  await nextTick()
+  if (isElementLocked(elementId)) {
+    if (editingElementId.value === elementId) editingElementId.value = null
   }
 }
-const toggleEditMode = () => {
-  if (!canvasStore.elementoSeleccionado || selectedElementLocked.value) return
-  if (editingElementId.value === canvasStore.elementoSeleccionado) {
-    // Salir de edición: quitar transformer y arrastre especial
+const toggleDragMode = () => {
+  // Alterna el modo arrastre global. Cuando se activa y hay un elemento seleccionado y no bloqueado,
+  // se activa también la edición (transformer) para permitir cambiar dimensiones.
+  dragModeGlobal.value = !dragModeGlobal.value
+  if (!dragModeGlobal.value) {
     editingElementId.value = null
-    activeDragElementId.value = null
   } else {
-    // Entrar en edición: activar transformer y permitir drag mientras se ajusta
-    editingElementId.value = canvasStore.elementoSeleccionado
-    activeDragElementId.value = canvasStore.elementoSeleccionado
+    const sel = canvasStore.elementoSeleccionado
+    if (sel && !isElementLocked(sel)) {
+      editingElementId.value = sel
+      nextTick(setupTransformer)
+    }
   }
-  nextTick(setupTransformer)
 }
 
-const canDragElement = (id) => !isElementLocked(id) && (activeDragElementId.value === id || editingElementId.value === id)
+const canDragElement = (id) => {
+  // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
+  if (isElementLocked(id)) return false
+  return dragModeGlobal.value
+}
 
 const setupTransformer = () => {
   if (!isEditingSelected.value || selectedElementLocked.value) return
@@ -1597,7 +1607,20 @@ const handleGlobalClick = (e) => {
   const isFormElement = e.target.matches('input, button, select, textarea, [contenteditable]')
   const isInPropertiesPanel = e.target.closest('[data-properties-panel]')
   if (!containerRef.value?.contains(e.target) && !isFormElement && !isInPropertiesPanel) {
+  canvasStore.seleccionarElemento(null)
+  speedDialOpen.value = false
+  editingElementId.value = null
+  }
+}
+
+// Deseleccionar al presionar Escape
+const handleKeyDown = (e) => {
+  if (!e) return
+  if (e.key === 'Escape' || e.key === 'Esc') {
     canvasStore.seleccionarElemento(null)
+    // Asegurar que el transformer/edición se cierre
+  editingElementId.value = null
+  speedDialOpen.value = false
   }
 }
 let resizeObserver = null
@@ -1611,10 +1634,12 @@ onMounted(async () => {
   await nextTick()
   centrarPlantaEnCanvas()
   window.addEventListener('click', handleGlobalClick)
+  window.addEventListener('keydown', handleKeyDown)
 })
 onUnmounted(() => {
   if (resizeObserver) resizeObserver.disconnect()
   window.removeEventListener('click', handleGlobalClick)
+  window.removeEventListener('keydown', handleKeyDown)
 })
 
 // Eliminar referencia originalStartElementDrag no usada
@@ -1768,6 +1793,6 @@ watch(
 .fade-scale-enter-active, .fade-scale-leave-active { transition: all 0.15s ease; }
 .fade-scale-enter-from, .fade-scale-leave-to { opacity: 0; transform: translateY(8px) scale(0.9); }
 
-.speed-action { position:absolute; right:0; width:48px; height:48px; margin-top:8px; border:1px solid #d1d5db; background:#fff; border-radius:9999px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px  12px rgba(0,0,0,.15); transition:all .15s ease; }
-.speed-action:hover { transform: translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,.2); background:#f8fafc; }
+.speed-action { position:absolute; right:0; width:48px; height:48px; margin-top:8px; border:1px solid #d1d5db; border-radius:9999px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px  12px rgba(0,0,0,.15); transition:all .15s ease; }
+.speed-action:hover { transform: translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,.2); }
 </style>
