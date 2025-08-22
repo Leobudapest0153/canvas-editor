@@ -62,6 +62,14 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Estado básico para desarrollo
   const elementos = ref([])
 
+  // Etiquetas
+  const etiquetas = ref([
+    { id: 1, texto: 'Urgente', colorFondo: '#FECACA', colorTexto: '#991B1B' },
+    { id: 2, texto: 'Revisar', colorFondo: '#DBEAFE', colorTexto: '#1E40AF' },
+    { id: 3, texto: 'Material Pesado', colorFondo: '#FEF9C3', colorTexto: '#854D0E' },
+  ]);
+  const etiquetasSeleccionadas = ref([]);
+
   const elementoSeleccionado = ref(null)
   const vistaActiva = computed(() => {
     // Vista automática según el contexto
@@ -1177,6 +1185,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+  // === FIN FUNCIONES DE SERIALIZACIÓN ===
+
   const abrirEditor = (plantaId = null) => {
     if (plantaId) {
       const plantaAEditar = plantas.value.find(p => p.id === plantaId);
@@ -1198,7 +1208,29 @@ export const useCanvasStore = defineStore('canvas', () => {
     plantaEnEdicion.value = null;
   }
 
-  // === FIN FUNCIONES DE SERIALIZACIÓN ===
+  /* Funciones de filtros*/
+  const getEtiquetaPorId = computed(() => {
+    return (id) => etiquetas.value.find((etiqueta) => etiqueta.id === id)
+  });
+
+  const agregarEtiqueta = (nuevaEtiqueta) => {
+    const newId = Math.max(0, ...etiquetas.value.map((e) => e.id)) + 1
+    etiquetas.value.push({ id: newId, ...nuevaEtiqueta })
+  };
+
+  const seleccionarEtiqueta = (etiquetaId) => {
+    if (!etiquetasSeleccionadas.value.includes(etiquetaId)) {
+      etiquetasSeleccionadas.value.push(etiquetaId)
+    }
+  };
+
+  const deseleccionarEtiqueta = (etiquetaId) => {
+    etiquetasSeleccionadas.value = etiquetasSeleccionadas.value.filter((id) => id !== etiquetaId)
+  }
+
+  const limpiarSeleccion = () => {
+    etiquetasSeleccionadas.value = []
+  }
 
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
   watch(
@@ -1242,6 +1274,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     snapGridEps,
     crearPlanta,
     plantaEnEdicion,
+    etiquetas,
+    etiquetasSeleccionadas,
 
     // Getters
     elementosVisibles,
@@ -1307,5 +1341,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     // == Editor de planta
     abrirEditor,
     cerrarEditor,
+
+    // == Filtros de capas
+    getEtiquetaPorId,
+    agregarEtiqueta,
+    seleccionarEtiqueta,
+    deseleccionarEtiqueta,
+    limpiarSeleccion,
   }
 })

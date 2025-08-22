@@ -12,52 +12,89 @@
 
 <template>
   <div class="h-full flex flex-col bg-white">
-    <!-- Controles de filtro -->
-    <div class="p-4 border-b border-gray-200 bg-gray-50">
-      <!-- Filtro por categoría -->
-      <div class="mb-3">
-        <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide">Categoría:</label>
-        <select
-          v-model="filtroCategoria"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
+    <!-- Contenedor para el botón y el panel de filtros -->
+    <div class="relative border-b border-gray-200">
+      <!-- Botón para mostrar/ocultar filtros -->
+      <div class="p-4 bg-white">
+        <button
+          @click="toggleFiltros"
+          class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
         >
-          <option value="">Todas las categorías</option>
-          <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
-            {{ categoria.nombre }}
-          </option>
-        </select>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L16 11.414V16a1 1 0 01-.293.707l-2 2A1 1 0 0112 18v-1.586l-3.707-3.707A1 1 0 018 12V6.414L3.293 4.707A1 1 0 013 4z"
+            ></path>
+          </svg>
+          <span>Filtros</span>
+          <span v-if="hayFiltrosActivos" class="w-2 h-2 bg-blue-500 rounded-full"></span>
+        </button>
       </div>
 
-      <!-- Filtro por ubicación -->
-      <div class="mb-3">
-        <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide">Ubicación:</label>
-        <select
-          v-model="filtroUbicacion"
-          class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
+      <!-- Panel de filtros desplegable -->
+      <transition name="unroll">
+        <div
+          v-if="filtrosVisibles"
+          class="absolute top-full left-0 w-full bg-gray-50 shadow-lg z-10"
         >
-          <option value="">Todas las ubicaciones</option>
-          <option value="suelo">Suelo</option>
-          <option value="pared">Pared</option>
-        </select>
-      </div>
+          <!-- Controles de filtro -->
+          <div class="p-4">
+            <!-- Filtro por categoría -->
+            <div class="mb-3">
+              <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide"
+                >Categoría:</label
+              >
+              <select
+                v-model="filtroCategoria"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
+              >
+                <option value="">Todas las categorías</option>
+                <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
+                  {{ categoria.nombre }}
+                </option>
+              </select>
+            </div>
 
-      <!-- Botón para limpiar filtros -->
-      <button
-        v-if="hayFiltrosActivos"
-        @click="limpiarFiltros"
-        class="flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-xs text-gray-600 cursor-pointer mt-2 hover:bg-gray-200 hover:text-gray-700 transition-colors"
-        title="Limpiar filtros"
-      >
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M6 18L18 6M6 6l12 12"
-          />
-        </svg>
-        Limpiar
-      </button>
+            <!-- Filtro por ubicación -->
+            <div class="mb-3">
+              <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide"
+                >Ubicación:</label
+              >
+              <select
+                v-model="filtroUbicacion"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
+              >
+                <option value="">Todas las ubicaciones</option>
+                <option value="suelo">Suelo</option>
+                <option value="pared">Pared</option>
+              </select>
+            </div>
+
+            <!-- NUEVO FILTRO A AGREGAR -->
+            <TagFilter @crear-etiqueta="abrirModalCrearEtiqueta" />
+
+            <!-- Botón para limpiar filtros -->
+            <button
+              v-if="hayFiltrosActivos"
+              @click="limpiarFiltros"
+              class="flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-xs text-gray-600 cursor-pointer mt-2 hover:bg-gray-200 hover:text-gray-700 transition-colors"
+              title="Limpiar filtros"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+              Limpiar
+            </button>
+          </div>
+        </div>
+      </transition>
     </div>
 
     <!-- Lista de elementos -->
@@ -196,38 +233,12 @@
         </div>
       </div>
     </div>
-
-    <!-- Estadísticas -->
-    <div class="p-4 border-t border-gray-200 bg-gray-50">
-      <div class="grid grid-cols-2 gap-3">
-        <div
-          class="flex justify-between items-center p-2 bg-white border border-gray-200 rounded-md"
-        >
-          <span class="text-xs text-gray-600 font-medium">Total:</span>
-          <span class="text-sm font-semibold text-gray-900">{{
-            canvasStore.elementosVisibles.length
-          }}</span>
-        </div>
-        <div
-          class="flex justify-between items-center p-2 bg-white border border-gray-200 rounded-md"
-        >
-          <span class="text-xs text-gray-600 font-medium">Visibles:</span>
-          <span class="text-sm font-semibold text-gray-900">{{ elementosVisibles }}</span>
-        </div>
-        <div
-          class="flex justify-between items-center p-2 bg-white border border-gray-200 rounded-md"
-        >
-          <span class="text-xs text-gray-600 font-medium">Suelo:</span>
-          <span class="text-sm font-semibold text-gray-900">{{ elementosPorUbicacion.suelo }}</span>
-        </div>
-        <div
-          class="flex justify-between items-center p-2 bg-white border border-gray-200 rounded-md"
-        >
-          <span class="text-xs text-gray-600 font-medium">Pared:</span>
-          <span class="text-sm font-semibold text-gray-900">{{ elementosPorUbicacion.pared }}</span>
-        </div>
-      </div>
-    </div>
+    <CreateTagModal
+      :show="modalVisible"
+      :initial-text="textoNuevaEtiqueta"
+      @close="modalVisible = false"
+      @save="guardarNuevaEtiqueta"
+    />
   </div>
 </template>
 
@@ -235,6 +246,8 @@
 import { ref, computed } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore'
 import { CATEGORIAS } from '@/utils/constants'
+import CreateTagModal from '../CreateTagModal.vue'
+import TagFilter from '../TagFilter.vue'
 
 // Composables
 const canvasStore = useCanvasStore()
@@ -242,6 +255,9 @@ const canvasStore = useCanvasStore()
 // Estado local
 const filtroCategoria = ref('')
 const filtroUbicacion = ref('')
+const filtrosVisibles = ref(false) // Controla la visibilidad del panel de filtros
+const modalVisible = ref(false);
+const textoNuevaEtiqueta = ref('');
 
 // Computed properties
 const categorias = computed(() => CATEGORIAS)
@@ -262,26 +278,27 @@ const elementosFiltrados = computed(() => {
     })
   }
 
+  if (canvasStore.etiquetasSeleccionadas.length > 0) {
+    elementos = elementos.filter((elemento) => {
+      if (!elemento.etiquetas || elemento.etiquetas.length === 0) {
+        return false
+      }
+      return canvasStore.etiquetasSeleccionadas.every((tagId) => elemento.etiquetas.includes(tagId))
+    })
+  }
+
   return elementos
 })
 
 const hayFiltrosActivos = computed(() => {
-  return filtroCategoria.value || filtroUbicacion.value
-})
-
-const elementosVisibles = computed(() => {
-  return canvasStore.elementosVisibles.filter((el) => el.visible !== false).length
-})
-
-const elementosPorUbicacion = computed(() => {
-  const elementos = canvasStore.elementosVisibles
-  return {
-    suelo: elementos.filter((el) => (el.metadata?.ubicacion || 'suelo') === 'suelo').length,
-    pared: elementos.filter((el) => (el.metadata?.ubicacion || 'suelo') === 'pared').length,
-  }
+  return !!(filtroCategoria.value || filtroUbicacion.value)
 })
 
 // Métodos
+const toggleFiltros = () => {
+  filtrosVisibles.value = !filtrosVisibles.value
+}
+
 const esElementoSeleccionado = (elementoId) => {
   return canvasStore.elementoSeleccionado === elementoId
 }
@@ -293,17 +310,12 @@ const seleccionarElemento = (elementoId) => {
 const toggleVisibilidad = (elementoId) => {
   const elemento = canvasStore.elementoPorId(elementoId)
   if (elemento) {
-    // Implementar toggle de visibilidad en el store
     canvasStore.toggleElementoVisibilidad(elementoId)
   }
 }
 
 const enfocarElemento = (elementoId) => {
-  // Seleccionar el elemento
   seleccionarElemento(elementoId)
-
-  // Aquí podrías agregar lógica para hacer pan/zoom al elemento
-  // Por ahora solo lo seleccionamos
   console.log('Enfocando elemento:', elementoId)
 }
 
@@ -327,4 +339,32 @@ const getIconoCategoria = (tipo) => {
   }
   return iconos[tipo] || '📦'
 }
+
+
+const abrirModalCrearEtiqueta = (texto) => {
+  textoNuevaEtiqueta.value = texto
+  modalVisible.value = true
+}
+
+const guardarNuevaEtiqueta = (nuevaEtiqueta) => {
+  canvasStore.agregarEtiqueta(nuevaEtiqueta)
+  modalVisible.value = false
+}
 </script>
+
+<style scoped>
+.unroll-enter-active,
+.unroll-leave-active {
+  transition: all 0.3s ease-in-out;
+  max-height: 500px; /* Altura máxima esperada del panel */
+  opacity: 1;
+  transform: translateY(0);
+}
+.unroll-enter-from,
+.unroll-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-10px);
+  overflow: hidden;
+}
+</style>
