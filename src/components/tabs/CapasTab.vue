@@ -11,13 +11,16 @@
 -->
 
 <template>
-  <div class="capas-tab">
+  <div class="h-full flex flex-col bg-white">
     <!-- Controles de filtro -->
-    <div class="filtros-section">
+    <div class="p-4 border-b border-gray-200 bg-gray-50">
       <!-- Filtro por categoría -->
-      <div class="filter-group">
-        <label class="filter-label">Categoría:</label>
-        <select v-model="filtroCategoria" class="filter-select">
+      <div class="mb-3">
+        <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide">Categoría:</label>
+        <select
+          v-model="filtroCategoria"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
+        >
           <option value="">Todas las categorías</option>
           <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
             {{ categoria.nombre }}
@@ -26,9 +29,12 @@
       </div>
 
       <!-- Filtro por ubicación -->
-      <div class="filter-group">
-        <label class="filter-label">Ubicación:</label>
-        <select v-model="filtroUbicacion" class="filter-select">
+      <div class="mb-3">
+        <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide">Ubicación:</label>
+        <select
+          v-model="filtroUbicacion"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
+        >
           <option value="">Todas las ubicaciones</option>
           <option value="suelo">Suelo</option>
           <option value="pared">Pared</option>
@@ -39,10 +45,10 @@
       <button
         v-if="hayFiltrosActivos"
         @click="limpiarFiltros"
-        class="btn-clear-filters"
+        class="flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-xs text-gray-600 cursor-pointer mt-2 hover:bg-gray-200 hover:text-gray-700 transition-colors"
         title="Limpiar filtros"
       >
-        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -55,10 +61,12 @@
     </div>
 
     <!-- Lista de elementos -->
-    <div class="elementos-section">
-      <div v-if="elementosFiltrados.length === 0" class="empty-state">
-        <div class="empty-icon">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="icon">
+    <div class="flex-1 overflow-y-auto bg-white">
+      <div v-if="elementosFiltrados.length === 0" class="py-8 px-4 text-center text-gray-600">
+        <div
+          class="w-12 h-12 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center"
+        >
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-6 h-6">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -67,60 +75,81 @@
             />
           </svg>
         </div>
-        <p class="empty-text">No hay elementos que coincidan con los filtros</p>
+        <p class="m-0 text-sm">No hay elementos que coincidan con los filtros</p>
       </div>
 
-      <div v-else class="elementos-list">
+      <div v-else class="p-2">
         <div
           v-for="elemento in elementosFiltrados"
           :key="elemento.id"
-          class="elemento-item"
+          class="flex items-center gap-3 p-3 border border-gray-200 rounded-lg mb-2 bg-white cursor-pointer transition-all hover:border-gray-300 hover:bg-gray-50"
           :class="{
-            selected: esElementoSeleccionado(elemento.id),
-            hidden: !elemento.visible,
+            'border-blue-500 bg-blue-50 ring ring-blue-100': esElementoSeleccionado(elemento.id),
+            'opacity-60 bg-gray-100': elemento.visible === false,
           }"
           @click="seleccionarElemento(elemento.id)"
         >
           <!-- Visual del elemento -->
-          <div class="elemento-visual">
+          <div class="flex-shrink-0">
             <div
-              class="elemento-preview"
+              class="w-10 h-10 rounded-md border border-gray-300 flex items-center justify-center relative overflow-hidden"
               :style="{
                 backgroundColor: elemento.color,
-                opacity: elemento.visible !== false ? 1 : 0.3,
+                opacity: elemento.visible === false ? 0.3 : 1,
               }"
-              :class="elemento.forma"
+              :class="{
+                'rounded-sm': elemento.forma === 'rectangular',
+                'rounded-full': elemento.forma === 'circular',
+              }"
             >
-              <span class="elemento-icon">{{ getIconoCategoria(elemento.tipo) }}</span>
+              <span class="text-base brightness-0 invert mix-blend-difference">{{
+                getIconoCategoria(elemento.tipo)
+              }}</span>
             </div>
           </div>
 
           <!-- Info del elemento -->
-          <div class="elemento-info">
-            <div class="elemento-nombre">{{ elemento.nombre }}</div>
-            <div class="elemento-detalles">
-              <span class="elemento-tipo">{{ getCategoriaNombre(elemento.tipo) }}</span>
-              <span class="elemento-ubicacion" :class="elemento.metadata?.ubicacion">
+          <div class="flex-1 min-w-0">
+            <div
+              class="font-medium text-gray-900 text-sm mb-1 whitespace-nowrap overflow-hidden text-ellipsis"
+            >
+              {{ elemento.nombre }}
+            </div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded capitalize">{{
+                getCategoriaNombre(elemento.tipo)
+              }}</span>
+              <span
+                class="text-xs px-1.5 py-0.5 rounded capitalize font-medium"
+                :class="{
+                  'bg-blue-100 text-blue-800':
+                    (elemento.metadata?.ubicacion || 'suelo') === 'suelo',
+                  'bg-green-100 text-green-800':
+                    (elemento.metadata?.ubicacion || 'suelo') === 'pared',
+                }"
+              >
                 {{ elemento.metadata?.ubicacion || 'suelo' }}
               </span>
             </div>
-            <div class="elemento-posicion">
+            <div class="text-xs text-gray-400 font-mono">
               X: {{ Math.round(elemento.x) }}, Y: {{ Math.round(elemento.y) }}
             </div>
           </div>
 
           <!-- Controles -->
-          <div class="elemento-controls">
+          <div class="flex items-center gap-1 flex-shrink-0">
             <!-- Toggle visibilidad -->
             <button
               @click.stop="toggleVisibilidad(elemento.id)"
-              class="control-btn"
-              :class="{ visible: elemento.visible !== false }"
+              class="p-1.5 border border-gray-200 rounded-md bg-white text-gray-600 cursor-pointer transition-all hover:bg-gray-100 hover:border-gray-300 hover:text-gray-700"
+              :class="{
+                'text-green-600 border-green-200 hover:bg-green-50': elemento.visible !== false,
+              }"
               :title="elemento.visible !== false ? 'Ocultar elemento' : 'Mostrar elemento'"
             >
               <svg
                 v-if="elemento.visible !== false"
-                class="icon"
+                class="w-4 h-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -138,7 +167,7 @@
                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                 />
               </svg>
-              <svg v-else class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -151,10 +180,10 @@
             <!-- Zoom al elemento -->
             <button
               @click.stop="enfocarElemento(elemento.id)"
-              class="control-btn"
+              class="p-1.5 border border-gray-200 rounded-md bg-white text-gray-600 cursor-pointer transition-all hover:bg-gray-100 hover:border-gray-300 hover:text-gray-700"
               title="Enfocar elemento"
             >
-              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
@@ -169,23 +198,33 @@
     </div>
 
     <!-- Estadísticas -->
-    <div class="stats-section">
-      <div class="stats-grid">
-        <div class="stat-item">
-          <span class="stat-label">Total:</span>
-          <span class="stat-value">{{ canvasStore.elementosVisibles.length }}</span>
+    <div class="p-4 border-t border-gray-200 bg-gray-50">
+      <div class="grid grid-cols-2 gap-3">
+        <div
+          class="flex justify-between items-center p-2 bg-white border border-gray-200 rounded-md"
+        >
+          <span class="text-xs text-gray-600 font-medium">Total:</span>
+          <span class="text-sm font-semibold text-gray-900">{{
+            canvasStore.elementosVisibles.length
+          }}</span>
         </div>
-        <div class="stat-item">
-          <span class="stat-label">Visibles:</span>
-          <span class="stat-value">{{ elementosVisibles }}</span>
+        <div
+          class="flex justify-between items-center p-2 bg-white border border-gray-200 rounded-md"
+        >
+          <span class="text-xs text-gray-600 font-medium">Visibles:</span>
+          <span class="text-sm font-semibold text-gray-900">{{ elementosVisibles }}</span>
         </div>
-        <div class="stat-item">
-          <span class="stat-label">Suelo:</span>
-          <span class="stat-value">{{ elementosPorUbicacion.suelo }}</span>
+        <div
+          class="flex justify-between items-center p-2 bg-white border border-gray-200 rounded-md"
+        >
+          <span class="text-xs text-gray-600 font-medium">Suelo:</span>
+          <span class="text-sm font-semibold text-gray-900">{{ elementosPorUbicacion.suelo }}</span>
         </div>
-        <div class="stat-item">
-          <span class="stat-label">Pared:</span>
-          <span class="stat-value">{{ elementosPorUbicacion.pared }}</span>
+        <div
+          class="flex justify-between items-center p-2 bg-white border border-gray-200 rounded-md"
+        >
+          <span class="text-xs text-gray-600 font-medium">Pared:</span>
+          <span class="text-sm font-semibold text-gray-900">{{ elementosPorUbicacion.pared }}</span>
         </div>
       </div>
     </div>
@@ -289,324 +328,3 @@ const getIconoCategoria = (tipo) => {
   return iconos[tipo] || '📦'
 }
 </script>
-
-<style scoped>
-.capas-tab {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #ffffff;
-}
-
-/* Header */
-.tab-header {
-  padding: 1rem;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
-}
-
-.tab-title {
-  margin: 0 0 0.25rem 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.tab-subtitle {
-  font-size: 0.875rem;
-  color: #6b7280;
-  margin: 0;
-}
-
-/* Filtros */
-.filtros-section {
-  padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
-}
-
-.filter-group {
-  margin-bottom: 0.75rem;
-}
-
-.filter-group:last-child {
-  margin-bottom: 0;
-}
-
-.filter-label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: #374151;
-  margin-bottom: 0.25rem;
-  text-transform: none;
-  letter-spacing: 0.05em;
-}
-
-.filter-select {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
-  background: white;
-  color: #111827;
-}
-
-.filter-select:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.btn-clear-filters {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 0.75rem;
-  color: #6b7280;
-  cursor: pointer;
-  margin-top: 0.5rem;
-}
-
-.btn-clear-filters:hover {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-.btn-clear-filters .icon {
-  width: 0.875rem;
-  height: 0.875rem;
-}
-
-/* Elementos */
-.elementos-section {
-  flex: 1;
-  overflow-y: auto;
-  background: white;
-}
-
-.empty-state {
-  padding: 2rem 1rem;
-  text-align: center;
-  color: #6b7280;
-}
-
-.empty-icon {
-  width: 48px;
-  height: 48px;
-  margin: 0 auto 1rem;
-  background: #f3f4f6;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.empty-icon .icon {
-  width: 24px;
-  height: 24px;
-}
-
-.empty-text {
-  margin: 0;
-  font-size: 0.875rem;
-}
-
-.elementos-list {
-  padding: 0.5rem;
-}
-
-.elemento-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  margin-bottom: 0.5rem;
-  background: white;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.elemento-item:hover {
-  border-color: #d1d5db;
-  background: #f9fafb;
-}
-
-.elemento-item.selected {
-  border-color: #3b82f6;
-  background: #eff6ff;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.elemento-item.hidden {
-  opacity: 0.6;
-  background: #f3f4f6;
-}
-
-/* Visual del elemento */
-.elemento-visual {
-  flex-shrink: 0;
-}
-
-.elemento-preview {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.375rem;
-  border: 1px solid #d1d5db;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-}
-
-.elemento-preview.rectangular {
-  border-radius: 0.25rem;
-}
-
-.elemento-preview.circular {
-  border-radius: 50%;
-}
-
-.elemento-icon {
-  font-size: 1rem;
-  filter: brightness(0) invert(1);
-  mix-blend-mode: difference;
-}
-
-/* Info del elemento */
-.elemento-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.elemento-nombre {
-  font-weight: 500;
-  color: #111827;
-  font-size: 0.875rem;
-  margin-bottom: 0.25rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.elemento-detalles {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.elemento-tipo {
-  font-size: 0.75rem;
-  color: #6b7280;
-  background: #f3f4f6;
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
-  text-transform: capitalize;
-}
-
-.elemento-ubicacion {
-  font-size: 0.75rem;
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
-  text-transform: capitalize;
-  font-weight: 500;
-}
-
-.elemento-ubicacion.suelo {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.elemento-ubicacion.pared {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.elemento-posicion {
-  font-size: 0.625rem;
-  color: #9ca3af;
-  font-family: monospace;
-}
-
-/* Controles */
-.elemento-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  flex-shrink: 0;
-}
-
-.control-btn {
-  padding: 0.375rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.375rem;
-  background: white;
-  color: #6b7280;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.control-btn:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
-  color: #374151;
-}
-
-.control-btn.visible {
-  color: #059669;
-  border-color: #d1fae5;
-}
-
-.control-btn.visible:hover {
-  background: #ecfdf5;
-}
-
-.control-btn .icon {
-  width: 1rem;
-  height: 1rem;
-}
-
-/* Estadísticas */
-.stats-section {
-  padding: 1rem;
-  border-top: 1px solid #e5e7eb;
-  background: #f9fafb;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-.stat-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.375rem;
-}
-
-.stat-label {
-  font-size: 0.75rem;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.stat-value {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #111827;
-}
-</style>

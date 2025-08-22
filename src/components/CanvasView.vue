@@ -5,7 +5,7 @@
   - Manejar eventos de interacción (drag, drop, select, etc.)
   - Renderizar elementos del catálogo en las plantas
   - Gestionar transformaciones y zoom del canvas
-  - Coordinar las vistas XY/ZX/ZY según el modo seleccionado
+  - Coordinar las vistas XY/XZ según el modo seleccionado
   - Manejar la jerarquía padre-hijo de elementos
   - Integrar detección de colisiones durante el movimiento
   - Sincronizar con el estado global del canvas
@@ -172,9 +172,9 @@
               />
           </v-group>
 
-          <!-- Elementos circulares -->
+          <!-- Elementos circulares: en vista XY son círculos, en vista XZ son rectángulos -->
           <v-circle
-            v-else-if="elemento.forma === 'circular'"
+            v-else-if="elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
             :config="{
               id: elemento.id,
               x: elemento.x + elemento.width / 2,
@@ -197,9 +197,36 @@
             @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'circular')"
           />
-          <!-- Icono de candado para elemento circular bloqueado -->
+
+          <!-- Elementos circulares en vista XZ se muestran como rectángulos (cilindro visto de frente) -->
+          <v-rect
+            v-else-if="elemento.forma === 'circular' && canvasStore.vistaActiva === 'XZ'"
+            :config="{
+              id: elemento.id,
+              x: elemento.x,
+              y: elemento.y,
+              width: elemento.width,
+              height: elemento.height,
+              fill: elemento.color,
+              stroke: getStrokeColor(elemento.id),
+              strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
+              opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
+              draggable: canDragElement(elemento.id),
+              shadowColor: 'black',
+              shadowBlur: 4,
+              shadowOpacity: 0.3,
+              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
+            }"
+            @click="() => selectElement(elemento.id)"
+            @dblclick="() => handleElementDoubleClick(elemento)"
+            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
+            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
+            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
+          />
+          <!-- Icono de candado para elemento circular bloqueado en vista XY -->
           <v-group
-            v-if="isElementLocked(elemento.id) && elemento.forma === 'circular'"
+            v-if="isElementLocked(elemento.id) && elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
             :config="{
               x: elemento.x,
               y: elemento.y,
@@ -221,6 +248,44 @@
               }"
             />
             <!-- Icono de candado para elemento circular bloqueado -->
+            <v-text
+              :config="{
+                x: elemento.width / 2 - 16,
+                y: elemento.height / 2 - 16,
+                text: '🔒',
+                fontSize: 32,
+                fontFamily: 'Arial',
+                fill: '#f59e0b',
+                listening: false,
+              }"
+            />
+          </v-group>
+
+          <!-- Icono de candado para elemento circular bloqueado en vista XZ (rectangular) -->
+          <v-group
+            v-if="isElementLocked(elemento.id) && elemento.forma === 'circular' && canvasStore.vistaActiva === 'XZ'"
+            :config="{
+              x: elemento.x,
+              y: elemento.y,
+              width: elemento.width,
+              height: elemento.height,
+              listening: false,
+              rotation: elemento.rotation || 0,
+              opacity: 0.35,
+            }"
+          >
+            <v-rect
+              :config="{
+                x: 0,
+                y: 0,
+                width: elemento.width,
+                height: elemento.height,
+                fill: '#000',
+                opacity: 0.12,
+                cornerRadius: 8,
+                listening: false,
+              }"
+            />
             <v-text
               :config="{
                 x: elemento.width / 2 - 16,
@@ -310,7 +375,7 @@
       <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
         Planta: {{ canvasStore.plantaActivaData.dimensiones.ancho }}×{{
           canvasStore.plantaActivaData.dimensiones.largo
-        }}cm
+        }}cm (Vista desde arriba)
       </span>
       <span
         v-if="
@@ -318,9 +383,14 @@
           canvasStore.elementoContenedorActual
         "
       >
-        Elemento: {{ canvasStore.elementoContenedorActual.nombre }} ({{
-          canvasStore.canvasAdaptativo.width
-        }}×{{ canvasStore.canvasAdaptativo.height }}px)
+        {{ canvasStore.estaEnElemento ? 'Elemento' : 'Contenedor' }}:
+        {{ canvasStore.elementoContenedorActual.nombre }}
+        <template v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones">
+          ({{ canvasStore.elementoContenedorActual.dimensiones.ancho }}×{{ canvasStore.elementoContenedorActual.dimensiones.alto }}cm - Vista de frente)
+        </template>
+        <template v-else>
+          ({{ canvasStore.canvasAdaptativo.width }}×{{ canvasStore.canvasAdaptativo.height }}px)
+        </template>
       </span>
       <span v-if="canvasStore.elementoSeleccionado">
         Seleccionado: {{ canvasStore.elementoSeleccionado }}
@@ -476,10 +546,24 @@ const getElementPixelDimensions = (elemento) => {
     return { width: elemento.width, height: elemento.height }
   }
 
-  // Si solo tiene dimensiones en cm, convertir
+  // Si solo tiene dimensiones en cm, convertir según la vista
   if (elemento.dimensiones) {
-    const widthCm = elemento.dimensiones.ancho || 100
-    const heightCm = elemento.dimensiones.largo || 60
+    let widthCm, heightCm
+
+    if (canvasStore.vistaActiva === 'XY') {
+      // Vista superior (XY): width = ancho, height = largo
+      widthCm = elemento.dimensiones.ancho || 100
+      heightCm = elemento.dimensiones.largo || 60
+    } else if (canvasStore.vistaActiva === 'XZ') {
+      // Vista frontal (XZ): width = ancho, height = alto
+      widthCm = elemento.dimensiones.ancho || 100
+      heightCm = elemento.dimensiones.alto || 20
+    } else {
+      // Fallback a vista XY
+      widthCm = elemento.dimensiones.ancho || 100
+      heightCm = elemento.dimensiones.largo || 60
+    }
+
     return {
       width: widthCm * CM_TO_PX,
       height: heightCm * CM_TO_PX,
@@ -1182,9 +1266,10 @@ const createElementFromDrop = (data, dropEvent) => {
   // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
   const { width, height } = getElementPixelDimensions(elemento)
 
-  // Obtener dimensiones originales en cm para guardar
-  const widthCm = elemento.dimensiones?.ancho || 100
-  const heightCm = elemento.dimensiones?.largo || 60
+  // Obtener dimensiones originales en cm para guardar (preservar todas las dimensiones)
+  const anchoCm = elemento.dimensiones?.ancho || 100
+  const largoCm = elemento.dimensiones?.largo || 60
+  const altoCm = elemento.dimensiones?.alto || 20
 
   // Aplicar dimensiones mínimas para mejorar la interacción
   const MIN_WIDTH = 40
@@ -1297,11 +1382,11 @@ const createElementFromDrop = (data, dropEvent) => {
       rotation: 0,
     },
 
-    // Estructura correcta para dimensiones (mantener en cm los datos físicos)
+    // Estructura correcta para dimensiones (preservar todas las dimensiones independientemente de la vista)
     dimensiones: {
-      ancho: widthCm,
-      largo: heightCm,
-      alto: elemento.dimensiones?.alto || elemento.alto || 20,
+      ancho: anchoCm,
+      largo: largoCm,
+      alto: altoCm,
     },
 
     // Propiedades legacy para compatibilidad con Konva (en px para renderizado)
@@ -1553,15 +1638,30 @@ const handleTransformEnd = (e, elementId, forma) => {
   // Clamp mínimo para evitar tamaños cero
   width = Math.max(8, width)
   height = Math.max(8, height)
+
   // Actualizar dimensiones físicas si existen
   const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
   let dimensiones = elemento?.dimensiones
   let newDimensiones = dimensiones ? { ...dimensiones } : undefined
+
   if (newDimensiones) {
-    // Asume que el canvas está en px y 1cm = CM_TO_PX
-    newDimensiones.ancho = Math.round(width / CM_TO_PX)
-    newDimensiones.largo = Math.round(height / CM_TO_PX)
+    // Actualizar las dimensiones correctas según la vista
+    const widthCm = Math.round(width / CM_TO_PX)
+    const heightCm = Math.round(height / CM_TO_PX)
+
+    if (canvasStore.vistaActiva === 'XY') {
+      // Vista superior (XY): width = ancho, height = largo
+      newDimensiones.ancho = widthCm
+      newDimensiones.largo = heightCm
+      // Mantener alto sin cambios
+    } else if (canvasStore.vistaActiva === 'XZ') {
+      // Vista frontal (XZ): width = ancho, height = alto
+      newDimensiones.ancho = widthCm
+      newDimensiones.alto = heightCm
+      // Mantener largo sin cambios
+    }
   }
+
   canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones })
   lastValidPositions.value.set(elementId, { x, y })
   nextTick(() => setupTransformer())

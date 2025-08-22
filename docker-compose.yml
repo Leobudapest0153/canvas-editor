@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  vue-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: inventory-smart:latest
+    ports:
+      - "3090:80"
+    container_name: inventory-smart
+    restart: unless-stopped

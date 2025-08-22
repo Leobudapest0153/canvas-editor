@@ -88,7 +88,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     tipo: 'contenedores',
     categoria: 'contenedores',
     forma: 'rectangular',
-    colorBase: '#dc2626',
+    colorBase: '#F0FAFF',
     dimensiones: {
       ancho: 30,
       largo: 40,
