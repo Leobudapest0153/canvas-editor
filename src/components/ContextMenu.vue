@@ -3,8 +3,9 @@
     <button
       class="ctx-item text-red-600 hover:bg-red-50"
       @click="onDelete"
-      aria-label="Eliminar (Supr)"
-      :title="'Eliminar (Supr)'"
+      :disabled="locked"
+      :aria-label="locked ? 'Elemento bloqueado — desbloquéalo para eliminar' : 'Eliminar (Supr)'"
+      :title="locked ? 'Elemento bloqueado — desbloquéalo para eliminar' : 'Eliminar (Supr)'"
     >
       Eliminar
     </button>
@@ -12,8 +13,9 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue'
+import { defineProps, defineEmits, computed } from 'vue'
 import { useDeleteElement } from '@/composables/useDeleteElement'
+import { useCanvasStore } from '@/composables/useCanvasStore'
 
 defineProps({
   visible: { type: Boolean, default: false },
@@ -23,8 +25,15 @@ defineProps({
 
 const emit = defineEmits(['close'])
 const { deleteSelected } = useDeleteElement()
+const store = useCanvasStore()
+
+const locked = computed(() => {
+  const el = store.elementoSeleccionadoCompleto
+  return !!(el && (el.bloqueado === true || el.locked === true))
+})
 
 const onDelete = () => {
+  if (locked.value) return
   deleteSelected({ withConfirm: true })
   emit('close')
 }

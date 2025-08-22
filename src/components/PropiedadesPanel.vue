@@ -266,9 +266,8 @@
         <button
           @click="onDeleteClick"
           class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
-          :disabled="!elementoSeleccionado"
-          aria-label="Eliminar (Supr)"
-          :title="'Eliminar (Supr)'"
+          :aria-label="isLockedSelected ? 'Elemento bloqueado — desbloquéalo para eliminar' : 'Eliminar (Supr)'"
+          :title="isLockedSelected ? 'Elemento bloqueado — desbloquéalo para eliminar' : 'Eliminar (Supr)'"
         >
           Eliminar
         </button>
@@ -309,6 +308,10 @@ const propiedadesEditables = ref({
 
 // Computed
 const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoCompleto)
+const isLockedSelected = computed(() => {
+  const el = elementoSeleccionado.value
+  return !!(el && (el.bloqueado === true || el.locked === true))
+})
 
 // Watchers
 watch(

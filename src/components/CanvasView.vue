@@ -435,7 +435,7 @@
       <button
         @click="fitToPlanta"
         @mouseenter="speedDialOpen = false"
-        :disabled="!canvasStore.estaEnPlanta || !canvasStore.plantaActivaData"
+        :disabled="!canvasStore.plantaActivaData"
         class="floating-btn btn-fit"
         title="Ajustar vista a la planta activa"
       >
@@ -1801,7 +1801,7 @@ watch(
   },
 )
 
-// Ajustar la vista para encuadrar la planta activa (usa polígono si existe)
+// Ajustar la vista para encuadrar la planta activa (usa polígono si existe o dimensiones en cm)
 const fitToPlanta = () => {
   try {
     const stage = stageRef.value?.getNode?.()
@@ -1811,7 +1811,57 @@ const fitToPlanta = () => {
     const planta = canvasStore.plantaActivaData
     let bbox = null
 
+    // Si estamos dentro de un elemento o contenedor (navegando dentro), ajustar al canvas adaptativo
+    // En este modo las coordenadas locales del elemento empiezan en 0,0 — usar layerConfig para el tamaño
+    if ((canvasStore.estaEnElemento || canvasStore.estaEnContenedor) && canvasStore.elementoContenedorActual) {
+      try {
+        // Usar el tamaño del layer (canvas adaptativo) como la caja a encuadrar
+        const localW = layerConfig.value.width || Math.max(1, canvasStore.elementoContenedorActual.width || 1)
+        const localH = layerConfig.value.height || Math.max(1, canvasStore.elementoContenedorActual.height || 1)
+        const elBbox = { x: 0, y: 0, width: Math.max(1, localW), height: Math.max(1, localH) }
+
+        // Calcular fit directo para el elemento y salir
+        const elMargin = 24
+        const vwEl = Math.max(16, stageSize.value.width - elMargin * 2)
+        const vhEl = Math.max(16, stageSize.value.height - elMargin * 2)
+        let scaleXel = elBbox.width > 0 ? vwEl / elBbox.width : 1
+        let scaleYel = elBbox.height > 0 ? vhEl / elBbox.height : 1
+        let targetScaleEl = Math.min(scaleXel, scaleYel)
+        targetScaleEl = Math.max(0.05, Math.min(10, targetScaleEl))
+        // En coordenadas locales la caja comienza en 0,0
+        const stageXel = (stageSize.value.width - elBbox.width * targetScaleEl) / 2
+        const stageYel = (stageSize.value.height - elBbox.height * targetScaleEl) / 2
+        canvasStore.configurarZoom(targetScaleEl)
+        canvasStore.configurarPan(stageXel, stageYel)
+        return
+      } catch (e) {
+        // si algo falla, continuar con lógica de planta
+        console.error('fitToPlanta (element) error', e)
+      }
+    }
+
+    // Si hay un elemento seleccionado fuera de la navegación, también permitir fit a él
+    if (!canvasStore.estaEnElemento && canvasStore.elementoSeleccionado) {
+      const sel = canvasStore.elementosVisibles.find((e) => e.id === canvasStore.elementoSeleccionado)
+      if (sel) {
+        const selBbox = { x: sel.x || 0, y: sel.y || 0, width: Math.max(1, sel.width || 1), height: Math.max(1, sel.height || 1) }
+        const selMargin = 24
+        const vwEl = Math.max(16, stageSize.value.width - selMargin * 2)
+        const vhEl = Math.max(16, stageSize.value.height - selMargin * 2)
+        let scaleXel = selBbox.width > 0 ? vwEl / selBbox.width : 1
+        let scaleYel = selBbox.height > 0 ? vhEl / selBbox.height : 1
+        let targetScaleEl = Math.min(scaleXel, scaleYel)
+        targetScaleEl = Math.max(0.05, Math.min(10, targetScaleEl))
+        const stageXel = (stageSize.value.width - selBbox.width * targetScaleEl) / 2 - selBbox.x * targetScaleEl
+        const stageYel = (stageSize.value.height - selBbox.height * targetScaleEl) / 2 - selBbox.y * targetScaleEl
+        canvasStore.configurarZoom(targetScaleEl)
+        canvasStore.configurarPan(stageXel, stageYel)
+        return
+      }
+    }
+
     if (planta) {
+      // Priorizar polígono si está disponible
       if (planta.poligono && Array.isArray(planta.poligono) && planta.poligono.length > 0) {
         const xs = planta.poligono.map((p) => p.x)
         const ys = planta.poligono.map((p) => p.y)
@@ -1819,30 +1869,72 @@ const fitToPlanta = () => {
         const maxX = Math.max(...xs)
         const minY = Math.min(...ys)
         const maxY = Math.max(...ys)
-        bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
+        // Aquí no asumimos unidades; conservamos bboxRaw para probar ambas interpretaciones
+        const bboxRaw = { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) }
+        // Interpretación 1: coordenadas ya en px
+        const bboxPx = { ...bboxRaw }
+        // Interpretación 2: coordenadas en cm → convertir a px
+        const bboxCmToPx = { x: bboxRaw.x * CM_TO_PX, y: bboxRaw.y * CM_TO_PX, width: Math.max(1, bboxRaw.width * CM_TO_PX), height: Math.max(1, bboxRaw.height * CM_TO_PX) }
+        bbox = { _candidates: [bboxPx, bboxCmToPx] }
+      } else if (planta.dimensiones && (planta.dimensiones.ancho || planta.dimensiones.largo)) {
+        // Usar dimensiones físicas de la planta (cm → px)
+        const w = (planta.dimensiones.ancho || 100) * CM_TO_PX
+        const h = (planta.dimensiones.largo || 100) * CM_TO_PX
+        bbox = { x: 0, y: 0, width: Math.max(1, w), height: Math.max(1, h) }
       } else if (layerConfig.value && layerConfig.value.width && layerConfig.value.height) {
-        bbox = { x: 0, y: 0, width: layerConfig.value.width, height: layerConfig.value.height }
+        // Fallback razonable
+        bbox = { x: 0, y: 0, width: Math.max(1, layerConfig.value.width), height: Math.max(1, layerConfig.value.height) }
       }
     }
 
     if (!bbox) {
-      // Si no hay planta, centrar por defecto
       centrarPlantaEnCanvas()
       return
     }
 
-    // Calcular escala para encuadrar bbox con margen
-    const vw = stageSize.value.width - margin * 2
-    const vh = stageSize.value.height - margin * 2
-    if (vw <= 0 || vh <= 0) return
+    // Calcular tamaño del viewport disponible
+    const vw = Math.max(16, stageSize.value.width - margin * 2)
+    const vh = Math.max(16, stageSize.value.height - margin * 2)
 
-    const scaleX = vw / bbox.width
-    const scaleY = vh / bbox.height
-    const targetScale = Math.max(0.1, Math.min(5, Math.min(scaleX, scaleY)))
+    // Si bbox tiene candidatos (polígono con unidades inciertas), probar ambas interpretaciones
+    let chosen = null
+    if (bbox && bbox._candidates) {
+      const candidates = bbox._candidates
+      const scales = candidates.map((b) => {
+        const sX = b.width > 0 ? vw / b.width : 1
+        const sY = b.height > 0 ? vh / b.height : 1
+        return Math.min(sX, sY)
+      })
+      // Elegir la interpretación que produce mayor escala (más acercamiento)
+      const bestIndex = scales[0] >= scales[1] ? 0 : 1
+      chosen = candidates[bestIndex]
+    } else {
+      chosen = bbox
+    }
 
-    // Calcular pan para centrar bbox en viewport
-    const stageX = (stageSize.value.width - bbox.width * targetScale) / 2 - bbox.x * targetScale
-    const stageY = (stageSize.value.height - bbox.height * targetScale) / 2 - bbox.y * targetScale
+    if (!chosen) {
+      centrarPlantaEnCanvas()
+      return
+    }
+
+    // Prevenir división por cero y limitar escala
+    const scaleX = chosen.width > 0 ? vw / chosen.width : 1
+    const scaleY = chosen.height > 0 ? vh / chosen.height : 1
+    let targetScale = Math.min(scaleX, scaleY)
+    // Aplicar pequeño multiplicador para acercar ligeramente (mejora percepcion)
+    targetScale = targetScale * 1.08
+    targetScale = Math.max(0.05, Math.min(10, targetScale))
+
+    // Si el resultado es prácticamente igual al zoom actual, no forzar cambio brusco
+    const currentZoom = canvasStore.zoom || 1
+    if (Math.abs(Math.log(targetScale) - Math.log(currentZoom)) < 0.02) {
+      // diferencia menor al ~2% en escala en log-space -> mantener zoom
+      targetScale = currentZoom
+    }
+
+    // Calcular pan para centrar bbox en viewport (en coords de stage)
+    const stageX = (stageSize.value.width - chosen.width * targetScale) / 2 - chosen.x * targetScale
+    const stageY = (stageSize.value.height - chosen.height * targetScale) / 2 - chosen.y * targetScale
 
     canvasStore.configurarZoom(targetScale)
     canvasStore.configurarPan(stageX, stageY)
