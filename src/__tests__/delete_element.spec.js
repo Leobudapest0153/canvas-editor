@@ -234,4 +234,48 @@ describe('deleteSelected', () => {
     // Historial no cambia
     expect(history.historySize.value).toBe(hBefore)
   })
+
+  it('snackbar con Deshacer (5s) ejecuta undo al hacer clic dentro del tiempo', async () => {
+    const store = useCanvasStore()
+    const history = useCanvasHistory()
+    const { deleteSelected } = useDeleteElement()
+
+    // Elemento inicial
+    addElement(store, { id: 'toast_1', tipo: 'elementos' })
+    store.seleccionarElemento('toast_1')
+
+    // Inicializa historial y asegura snapshot base
+    history.initializeHistory('pre')
+
+    // Stub de toasts para capturar opciones
+    const showSpy = vi.fn()
+    global.window.__toasts = { show: showSpy }
+
+    // Confirmación positiva
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    // Ejecuta eliminación
+    const ok = await deleteSelected({ withConfirm: true })
+    expect(ok).toBe(true)
+
+    // Debe haberse llamado show con mensaje y timeout 5000 y CTA
+    expect(showSpy).toHaveBeenCalledTimes(1)
+    const [msg, opts] = showSpy.mock.calls[0]
+    expect(msg).toContain('Elemento(s) eliminados')
+    expect(opts).toBeTruthy()
+    expect(opts.timeout).toBe(5000)
+    expect(opts.cta).toBeTruthy()
+    expect(opts.cta.label).toContain('Deshacer')
+
+    // Elemento ya no está
+    expect(store.elementos.find((e) => e.id === 'toast_1')).toBeUndefined()
+
+    // Simular clic en CTA de deshacer
+    opts.cta.onClick()
+
+    // Debe restaurarse el elemento tras undo
+    expect(store.elementos.find((e) => e.id === 'toast_1')).toBeTruthy()
+
+    confirmSpy.mockRestore()
+  })
 })

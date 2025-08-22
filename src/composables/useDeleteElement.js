@@ -162,6 +162,22 @@ export function useDeleteElement() {
     // 6) Empujar un único snapshot al historial
     history.pushState('Eliminar elemento')
 
+    // 7) Snackbar con opción de deshacer (5s)
+    try {
+      if (typeof window !== 'undefined' && window.__toasts?.show) {
+        window.__toasts.show('Elemento(s) eliminados — Deshacer (5s)', {
+          type: 'info',
+          timeout: 5000,
+          cta: {
+            label: 'Deshacer',
+            onClick: () => {
+              try { history.undo() } catch (e) { /* noop */ }
+            },
+          },
+        })
+      }
+    } catch (e) { void e }
+
     return true
   }
 
