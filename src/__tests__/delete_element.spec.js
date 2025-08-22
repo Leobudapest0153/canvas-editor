@@ -25,9 +25,7 @@ const addElement = (store, el) => {
 describe('deleteSelected', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    // Clean confirm stub if any
     vi.unstubAllGlobals()
-    // Reset drag flag
     if (typeof window !== 'undefined') window.__dvCanvasDragActive = false
   })
 
@@ -36,20 +34,18 @@ describe('deleteSelected', () => {
     const history = useCanvasHistory()
     const { deleteSelected } = useDeleteElement()
 
-    // Setup: un elemento simple
     addElement(store, { id: 'el_1', tipo: 'elementos' })
     store.seleccionarElemento('el_1')
 
-    // Snapshot pre-eliminación
     history.initializeHistory('pre')
     const beforeSize = history.historySize.value
 
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const ok = deleteSelected({ withConfirm: true })
     expect(ok).toBe(true)
+    confirmSpy.mockRestore()
 
-    // Debe haberse eliminado del store
     expect(store.elementos.find((e) => e.id === 'el_1')).toBeUndefined()
-    // Un snapshot agregado
     expect(history.historySize.value).toBe(beforeSize + 1)
   })
 
@@ -58,7 +54,6 @@ describe('deleteSelected', () => {
     const history = useCanvasHistory()
     const { deleteSelected } = useDeleteElement()
 
-    // contenedor con dos hijos
     addElement(store, { id: 'c_1', tipo: 'contenedores', hijos: ['h_1', 'h_2'] })
     addElement(store, { id: 'h_1', tipo: 'elementos', padre: 'c_1' })
     addElement(store, { id: 'h_2', tipo: 'elementos', padre: 'c_1' })
@@ -66,7 +61,6 @@ describe('deleteSelected', () => {
 
     history.initializeHistory('pre')
 
-    // Stub confirm -> true
     const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation((msg) => {
       expect(msg).toContain('Se eliminará también 2 elemento(s) dentro')
       return true
@@ -76,7 +70,6 @@ describe('deleteSelected', () => {
     expect(ok).toBe(true)
     confirmSpy.mockRestore()
 
-    // Deben eliminarse todos
     expect(store.elementos.find((e) => e.id === 'c_1')).toBeUndefined()
     expect(store.elementos.find((e) => e.id === 'h_1')).toBeUndefined()
     expect(store.elementos.find((e) => e.id === 'h_2')).toBeUndefined()
@@ -90,17 +83,17 @@ describe('deleteSelected', () => {
     addElement(store, { id: 'el_2', tipo: 'elementos' })
     store.seleccionarElemento('el_2')
 
-    // Pre-snapshot
     history.initializeHistory('pre')
 
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const ok = deleteSelected({ withConfirm: true })
     expect(ok).toBe(true)
     expect(store.elementos.find((e) => e.id === 'el_2')).toBeUndefined()
 
-    // Undo -> debe reaparecer
     const undone = history.undo()
     expect(undone).toBe(true)
     expect(store.elementos.find((e) => e.id === 'el_2')).toBeTruthy()
+    confirmSpy.mockRestore()
   })
 
   it('(d) sin selección no hace nada', () => {
@@ -109,7 +102,6 @@ describe('deleteSelected', () => {
     const { deleteSelected } = useDeleteElement()
 
     addElement(store, { id: 'el_3', tipo: 'elementos' })
-    // No seleccionar
     history.initializeHistory('pre')
     const before = store.elementos.length
     const hBefore = history.historySize.value
@@ -129,12 +121,10 @@ describe('deleteSelected', () => {
     store.seleccionarElemento('el_4')
     history.initializeHistory('pre')
 
-    // Simular flag de arrastre activo
     window.__dvCanvasDragActive = true
 
     const ok = deleteSelected({ withConfirm: true })
     expect(ok).toBe(false)
-    // Elemento sigue presente
     expect(store.elementos.find((e) => e.id === 'el_4')).toBeTruthy()
   })
 
@@ -146,17 +136,16 @@ describe('deleteSelected', () => {
 
     addElement(store, { id: 'el_buf', tipo: 'elementos' })
     store.seleccionarElemento('el_buf')
-    // Agregar al buffer una copia del elemento
     buffer.copyToBuffer('el_buf')
 
     history.initializeHistory('pre')
 
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const ok = deleteSelected({ withConfirm: true })
     expect(ok).toBe(true)
+    confirmSpy.mockRestore()
 
-    // Buffer no debe contener referencias a el_buf
     const any = buffer.getBufferItems().some((it) => it.originalId === 'el_buf')
     expect(any).toBe(false)
   })
 })
-

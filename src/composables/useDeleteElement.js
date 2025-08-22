@@ -43,9 +43,11 @@ export function useDeleteElement() {
     const descendants = new Set()
     collectDescendants(selectedId, descendants)
 
-    // Confirmación si hay hijos/descendientes
-    if (withConfirm && descendants.size > 0) {
-      const msg = `Se eliminará también ${descendants.size} elemento(s) dentro`
+    // Confirmación siempre que se solicite
+    if (withConfirm) {
+      const msg = descendants.size > 0
+        ? `Se eliminará también ${descendants.size} elemento(s) dentro`
+        : '¿Seguro que deseas eliminar este elemento?'
       const ok = typeof window !== 'undefined' && typeof window.confirm === 'function' ? window.confirm(msg) : true
       if (!ok) return false
     }
