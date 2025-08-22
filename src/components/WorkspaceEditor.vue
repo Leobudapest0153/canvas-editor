@@ -1,78 +1,151 @@
 <template>
-  <div v-if="canvasStore.crearPlanta" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-    <div class="relative bg-white rounded-lg shadow-xl w-[85vw] h-[90vh] p-4 overflow-hidden flex flex-col">
-      <button @click="closeModal" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 z-10">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+  <div v-if="canvasStore.crearPlanta" class="fixed inset-0 z-50 flex items-center justify-center">
+    <!-- Overlay -->
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-[1px]" @click="closeModal" />
+    <!-- Modal -->
+    <div class="relative z-10 bg-white rounded-xl shadow-2xl w-[85vw] h-[95vh] overflow-hidden flex flex-col">
+      <!-- Close (X) -->
+      <button @click="closeModal" class="absolute top-3 right-3 text-gray-500 hover:text-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" aria-label="Cerrar">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+        </svg>
       </button>
-      <h3 class="text-lg font-semibold mb-3 flex-shrink-0">Área de Trabajo</h3>
 
-      <div class="grid gap-4 md:grid-cols-5 flex-grow min-h-0">
-        <div class="md:col-span-3 flex flex-col">
-          <DrawEditor ref="canvasEditorRef"
-                        :polygon="local.polygon"
-                        :elements="local.elements"
-                        :worldWidth="worldWidth"
-                        :worldHeight="worldHeight"
-                        :adding="adding"
-                        :deleting="deleting"
-                        @update:polygon="onPolygonUpdate"
-                        @notice="newNotice => notice = newNotice"
-                        class="flex-grow" />
+      <!-- Header -->
+      <h3 class="text-lg font-semibold tracking-tight text-gray-900 px-5 py-4 border-b border-b-slate-200 flex-shrink-0">
+        Área de Trabajo
+      </h3>
 
-          <div class="flex items-center gap-2 mt-2 flex-shrink-0">
-            <button class="px-3 py-2 rounded-lg border bg-white text-slate-800" :class="{ 'ring-2 ring-sky-500': adding }" @click="toggleAddMode">{{ adding ? 'Salir de modo añadir' : 'Añadir vértice' }}</button>
-            <button class="px-3 py-2 rounded-lg border bg-white text-slate-800" :class="{ 'ring-2 ring-rose-500': deleting }" @click="toggleDeleteMode">{{ deleting ? 'Salir de modo eliminar' : 'Eliminar vértice' }}</button>
-            <button class="px-3 py-2 rounded-lg border bg-white text-slate-800" @click="() => canvasEditorRef.fitStageToPolygon()">Ajustar Vista</button>
+      <!-- Body -->
+      <div class="grid gap-0 md:grid-cols-5 flex-grow min-h-0">
+        <!-- Canvas (no modificar contenido) -->
+        <div class="md:col-span-3 flex flex-col bg-slate-50/60">
+          <div class="flex-grow min-h-0 p-3">
+            <div class="h-full w-full overflow-auto rounded-lg bg-white">
+              <DrawEditor
+                ref="canvasEditorRef"
+                :polygon="local.polygon"
+                :elements="local.elements"
+                :worldWidth="worldWidth"
+                :worldHeight="worldHeight"
+                :adding="adding"
+                :deleting="deleting"
+                @update:polygon="onPolygonUpdate"
+                @notice="newNotice => notice = newNotice"
+                class="h-full w-full"
+              />
+            </div>
           </div>
-          <div class="mt-1 text-sm h-5 flex-shrink-0" :class="notice ? 'text-rose-600' : 'text-transparent'">{{ notice || '.' }}</div>
+
+          <!-- Toolbar debajo del canvas -->
+          <div class="px-3 pb-2">
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button class="px-3 py-2 rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
+                      :class="{ 'ring-2 ring-sky-500': adding }"
+                      @click="toggleAddMode">
+                {{ adding ? 'Salir de modo añadir' : 'Añadir vértice' }}
+              </button>
+              <button class="px-3 py-2 rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
+                      :class="{ 'ring-2 ring-rose-500': deleting }"
+                      @click="toggleDeleteMode">
+                {{ deleting ? 'Salir de modo eliminar' : 'Eliminar vértice' }}
+              </button>
+              <button class="px-3 py-2 rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
+                      @click="() => canvasEditorRef.fitStageToPolygon()">
+                Ajustar Vista
+              </button>
+            </div>
+            <div class="mt-1 text-sm h-5 flex-shrink-0"
+                 :class="notice ? 'text-rose-600' : 'text-transparent'">
+              {{ notice || '.' }}
+            </div>
+          </div>
         </div>
 
-        <div class="md:col-span-2 space-y-3">
-          <div class="border rounded-lg p-3">
-            <h4 class="font-medium mb-1">Nombre</h4>
-            <input class="w-full border rounded-lg px-3 py-2" :class="{'border-rose-500 ring-1 ring-rose-500': errors.name}" v-model="local.name" placeholder="Ej. Bodega A" />
+        <!-- Panel de inputs -->
+        <div class="md:col-span-2 space-y-3 p-4 overflow-y-auto">
+          <!-- Nombre -->
+          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
+            <h4 class="text-sm font-semibold text-gray-800 mb-1">Nombre</h4>
+            <input
+              class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-400 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+              :class="{'border-rose-500 ring-2 ring-rose-500/60': errors.name}"
+              v-model="local.name"
+              placeholder="Ej. Bodega A"
+            />
           </div>
-          <div class="border rounded-lg p-3">
-            <h4 class="font-medium mb-1">Plantilla</h4>
-            <select class="w-full border rounded-lg px-3 py-2" v-model="local.shape" @change="onShapeChange">
+
+          <!-- Plantilla -->
+          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
+            <h4 class="text-sm font-semibold text-gray-800 mb-1">Plantilla</h4>
+            <select
+              class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+              v-model="local.shape"
+              @change="onShapeChange"
+            >
               <option value="none" disabled>Sin definir</option>
               <option value="rectangle">Rectángulo</option>
               <option value="circle">Círculo</option>
             </select>
           </div>
-          <div class="border rounded-lg p-3">
-            <h4 class="font-medium mb-0">Dimensiones</h4>
-            <div class="grid grid-cols-2 gap-x-2 gap-y-1">
-                <div>
-                  <label class="text-xs text-slate-600">Ancho (m)</label>
-                  <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="localRectWMeters" />
-                </div>
-                <div>
-                  <label class="text-xs text-slate-600">Largo (m)</label>
-                  <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="localRectLMeters" />
-                </div>
-                <div class="mt-2">
-                  <label class="text-xs text-slate-600">Alto (m)</label>
-                  <input type="number" class="w-full border rounded-lg px-2 py-1" :class="{'border-rose-500 ring-1 ring-rose-500': errors.dimensions}" v-model.number="heightMeters" />
-                </div>
+
+          <!-- Dimensiones -->
+          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
+            <h4 class="text-sm font-semibold text-gray-800 mb-1">Dimensiones</h4>
+            <div class="grid grid-cols-2 gap-x-3 gap-y-3">
+              <div>
+                <label class="mb-1 block text-xs text-slate-600">Ancho (m)</label>
+                <input type="number"
+                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+                  :class="{'border-rose-500 ring-2 ring-rose-500/60': errors.dimensions}"
+                  v-model.number="localRectWMeters" />
+              </div>
+              <div>
+                <label class="mb-1 block text-xs text-slate-600">Largo (m)</label>
+                <input type="number"
+                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+                  :class="{'border-rose-500 ring-2 ring-rose-500/60': errors.dimensions}"
+                  v-model.number="localRectLMeters" />
+              </div>
+              <div class="col-span-2">
+                <label class="mb-1 block text-xs text-slate-600">Alto (m)</label>
+                <input type="number"
+                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+                  :class="{'border-rose-500 ring-2 ring-rose-500/60': errors.dimensions}"
+                  v-model.number="heightMeters" />
+              </div>
             </div>
           </div>
-          <div class="border rounded-lg p-3 space-y-3">
-            <h4 class="font-medium mb-0">Extras</h4>
+
+          <!-- Extras -->
+          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
+            <h4 class="text-sm font-semibold text-gray-800 mb-1">Extras</h4>
             <div>
-              <label class="text-xs text-slate-600">Peso máximo (kg)</label>
-              <input type="number" class="w-full border rounded-lg px-2 py-1" v-model.number="local.maxWeight" placeholder="Ej. 1000" />
+              <label class="mb-1 block text-xs text-slate-600">Peso máximo (kg)</label>
+              <input type="number"
+                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+                v-model.number="local.maxWeight"
+                placeholder="Ej. 1000" />
             </div>
           </div>
         </div>
       </div>
 
-      <div class="mt-4 flex justify-end gap-2 flex-shrink-0">
-        <button class="px-3 py-2 rounded-lg border bg-blue-600 text-white border-blue-600 hover:bg-blue-700 transition-colors" @click="onSave">Guardar Cambios</button>
+      <!-- Footer con Cerrar + Guardar -->
+      <div class="px-5 py-4 border-t border-t-slate-200 bg-gray-50 flex justify-end gap-3 flex-shrink-0">
+        <button class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                @click="closeModal">
+          Cerrar
+        </button>
+        <button class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                @click="onSave">
+          Guardar Cambios
+        </button>
       </div>
     </div>
   </div>
 </template>
+
 
 <script setup>
 import { computed, reactive, ref, watch, nextTick } from 'vue'
@@ -196,7 +269,13 @@ const onPolygonUpdate = (newPolygon) => {
 
 const heightMeters = computed({
   get: () => local.height / 100,
-  set: (val) => { local.height = Math.max(0, val) * 100 }
+  set: (val) => {
+    // Asegurarse de que el valor sea un número antes de asignarlo
+    const numericVal = parseFloat(val);
+    if (!isNaN(numericVal)) {
+      local.height = Math.max(0, numericVal) * 100;
+    }
+  }
 })
 
 function applyRect(w_cm, l_cm){
@@ -215,15 +294,23 @@ function applyCircle(w_cm, l_cm) {
   return ovalSamplePoints(cx, cy, rx, ry, 32).map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }));
 }
 
-watch([localRectWMeters, localRectLMeters], () => {
+// --- WATCH CORREGIDO ---
+watch([localRectWMeters, localRectLMeters], ([newW, newL]) => {
   if (isLoadingData.value) return;
 
   clearTimeout(dimensionChangeDebounce);
+
+  // Si el valor del input es vacío, v-model.number lo convierte en '' (string) o null.
+  // Esta guarda previene la ejecución si los valores no son números válidos y positivos.
+  if (typeof newW !== 'number' || typeof newL !== 'number' || newW <= 0 || newL <= 0) {
+    return;
+  }
 
   dimensionChangeDebounce = setTimeout(() => {
     const oldW_cm = rectW.value;
     const oldL_cm = rectL.value;
 
+    // Usamos los valores de las refs, que son la fuente de verdad
     const newW_cm = localRectWMeters.value * 100;
     const newL_cm = localRectLMeters.value * 100;
 
@@ -286,21 +373,17 @@ function onShapeChange(event) {
   nextTick(() => { canvasEditorRef.value?.fitStageToPolygon() });
 }
 
-// --- onSave CORREGIDO ---
 function onSave(){
-  // 1. Limpiamos errores y avisos anteriores para empezar de cero.
   notice.value = ''
   errors.name = false
   errors.dimensions = false
 
-  // 2. RESTAURADO: Se ejecuta una validación final del polígono. Esta es la parte crucial.
   const finalValidation = canvasEditorRef.value?.isPolygonValid(local.polygon, local.elements);
   if (finalValidation && !finalValidation.valid) {
     notice.value = finalValidation.message;
-    return; // Si el polígono es inválido, nos detenemos aquí.
+    return;
   }
 
-  // 3. Se ejecutan las demás validaciones secuencialmente.
   if (!local.name.trim()) {
     errors.name = true
     notice.value = 'El campo "Nombre" es obligatorio.'
@@ -308,6 +391,7 @@ function onSave(){
   }
 
   if (local.shape === 'rectangle' || local.shape === 'circle') {
+    // Validar contra las refs directamente
     if (localRectWMeters.value <= 0 || localRectLMeters.value <= 0 || heightMeters.value <= 0) {
       errors.dimensions = true
       notice.value = 'Las dimensiones deben ser mayores a cero.'
@@ -320,7 +404,6 @@ function onSave(){
     return
   }
 
-  // 4. Si todo es válido, se procede a guardar.
   const plantaData = {
     id: local.id,
     nombre: local.name.trim(),
