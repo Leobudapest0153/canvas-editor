@@ -548,7 +548,8 @@ import { useDeleteElement } from '@/composables/useDeleteElement'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { applyEdgeConstraint } from '@/utils/edgeConstraint'
 import { resetEdgeState } from '@/composables/useEdgeState'
-import { runFinalClamp } from '@/utils/finalizeDrag'
+import { resolveFinalByIntervals } from '@/utils/finalIntervals'
+import { finalizePlacement } from '@/utils/finalizeDrag'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -900,6 +901,9 @@ const dragStartPositions = ref(new Map())
 const lastValidPositions = ref(new Map())
 // Marca de borde para feedback visual
 const atEdgeMap = ref(new Map())
+// Nuevos: tracking de última pos deseada y última velocidad en rAF
+const lastDesiredPosMap = ref(new Map())
+const lastVelocityMap = ref(new Map())
 
 // Helper: color de borde con feedback
 const getStrokeColor = (elementId) => {
@@ -968,6 +972,9 @@ const startElementDrag = (elementId) => {
   if (elemento) {
     dragStartPositions.value.set(elementId, { x: elemento.x, y: elemento.y })
     lastValidPositions.value.set(elementId, { x: elemento.x, y: elemento.y })
+    // Inicializar pos deseada y velocidad
+    lastDesiredPosMap.value.set(elementId, { x: elemento.x, y: elemento.y })
+    lastVelocityMap.value.set(elementId, { x: 0, y: 0 })
   }
 
   // Resetear estado de borde/histéresis al iniciar
@@ -1086,13 +1093,14 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (!elemento) return
 
-  // Feedback visual: bordes cuando está pegado o hay conflicto
-  // const warn = atEdgeMap.value.get(elementId)
+  // Actualizar lastVelocity respecto a la última pos deseada conocida
+  const prev = lastDesiredPosMap.value.get(elementId) || { x: elemento.x, y: elemento.y }
+  lastVelocityMap.value.set(elementId, { x: x - prev.x, y: y - prev.y })
+  lastDesiredPosMap.value.set(elementId, { x, y })
 
   // Detectar conflictos en tiempo real (no bloquea)
   const moving = { ...elemento, x, y }
   setLiveConflictsThrottled(moving)
-  // const hasAnyConflict = liveConflicts.value.length > 0
 
   // Dejar feedback visual y draw al rAF loop; NO escribir en store
   const rec = rafControllers.get(elementId)
@@ -1115,23 +1123,85 @@ const endElementDrag = async (elementId) => {
     const shape = stage.findOne(`#${elementId}`)
     if (shape && layer) {
       const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-      const others = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
-      await runFinalClamp({
-        shape,
-        el: elemento,
-        areaBounds,
-        grid: canvasStore.gridSize || 50,
-        elements: others,
-        lastValidPos: lastValidPositions.value.get(elementId) || { x: elemento.x, y: elemento.y },
-        CM_TO_PX,
-      })
+      const elementoActual = canvasStore.elementosVisibles.find((e) => e.id === elementId)
+      if (elementoActual) {
+        // Candidato desde el shape (bbox de modelo)
+        let candX, candY
+        if (shape.className === 'Circle' || elementoActual.forma === 'circular') {
+          const r = Math.min(elementoActual.width, elementoActual.height) / 2
+          candX = shape.x() - r
+          candY = shape.y() - r
+        } else {
+          candX = shape.x()
+          candY = shape.y()
+        }
 
-      // Repaint sincronizado (doble rAF si hace falta) antes del commit
-      await nextTick()
-      await new Promise((r) => requestAnimationFrame(() => r()))
-      layer.clearCache?.()
-      layer.batchDraw?.()
-      await new Promise((r) => requestAnimationFrame(() => r()))
+        // Vecinos bloqueantes (suelo–suelo)
+        const neighbors = canvasStore.elementosVisibles.filter((e) =>
+          e.id !== elementId && (e.ubicacion || 'suelo') === 'suelo' && (elementoActual.ubicacion || 'suelo') === 'suelo',
+        )
+
+        // Última velocidad estimada del rAF
+        const lastVel = lastVelocityMap.value.get(elementId) || { x: 0, y: 0 }
+
+        // stroke del shape
+        const strokeEnabled = typeof shape.strokeEnabled === 'function' ? shape.strokeEnabled() : !!shape.strokeEnabled
+        const strokeWidth = typeof shape.strokeWidth === 'function' ? shape.strokeWidth() : (shape.strokeWidth || 0)
+        const strokePx = strokeEnabled ? strokeWidth : 0
+
+        // Elemento rectangular para resolver (círculos como AABB)
+        const asRect = elementoActual.forma === 'circular'
+          ? { ...elementoActual, width: Math.min(elementoActual.width, elementoActual.height), height: Math.min(elementoActual.width, elementoActual.height) }
+          : { ...elementoActual }
+        asRect.__strokePx = strokePx
+
+        // margen en px para factibilidad del corredor
+        const { MARGIN_CM } = await import('@/utils/constants')
+        const marginPx = (MARGIN_CM || 0) * (CM_TO_PX || 1)
+
+        const lastPos = lastValidPositions.value.get(elementId) || { x: elementoActual.x, y: elementoActual.y }
+        const solved = finalizePlacement({
+          candidate: { x: candX, y: candY },
+          movingEl: asRect,
+          neighbors,
+          areaBounds,
+          grid: canvasStore.gridSize || 50,
+          lastValidPos: lastPos,
+          CM_TO_PX,
+          strokePx,
+          lastVelocity: lastVel,
+        })
+
+        // Aplicar al shape
+        if (shape.className === 'Circle' || elementoActual.forma === 'circular') {
+          const r = Math.min(elementoActual.width, elementoActual.height) / 2
+          shape.x(solved.x + r)
+          shape.y(solved.y + r)
+        } else {
+          shape.x(solved.x)
+          shape.y(solved.y)
+        }
+
+        // Guardar bandera de fallback usado
+        const fallbackUsed = Math.abs(solved.x - lastPos.x) <= 1e-6 && Math.abs(solved.y - lastPos.y) <= 1e-6
+
+        // Repaint sincronizado
+        await nextTick()
+        await new Promise((r) => requestAnimationFrame(() => r()))
+        layer.clearCache?.()
+        layer.batchDraw?.()
+        await new Promise((r) => requestAnimationFrame(() => r()))
+
+        // Persistir posición final en el store y guardar snapshot sólo si no hubo fallback
+        if (!fallbackUsed) {
+          canvasStore.actualizarPosicionConHistorial(
+            elementId,
+            solved.x,
+            solved.y,
+            `Elemento movido: ${elementoActual.nombre || elementoActual.tipo || elementId}`,
+          )
+        }
+      }
     }
   } catch { /* ignore */ }
 
@@ -1140,7 +1210,8 @@ const endElementDrag = async (elementId) => {
   try {
     const stage = stageRef.value.getNode()
     const shape = stage.findOne(`#${elementId}`)
-    if (shape) {
+    const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
+    if (shape && elemento) {
       if (shape.className === 'Circle' || elemento.forma === 'circular') {
         const r = Math.min(elemento.width, elemento.height) / 2
         finalX = shape.x() - r
@@ -1183,17 +1254,8 @@ const endElementDrag = async (elementId) => {
   perfContexts.delete(elementId)
 
   // Persistir posición final en el store y guardar snapshot
-  canvasStore.actualizarPosicionConHistorial(
-    elementId,
-    finalX,
-    finalY,
-    `Elemento movido: ${elemento.nombre || elemento.tipo || elementId}`,
-  )
-
-  // Limpiar estado temporal y resetear estado de borde
-  dragStartPositions.value.delete(elementId)
-  atEdgeMap.value.delete(elementId)
-  try { resetEdgeState(elementId) } catch { /* ignore */ }
+  // (omitido aquí: ya se realiza condicionalmente antes)
+  // ...existing code...
 }
 
 // === FUNCIONES DE DROP DESDE CATÁLOGO ===
