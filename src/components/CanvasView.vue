@@ -361,6 +361,7 @@
         <v-transformer
           v-if="isEditingSelected && canvasStore.elementoSeleccionado && !selectedElementLocked"
           ref="transformerRef"
+          :flipEnabled="false"
           :config="{
             rotateEnabled: true,
             ignoreStroke: true,
