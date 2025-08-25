@@ -1,7 +1,17 @@
 // Lightweight rAF-based drag loop. Keeps local state only and
 // ensures at most one update + one batchDraw per frame.
 
-export function setupRafDrag({ stage: _stage, layer, getMovingShapeBBox, onValidateLight, onCommitEnd }) {
+export function setupRafDrag({
+  stage: _stage,
+  layer,
+  getMovingShapeBBox,
+  onValidateLight,
+  onCommitEnd,
+  onFrame,
+  // Nuevos parámetros para validación de posición
+  validatePosition = null, // función (pos) => boolean
+  onValidPositionUpdate = null // callback cuando se encuentra una posición válida
+}) {
   // Marcar _stage como usado para ESLint
   void _stage
   let running = false
@@ -12,6 +22,9 @@ export function setupRafDrag({ stage: _stage, layer, getMovingShapeBBox, onValid
 
   // Optional local position cache the client can set from dragmove
   let desiredPos = null
+
+  // Tracking de la última posición válida durante el drag
+  let lastGoodPos = null
 
   const readBBox = () => {
     if (typeof getMovingShapeBBox === 'function') return getMovingShapeBBox()
@@ -26,10 +39,34 @@ export function setupRafDrag({ stage: _stage, layer, getMovingShapeBBox, onValid
       return
     }
     lastFrameTime = ts
+    const wasDirty = dirty
     dirty = false
+
+    // Permitir que el cliente aplique desiredPos en el frame, si existe
+    if (wasDirty && desiredPos && typeof onFrame === 'function') {
+      try {
+        onFrame(desiredPos)
+      } catch (e) { void e }
+    }
 
     const bbox = readBBox()
     if (bbox) {
+      // Validar la posición actual si se proporciona validador
+      if (validatePosition && typeof validatePosition === 'function') {
+        try {
+          const isValid = validatePosition({ x: bbox.x, y: bbox.y })
+          if (isValid) {
+            lastGoodPos = { x: bbox.x, y: bbox.y }
+            // Notificar al callback si se proporciona
+            if (onValidPositionUpdate && typeof onValidPositionUpdate === 'function') {
+              onValidPositionUpdate(lastGoodPos)
+            }
+          }
+        } catch (e) {
+          console.warn('Error en validación de posición durante drag:', e)
+        }
+      }
+
       // Call light validation; consumer can throttle internally
       if (typeof onValidateLight === 'function') {
         try {
@@ -51,6 +88,15 @@ export function setupRafDrag({ stage: _stage, layer, getMovingShapeBBox, onValid
     running = true
     dirty = true
     lastDrawnBBox = null
+    // Inicializar lastGoodPos con la posición actual del shape en el momento de iniciar
+    try {
+      const bbox = readBBox()
+      if (bbox && typeof bbox.x === 'number' && typeof bbox.y === 'number') {
+        lastGoodPos = { x: bbox.x, y: bbox.y }
+      } else {
+        lastGoodPos = null
+      }
+    } catch { lastGoodPos = null }
     try { if (typeof window !== 'undefined') window.__dvCanvasDragActive = true } catch (e) { void e }
     rafId = requestAnimationFrame(loop)
   }
@@ -71,6 +117,7 @@ export function setupRafDrag({ stage: _stage, layer, getMovingShapeBBox, onValid
     } catch (e) { void e }
     desiredPos = null
     lastDrawnBBox = null
+    // No reseteamos lastGoodPos aquí para que esté disponible en endElementDrag
     try { if (typeof window !== 'undefined') window.__dvCanvasDragActive = false } catch (e) { void e }
   }
 
@@ -79,6 +126,8 @@ export function setupRafDrag({ stage: _stage, layer, getMovingShapeBBox, onValid
     move,
     end,
     getDesiredPos: () => desiredPos,
+    getLastGoodPos: () => lastGoodPos, // Nuevo método para obtener la última posición válida
+    resetLastGoodPos: () => { lastGoodPos = null } // Método para limpiar después del dragend
   }
 }
 
