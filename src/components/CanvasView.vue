@@ -54,6 +54,7 @@
             stroke: '#0ea5e9',
             fill: 'rgba(14,165,233,0.08)',
             strokeWidth: 2,
+            listening: false,
           }"
         />
         <!-- Debug: mostrar información según el contexto -->
