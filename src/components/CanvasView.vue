@@ -559,6 +559,7 @@ import SpeedDialContext from '@/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
+import Konva from 'konva'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({

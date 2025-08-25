@@ -586,7 +586,26 @@ export const useCanvasStore = defineStore('canvas', () => {
   const actualizarElemento = (elementoId, propiedades) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (elemento) {
-      Object.assign(elemento, propiedades)
+      for (const key in propiedades) {
+        if (typeof propiedades[key] === 'object' && propiedades[key] !== null && !Array.isArray(propiedades[key])) {
+        // Si la propiedad es un objeto (como 'dimensiones'), la fusionamos recursivamente.
+        if (!elemento[key]) elemento[key] = {}
+          Object.assign(elemento[key], propiedades[key]);
+        } else {
+          // Si es un valor simple, lo asignamos directamente.
+          elemento[key] = propiedades[key];
+        }
+      }
+     
+      // Correciones en los datos de ancho y largo a base de las dimensiones
+      if (propiedades.dimensiones) {
+        if (propiedades.dimensiones.ancho !== undefined) {
+          elemento.width = elemento.dimensiones.ancho * CM_TO_PX
+        }
+        if (propiedades.dimensiones.largo !== undefined) {
+          elemento.height = elemento.dimensiones.largo * CM_TO_PX
+        }
+      }
     }
   }
 

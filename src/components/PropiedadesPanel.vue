@@ -172,14 +172,63 @@
           </p>
 
           <!-- Dimensiones físicas adicionales (si están disponibles) -->
-          <div v-if="elementoSeleccionado.dimensiones" class="mt-3 pt-3 border-t border-gray-200">
-            <h4 class="text-xs font-medium text-gray-600 mb-2">Dimensiones Físicas</h4>
-            <div class="grid grid-cols-3 gap-2 text-xs text-gray-500">
-              <div>Ancho: {{ elementoSeleccionado.dimensiones.ancho }}cm</div>
-              <div>Largo: {{ elementoSeleccionado.dimensiones.largo }}cm</div>
-              <div>Alto: {{ elementoSeleccionado.dimensiones.alto }}cm</div>
+          <div class="mt-6">
+            <h4 class="font-semibold text-gray-700 mb-3">Dimensiones Físicas (cm)</h4>
+            <div class="space-y-3">
+              <!-- Campo Ancho -->
+              <div class="grid grid-cols-2 items-center">
+                <label for="prop-ancho" class="text-sm text-gray-500">Ancho</label>
+                <input
+                  id="prop-ancho"
+                  type="number"
+                  :value="elementoSeleccionado.dimensiones?.ancho"
+                  @keyup="actualizarDimension('ancho', $event.target.value)"
+                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                />
             </div>
-          </div>
+            <!-- Campo Largo -->
+            <div class="grid grid-cols-2 items-center">
+              <label for="prop-largo" class="text-sm text-gray-500">Largo</label>
+              <input
+                id="prop-largo"
+                type="number"
+                :value="elementoSeleccionado.dimensiones?.largo"
+                @keyup="actualizarDimension('largo', $event.target.value)"
+                class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <!-- Campo Alto -->
+            <div class="grid grid-cols-2 items-center">
+              <label for="prop-alto" class="text-sm text-gray-500">Alto</label>
+              <input
+                id="prop-alto"
+                type="number"
+                :value="elementoSeleccionado.dimensiones?.alto"
+                @change="actualizarDimension('alto', $event.target.value)"
+                class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+      </div>
+    </div>
+
+    <!-- === NUEVA SECCIÓN DE PROPIEDADES ADICIONALES === -->
+    <div class="mt-6">
+      <h4 class="font-semibold text-gray-700 mb-3">Propiedades Adicionales</h4>
+      <div class="space-y-3">
+        <!-- Campo Peso Máximo -->
+        <div class="grid grid-cols-2 items-center">
+          <label for="prop-peso-max" class="text-sm text-gray-500">Peso Máximo (kg)</label>
+          <input
+            id="prop-peso-max"
+            type="number"
+            :value="elementoSeleccionado.pesoMaximo"
+            @change="actualizarPropiedadSimple('pesoMaximo', $event.target.value)"
+            class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Ej: 100"
+          />
+        </div>
+      </div>
+    </div>
 
           <!-- Información específica para elementos de pared -->
           <div
@@ -419,6 +468,28 @@ const guardarYAsignarNuevaEtiqueta = (nuevaEtiqueta) => {
   if (!elementoSeleccionado.value) return
   canvasStore.crearYAsignarEtiquetaAElemento(elementoSeleccionado.value.id, nuevaEtiqueta)
   modalCrearEtiquetaVisible.value = false
+}
+
+const actualizarDimension = (dimension, valor) => {
+  if (!elementoSeleccionado.value) return
+  const valorNumerico = parseFloat(valor)
+  if (isNaN(valorNumerico)) return // Evitar enviar valores no numéricos
+
+  canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+    dimensiones: {
+      [dimension]: valorNumerico,
+    },
+  })
+}
+
+const actualizarPropiedadSimple = (propiedad, valor) => {
+  if (!elementoSeleccionado.value) return
+  const valorNumerico = parseFloat(valor)
+  if (isNaN(valorNumerico)) return
+
+  canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+    [propiedad]: valorNumerico,
+  })
 }
 </script>
 
