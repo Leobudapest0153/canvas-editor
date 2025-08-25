@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch, onMounted, defineProps, defineEmits, toRefs, onUnmounted } from 'vue'
+import { computed, reactive, ref, onMounted, defineProps, defineEmits, toRefs, onUnmounted } from 'vue'
 import GridLayer from './GridLayer.vue'
 import RulersOverlay from './RulersOverlay.vue'
 
