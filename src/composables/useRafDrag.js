@@ -1,7 +1,7 @@
 // Lightweight rAF-based drag loop. Keeps local state only and
 // ensures at most one update + one batchDraw per frame.
 
-export function setupRafDrag({ stage: _stage, layer, getMovingShapeBBox, onValidateLight, onCommitEnd }) {
+export function setupRafDrag({ stage: _stage, layer, getMovingShapeBBox, onValidateLight, onCommitEnd, onFrame }) {
   // Marcar _stage como usado para ESLint
   void _stage
   let running = false
@@ -26,7 +26,15 @@ export function setupRafDrag({ stage: _stage, layer, getMovingShapeBBox, onValid
       return
     }
     lastFrameTime = ts
+    const wasDirty = dirty
     dirty = false
+
+    // Permitir que el cliente aplique desiredPos en el frame, si existe
+    if (wasDirty && desiredPos && typeof onFrame === 'function') {
+      try {
+        onFrame(desiredPos)
+      } catch (e) { void e }
+    }
 
     const bbox = readBBox()
     if (bbox) {

@@ -524,7 +524,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { setupRafDrag } from '@/composables/useRafDrag'
 import { enablePerfMode } from '@/composables/usePerfMode'
-import { clampToAreaFast, computeSnapFast, throttleEveryNFrames } from '@/utils/dragMath'
+import { throttleEveryNFrames } from '@/utils/dragMath'
 import { useCanvasWithHistory } from '@/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/composables/useCanvasBuffer'
 import { useConflicts } from '@/composables/useConflicts'
@@ -537,17 +537,17 @@ import {
 } from '@/utils/collision'
 import {
   rectInsidePolygon,
-  circleInsidePolygon,
   clampRectToRect,
   snapToGrid,
-  safeSnapRect,
   nudgePlace,
 } from '@/utils/geometry'
-import { SNAP_EPS, GRID_SIZE, CM_TO_PX } from '@/utils/constants'
+import { GRID_SIZE, CM_TO_PX } from '@/utils/constants'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
+import { applyEdgeConstraint } from '@/utils/edgeConstraint'
+import { resetEdgeState } from '@/composables/useEdgeState'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -923,98 +923,8 @@ const toStageCoords = (pos) => {
 }
 
 // Drag bound para cada elemento y forma
-const dragBoundForElement = (pos, elemento, forma = 'rect') => {
-  const layerPos = toLayerCoords(pos)
-  const boundary = computeBoundary()
-
-  if (forma === 'circle') {
-    // pos viene como centro
-    const r = Math.min(elemento.width, elemento.height) / 2
-    if (boundary.type === 'rect') {
-      // Orden: clamp → colisiones → clamp ��� validar (sin snap en drag)
-      const clampedCenter = {
-        x: Math.max(r, Math.min(layerPos.x, boundary.W - r)),
-        y: Math.max(r, Math.min(layerPos.y, boundary.H - r)),
-      }
-      const asRect = { ...elemento, width: r * 2, height: r * 2 }
-      const resolved = resolveAgainstBlockingObstacles(
-        clampedCenter.x - r,
-        clampedCenter.y - r,
-        asRect,
-      )
-      const finalCenter = { x: resolved.x + r, y: resolved.y + r }
-
-      // Edge feedback
-      const toLeft = Math.abs(finalCenter.x - r)
-      const toTop = Math.abs(finalCenter.y - r)
-      const toRight = Math.abs(boundary.W - (finalCenter.x + r))
-      const toBottom = Math.abs(boundary.H - (finalCenter.y + r))
-      const atEdge =
-        toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
-      atEdgeMap.value.set(elemento.id, atEdge)
-
-      lastValidPositions.value.set(elemento.id, { x: finalCenter.x - r, y: finalCenter.y - r })
-      return toStageCoords(finalCenter)
-    }
-    if (boundary.type === 'polygon') {
-      const inside = circleInsidePolygon(layerPos.x, layerPos.y, r, boundary.points)
-      if (!inside) {
-        // Mantener último válido
-        const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
-        const centerPrev = { x: prev.x + r, y: prev.y + r }
-        return toStageCoords(centerPrev)
-      }
-      atEdgeMap.value.set(elemento.id, false)
-      lastValidPositions.value.set(elemento.id, { x: layerPos.x - r, y: layerPos.y - r })
-      return pos
-    }
-  }
-
-  // Rectangular usan bbox axis-aligned
-  const w = elemento.width
-  const h = elemento.height
-
-  if (boundary.type === 'rect') {
-    // Orden: clamp → colisiones → clamp → snap → validar
-    // (1) clamp inicial sin snap
-    const clamped = clampRectToRect(layerPos.x, layerPos.y, w, h, boundary.W, boundary.H)
-
-    // (2-4) resolver bloqueantes no-expansivo con prioridad de contorno
-    let adjusted = { x: clamped.x, y: clamped.y }
-    const res = resolveAgainstBlockingObstacles(clamped.x, clamped.y, elemento)
-    adjusted = { x: res.x, y: res.y }
-
-    // Edge feedback basado en posición final
-    const toLeft = Math.abs(adjusted.x)
-    const toTop = Math.abs(adjusted.y)
-    const toRight = Math.abs(boundary.W - (adjusted.x + w))
-    const toBottom = Math.abs(boundary.H - (adjusted.y + h))
-    const atEdge =
-      toLeft <= SNAP_EPS || toTop <= SNAP_EPS || toRight <= SNAP_EPS || toBottom <= SNAP_EPS
-
-    atEdgeMap.value.set(elemento.id, atEdge)
-    lastValidPositions.value.set(elemento.id, { x: adjusted.x, y: adjusted.y })
-    return toStageCoords({ x: adjusted.x, y: adjusted.y })
-  }
-
-  if (boundary.type === 'polygon') {
-    const inside = rectInsidePolygon(layerPos.x, layerPos.y, w, h, boundary.points)
-    if (!inside) {
-      const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
-      return toStageCoords(prev)
-    }
-    // En polígono, no resolvemos contra obstáculos complejos: fallback si bloquea
-    const moving = { ...elemento, x: layerPos.x, y: layerPos.y }
-    const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles)
-    if (conflicts.some((c) => c.bloqueante)) {
-      const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
-      return toStageCoords(prev)
-    }
-    atEdgeMap.value.set(elemento.id, false)
-    lastValidPositions.value.set(elemento.id, { x: layerPos.x, y: layerPos.y })
-    return pos
-  }
-
+const dragBoundForElement = (pos) => {
+  // No interferir con rAF: dejar pasar tal cual (no-ops)
   return pos
 }
 
@@ -1042,6 +952,9 @@ const startElementDrag = (elementId) => {
     dragStartPositions.value.set(elementId, { x: elemento.x, y: elemento.y })
     lastValidPositions.value.set(elementId, { x: elemento.x, y: elemento.y })
   }
+
+  // Resetear estado de borde/histéresis al iniciar
+  try { resetEdgeState(elementId) } catch { /* ignore */ }
 
   // Limpiar conflictos previos al iniciar un nuevo arrastre
   conflictsApi.clear()
@@ -1098,7 +1011,42 @@ const startElementDrag = (elementId) => {
 
       const onCommitEnd = () => {}
 
-      const ctrl = setupRafDrag({ stage, layer, getMovingShapeBBox, onValidateLight, onCommitEnd })
+      // onFrame: aplicar clamp puro de borde con histéresis y luego resolver colisiones
+      const onFrame = (desiredPos) => {
+        if (!shape) return
+        const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
+        if (!elemento) return
+        const W = layerConfig.value.width
+        const H = layerConfig.value.height
+        const areaBounds = { minX: 0, minY: 0, maxX: W, maxY: H }
+
+        // Para círculos, desiredPos ya es top-left (convertido en updateElementPosition)
+        const asRect = elemento.forma === 'circular'
+          ? { ...elemento, width: Math.min(elemento.width, elemento.height), height: Math.min(elemento.width, elemento.height) }
+          : elemento
+
+        const { pos } = applyEdgeConstraint({ x: desiredPos.x, y: desiredPos.y }, asRect, areaBounds)
+
+        // Resolver colisiones después del clamp a borde
+        let x = pos.x
+        let y = pos.y
+        const res = resolveAgainstBlockingObstacles(x, y, asRect)
+        x = res.x
+        y = res.y
+
+        // Escribir en el shape sin snap durante drag
+        if (shape.className === 'Circle') {
+          const r = Math.min(elemento.width, elemento.height) / 2
+          shape.x(x + r)
+          shape.y(y + r)
+        } else {
+          shape.x(x)
+          shape.y(y)
+        }
+        lastValidPositions.value.set(elementId, { x, y })
+      }
+
+      const ctrl = setupRafDrag({ stage, layer, getMovingShapeBBox, onValidateLight, onCommitEnd, onFrame })
       rafControllers.set(elementId, { ctrl, shape, layer })
       ctrl.start()
     }
@@ -1145,51 +1093,40 @@ const endElementDrag = (elementId) => {
 
   let final = lastValidPositions.value.get(elementId) || { x: elemento.x, y: elemento.y }
 
-  // Snap-to-grid al finalizar el drag, preservando contorno y contacto con vecinos
+  // Orden final: clamp → snap → re-clamp
   const boundary = computeBoundary()
   if (boundary.type === 'rect') {
-    const neighbors = canvasStore.elementosVisibles.filter((el) => el.id !== elementId)
-    // Aplicar snap seguro para rectángulos; círculos mantienen posición final para no romper radios
+    const area = { W: boundary.W, H: boundary.H }
+    // Clamp inicial
+    const c1 = clampRectToRect(final.x, final.y, elemento.width, elemento.height, area.W, area.H)
+    let xf = c1.x
+    let yf = c1.y
+
+    // Snap a grilla con umbral, solo para rects; para círculos snap al centro
     if (elemento.forma === 'rectangular' || !elemento.forma) {
-      const snapped = safeSnapRect(
-        final.x,
-        final.y,
-        elemento.width,
-        elemento.height,
-        { W: boundary.W, H: boundary.H },
-        neighbors,
-        canvasStore.gridSize || 50,
-        1e-6,
-        { snapX: true, snapY: true },
-        canvasStore.snapGridEps || 6,
-      )
-      // Validar que el snap no introduzca bloqueos; si lo hace, mantener final
-      const test = { ...elemento, x: snapped.x, y: snapped.y }
-      const conflicts = detectConflictsFor(test, canvasStore.elementosVisibles).filter(
-        (c) => c.bloqueante,
-      )
-      if (conflicts.length === 0) {
-        final = { x: snapped.x, y: snapped.y }
+      const snapped = snapToGrid(xf, yf, canvasStore.gridSize || 50)
+      // re-clamp
+      const c2 = clampRectToRect(snapped.x, snapped.y, elemento.width, elemento.height, area.W, area.H)
+      xf = c2.x
+      yf = c2.y
+      // Validar conflictos; si introduce bloqueo, mantener pre-snap
+      const test = { ...elemento, x: xf, y: yf }
+      const conflicts = detectConflictsFor(test, canvasStore.elementosVisibles).filter((c) => c.bloqueante)
+      if (conflicts.length > 0) {
+        xf = c1.x
+        yf = c1.y
       }
     } else if (elemento.forma === 'circular') {
-      // Snap del centro por proximidad; no forzar si no está cerca ni si saca fuera
       const r = Math.min(elemento.width, elemento.height) / 2
-      const center = { x: final.x + r, y: final.y + r }
+      const center = { x: xf + r, y: yf + r }
       const snappedC = snapToGrid(center.x, center.y, canvasStore.gridSize || 50)
-      const gridEps = canvasStore.snapGridEps || 6
-      const targetC = {
-        x: Math.abs(snappedC.x - center.x) <= gridEps ? snappedC.x : center.x,
-        y: Math.abs(snappedC.y - center.y) <= gridEps ? snappedC.y : center.y,
-      }
-      const clampedC = {
-        x: Math.max(r, Math.min(targetC.x, boundary.W - r)),
-        y: Math.max(r, Math.min(targetC.y, boundary.H - r)),
-      }
-      // Aceptar si el clamp no cambió el resultado (no expulsa fuera)
-      if (Math.abs(clampedC.x - targetC.x) < 1e-6 && Math.abs(clampedC.y - targetC.y) < 1e-6) {
-        final = { x: clampedC.x - r, y: clampedC.y - r }
-      }
+      const c2x = Math.max(r, Math.min(snappedC.x, area.W - r))
+      const c2y = Math.max(r, Math.min(snappedC.y, area.H - r))
+      xf = c2x - r
+      yf = c2y - r
     }
+
+    final = { x: xf, y: yf }
   }
 
   // Evaluar conflictos al finalizar (solo para pintar/estado, sin modal ni toasts)
@@ -1215,23 +1152,18 @@ const endElementDrag = (elementId) => {
   }
   perfContexts.delete(elementId)
 
-  // Snap/clamp final rápido y commit único + snapshot
-  const area = { type: 'rect', W: layerConfig.value.width, H: layerConfig.value.height }
-  const snapped = computeSnapFast(final.x, final.y, canvasStore.gridSize || 50)
-  const clamped = clampToAreaFast(snapped.x, snapped.y, elemento.width, elemento.height, area)
-
   // Actualizar posición final y guardar historial una sola vez
   canvasStore.actualizarPosicionConHistorial(
     elementId,
-    clamped.x,
-    clamped.y,
+    final.x,
+    final.y,
     `Elemento movido: ${elemento.nombre || elemento.tipo || elementId}`,
   )
 
-  // No mostrar toasts ni abrir modales
-
+  // Limpiar estado temporal y resetear estado de borde
   dragStartPositions.value.delete(elementId)
   atEdgeMap.value.delete(elementId)
+  try { resetEdgeState(elementId) } catch { /* ignore */ }
 }
 
 // === FUNCIONES DE DROP DESDE CATÁLOGO ===
@@ -1929,7 +1861,7 @@ const fitToPlanta = () => {
       return
     }
 
-    // Calcular tama��o del viewport disponible
+    // Calcular tamaño del viewport disponible
     const vw = Math.max(16, stageSize.value.width - margin * 2)
     const vh = Math.max(16, stageSize.value.height - margin * 2)
 
