@@ -86,6 +86,9 @@ export const useCanvasStore = defineStore('canvas', () => {
   const panX = ref(0)
   const panY = ref(0)
 
+  const elementoDestacadoId = ref(null);
+  const idsElementosFiltrados = ref(null);
+
   // Configuración de grilla y snap
   const gridSize = ref(50) // px entre líneas de grilla
   const snapGridEps = ref(6) // px de proximidad para aplicar snap al soltar
@@ -731,7 +734,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     } else {
       // Si estamos en una planta, agregar normalmente
       nuevoElemento.plantaId = contextoNavegacion.value.id
-      nuevoElemento.padre = null
+      nuevoElemento.padre = null;
+      nuevoElemento.etiquetas = []; // Sin etiquetas inicialmente
 
       // Actualizar el array de elementos en la planta
       const planta = plantas.value.find((p) => p.id === contextoNavegacion.value.id)
@@ -1309,6 +1313,56 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+
+  // Funciones para agregar etiquetas a los filtros
+  const agregarEtiquetaAElemento = (elementoId, etiquetaId) => {
+    const elemento = elementos.value.find((el) => el.id === elementoId)
+    if (elemento) {
+      if (!elemento.etiquetas) {
+        elemento.etiquetas = []
+      }
+    if (!elemento.etiquetas.includes(etiquetaId)) {
+        elemento.etiquetas.push(etiquetaId)
+        saveToHistory(`Etiqueta añadida a ${elemento.nombre}`)
+      }
+    }
+  }
+
+  const quitarEtiquetaDeElemento = (elementoId, etiquetaId) => {
+    const elemento = elementos.value.find((el) => el.id === elementoId)
+    if (elemento && elemento.etiquetas) {
+      const index = elemento.etiquetas.indexOf(etiquetaId)
+      if (index > -1) {
+        elemento.etiquetas.splice(index, 1)
+        saveToHistory(`Etiqueta quitada de ${elemento.nombre}`)
+      }
+    }
+  }
+
+
+  const crearYAsignarEtiquetaAElemento = (elementoId, nuevaEtiqueta) => {
+     // 1. Crear la etiqueta globalmente
+    const newId = Math.max(0, ...etiquetas.value.map((e) => e.id)) + 1
+    const etiquetaCompleta = { id: newId, ...nuevaEtiqueta }
+    etiquetas.value.push(etiquetaCompleta)
+
+    // 2. Asignarla al elemento
+    agregarEtiquetaAElemento(elementoId, newId)
+  }
+  const destacarElemento = (elementoId) => {
+    elementoDestacadoId.value = elementoId
+    // El efecto de destaque se quitará automáticamente después de un tiempo
+    setTimeout(() => {
+      if (elementoDestacadoId.value === elementoId) {
+        elementoDestacadoId.value = null
+      }
+    }, 4000);
+  }
+
+  const actualizarIdsFiltrados = (ids) => {
+    idsElementosFiltrados.value = ids
+  }
+
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
   watch(
     () => [contextoNavegacion.value.tipo, contextoNavegacion.value.id],
@@ -1353,6 +1407,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     plantaEnEdicion,
     etiquetas,
     etiquetasSeleccionadas,
+    elementoDestacadoId,
+    idsElementosFiltrados,
 
     // Getters
     elementosVisibles,
@@ -1428,5 +1484,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     limpiarSeleccion,
     elementosVisiblesParaCapas,
     agregarYSeleccionarEtiqueta,
+
+    // == Asignar etiquetas
+    agregarEtiquetaAElemento,
+    quitarEtiquetaDeElemento,
+    crearYAsignarEtiquetaAElemento,
+
+    // == Destacar
+    destacarElemento,
+    actualizarIdsFiltrados,
   }
 })

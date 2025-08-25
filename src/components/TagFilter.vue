@@ -15,7 +15,7 @@
       >
         <span>{{ etiqueta.texto }}</span>
         <button
-          @click.stop="deseleccionarEtiqueta(etiqueta.id)"
+          @click.stop="onRemoveTag(etiqueta.id)"
           class="w-4 h-4 flex items-center justify-center rounded-full opacity-70 hover:opacity-100"
           :style="{ backgroundColor: 'rgba(0,0,0,0.1)' }"
           title="Eliminar etiqueta"
@@ -49,7 +49,7 @@
           >
             <li
               v-if="puedeCrear"
-              @mousedown.prevent="crearNuevaEtiqueta"
+              @mousedown.prevent="onCreateTag"
               class="px-3 py-2 text-sm text-blue-600 cursor-pointer hover:bg-blue-50"
               :class="{ 'bg-blue-50': activeIndex === 0 }"
             >
@@ -59,7 +59,7 @@
             <li
               v-for="(sugerencia, index) in sugerenciasFiltradas"
               :key="sugerencia.id"
-              @mousedown.prevent="seleccionarEtiqueta(sugerencia)"
+              @mousedown.prevent="onAddTag(sugerencia)"
               class="px-3 py-2 text-sm text-gray-700 cursor-pointer hover:bg-gray-100"
               :class="{ 'bg-gray-100': activeIndex === index + (puedeCrear ? 1 : 0) }"
             >
@@ -76,7 +76,17 @@
 import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore'
 
-const emit = defineEmits(['crear-etiqueta'])
+// --- CAMBIOS AQUÍ ---
+const props = defineProps({
+  // Array de IDs de las etiquetas seleccionadas
+  selectedIds: {
+    type: Array,
+    default: () => [],
+  },
+})
+
+const emit = defineEmits(['add', 'remove', 'create'])
+// --- FIN DE CAMBIOS ---
 
 // Store y refs
 const canvasStore = useCanvasStore()
@@ -87,17 +97,13 @@ const activeIndex = ref(-1)
 
 // Computed properties
 const selectedTags = computed(() => {
-  // --- CORRECCIÓN CLAVE AQUÍ ---
-  // Mapeamos los IDs a las etiquetas completas y luego filtramos cualquier
-  // resultado que sea `undefined` para evitar que el componente se rompa.
-  return canvasStore.etiquetasSeleccionadas
-    .map(id => canvasStore.getEtiquetaPorId(id))
-    .filter(Boolean); // 'Boolean' como función elimina todos los valores "falsy" (null, undefined, etc.)
-});
-
+  // Ahora usa la prop en lugar del store
+  return props.selectedIds.map((id) => canvasStore.getEtiquetaPorId(id)).filter(Boolean)
+})
 
 const sugerenciasFiltradas = computed(() => {
-  const seleccionados = new Set(canvasStore.etiquetasSeleccionadas)
+  // Ahora usa la prop para saber cuáles ya están seleccionadas
+  const seleccionados = new Set(props.selectedIds)
   const termino = terminoBusqueda.value.toLowerCase()
 
   return canvasStore.etiquetas.filter((etiqueta) => {
@@ -110,7 +116,7 @@ const sugerenciasFiltradas = computed(() => {
 const puedeCrear = computed(() => {
   if (!terminoBusqueda.value) return false
   const busquedaExacta = canvasStore.etiquetas.some(
-    (e) => e.texto.toLowerCase() === terminoBusqueda.value.toLowerCase()
+    (e) => e.texto.toLowerCase() === terminoBusqueda.value.toLowerCase(),
   )
   return !busquedaExacta
 })
@@ -136,9 +142,10 @@ const cerrarSugerencias = () => {
   activeIndex.value = -1
 }
 
-const seleccionarEtiqueta = (etiqueta) => {
+// --- MÉTODOS MODIFICADOS PARA EMITIR EVENTOS ---
+const onAddTag = (etiqueta) => {
   if (!etiqueta) return
-  canvasStore.seleccionarEtiqueta(etiqueta.id)
+  emit('add', etiqueta.id) // Emitir evento 'add' con el ID
   terminoBusqueda.value = ''
   activeIndex.value = -1
   nextTick(() => {
@@ -146,18 +153,19 @@ const seleccionarEtiqueta = (etiqueta) => {
   })
 }
 
-const deseleccionarEtiqueta = (etiquetaId) => {
-  canvasStore.deseleccionarEtiqueta(etiquetaId)
+const onRemoveTag = (etiquetaId) => {
+  emit('remove', etiquetaId) // Emitir evento 'remove' con el ID
   nextTick(() => {
     focusInput()
   })
 }
 
-const crearNuevaEtiqueta = () => {
-  emit('crear-etiqueta', terminoBusqueda.value)
+const onCreateTag = () => {
+  emit('create', terminoBusqueda.value) // Emitir evento 'create' con el texto
   terminoBusqueda.value = ''
   cerrarSugerencias()
 }
+// --- FIN DE MÉTODOS MODIFICADOS ---
 
 const moverActivo = (direccion) => {
   const totalOpciones = sugerenciasFiltradas.value.length + (puedeCrear.value ? 1 : 0)
@@ -167,18 +175,18 @@ const moverActivo = (direccion) => {
 
 const handleEnter = () => {
   if (activeIndex.value === -1) {
-    if (puedeCrear.value) crearNuevaEtiqueta()
+    if (puedeCrear.value) onCreateTag()
     return
   }
 
   if (puedeCrear.value) {
     if (activeIndex.value === 0) {
-      crearNuevaEtiqueta()
+      onCreateTag()
     } else {
-      seleccionarEtiqueta(sugerenciasFiltradas.value[activeIndex.value - 1])
+      onAddTag(sugerenciasFiltradas.value[activeIndex.value - 1])
     }
   } else {
-    seleccionarEtiqueta(sugerenciasFiltradas.value[activeIndex.value])
+    onAddTag(sugerenciasFiltradas.value[activeIndex.value])
   }
 }
 </script>

@@ -61,7 +61,12 @@
             </div>
 
             <!-- FILTRO DE ETIQUETAS -->
-            <TagFilter @crear-etiqueta="abrirModalCrearEtiqueta" />
+            <TagFilter
+              :selected-ids="canvasStore.etiquetasSeleccionadas"
+              @add="canvasStore.seleccionarEtiqueta"
+              @remove="canvasStore.deseleccionarEtiqueta"
+              @create="abrirModalCrearEtiqueta"
+            />
 
             <!-- Botón para limpiar filtros -->
             <button

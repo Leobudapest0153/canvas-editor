@@ -53,6 +53,14 @@
             </p>
           </div>
 
+          <TagFilter
+            class="pb-3"
+            :selected-ids="elementoSeleccionado.etiquetas || []"
+            @add="handleAgregarEtiqueta"
+            @remove="handleQuitarEtiqueta"
+            @create="abrirModalCrearEtiqueta"
+          />
+
           <!-- Tipo y Categoría -->
           <div class="grid grid-cols-2 gap-3 mb-4">
             <div>
@@ -94,7 +102,7 @@
               <input
                 v-model="propiedadesEditables.color"
                 type="color"
-                class="w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
+                class="!w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
                 @input="actualizarPropiedad('color', $event.target.value)"
               />
               <input
@@ -234,7 +242,7 @@
         </div>
 
         <!-- Vista Previa -->
-        <div class="bg-gray-50 rounded-lg p-4">
+        <!-- <div class="bg-gray-50 rounded-lg p-4">
           <h3 class="text-sm font-medium text-gray-700 mb-3">Vista Previa</h3>
           <div
             class="flex items-center justify-center p-4 bg-white border border-gray-200 rounded-lg overflow-hidden isolate shadow-sm"
@@ -256,7 +264,7 @@
               </span>
             </div>
           </div>
-        </div>
+        </div> -->
       </div>
     </div>
 
@@ -288,6 +296,12 @@
       </div>
     </div>
   </div>
+  <CreateTagModal
+    :show="modalCrearEtiquetaVisible"
+    :initial-text="textoNuevaEtiqueta"
+    @close="modalCrearEtiquetaVisible = false"
+    @save="guardarYAsignarNuevaEtiqueta"
+  />
 </template>
 
 <script setup>
@@ -295,6 +309,8 @@ import { ref, watch, computed } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore.js'
 import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
 import { useDeleteElement } from '@/composables/useDeleteElement'
+import TagFilter from './TagFilter.vue'
+import CreateTagModal from './CreateTagModal.vue'
 
 // Store
 const canvasStore = useCanvasStore()
@@ -305,6 +321,9 @@ const propiedadesEditables = ref({
   nombre: '',
   color: '#3B82F6',
 })
+
+const modalCrearEtiquetaVisible = ref(false);
+const textoNuevaEtiqueta = ref('');
 
 // Computed
 const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoCompleto)
@@ -379,6 +398,27 @@ const onDeleteClick = () => {
 const obtenerNombreElementoPorId = (elementoId) => {
   const elemento = canvasStore.elementoPorId(elementoId)
   return elemento ? elemento.nombre || generarNombrePorDefecto(elemento) : `ID: ${elementoId}`
+}
+
+const handleAgregarEtiqueta = (etiquetaId) => {
+  if (!elementoSeleccionado.value) return
+  canvasStore.agregarEtiquetaAElemento(elementoSeleccionado.value.id, etiquetaId)
+}
+
+const handleQuitarEtiqueta = (etiquetaId) => {
+  if (!elementoSeleccionado.value) return
+  canvasStore.quitarEtiquetaDeElemento(elementoSeleccionado.value.id, etiquetaId)
+}
+
+const abrirModalCrearEtiqueta = (texto) => {
+  textoNuevaEtiqueta.value = texto
+  modalCrearEtiquetaVisible.value = true
+}
+
+const guardarYAsignarNuevaEtiqueta = (nuevaEtiqueta) => {
+  if (!elementoSeleccionado.value) return
+  canvasStore.crearYAsignarEtiquetaAElemento(elementoSeleccionado.value.id, nuevaEtiqueta)
+  modalCrearEtiquetaVisible.value = false
 }
 </script>
 
