@@ -62,6 +62,14 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Estado básico para desarrollo
   const elementos = ref([])
 
+  // Etiquetas
+  const etiquetas = ref([
+    { id: 1, texto: 'Urgente', colorFondo: '#FECACA', colorTexto: '#991B1B' },
+    { id: 2, texto: 'Revisar', colorFondo: '#DBEAFE', colorTexto: '#1E40AF' },
+    { id: 3, texto: 'Material Pesado', colorFondo: '#FEF9C3', colorTexto: '#854D0E' },
+  ])
+  const etiquetasSeleccionadas = ref([])
+
   const elementoSeleccionado = ref(null)
   const vistaActiva = computed(() => {
     // Vista automática según el contexto
@@ -74,9 +82,12 @@ export const useCanvasStore = defineStore('canvas', () => {
   })
   const zoom = ref(1)
   const crearPlanta = ref(false)
-  const plantaEnEdicion = ref(null);
+  const plantaEnEdicion = ref(null)
   const panX = ref(0)
   const panY = ref(0)
+
+  const elementoDestacadoId = ref(null);
+  const idsElementosFiltrados = ref(null);
 
   // Configuración de grilla y snap
   const gridSize = ref(50) // px entre líneas de grilla
@@ -575,7 +586,26 @@ export const useCanvasStore = defineStore('canvas', () => {
   const actualizarElemento = (elementoId, propiedades) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (elemento) {
-      Object.assign(elemento, propiedades)
+      for (const key in propiedades) {
+        if (typeof propiedades[key] === 'object' && propiedades[key] !== null && !Array.isArray(propiedades[key])) {
+        // Si la propiedad es un objeto (como 'dimensiones'), la fusionamos recursivamente.
+        if (!elemento[key]) elemento[key] = {}
+          Object.assign(elemento[key], propiedades[key]);
+        } else {
+          // Si es un valor simple, lo asignamos directamente.
+          elemento[key] = propiedades[key];
+        }
+      }
+     
+      // Correciones en los datos de ancho y largo a base de las dimensiones
+      if (propiedades.dimensiones) {
+        if (propiedades.dimensiones.ancho !== undefined) {
+          elemento.width = elemento.dimensiones.ancho * CM_TO_PX
+        }
+        if (propiedades.dimensiones.largo !== undefined) {
+          elemento.height = elemento.dimensiones.largo * CM_TO_PX
+        }
+      }
     }
   }
 
@@ -723,7 +753,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     } else {
       // Si estamos en una planta, agregar normalmente
       nuevoElemento.plantaId = contextoNavegacion.value.id
-      nuevoElemento.padre = null
+      nuevoElemento.padre = null;
+      nuevoElemento.etiquetas = []; // Sin etiquetas inicialmente
 
       // Actualizar el array de elementos en la planta
       const planta = plantas.value.find((p) => p.id === contextoNavegacion.value.id)
@@ -1208,28 +1239,148 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+  // === FIN FUNCIONES DE SERIALIZACIÓN ===
+
   const abrirEditor = (plantaId = null) => {
     if (plantaId) {
-      const plantaAEditar = plantas.value.find(p => p.id === plantaId);
+      const plantaAEditar = plantas.value.find((p) => p.id === plantaId)
       if (plantaAEditar) {
-        plantaEnEdicion.value = plantaAEditar;
+        plantaEnEdicion.value = plantaAEditar
       } else {
-        console.error(`No se encontró la planta con id: ${plantaId}`);
-        plantaEnEdicion.value = null;
-        return;
+        console.error(`No se encontró la planta con id: ${plantaId}`)
+        plantaEnEdicion.value = null
+        return
       }
     } else {
-      plantaEnEdicion.value = null;
+      plantaEnEdicion.value = null
     }
-  crearPlanta.value = true;
+    crearPlanta.value = true
   }
 
   const cerrarEditor = () => {
     crearPlanta.value = false
-    plantaEnEdicion.value = null;
+    plantaEnEdicion.value = null
   }
 
-  // === FIN FUNCIONES DE SERIALIZACIÓN ===
+  /* Funciones de filtros*/
+  const getEtiquetaPorId = computed(() => {
+    return (id) => etiquetas.value.find((etiqueta) => etiqueta.id === id)
+  })
+
+  const agregarEtiqueta = (nuevaEtiqueta) => {
+    const newId = Math.max(0, ...etiquetas.value.map((e) => e.id)) + 1
+    etiquetas.value.push({ id: newId, ...nuevaEtiqueta })
+  }
+
+  const seleccionarEtiqueta = (etiquetaId) => {
+    if (!etiquetasSeleccionadas.value.includes(etiquetaId)) {
+      etiquetasSeleccionadas.value.push(etiquetaId)
+    }
+  }
+
+  const deseleccionarEtiqueta = (etiquetaId) => {
+    etiquetasSeleccionadas.value = etiquetasSeleccionadas.value.filter((id) => id !== etiquetaId)
+  }
+
+  const limpiarSeleccion = () => {
+    etiquetasSeleccionadas.value = []
+  }
+
+  const elementosVisiblesParaCapas = computed(() => {
+    // "Desenvolvemos" los elementos para asegurarnos de que trabajamos con el objeto de datos real.
+    const elementosLimpios = elementos.value.map((el) => el?._custom?.value || el)
+
+    // Si estamos en una planta, mostrar solo elementos de tipo 'elementos' (sin padre)
+    if (contextoNavegacion.value.tipo === 'plantas') {
+      const plantaId = contextoNavegacion.value.id
+      const elementosEnEstaPlanta = elementosLimpios.filter((el) => el.plantaId === plantaId)
+      return elementosEnEstaPlanta.filter((el) => !el.padre && el.tipo === 'elementos')
+    }
+
+    // Si estamos dentro de un elemento, mostrar solo contenedores hijos
+    if (contextoNavegacion.value.tipo === 'elementos') {
+      const elementoPadre = elementosLimpios.find((el) => el.id === contextoNavegacion.value.id)
+      if (elementoPadre && elementoPadre.hijos) {
+        return elementoPadre.hijos
+          .map((hijoId) => elementosLimpios.find((el) => el.id === hijoId))
+          .filter((hijo) => hijo && hijo.tipo === 'contenedores')
+      }
+    }
+
+    // Si estamos dentro de un contenedor, mostrar elementos Y otros contenedores hijos
+    if (contextoNavegacion.value.tipo === 'contenedores') {
+      const contenedorPadre = elementosLimpios.find((el) => el.id === contextoNavegacion.value.id)
+      if (contenedorPadre && contenedorPadre.hijos) {
+        return contenedorPadre.hijos
+          .map((hijoId) => elementosLimpios.find((el) => el.id === hijoId))
+          .filter((hijo) => hijo && (hijo.tipo === 'elementos' || hijo.tipo === 'contenedores'))
+      }
+    }
+
+    return []
+  })
+
+  const agregarYSeleccionarEtiqueta = (nuevaEtiqueta) => {
+    // 1. Agregar la etiqueta a la lista global (lógica de agregarEtiqueta)
+    const newId = Math.max(0, ...etiquetas.value.map((e) => e.id)) + 1
+    const etiquetaCompleta = { id: newId, ...nuevaEtiqueta }
+    etiquetas.value.push(etiquetaCompleta)
+
+    // 2. Seleccionarla inmediatamente
+    if (!etiquetasSeleccionadas.value.includes(newId)) {
+      etiquetasSeleccionadas.value.push(newId)
+    }
+  }
+
+
+  // Funciones para agregar etiquetas a los filtros
+  const agregarEtiquetaAElemento = (elementoId, etiquetaId) => {
+    const elemento = elementos.value.find((el) => el.id === elementoId)
+    if (elemento) {
+      if (!elemento.etiquetas) {
+        elemento.etiquetas = []
+      }
+    if (!elemento.etiquetas.includes(etiquetaId)) {
+        elemento.etiquetas.push(etiquetaId)
+        saveToHistory(`Etiqueta añadida a ${elemento.nombre}`)
+      }
+    }
+  }
+
+  const quitarEtiquetaDeElemento = (elementoId, etiquetaId) => {
+    const elemento = elementos.value.find((el) => el.id === elementoId)
+    if (elemento && elemento.etiquetas) {
+      const index = elemento.etiquetas.indexOf(etiquetaId)
+      if (index > -1) {
+        elemento.etiquetas.splice(index, 1)
+        saveToHistory(`Etiqueta quitada de ${elemento.nombre}`)
+      }
+    }
+  }
+
+
+  const crearYAsignarEtiquetaAElemento = (elementoId, nuevaEtiqueta) => {
+     // 1. Crear la etiqueta globalmente
+    const newId = Math.max(0, ...etiquetas.value.map((e) => e.id)) + 1
+    const etiquetaCompleta = { id: newId, ...nuevaEtiqueta }
+    etiquetas.value.push(etiquetaCompleta)
+
+    // 2. Asignarla al elemento
+    agregarEtiquetaAElemento(elementoId, newId)
+  }
+  const destacarElemento = (elementoId) => {
+    elementoDestacadoId.value = elementoId
+    // El efecto de destaque se quitará automáticamente después de un tiempo
+    setTimeout(() => {
+      if (elementoDestacadoId.value === elementoId) {
+        elementoDestacadoId.value = null
+      }
+    }, 4000);
+  }
+
+  const actualizarIdsFiltrados = (ids) => {
+    idsElementosFiltrados.value = ids
+  }
 
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
   watch(
@@ -1273,6 +1424,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     snapGridEps,
     crearPlanta,
     plantaEnEdicion,
+    etiquetas,
+    etiquetasSeleccionadas,
+    elementoDestacadoId,
+    idsElementosFiltrados,
 
     // Getters
     elementosVisibles,
@@ -1339,5 +1494,23 @@ export const useCanvasStore = defineStore('canvas', () => {
     // == Editor de planta
     abrirEditor,
     cerrarEditor,
+
+    // == Filtros de capas
+    getEtiquetaPorId,
+    agregarEtiqueta,
+    seleccionarEtiqueta,
+    deseleccionarEtiqueta,
+    limpiarSeleccion,
+    elementosVisiblesParaCapas,
+    agregarYSeleccionarEtiqueta,
+
+    // == Asignar etiquetas
+    agregarEtiquetaAElemento,
+    quitarEtiquetaDeElemento,
+    crearYAsignarEtiquetaAElemento,
+
+    // == Destacar
+    destacarElemento,
+    actualizarIdsFiltrados,
   }
 })

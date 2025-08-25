@@ -5,7 +5,7 @@
     <!-- Modal -->
     <div class="relative z-10 bg-white rounded-xl shadow-2xl w-[85vw] h-[95vh] overflow-hidden flex flex-col">
       <!-- Close (X) -->
-      <button @click="closeModal" class="absolute top-3 right-3 text-gray-500 hover:text-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" aria-label="Cerrar">
+      <button @click="closeModal" class="cursor-pointer absolute top-3 right-3 text-gray-500 hover:text-gray-700 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" aria-label="Cerrar">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
         </svg>
@@ -40,17 +40,17 @@
           <!-- Toolbar debajo del canvas -->
           <div class="px-3 pb-2">
             <div class="flex items-center gap-2 flex-shrink-0">
-              <button class="px-3 py-2 rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
+              <button class="px-3 py-2 cursor-pointer rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
                       :class="{ 'ring-2 ring-sky-500': adding }"
                       @click="toggleAddMode">
                 {{ adding ? 'Salir de modo añadir' : 'Añadir vértice' }}
               </button>
-              <button class="px-3 py-2 rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
+              <button class="px-3 py-2 cursor-pointer rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
                       :class="{ 'ring-2 ring-rose-500': deleting }"
                       @click="toggleDeleteMode">
                 {{ deleting ? 'Salir de modo eliminar' : 'Eliminar vértice' }}
               </button>
-              <button class="px-3 py-2 rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
+              <button class="px-3 py-2 cursor-pointer rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
                       @click="() => canvasEditorRef.fitStageToPolygon()">
                 Ajustar Vista
               </button>
@@ -133,11 +133,11 @@
 
       <!-- Footer con Cerrar + Guardar -->
       <div class="px-5 py-4 border-t border-t-slate-200 bg-gray-50 flex justify-end gap-3 flex-shrink-0">
-        <button class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        <button class="px-4 py-2 cursor-pointer rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 @click="closeModal">
           Cerrar
         </button>
-        <button class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        <button class="px-4 py-2 cursor-pointer rounded-lg bg-indigo-600 text-white font-medium shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 @click="onSave">
           Guardar Cambios
         </button>
