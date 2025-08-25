@@ -1331,6 +1331,71 @@ const endElementDrag = async (elementId) => {
     finalY = last.y
   }
 
+  // Garantizar persistencia CON VALIDACIÓN: solo persistir si la posición final es válida
+  try {
+    const storeEl = canvasStore.elementosVisibles.find((el) => el.id === elementId)
+    const EPS_PERSIST = 0.5 // px, tolerancia mínima para considerar cambio
+    const posDiff = storeEl && (Math.abs((storeEl.x || 0) - finalX) > EPS_PERSIST || Math.abs((storeEl.y || 0) - finalY) > EPS_PERSIST)
+
+    if (storeEl && posDiff) {
+      // Validar que la posición final está dentro del área y es válida según el validador común
+      const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+      const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
+      const isValidNow = isPlacementValid({ pos: { x: finalX, y: finalY }, movingEl: storeEl, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+
+      if (isValidNow) {
+        // Persistir posición final con historial
+        canvasStore.actualizarPosicionConHistorial(
+          elementId,
+          finalX,
+          finalY,
+          `Elemento movido: ${storeEl.nombre || storeEl.tipo || elementId}`,
+        )
+        // Actualizar lastValidPositions para evitar divergencias posteriores
+        lastValidPositions.value.set(elementId, { x: finalX, y: finalY })
+        console.debug('[finalize] persisted final pos for', elementId, { finalX, finalY })
+      } else {
+        // Si la posición final NO es válida, revertir visualmente a la última válida y persistir esa última válida
+        const revertPos = lastGoodPos || lastValidPositions.value.get(elementId) || { x: storeEl.x || 0, y: storeEl.y || 0 }
+        console.debug('[finalize] final pos INVALID - reverting to last valid pos for', elementId, { finalX, finalY, revertPos })
+        try {
+          const stage2 = stageRef.value?.getNode?.()
+          const layer2 = layerRef.value?.getNode?.()
+          const shape2 = stage2?.findOne?.(`#${elementId}`)
+          if (shape2) {
+            if (shape2.className === 'Circle' || storeEl.forma === 'circular') {
+              const r = Math.min(storeEl.width, storeEl.height) / 2
+              shape2.x(revertPos.x + r)
+              shape2.y(revertPos.y + r)
+            } else {
+              shape2.x(revertPos.x)
+              shape2.y(revertPos.y)
+            }
+            // repaint
+            layer2?.batchDraw?.()
+          }
+        } catch (err) { console.warn('Error reverting shape position', err) }
+
+        // Persistir la posición revertida para mantener consistencia
+        try {
+          canvasStore.actualizarPosicionConHistorial(
+            elementId,
+            revertPos.x,
+            revertPos.y,
+            `Revertir posición inválida: ${storeEl.nombre || storeEl.tipo || elementId}`,
+          )
+          lastValidPositions.value.set(elementId, { x: revertPos.x, y: revertPos.y })
+        } catch (err) {
+          console.warn('Error persisting revert position', err)
+        }
+      }
+    } else {
+      console.debug('[finalize] no persistence needed for', elementId, { finalX, finalY, storeX: storeEl?.x, storeY: storeEl?.y })
+    }
+  } catch (err) {
+    console.warn('Error persisting final position for', elementId, err)
+  }
+
   // 7. Limpiar conflictos después del dragend exitoso
   conflictsApi.clear()
 
@@ -2049,25 +2114,6 @@ const fitToPlanta = () => {
       }
     }
 
-    // Si hay un elemento seleccionado fuera de la navegación, también permitir fit a él
-    if (!canvasStore.estaEnElemento && canvasStore.elementoSeleccionado) {
-      const sel = canvasStore.elementosVisibles.find((e) => e.id === canvasStore.elementoSeleccionado)
-      if (sel) {
-        const selBbox = { x: sel.x || 0, y: sel.y || 0, width: Math.max(1, sel.width || 1), height: Math.max(1, sel.height || 1) }
-        const selMargin = 24
-        const vwEl = Math.max(16, stageSize.value.width - selMargin * 2)
-        const vhEl = Math.max(16, stageSize.value.height - selMargin * 2)
-        let scaleXel = selBbox.width > 0 ? vwEl / selBbox.width : 1
-        let scaleYel = selBbox.height > 0 ? vhEl / selBbox.height : 1
-        let targetScaleEl = Math.min(scaleXel, scaleYel)
-        targetScaleEl = Math.max(0.05, Math.min(10, targetScaleEl))
-        const stageXel = (stageSize.value.width - selBbox.width * targetScaleEl) / 2 - selBbox.x * targetScaleEl
-        const stageYel = (stageSize.value.height - selBbox.height * targetScaleEl) / 2 - selBbox.y * targetScaleEl
-        canvasStore.configurarZoom(targetScaleEl)
-        canvasStore.configurarPan(stageXel, stageYel)
-        return
-      }
-    }
 
     if (planta) {
       // Priorizar polígono si está disponible
