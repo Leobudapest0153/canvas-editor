@@ -550,7 +550,7 @@ import { applyEdgeConstraint } from '@/utils/edgeConstraint'
 import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
-import { isValidPlacement } from '@/utils/placementValidity'
+import { isPlacementValid } from '@/utils/isPlacementValid'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -1011,24 +1011,29 @@ const startElementDrag = (elementId) => {
       }
 
       const onValidateLight = throttle2((bbox) => {
-        const area = { type: 'rect', W: layerConfig.value.width, H: layerConfig.value.height }
-        const outside =
-          bbox.x < 0 || bbox.y < 0 || bbox.x + bbox.width > area.W || bbox.y + bbox.height > area.H
+        // Overlay rojo/ok basado en el MISMO predicado de validez (modelo puro)
+        const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+        const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
+        if (!elemento) return
         const moving = {
           id: elementId,
-          x: bbox.x,
-          y: bbox.y,
-          width: bbox.width,
-          height: bbox.height,
+          width: elemento.forma === 'circular' ? Math.min(bbox.width, bbox.height) : bbox.width,
+          height: elemento.forma === 'circular' ? Math.min(bbox.width, bbox.height) : bbox.height,
+          forma: elemento.forma || 'rectangular',
+          ubicacion: elemento.ubicacion || 'suelo',
         }
-        const conflicts = detectConflictsFor(moving, canvasStore.elementosVisibles).filter(
-          (c) => c.bloqueante,
-        )
-        const warn = outside || conflicts.length > 0
+        const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
+        const isOk = isPlacementValid({
+          pos: { x: bbox.x, y: bbox.y },
+          movingEl: moving,
+          neighbors,
+          areaBounds,
+          CM_TO_PX,
+          epsPx: 0.5,
+        })
+        const warn = !isOk
         try {
-          shape.stroke(
-            warn ? '#ef4444' : canvasStore.elementoSeleccionado === elementId ? '#000' : '#666',
-          )
+          shape.stroke(warn ? '#ef4444' : canvasStore.elementoSeleccionado === elementId ? '#000' : '#666')
         } catch {
           console.warn('Error al actualizar el color del borde del shape:', elementId)
         }
@@ -1075,25 +1080,9 @@ const startElementDrag = (elementId) => {
       const validatePosition = (pos) => {
         const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
         if (!elemento) return false
-
-        const neighbors = canvasStore.elementosVisibles.filter((e) =>
-          e.id !== elementId && (e.ubicacion || 'suelo') === 'suelo' && (elemento.ubicacion || 'suelo') === 'suelo'
-        )
-
-        const strokeEnabled = typeof shape.strokeEnabled === 'function' ? shape.strokeEnabled() : !!shape.strokeEnabled
-        const strokeWidth = typeof shape.strokeWidth === 'function' ? shape.strokeWidth() : (shape.strokeWidth || 0)
-        const strokePx = strokeEnabled ? strokeWidth : 0
-
+        const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
         const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-
-        return isValidPlacement({
-          pos,
-          movingEl: elemento,
-          neighbors,
-          areaBounds,
-          CM_TO_PX,
-          strokePx
-        })
+        return isPlacementValid({ pos, movingEl: elemento, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
       }
 
       const ctrl = setupRafDrag({
@@ -1150,12 +1139,14 @@ const endElementDrag = async (elementId) => {
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (!elemento) return
 
-  // Obtener lastGoodPos del RAF controller antes de limpiar
+  // Obtener lastGoodPos y pausar rAF/validaciones live
   const rec = rafControllers.get(elementId)
   let lastGoodPos = null
   if (rec && rec.ctrl && rec.ctrl.getLastGoodPos) {
     lastGoodPos = rec.ctrl.getLastGoodPos()
   }
+  // Pausar rAF inmediatamente para evitar interferencias durante finalize
+  try { rec?.ctrl?.end?.() } catch { /* ignore */ }
 
   // Ejecutar validación y finalización con nueva lógica
   try {
@@ -1182,10 +1173,8 @@ const endElementDrag = async (elementId) => {
           e.id !== elementId && (e.ubicacion || 'suelo') === 'suelo' && (elementoActual.ubicacion || 'suelo') === 'suelo',
         )
 
-        // stroke del shape
-        const strokeEnabled = typeof shape.strokeEnabled === 'function' ? shape.strokeEnabled() : !!shape.strokeEnabled
-        const strokeWidth = typeof shape.strokeWidth === 'function' ? shape.strokeWidth() : (shape.strokeWidth || 0)
-        const strokePx = strokeEnabled ? strokeWidth : 0
+        // strokePxEstable: usar el stroke normal del elemento (no la selección). Por defecto 1px
+        const strokePx = 1
 
         // 1. Verificar validez de la posición actual después de finalizePlacement
         const lastPos = lastValidPositions.value.get(elementId) || { x: elementoActual.x, y: elementoActual.y }
@@ -1210,14 +1199,14 @@ const endElementDrag = async (elementId) => {
           lastVelocity: lastVel,
         })
 
-        // 2. Verificar validez final con isValidPlacement
-        const finalIsValid = isValidPlacement({
+        // 2. Verificar validez final con el MISMO predicado isPlacementValid (modelo puro)
+        const finalIsValid = isPlacementValid({
           pos: { x: solved.x, y: solved.y },
           movingEl: elementoActual,
           neighbors,
           areaBounds,
           CM_TO_PX,
-          strokePx
+          epsPx: 0.5,
         })
 
         let finalPosition = { x: solved.x, y: solved.y }
@@ -1252,13 +1241,13 @@ const endElementDrag = async (elementId) => {
           })
 
           // Validar el resultado del re-clamp
-          const reclampIsValid = isValidPlacement({
+          const reclampIsValid = isPlacementValid({
             pos: { x: reclampResult.x, y: reclampResult.y },
             movingEl: elementoActual,
             neighbors,
             areaBounds,
             CM_TO_PX,
-            strokePx
+            epsPx: 0.5,
           })
 
           if (reclampIsValid) {
@@ -1344,14 +1333,9 @@ const endElementDrag = async (elementId) => {
   // 7. Limpiar conflictos después del dragend exitoso
   conflictsApi.clear()
 
-  // Detener rAF y restaurar modo performance
+  // Limpiar estado del controlador rAF (ya pausado arriba)
   if (rec && rec.ctrl) {
-    try {
-      rec.ctrl.resetLastGoodPos() // Limpiar el tracking de lastGoodPos
-      rec.ctrl.end({ x: finalX, y: finalY, width: elemento.width, height: elemento.height })
-    } catch {
-      console.warn('Error al finalizar el arrastre del elemento:', elementId)
-    }
+    try { rec.ctrl.resetLastGoodPos() } catch { /* ignore */ }
   }
   rafControllers.delete(elementId)
   const perf = perfContexts.get(elementId)

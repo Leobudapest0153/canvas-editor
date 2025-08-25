@@ -88,7 +88,15 @@ export function setupRafDrag({
     running = true
     dirty = true
     lastDrawnBBox = null
-    lastGoodPos = null // Reset al inicio del drag
+    // Inicializar lastGoodPos con la posición actual del shape en el momento de iniciar
+    try {
+      const bbox = readBBox()
+      if (bbox && typeof bbox.x === 'number' && typeof bbox.y === 'number') {
+        lastGoodPos = { x: bbox.x, y: bbox.y }
+      } else {
+        lastGoodPos = null
+      }
+    } catch { lastGoodPos = null }
     try { if (typeof window !== 'undefined') window.__dvCanvasDragActive = true } catch (e) { void e }
     rafId = requestAnimationFrame(loop)
   }
