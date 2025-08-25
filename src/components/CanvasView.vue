@@ -550,6 +550,7 @@ import { applyEdgeConstraint } from '@/utils/edgeConstraint'
 import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
+import { isValidPlacement } from '@/utils/placementValidity'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -1070,7 +1071,40 @@ const startElementDrag = (elementId) => {
         lastValidPositions.value.set(elementId, { x, y })
       }
 
-      const ctrl = setupRafDrag({ stage, layer, getMovingShapeBBox, onValidateLight, onCommitEnd, onFrame })
+      // Función de validación para el RAF drag
+      const validatePosition = (pos) => {
+        const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
+        if (!elemento) return false
+
+        const neighbors = canvasStore.elementosVisibles.filter((e) =>
+          e.id !== elementId && (e.ubicacion || 'suelo') === 'suelo' && (elemento.ubicacion || 'suelo') === 'suelo'
+        )
+
+        const strokeEnabled = typeof shape.strokeEnabled === 'function' ? shape.strokeEnabled() : !!shape.strokeEnabled
+        const strokeWidth = typeof shape.strokeWidth === 'function' ? shape.strokeWidth() : (shape.strokeWidth || 0)
+        const strokePx = strokeEnabled ? strokeWidth : 0
+
+        const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+
+        return isValidPlacement({
+          pos,
+          movingEl: elemento,
+          neighbors,
+          areaBounds,
+          CM_TO_PX,
+          strokePx
+        })
+      }
+
+      const ctrl = setupRafDrag({
+        stage,
+        layer,
+        getMovingShapeBBox,
+        onValidateLight,
+        onCommitEnd,
+        onFrame,
+        validatePosition
+      })
       rafControllers.set(elementId, { ctrl, shape, layer })
       ctrl.start()
     }
@@ -1116,7 +1150,14 @@ const endElementDrag = async (elementId) => {
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (!elemento) return
 
-  // Ejecutar clamp final con ajuste de stroke y orden especificado
+  // Obtener lastGoodPos del RAF controller antes de limpiar
+  const rec = rafControllers.get(elementId)
+  let lastGoodPos = null
+  if (rec && rec.ctrl && rec.ctrl.getLastGoodPos) {
+    lastGoodPos = rec.ctrl.getLastGoodPos()
+  }
+
+  // Ejecutar validación y finalización con nueva lógica
   try {
     const stage = stageRef.value.getNode()
     const layer = layerRef.value.getNode()
@@ -1141,13 +1182,14 @@ const endElementDrag = async (elementId) => {
           e.id !== elementId && (e.ubicacion || 'suelo') === 'suelo' && (elementoActual.ubicacion || 'suelo') === 'suelo',
         )
 
-        // Última velocidad estimada del rAF
-        const lastVel = lastVelocityMap.value.get(elementId) || { x: 0, y: 0 }
-
         // stroke del shape
         const strokeEnabled = typeof shape.strokeEnabled === 'function' ? shape.strokeEnabled() : !!shape.strokeEnabled
         const strokeWidth = typeof shape.strokeWidth === 'function' ? shape.strokeWidth() : (shape.strokeWidth || 0)
         const strokePx = strokeEnabled ? strokeWidth : 0
+
+        // 1. Verificar validez de la posición actual después de finalizePlacement
+        const lastPos = lastValidPositions.value.get(elementId) || { x: elementoActual.x, y: elementoActual.y }
+        const lastVel = lastVelocityMap.value.get(elementId) || { x: 0, y: 0 }
 
         // Elemento rectangular para resolver (círculos como AABB)
         const asRect = elementoActual.forma === 'circular'
@@ -1155,11 +1197,7 @@ const endElementDrag = async (elementId) => {
           : { ...elementoActual }
         asRect.__strokePx = strokePx
 
-        // margen en px para factibilidad del corredor
-        const { MARGIN_CM } = await import('@/utils/constants')
-        const marginPx = (MARGIN_CM || 0) * (CM_TO_PX || 1)
-
-        const lastPos = lastValidPositions.value.get(elementId) || { x: elementoActual.x, y: elementoActual.y }
+        // Ejecutar finalizePlacement primero
         const solved = finalizePlacement({
           candidate: { x: candX, y: candY },
           movingEl: asRect,
@@ -1172,18 +1210,84 @@ const endElementDrag = async (elementId) => {
           lastVelocity: lastVel,
         })
 
-        // Aplicar al shape
-        if (shape.className === 'Circle' || elementoActual.forma === 'circular') {
-          const r = Math.min(elementoActual.width, elementoActual.height) / 2
-          shape.x(solved.x + r)
-          shape.y(solved.y + r)
-        } else {
-          shape.x(solved.x)
-          shape.y(solved.y)
+        // 2. Verificar validez final con isValidPlacement
+        const finalIsValid = isValidPlacement({
+          pos: { x: solved.x, y: solved.y },
+          movingEl: elementoActual,
+          neighbors,
+          areaBounds,
+          CM_TO_PX,
+          strokePx
+        })
+
+        let finalPosition = { x: solved.x, y: solved.y }
+        let fallbackUsed = false
+
+        // 3. Si la posición final no es válida, usar lastGoodPos o lastValidPos
+        if (!finalIsValid) {
+          console.log('Posición final inválida, usando fallback...')
+
+          if (lastGoodPos) {
+            console.log('Usando lastGoodPos del RAF drag:', lastGoodPos)
+            finalPosition = { x: lastGoodPos.x, y: lastGoodPos.y }
+          } else {
+            console.log('Usando lastValidPos de dragstart:', lastPos)
+            finalPosition = { x: lastPos.x, y: lastPos.y }
+          }
+
+          // Aplicar clamp→snap→re-clamp en la posición de fallback
+          const { MARGIN_CM } = await import('@/utils/constants')
+          const marginPx = (MARGIN_CM || 0) * (CM_TO_PX || 1)
+
+          const reclampResult = finalizePlacement({
+            candidate: finalPosition,
+            movingEl: asRect,
+            neighbors,
+            areaBounds,
+            grid: canvasStore.gridSize || 50,
+            lastValidPos: lastPos,
+            CM_TO_PX,
+            strokePx,
+            lastVelocity: { x: 0, y: 0 }, // Sin velocidad en fallback
+          })
+
+          // Validar el resultado del re-clamp
+          const reclampIsValid = isValidPlacement({
+            pos: { x: reclampResult.x, y: reclampResult.y },
+            movingEl: elementoActual,
+            neighbors,
+            areaBounds,
+            CM_TO_PX,
+            strokePx
+          })
+
+          if (reclampIsValid) {
+            finalPosition = { x: reclampResult.x, y: reclampResult.y }
+          } else {
+            // Si sigue inválido, mantener lastValidPos original
+            console.log('Re-clamp sigue inválido, manteniendo lastValidPos original')
+            finalPosition = { x: lastPos.x, y: lastPos.y }
+          }
+
+          fallbackUsed = true
         }
 
-        // Guardar bandera de fallback usado
-        const fallbackUsed = Math.abs(solved.x - lastPos.x) <= 1e-6 && Math.abs(solved.y - lastPos.y) <= 1e-6
+        // 4. Aplicar posición final al shape
+        if (shape.className === 'Circle' || elementoActual.forma === 'circular') {
+          const r = Math.min(elementoActual.width, elementoActual.height) / 2
+          shape.x(finalPosition.x + r)
+          shape.y(finalPosition.y + r)
+        } else {
+          shape.x(finalPosition.x)
+          shape.y(finalPosition.y)
+        }
+
+        // 5. Limpiar stroke rojo - elemento ya no debe estar en estado inválido
+        try {
+          shape.stroke(canvasStore.elementoSeleccionado === elementId ? '#000' : '#666')
+        } catch {
+          console.warn('Error al limpiar stroke del shape:', elementId)
+        }
 
         // Repaint sincronizado
         await nextTick()
@@ -1192,18 +1296,25 @@ const endElementDrag = async (elementId) => {
         layer.batchDraw?.()
         await new Promise((r) => requestAnimationFrame(() => r()))
 
-        // Persistir posición final en el store y guardar snapshot sólo si no hubo fallback
-        if (!fallbackUsed) {
+        // 6. Guardar snapshot solo si la posición final difiere de lastValidPos
+        const positionChanged = Math.abs(finalPosition.x - lastPos.x) > 1e-6 || Math.abs(finalPosition.y - lastPos.y) > 1e-6
+
+        if (positionChanged) {
           canvasStore.actualizarPosicionConHistorial(
             elementId,
-            solved.x,
-            solved.y,
+            finalPosition.x,
+            finalPosition.y,
             `Elemento movido: ${elementoActual.nombre || elementoActual.tipo || elementId}`,
           )
         }
+
+        // Actualizar lastValidPositions con la posición final
+        lastValidPositions.value.set(elementId, finalPosition)
       }
     }
-  } catch { /* ignore */ }
+  } catch (err) {
+    console.warn('Error en endElementDrag:', err)
+  }
 
   // Leer posición final del shape para persistir
   let finalX, finalY
@@ -1230,15 +1341,13 @@ const endElementDrag = async (elementId) => {
     finalY = last.y
   }
 
-  // Evaluar conflictos al finalizar (solo para pintar/estado, sin modal ni toasts)
-  const movingNow = { ...elemento, x: finalX, y: finalY }
-  const conflicts = detectConflictsFor(movingNow, canvasStore.elementosVisibles)
-  conflictsApi.setConflicts(conflicts, elementId)
+  // 7. Limpiar conflictos después del dragend exitoso
+  conflictsApi.clear()
 
   // Detener rAF y restaurar modo performance
-  const rec = rafControllers.get(elementId)
   if (rec && rec.ctrl) {
     try {
+      rec.ctrl.resetLastGoodPos() // Limpiar el tracking de lastGoodPos
       rec.ctrl.end({ x: finalX, y: finalY, width: elemento.width, height: elemento.height })
     } catch {
       console.warn('Error al finalizar el arrastre del elemento:', elementId)
@@ -1252,10 +1361,6 @@ const endElementDrag = async (elementId) => {
     console.warn('Error al restaurar el contexto de rendimiento del elemento:', elementId)
   }
   perfContexts.delete(elementId)
-
-  // Persistir posición final en el store y guardar snapshot
-  // (omitido aquí: ya se realiza condicionalmente antes)
-  // ...existing code...
 }
 
 // === FUNCIONES DE DROP DESDE CATÁLOGO ===
@@ -1742,8 +1847,7 @@ const handleTransformEnd = (e, elementId, forma) => {
       newDimensiones.largo = heightCm
       // Mantener alto sin cambios
     } else if (canvasStore.vistaActiva === 'XZ') {
-      // Vista frontal (XZ): width = ancho, height = alto
-      newDimensiones.ancho = widthCm
+      // Vista frontal (XZ): width = anchoCm
       newDimensiones.alto = heightCm
       // Mantener largo sin cambios
     }
