@@ -9,28 +9,30 @@
   <div class="navegacion-jerarquica">
     <!-- Breadcrumbs -->
     <div class="breadcrumbs">
-      <button
-        v-for="(crumb, index) in canvasStore.breadcrumbs"
-        :key="`${crumb.tipo}-${crumb.id}`"
-        class="breadcrumb-item"
-        :class="{ active: index === canvasStore.breadcrumbs.length - 1 }"
-        @click="navegarACrumb(crumb, index)"
-      >
-        <span class="crumb-icon">{{ crumb.icono }}</span>
-        <span class="crumb-text">{{ crumb.nombre }}</span>
-      </button>
+      <template v-for="(crumb, index) in canvasStore.breadcrumbs" :key="`${crumb.tipo}-${crumb.id}`">
+        <span class="crumb-group">
+          <button
+            class="breadcrumb-item"
+            :class="{ active: index === canvasStore.breadcrumbs.length - 1 }"
+            @click="navegarACrumb(crumb, index)"
+          >
+            <span class="crumb-icon">{{ crumb.icono }}</span>
+            <span class="crumb-text">{{ crumb.nombre }}</span>
+          </button>
 
-      <!-- Separadores -->
-      <svg
-        v-for="(crumb, index) in canvasStore.breadcrumbs.slice(0, -1)"
-        :key="`sep-${index}`"
-        class="breadcrumb-separator"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-      </svg>
+          <!-- Separador entre elementos, no renderizar después del último -->
+          <svg
+            v-if="index < canvasStore.breadcrumbs.length - 1"
+            class="breadcrumb-separator"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </span>
+      </template>
     </div>
 
     <!-- Controles de navegación -->
@@ -110,27 +112,15 @@ const navegarACrumb = (crumb, index) => {
   if (crumb.tipo === 'plantas') {
     canvasStore.navegarAPlanta(crumb.id)
   } else if (crumb.tipo === 'elementos' || crumb.tipo === 'contenedores') {
-    // Navegar específicamente a este elemento/contenedor
-    // Reconstruir el path hasta este elemento
+    // Usar la función del store para navegar a un elemento/contenedor
+    // Esto asegura que zoom/pan, selección y canvas adaptativo se actualicen correctamente
+    // Reconstruir el path hasta este elemento y usar navegarAContexto para reemplazarlo
     const nuevoPath = canvasStore.breadcrumbs.slice(0, index + 1).map((breadcrumb) => ({
       tipo: breadcrumb.tipo,
       id: breadcrumb.id,
       nombre: breadcrumb.nombre,
     }))
-
-    canvasStore.contextoNavegacion.value = {
-      tipo: crumb.tipo,
-      id: crumb.id,
-      path: nuevoPath,
-    }
-
-    // Calcular canvas adaptativo si es un elemento/contenedor
-    if (crumb.tipo === 'elementos' || crumb.tipo === 'contenedores') {
-      const elemento = canvasStore.elementoPorId(crumb.id)
-      if (elemento) {
-        canvasStore.calcularCanvasAdaptativo(elemento)
-      }
-    }
+    canvasStore.navegarAContexto(crumb.tipo, crumb.id, nuevoPath)
   }
 }
 </script>
@@ -198,6 +188,9 @@ const navegarACrumb = (crumb, index) => {
   color: #9ca3af;
   flex-shrink: 0;
 }
+
+.crumb-group { display: inline-flex; align-items: center; gap: 0.5rem; }
+.breadcrumb-separator { display: inline-block; vertical-align: middle; pointer-events: none; }
 
 /* Controles de navegación */
 .nav-controls {
