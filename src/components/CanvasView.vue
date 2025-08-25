@@ -121,13 +121,18 @@
               width: elemento.width,
               height: elemento.height,
               fill: elemento.color,
+              stroke: getElementStroke(elemento),
+              strokeWidth: getElementStrokeWidth(elemento),
+              opacity: getElementOpacity(elemento),
               stroke: getStrokeColor(elemento.id),
-              strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
-              opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
               draggable: canDragElement(elemento.id),
-              shadowColor: 'black',
-              shadowBlur: 4,
-              shadowOpacity: 0.3,
+              offsetX: elemento.width / 2,
+              offsetY: elemento.height / 2,
+              shadowColor: getElementShadow(elemento).color,
+              shadowBlur: getElementShadow(elemento).blur,
+              shadowOpacity: getElementShadow(elemento).opacity,
+              shadowOffsetX: getElementShadow(elemento).offsetX,
+              shadowOffsetY: getElementShadow(elemento).offsetY,
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
             }"
             @click="() => selectElement(elemento.id)"
@@ -189,12 +194,18 @@
               y: elemento.y + elemento.height / 2,
               radius: Math.min(elemento.width, elemento.height) / 2,
               fill: elemento.color,
-              stroke: getStrokeColor(elemento.id),
+              stroke: getElementStroke(elemento),
+              strokeWidth: getElementStrokeWidth(elemento),
+              opacity: getElementOpacity(elemento),
               strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
               opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
-              draggable: canDragElement(elemento.id),
-              shadowColor: 'black',
-              shadowBlur: 4,
+              offsetX: elemento.width / 2,
+              offsetY: elemento.height / 2,
+              shadowColor: getElementShadow(elemento).color,
+              shadowBlur: getElementShadow(elemento).blur,
+              shadowOpacity: getElementShadow(elemento).opacity,
+              shadowOffsetX: getElementShadow(elemento).offsetX,
+              shadowOffsetY: getElementShadow(elemento).offsetY,
               shadowOpacity: 0.3,
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'circle'),
             }"
@@ -715,6 +726,7 @@ const stageSize = ref({ width: 800, height: 600 })
 const isDragOverCanvas = ref(false)
 const isElementDragging = ref(false)
 const stageDragEnabled = ref(true)
+const highlightAnimation = ref(null);
 
 // Configuración del stage - OCUPA TODO EL CONTENEDOR
 const stageConfig = computed(() => {
@@ -790,6 +802,105 @@ const gridLines = computed(() => {
 
   return { vertical, horizontal }
 })
+
+const getElementOpacity = (elemento) => {
+  if (isElementLocked(elemento.id)) return 0.35
+
+  // Si la lista de IDs filtrados existe (es decir, hay filtros activos)
+  if (canvasStore.idsElementosFiltrados !== null) {
+    // Si el elemento NO está en la lista, reducir su opacidad
+    if (!canvasStore.idsElementosFiltrados.includes(elemento.id)) {
+      return 0.2
+    }
+  }
+
+  // Opacidad por defecto
+  return 0.8
+}
+
+const getElementStroke = (elemento) => {
+  if (canvasStore.elementoDestacadoId === elemento.id) return elemento.color;
+  if (atEdgeMap.value.get(elemento.id)) return '#f59e0b';
+  return canvasStore.elementoSeleccionado === elemento.id ? '#000' : '#666';
+}
+
+const getElementStrokeWidth = (elemento) => {
+  if (canvasStore.elementoDestacadoId === elemento.id) return 4
+  return canvasStore.elementoSeleccionado === elemento.id ? 3 : 1
+}
+
+const getElementShadow = (elemento) => {
+  if (canvasStore.elementoDestacadoId === elemento.id) {
+    console.log(elemento);
+    return {
+      color: elemento.colorBase,
+      blur: 80,
+      opacity: 1.9,
+      offsetX: 0,
+      offsetY: 0,
+    }
+  }
+  // Sombra por defecto
+  return {
+    color: 'black',
+    blur: 4,
+    opacity: 0.3,
+    offsetX: 0,
+    offsetY: 0,
+  }
+}
+
+
+watch(
+  () => canvasStore.elementoDestacadoId,
+  (newId, oldId) => {
+    // Detener animación anterior si la hay
+    if (highlightAnimation.value) {
+      highlightAnimation.value.stop()
+      highlightAnimation.value = null
+    }
+    // Restaurar sombra del elemento anterior
+    if (oldId) {
+      const oldNode = stageRef.value?.getNode().findOne(`#${oldId}`)
+      if (oldNode) {
+        oldNode.shadowBlur(4)
+        oldNode.shadowOpacity(0.3)
+        oldNode.scaleX(1);
+        oldNode.scaleY(1);
+      }
+    }
+
+    if (newId) {
+      const elemento = canvasStore.elementoPorId(newId)
+      const node = stageRef.value?.getNode().findOne(`#${newId}`)
+
+      if (elemento && node) {
+        // 1. Centrar la vista en el elemento
+        const stage = stageRef.value.getNode()
+
+        const currentScale = canvasStore.zoom
+
+        const newPos = {
+          x: -elemento.x * currentScale + stage.width() / 2 - (elemento.width * currentScale) / 2,
+          y: -elemento.y * currentScale + stage.height() / 2 - (elemento.height * currentScale) / 2,
+        }
+
+        canvasStore.configurarPan(newPos.x, newPos.y)
+
+        highlightAnimation.value = new Konva.Animation((frame) => {
+          const period = 1000;
+          const amplitude = 0.15
+          const scale = 1 + amplitude / 2 + (Math.sin((frame.time * 2 * Math.PI) / period) * amplitude) / 2
+          
+          node.scaleX(scale)
+          node.scaleY(scale)
+          }, node.getLayer())
+
+          highlightAnimation.value.start()
+        }
+    }
+  },
+);
 
 // Obtiene el contorno de la planta activa como rect o polígono
 const computeBoundary = () => {

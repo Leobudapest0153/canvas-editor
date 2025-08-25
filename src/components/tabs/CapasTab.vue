@@ -134,6 +134,15 @@
           <!-- Controles -->
           <div class="flex items-center gap-2">
             <button
+              @click.stop="canvasStore.destacarElemento(elemento.id)"
+              class="p-1 text-gray-400 hover:text-blue-600"
+              title="Encontrar en el canvas"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+            </button>
+            <button
               @click.stop="canvasStore.toggleElementoVisibilidad(elemento.id)"
               class="p-1 text-gray-400 hover:text-gray-600"
               :title="elemento.visible === false ? 'Mostrar' : 'Ocultar'"
@@ -183,7 +192,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore'
 import { CATEGORIAS } from '@/utils/constants'
 import TagFilter from '@/components/TagFilter.vue'
@@ -288,6 +297,21 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('mousedown', handleClickOutside)
 })
+
+watch(
+  [elementosFiltrados, hayFiltrosActivos],
+  ([filtrados, activos]) => {
+    if (activos) {
+      // Si hay filtros, pasamos la lista de IDs que los cumplen
+      const ids = filtrados.map((el) => el.id)
+      canvasStore.actualizarIdsFiltrados(ids)
+    } else {
+      // Si no hay filtros, pasamos null para desactivar el efecto de opacidad
+      canvasStore.actualizarIdsFiltrados(null)
+    }
+  },
+  { immediate: true }, // immediate para que se ejecute al cargar el componente
+)
 
 const esElementoSeleccionado = (elementoId) => {
   return canvasStore.elementoSeleccionado === elementoId
