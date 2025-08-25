@@ -17,7 +17,7 @@
         v-for="tab in tabs"
         :key="tab.id"
         @click="activeTab = tab.id"
-        :class="['tab-btn', { active: activeTab === tab.id }]"
+        :class="['tab-btn', 'relative' ,{ active: activeTab === tab.id }]"
         :title="tab.tooltip"
       >
         <!-- Icono Cubo para Elementos -->
@@ -44,6 +44,7 @@
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
+
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -68,6 +69,10 @@
           />
         </svg>
 
+        <span
+          v-if="tab.id === 'capas' && activeFilters"
+          class="absolute top-2 right-1 w-2 h-2 bg-blue-500 rounded-full"
+        ></span>
         <span class="tab-label">{{ tab.label }}</span>
       </button>
     </div>
@@ -93,10 +98,13 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import ElementosTab from './tabs/ElementosTab.vue'
 import CapasTab from './tabs/CapasTab.vue'
 import BufferTab from './tabs/BufferTab.vue'
+import {useCanvasStore} from '@/composables/useCanvasStore'
+
+const canvasStore = useCanvasStore();
 
 // Estado del tab activo
 const activeTab = ref('elementos')
@@ -119,6 +127,10 @@ const tabs = [
     tooltip: 'Almacén temporal de elementos',
   },
 ]
+
+const activeFilters = computed(() => {
+  return canvasStore.elementoDestacadoId || canvasStore.idsElementosFiltrados;
+});
 </script>
 
 <style scoped>
