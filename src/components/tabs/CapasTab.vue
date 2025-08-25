@@ -1,21 +1,9 @@
-<!--
-  CapasTab.vue
-  Tab para gestión de capas y visualización de elementos en el canvas.
-
-  Funcionalidades:
-  - Mostrar todos los elementos del canvas activo
-  - Filtrar por categoría
-  - Filtrar por ubicación (suelo/pared)
-  - Control visual de visibilidad de elementos
-  - Selección de elementos desde la lista
--->
-
 <template>
   <div class="h-full flex flex-col bg-white">
     <!-- Contenedor para el botón y el panel de filtros -->
     <div class="relative border-b border-gray-200">
       <!-- Botón para mostrar/ocultar filtros -->
-      <div class="p-4 bg-white">
+      <div class="p-4 bg-white" ref="filtrosBotonRef">
         <button
           @click="toggleFiltros"
           class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -38,11 +26,11 @@
         <div
           v-if="filtrosVisibles"
           class="absolute top-full left-0 w-full bg-gray-50 shadow-lg z-10"
+          ref="filtrosPanelRef"
         >
-          <!-- Controles de filtro -->
-          <div class="p-4">
+          <div class="p-4 space-y-3">
             <!-- Filtro por categoría -->
-            <div class="mb-3">
+            <div>
               <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide"
                 >Categoría:</label
               >
@@ -58,7 +46,7 @@
             </div>
 
             <!-- Filtro por ubicación -->
-            <div class="mb-3">
+            <div>
               <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide"
                 >Ubicación:</label
               >
@@ -72,7 +60,7 @@
               </select>
             </div>
 
-            <!-- NUEVO FILTRO A AGREGAR -->
+            <!-- FILTRO DE ETIQUETAS -->
             <TagFilter @crear-etiqueta="abrirModalCrearEtiqueta" />
 
             <!-- Botón para limpiar filtros -->
@@ -126,67 +114,28 @@
           }"
           @click="seleccionarElemento(elemento.id)"
         >
-          <!-- Visual del elemento -->
-          <div class="flex-shrink-0">
-            <div
-              class="w-10 h-10 rounded-md border border-gray-300 flex items-center justify-center relative overflow-hidden"
-              :style="{
-                backgroundColor: elemento.color,
-                opacity: elemento.visible === false ? 0.3 : 1,
-              }"
-              :class="{
-                'rounded-sm': elemento.forma === 'rectangular',
-                'rounded-full': elemento.forma === 'circular',
-              }"
-            >
-              <span class="text-base brightness-0 invert mix-blend-difference">{{
-                getIconoCategoria(elemento.tipo)
-              }}</span>
-            </div>
+          <!-- Visual -->
+          <div
+            class="w-10 h-10 rounded-md flex-shrink-0 flex items-center justify-center"
+            :style="{ backgroundColor: elemento.colorBase || '#E0E0E0' }"
+          >
+            <span class="text-xl">{{ elemento.icono || '📦' }}</span>
           </div>
-
-          <!-- Info del elemento -->
-          <div class="flex-1 min-w-0">
-            <div
-              class="font-medium text-gray-900 text-sm mb-1 whitespace-nowrap overflow-hidden text-ellipsis"
-            >
-              {{ elemento.nombre }}
-            </div>
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-xs text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded capitalize">{{
-                getCategoriaNombre(elemento.tipo)
-              }}</span>
-              <span
-                class="text-xs px-1.5 py-0.5 rounded capitalize font-medium"
-                :class="{
-                  'bg-blue-100 text-blue-800':
-                    (elemento.metadata?.ubicacion || 'suelo') === 'suelo',
-                  'bg-green-100 text-green-800':
-                    (elemento.metadata?.ubicacion || 'suelo') === 'pared',
-                }"
-              >
-                {{ elemento.metadata?.ubicacion || 'suelo' }}
-              </span>
-            </div>
-            <div class="text-xs text-gray-400 font-mono">
-              X: {{ Math.round(elemento.x) }}, Y: {{ Math.round(elemento.y) }}
-            </div>
+          <!-- Info -->
+          <div class="flex-1 overflow-hidden">
+            <p class="text-sm font-semibold text-gray-800 truncate">{{ elemento.nombre }}</p>
+            <p class="text-xs text-gray-500 truncate">{{ elemento.tipo }}</p>
           </div>
-
           <!-- Controles -->
-          <div class="flex items-center gap-1 flex-shrink-0">
-            <!-- Toggle visibilidad -->
+          <div class="flex items-center gap-2">
             <button
-              @click.stop="toggleVisibilidad(elemento.id)"
-              class="p-1.5 border border-gray-200 rounded-md bg-white text-gray-600 cursor-pointer transition-all hover:bg-gray-100 hover:border-gray-300 hover:text-gray-700"
-              :class="{
-                'text-green-600 border-green-200 hover:bg-green-50': elemento.visible !== false,
-              }"
-              :title="elemento.visible !== false ? 'Ocultar elemento' : 'Mostrar elemento'"
+              @click.stop="canvasStore.toggleElementoVisibilidad(elemento.id)"
+              class="p-1 text-gray-400 hover:text-gray-600"
+              :title="elemento.visible === false ? 'Mostrar' : 'Ocultar'"
             >
               <svg
                 v-if="elemento.visible !== false"
-                class="w-4 h-4"
+                class="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -204,28 +153,12 @@
                   d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                 />
               </svg>
-              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L12 12m0 0l3.121-3.121M12 12l4.242 4.242"
-                />
-              </svg>
-            </button>
-
-            <!-- Zoom al elemento -->
-            <button
-              @click.stop="enfocarElemento(elemento.id)"
-              class="p-1.5 border border-gray-200 rounded-md bg-white text-gray-600 cursor-pointer transition-all hover:bg-gray-100 hover:border-gray-300 hover:text-gray-700"
-              title="Enfocar elemento"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7 .525-1.664 1.373-3.16 2.42-4.418M15.35 15.35A3 3 0 0112 12a3 3 0 01-3.35-3.35M1.125 4.125L.172 3.172m1.953 1.953l18.8 18.8"
                 />
               </svg>
             </button>
@@ -233,6 +166,8 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal para crear etiquetas -->
     <CreateTagModal
       :show="modalVisible"
       :initial-text="textoNuevaEtiqueta"
@@ -243,11 +178,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore'
 import { CATEGORIAS } from '@/utils/constants'
-import CreateTagModal from '../CreateTagModal.vue'
-import TagFilter from '../TagFilter.vue'
+import TagFilter from '@/components/TagFilter.vue'
+import CreateTagModal from '@/components/CreateTagModal.vue'
 
 // Composables
 const canvasStore = useCanvasStore()
@@ -255,35 +190,41 @@ const canvasStore = useCanvasStore()
 // Estado local
 const filtroCategoria = ref('')
 const filtroUbicacion = ref('')
-const filtrosVisibles = ref(false) // Controla la visibilidad del panel de filtros
-const modalVisible = ref(false);
-const textoNuevaEtiqueta = ref('');
+const filtrosVisibles = ref(false)
+const modalVisible = ref(false)
+const textoNuevaEtiqueta = ref('')
+
+// Refs para la lógica de click-outside
+const filtrosBotonRef = ref(null)
+const filtrosPanelRef = ref(null)
 
 // Computed properties
 const categorias = computed(() => CATEGORIAS)
 
 const elementosFiltrados = computed(() => {
-  let elementos = canvasStore.elementosVisibles
+  // --- CAMBIO CLAVE AQUÍ ---
+  // Usamos la nueva computed property segura del store
+  let elementos = canvasStore.elementosVisiblesParaCapas
 
-  // Filtrar por categoría
   if (filtroCategoria.value) {
-    elementos = elementos.filter((elemento) => elemento.tipo === filtroCategoria.value)
+    elementos = elementos.filter((elemento) => elemento.categoria === filtroCategoria.value)
   }
 
-  // Filtrar por ubicación
   if (filtroUbicacion.value) {
     elementos = elementos.filter((elemento) => {
-      const ubicacion = elemento.metadata?.ubicacion || 'suelo'
-      return ubicacion === filtroUbicacion.value
+      // Asumimos que la propiedad 'ubicacion' está en la raíz del objeto limpio
+      return elemento.ubicacion === filtroUbicacion.value
     })
   }
 
   if (canvasStore.etiquetasSeleccionadas.length > 0) {
     elementos = elementos.filter((elemento) => {
-      if (!elemento.etiquetas || elemento.etiquetas.length === 0) {
+      if (!elemento.etiquetas || !Array.isArray(elemento.etiquetas)) {
         return false
       }
-      return canvasStore.etiquetasSeleccionadas.every((tagId) => elemento.etiquetas.includes(tagId))
+      return canvasStore.etiquetasSeleccionadas.every((tagId) =>
+        elemento.etiquetas.includes(tagId)
+      )
     })
   }
 
@@ -291,13 +232,57 @@ const elementosFiltrados = computed(() => {
 })
 
 const hayFiltrosActivos = computed(() => {
-  return !!(filtroCategoria.value || filtroUbicacion.value)
+  return !!(
+    filtroCategoria.value ||
+    filtroUbicacion.value ||
+    canvasStore.etiquetasSeleccionadas.length > 0
+  )
 })
 
 // Métodos
 const toggleFiltros = () => {
   filtrosVisibles.value = !filtrosVisibles.value
 }
+
+const limpiarFiltros = () => {
+  filtroCategoria.value = ''
+  filtroUbicacion.value = ''
+  canvasStore.limpiarSeleccion()
+}
+
+const abrirModalCrearEtiqueta = (texto) => {
+  textoNuevaEtiqueta.value = texto
+  modalVisible.value = true
+}
+
+const guardarNuevaEtiqueta = (nuevaEtiqueta) => {
+  canvasStore.agregarYSeleccionarEtiqueta(nuevaEtiqueta)
+  modalVisible.value = false;
+}
+
+const handleClickOutside = (event) => {
+  if (modalVisible.value) {
+    return
+  }
+
+  if (
+    filtrosVisibles.value &&
+    filtrosBotonRef.value &&
+    !filtrosBotonRef.value.contains(event.target) &&
+    filtrosPanelRef.value &&
+    !filtrosPanelRef.value.contains(event.target)
+  ) {
+    filtrosVisibles.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', handleClickOutside)
+})
 
 const esElementoSeleccionado = (elementoId) => {
   return canvasStore.elementoSeleccionado === elementoId
@@ -306,57 +291,13 @@ const esElementoSeleccionado = (elementoId) => {
 const seleccionarElemento = (elementoId) => {
   canvasStore.seleccionarElemento(elementoId)
 }
-
-const toggleVisibilidad = (elementoId) => {
-  const elemento = canvasStore.elementoPorId(elementoId)
-  if (elemento) {
-    canvasStore.toggleElementoVisibilidad(elementoId)
-  }
-}
-
-const enfocarElemento = (elementoId) => {
-  seleccionarElemento(elementoId)
-  console.log('Enfocando elemento:', elementoId)
-}
-
-const limpiarFiltros = () => {
-  filtroCategoria.value = ''
-  filtroUbicacion.value = ''
-}
-
-const getCategoriaNombre = (tipo) => {
-  const categoria = categorias.value.find((cat) => cat.id === tipo)
-  return categoria ? categoria.nombre : tipo
-}
-
-const getIconoCategoria = (tipo) => {
-  const iconos = {
-    anaqueles: '📚',
-    estantes: '📋',
-    mesas: '🗄️',
-    armarios: '🗃️',
-    contenedores: '📦',
-  }
-  return iconos[tipo] || '📦'
-}
-
-
-const abrirModalCrearEtiqueta = (texto) => {
-  textoNuevaEtiqueta.value = texto
-  modalVisible.value = true
-}
-
-const guardarNuevaEtiqueta = (nuevaEtiqueta) => {
-  canvasStore.agregarEtiqueta(nuevaEtiqueta)
-  modalVisible.value = false
-}
 </script>
 
 <style scoped>
 .unroll-enter-active,
 .unroll-leave-active {
   transition: all 0.3s ease-in-out;
-  max-height: 500px; /* Altura máxima esperada del panel */
+  max-height: 500px;
   opacity: 1;
   transform: translateY(0);
 }
