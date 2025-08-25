@@ -2054,25 +2054,6 @@ const fitToPlanta = () => {
       }
     }
 
-    // Si hay un elemento seleccionado fuera de la navegación, también permitir fit a él
-    if (!canvasStore.estaEnElemento && canvasStore.elementoSeleccionado) {
-      const sel = canvasStore.elementosVisibles.find((e) => e.id === canvasStore.elementoSeleccionado)
-      if (sel) {
-        const selBbox = { x: sel.x || 0, y: sel.y || 0, width: Math.max(1, sel.width || 1), height: Math.max(1, sel.height || 1) }
-        const selMargin = 24
-        const vwEl = Math.max(16, stageSize.value.width - selMargin * 2)
-        const vhEl = Math.max(16, stageSize.value.height - selMargin * 2)
-        let scaleXel = selBbox.width > 0 ? vwEl / selBbox.width : 1
-        let scaleYel = selBbox.height > 0 ? vhEl / selBbox.height : 1
-        let targetScaleEl = Math.min(scaleXel, scaleYel)
-        targetScaleEl = Math.max(0.05, Math.min(10, targetScaleEl))
-        const stageXel = (stageSize.value.width - selBbox.width * targetScaleEl) / 2 - selBbox.x * targetScaleEl
-        const stageYel = (stageSize.value.height - selBbox.height * targetScaleEl) / 2 - selBbox.y * targetScaleEl
-        canvasStore.configurarZoom(targetScaleEl)
-        canvasStore.configurarPan(stageXel, stageYel)
-        return
-      }
-    }
 
     if (planta) {
       // Priorizar polígono si está disponible
