@@ -439,8 +439,12 @@ watch(
   },
   { deep: true },
 )
-</script>
 
-<style scoped>
-/* Estilos eliminados: todo se maneja con clases de Tailwind en el template */
-</style>
+// Observar cambios en el contexto para verificar validez del filtro de categoría
+watch(
+  () => canvasStore.contextoActual.tipo,
+  (_nuevoContexto) => {
+    categoriaSeleccionada.value = null
+  }
+)
+</script>
