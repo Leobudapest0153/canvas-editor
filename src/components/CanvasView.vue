@@ -580,36 +580,37 @@ const confirmDialog = useConfirmDialog()
  * @returns {Object} - { width: number, height: number } en píxeles
  */
 const getElementPixelDimensions = (elemento) => {
-  // Si ya tiene width/height en píxeles, usarlos
-  if (elemento.width && elemento.height) {
+  // Si ya tiene width/height en píxeles, usarlos solo si no tiene dimensiones en cm
+  // Esto es para compatibilidad con elementos legacy que solo tienen width/height
+  if (!elemento.dimensiones && elemento.width && elemento.height) {
     return { width: elemento.width, height: elemento.height }
   }
 
-  // Si solo tiene dimensiones en cm, convertir según la vista
+  // Priorizar dimensiones en cm y convertir según la vista
   if (elemento.dimensiones) {
     let widthCm, heightCm
 
     if (canvasStore.vistaActiva === 'XY') {
       // Vista superior (XY): width = ancho, height = largo
-      widthCm = elemento.dimensiones.ancho || 100
-      heightCm = elemento.dimensiones.largo || 60
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
+      heightCm = elemento.dimensiones.largo || (elemento.height ? elemento.height / CM_TO_PX : 6)
     } else if (canvasStore.vistaActiva === 'XZ') {
       // Vista frontal (XZ): width = ancho, height = alto
-      widthCm = elemento.dimensiones.ancho || 100
-      heightCm = elemento.dimensiones.alto || 20
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
+      heightCm = elemento.dimensiones.alto || (elemento.height ? elemento.height / CM_TO_PX : 6)
     } else {
       // Fallback a vista XY
-      widthCm = elemento.dimensiones.ancho || 100
-      heightCm = elemento.dimensiones.largo || 60
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
+      heightCm = elemento.dimensiones.largo || (elemento.height ? elemento.height / CM_TO_PX : 6)
     }
 
     return {
-      width: widthCm * CM_TO_PX,
-      height: heightCm * CM_TO_PX,
+      width: Math.round(widthCm * CM_TO_PX),
+      height: Math.round(heightCm * CM_TO_PX),
     }
   }
 
-  // Fallback a valores por defecto
+  // Fallback a valores por defecto (solo para elementos sin dimensiones definidas)
   return { width: 100, height: 60 }
 }
 const conflictsApi = useConflicts()
@@ -1544,6 +1545,35 @@ const createElementFromDrop = (data, dropEvent) => {
   // 10. Crear el elemento solo si la validación fue exitosa
   const color = elemento.color || elemento.colorBase || '#3B82F6'
 
+  // Comprobar si estamos en un contexto de elementos y agregando un contenedor
+  // En ese caso, debemos tomar el largo del elemento padre
+  let largoCmFinal = largoCm;
+  let finalHeightFinal = finalHeight;
+
+  if (canvasStore.contextoActual.tipo === 'elementos' && elemento.tipo === 'contenedores') {
+    // Obtener el elemento padre (el elemento actual donde estamos)
+    const elementoPadre = canvasStore.elementoContenedorActual;
+    if (elementoPadre && elementoPadre.dimensiones) {
+      // Usar el largo del elemento padre para el contenedor
+      largoCmFinal = elementoPadre.dimensiones.largo;
+
+      // La altura en píxeles para el renderizado depende de la vista
+      if (canvasStore.vistaActiva === 'XY') {
+        // En vista XY, la altura visual corresponde al largo
+        finalHeightFinal = largoCmFinal * CM_TO_PX;
+      } else if (canvasStore.vistaActiva === 'XZ') {
+        // En vista XZ, la altura visual corresponde al alto, no al largo
+        // No modificamos finalHeightFinal en este caso
+      }
+
+      console.log('Contenedor ajustado al largo del elemento padre:', {
+        largoPadre: largoCmFinal,
+        altoPxFinal: finalHeightFinal,
+        vista: canvasStore.vistaActiva
+      });
+    }
+  }
+
   const nuevoElemento = {
     id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
     tipo: elemento.tipo || (elemento.categoria === 'contenedores' ? 'contenedores' : 'elementos'), // Asegurar que siempre tenga tipo
@@ -1561,7 +1591,7 @@ const createElementFromDrop = (data, dropEvent) => {
     // Estructura correcta para dimensiones (preservar todas las dimensiones independientemente de la vista)
     dimensiones: {
       ancho: anchoCm,
-      largo: largoCm,
+      largo: largoCmFinal, // Usamos el largo ajustado si corresponde
       alto: altoCm,
     },
 
@@ -1569,7 +1599,7 @@ const createElementFromDrop = (data, dropEvent) => {
     x: finalPosition.x,
     y: finalPosition.y,
     width: finalWidth,
-    height: finalHeight,
+    height: finalHeightFinal, // Usamos la altura ajustada si corresponde
 
     color: color,
     colorBase: color,
@@ -1611,7 +1641,29 @@ const createElementFromBuffer = (data, dropEvent) => {
   const elemento = bufferItem.elemento
 
   // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
-  const { width, height } = getElementPixelDimensions(elemento)
+  let { width, height } = getElementPixelDimensions(elemento)
+
+  // Ajustar las dimensiones del contenedor si estamos en un elemento
+  if (canvasStore.contextoActual.tipo === 'elementos' && elemento.tipo === 'contenedores') {
+    // Obtener el elemento padre (el elemento actual donde estamos)
+    const elementoPadre = canvasStore.elementoContenedorActual;
+    if (elementoPadre && elementoPadre.dimensiones) {
+      // Si estamos en vista XZ (frontal), ajustar el alto según el largo del padre
+      if (canvasStore.vistaActiva === 'XZ') {
+        const largoPadreCm = elementoPadre.dimensiones.largo;
+
+        // Actualizar también las dimensiones en el elemento del buffer
+        if (elemento.dimensiones) {
+          elemento.dimensiones.largo = largoPadreCm;
+        }
+
+        console.log('Buffer: Contenedor ajustado al largo del elemento padre:', {
+          largoPadreCm,
+          altoPixelesFinal: height
+        });
+      }
+    }
+  }
 
   // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
   const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
@@ -1812,8 +1864,8 @@ const handleTransformEnd = (e, elementId, forma) => {
     node.scaleX(1); node.scaleY(1)
   }
   // Clamp mínimo para evitar tamaños cero
-  width = Math.max(8, width)
-  height = Math.max(8, height)
+  // width = Math.max(8, width)
+  // height = Math.max(8, height)
 
   // Actualizar dimensiones físicas si existen
   const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
@@ -1831,9 +1883,17 @@ const handleTransformEnd = (e, elementId, forma) => {
       newDimensiones.largo = heightCm
       // Mantener alto sin cambios
     } else if (canvasStore.vistaActiva === 'XZ') {
-      // Vista frontal (XZ): width = anchoCm
+      // Vista frontal (XZ): width = ancho, height = alto
+      newDimensiones.ancho = widthCm
       newDimensiones.alto = heightCm
-      // Mantener largo sin cambios
+
+      // Importante: Mantener el largo del elemento sin cambios
+      // (en la vista XZ, height es alto, pero necesitamos conservar largo)
+      // No actualizar largo aquí, pero asegurarse de que existe
+      if (newDimensiones.largo === undefined) {
+        // Si no tenía largo, asignar un valor por defecto
+        newDimensiones.largo = elemento.dimensiones?.largo || 60;
+      }
     }
   }
 

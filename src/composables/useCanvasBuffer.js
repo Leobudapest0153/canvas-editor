@@ -191,6 +191,46 @@ export const useCanvasBuffer = () => {
     delete newElement.plantaId
     delete newElement.padre
 
+    // Ajustar dimensiones para contenedores si estamos en un elemento
+    if (canvasStore.contextoActual.tipo === 'elementos' && elemento.tipo === 'contenedores') {
+      // Obtener el elemento padre (contexto actual)
+      const elementoPadre = canvasStore.elementoContenedorActual
+      if (elementoPadre && elementoPadre.dimensiones && elementoPadre.dimensiones.largo) {
+        const largoPadreCm = elementoPadre.dimensiones.largo
+        const CM_TO_PX = 10 // Factor de conversión cm a píxeles
+
+        // Ajustar dimensiones en cm
+        if (!newElement.dimensiones) {
+          newElement.dimensiones = {
+            ancho: newElement.width ? Math.round(newElement.width / CM_TO_PX) : 10,
+            largo: largoPadreCm,
+            alto: newElement.height ? Math.round(newElement.height / CM_TO_PX) : 10
+          }
+        } else {
+          // Asegurarse de que largo existe y se establece correctamente
+          newElement.dimensiones.largo = largoPadreCm
+        }
+
+        // Ajustar las propiedades visual/legacy según la vista
+        if (canvasStore.vistaActiva === 'XZ') {
+          // En vista XZ, height refleja el alto (no el largo)
+          // Mantenemos el valor visual existente, ya que se corresponde con alto
+        } else if (canvasStore.vistaActiva === 'XY') {
+          // En vista XY, height refleja el largo
+          newElement.height = largoPadreCm * CM_TO_PX
+        }
+
+        console.log('Buffer: Contenedor pegado con largo ajustado al elemento padre:', {
+          largoPadreCm,
+          dimensionesCm: newElement.dimensiones,
+          widthPx: newElement.width,
+          heightPx: newElement.height,
+          vista: canvasStore.vistaActiva,
+          elemento: newElement.nombre
+        })
+      }
+    }
+
     // Agregar al canvas
     canvasStore.agregarElemento(newElement)
     console.log('📋 Elemento pegado desde buffer:', newElement.nombre)
