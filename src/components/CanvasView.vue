@@ -32,6 +32,38 @@
       @dragend="handleStageDragEnd"
     >
       <v-layer ref="layerRef">
+        <template v-if="canvasStore.elementoAura">
+        <v-rect
+          v-if="canvasStore.elementoAura.forma === 'rectangular' || !canvasStore.elementoAura.forma"
+          :config="{
+            id: canvasStore.elementoAura.id,
+            x: canvasStore.elementoAura.x,
+            y: canvasStore.elementoAura.y,
+            width: canvasStore.elementoAura.width,
+            height: canvasStore.elementoAura.height,
+            fill: canvasStore.elementoAura.color,
+            opacity: 0.5, // Una opacidad base para el aura
+            cornerRadius: 10, // Bordes redondeados para un look más suave
+            listening: false, // El aura no debe ser clickeable
+          }"
+        />
+         <v-circle
+            v-else-if="canvasStore.elementoAura.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
+            :config="{
+              id: canvasStore.elementoAura.id,
+              x: canvasStore.elementoAura.x + canvasStore.elementoAura.width / 2,
+              y: canvasStore.elementoAura.y + canvasStore.elementoAura.height / 2,
+              radius: Math.min(canvasStore.elementoAura.width, canvasStore.elementoAura.height) / 2,
+              fill: canvasStore.elementoAura.color,
+              opacity: 0.5,
+              cornerRadius: 10,
+              listening: false,
+            }"
+          />
+
+
+        <!-- Aquí podrías añadir v-circle, etc., si tienes otras formas -->
+      </template>
         <!-- Fondo de la planta - área delimitada -->
         <v-rect
           :config="{
@@ -125,9 +157,9 @@
               strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
               opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
               draggable: canDragElement(elemento.id),
-              shadowColor: 'black',
-              shadowBlur: 4,
-              shadowOpacity: 0.3,
+              shadowColor: getElementShadow(elemento).color,
+              shadowBlur: getElementShadow(elemento).blur / canvasStore.zoom,
+              shadowOpacity: getElementShadow(elemento).opacity,
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
             }"
             @click="() => selectElement(elemento.id)"
@@ -193,9 +225,9 @@
               strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
               opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
               draggable: canDragElement(elemento.id),
-              shadowColor: 'black',
-              shadowBlur: 4,
-              shadowOpacity: 0.3,
+              shadowColor: getElementShadow(elemento).color,
+              shadowBlur: getElementShadow(elemento).blur / canvasStore.zoom,
+              shadowOpacity: getElementShadow(elemento).opacity,
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'circle'),
             }"
             @click="() => selectElement(elemento.id)"
@@ -718,6 +750,7 @@ const stageSize = ref({ width: 800, height: 600 })
 const isDragOverCanvas = ref(false)
 const isElementDragging = ref(false)
 const stageDragEnabled = ref(true)
+const highlightAnimation = ref(null);
 
 // Configuración del stage - OCUPA TODO EL CONTENEDOR
 const stageConfig = computed(() => {
@@ -1599,6 +1632,78 @@ const createElementFromDrop = (data, dropEvent) => {
   // Seleccionar el elemento recién creado
   canvasStore.seleccionarElemento(nuevoElemento.id)
 }
+
+const getElementShadow = (elemento) => {
+  if (canvasStore.elementoDestacadoId === elemento.id) {
+    return {
+      color: elemento.color,
+      // Un valor base muy grande para el resplandor
+      blur: 120,
+      opacity: 1, // Opacidad máxima para un color sólido
+      offsetX: 0,
+      offsetY: 0,
+    }
+  }
+  // Sombra por defecto
+  return {
+    color: 'black',
+    blur: 4,
+    opacity: 0.3,
+    offsetX: 0,
+    offsetY: 0,
+  }
+}
+
+watch(
+  () => canvasStore.elementoDestacadoId,
+  (newId, oldId) => {
+    // Detener animación anterior
+    if (highlightAnimation.value) {
+      highlightAnimation.value.stop()
+      highlightAnimation.value = null
+    }
+
+    if (newId) {
+      const elemento = canvasStore.elementoPorId(newId)
+      const stage = stageRef.value?.getNode()
+
+      // Esperamos a que el aura se renderice en el DOM de Konva
+      nextTick(() => {
+        const nodeAura = stage?.findOne(`#aura_${newId}`)
+
+        if (elemento && stage && nodeAura) {
+          // 1. VOLVEMOS AL ZOOM INVASIVO ORIGINAL
+          const margin = 150 // Margen alrededor del elemento
+          const scale = Math.min(
+            (stage.width() - margin) / elemento.width,
+            (stage.height() - margin) / elemento.height,
+            0.2,
+          )
+
+          const newPos = {
+            x: -elemento.x * scale + stage.width() / 2 - (elemento.width * scale) / 2,
+            y: -elemento.y * scale + stage.height() / 2 - (elemento.height * scale) / 2,
+          }
+
+          canvasStore.configurarZoom(scale)
+          canvasStore.configurarPan(newPos.x, newPos.y)
+
+          // 2. ANIMAMOS EL AURA (su opacidad y escala)
+          highlightAnimation.value = new Konva.Animation((frame) => {
+            const period = 1000
+            const oscillation = (Math.sin((frame.time * 2 * Math.PI) / period) + 1) / 2 // Va de 0 a 1
+
+            // La opacidad del aura "respira" entre 0.3 y 0.7
+            nodeAura.opacity(0.3 + oscillation * 0.4)
+            
+          }, nodeAura.getLayer())
+
+          highlightAnimation.value.start()
+        }
+      })
+    }
+  },
+)
 
 const createElementFromBuffer = (data, dropEvent) => {
   // Obtener el elemento del buffer para validar sus dimensiones

@@ -88,6 +88,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const elementoDestacadoId = ref(null);
   const idsElementosFiltrados = ref(null);
+  const elementoAura = ref(null);
 
   // Configuración de grilla y snap
   const gridSize = ref(50) // px entre líneas de grilla
@@ -1369,14 +1370,33 @@ export const useCanvasStore = defineStore('canvas', () => {
     agregarEtiquetaAElemento(elementoId, newId)
   }
   const destacarElemento = (elementoId) => {
+    const elemento = elementoPorId.value(elementoId)
+    if (!elemento) return
+
     elementoDestacadoId.value = elementoId
-    // El efecto de destaque se quitará automáticamente después de un tiempo
+
+    // Creamos la configuración del aura basada en el elemento
+    const paddingAura = 30 / zoom.value; // Píxeles extra de tamaño para el aura
+    elementoAura.value = {
+      // Usamos un ID único para el aura para evitar conflictos de key
+      id: `aura_${elemento.id}`, 
+      forma: elemento.forma,
+      x: elemento.x - paddingAura / 2,
+      y: elemento.y - paddingAura / 2,
+      width: elemento.width + paddingAura,
+      height: elemento.height + paddingAura,
+      color: elemento.color,
+    }
+
+    // Limpiamos todo después de un tiempo
     setTimeout(() => {
       if (elementoDestacadoId.value === elementoId) {
         elementoDestacadoId.value = null
+        elementoAura.value = null // <-- Limpiar el aura
       }
-    }, 4000);
-  }
+    }, 2500) // Aumentamos un poco el tiempo a 2.5 segundos
+  };
+  
 
   const actualizarIdsFiltrados = (ids) => {
     idsElementosFiltrados.value = ids
@@ -1428,6 +1448,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     etiquetasSeleccionadas,
     elementoDestacadoId,
     idsElementosFiltrados,
+    elementoAura,
 
     // Getters
     elementosVisibles,
