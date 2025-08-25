@@ -399,6 +399,37 @@ export const useCanvasStore = defineStore('canvas', () => {
     saveToHistory(`Navegación al padre`)
   }
 
+  /**
+   * Navegar a un contexto ya construido (reemplaza el path en lugar de hacer push)
+   * útil para cuando se selecciona un breadcrumb y queremos volver a un punto del path
+   */
+  const navegarAContexto = (tipo, id, path) => {
+    if (!path || !Array.isArray(path) || path.length === 0) return
+
+    contextoNavegacion.value = {
+      tipo: tipo,
+      id: id,
+      path: path,
+    }
+
+    // Actualizar canvas adaptativo según el nuevo contexto
+    if (tipo === 'plantas') {
+      const planta = plantaPorId.value(id)
+      calcularCanvasAdaptativoPlanta(planta)
+    } else {
+      const elemento = elementoPorId.value(id)
+      if (elemento) calcularCanvasAdaptativo(elemento)
+    }
+
+    // Reset zoom/pan y deseleccionar
+    zoom.value = 1
+    panX.value = 0
+    panY.value = 0
+    elementoSeleccionado.value = null
+
+    saveToHistory(`Navegación a contexto: ${id}`)
+  }
+
   const navegarAPlanta = (plantaId) => {
     const planta = plantaPorId.value(plantaId)
     if (!planta) {
@@ -1365,6 +1396,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Navegación jerárquica - Actions
     navegarAElemento,
     navegarAlPadre,
+  navegarAContexto,
     navegarAPlanta,
     calcularCanvasAdaptativo,
     calcularCanvasAdaptativoPlanta,
