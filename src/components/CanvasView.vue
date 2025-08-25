@@ -548,6 +548,7 @@ import { useDeleteElement } from '@/composables/useDeleteElement'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { applyEdgeConstraint } from '@/utils/edgeConstraint'
 import { resetEdgeState } from '@/composables/useEdgeState'
+import { runFinalClamp } from '@/utils/finalizeDrag'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -907,6 +908,7 @@ const getStrokeColor = (elementId) => {
 }
 
 // Convierte posición stage->layer considerando zoom/pan
+// eslint-disable-next-line no-unused-vars
 const toLayerCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -916,16 +918,31 @@ const toLayerCoords = (pos) => {
 }
 
 // Convierte posición layer->stage considerando zoom/pan
+// eslint-disable-next-line no-unused-vars
 const toStageCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
   return { x: pos.x * scale + stage.x(), y: pos.y * scale + stage.y() }
 }
 
-// Drag bound para cada elemento y forma
-const dragBoundForElement = (pos) => {
-  // No interferir con rAF: dejar pasar tal cual (no-ops)
-  return pos
+// Drag bound para cada elemento y forma (clamp mínimo al contorno)
+const dragBoundForElement = (pos, elemento, forma = 'rect') => {
+  try {
+    const layerW = layerConfig.value.width
+    const layerH = layerConfig.value.height
+    const lp = toLayerCoords(pos)
+    if (forma === 'circular') {
+      const r = Math.min(elemento.width, elemento.height) / 2
+      const cx = Math.max(r, Math.min(lp.x, layerW - r))
+      const cy = Math.max(r, Math.min(lp.y, layerH - r))
+      return toStageCoords({ x: cx, y: cy })
+    } else {
+      const c = clampRectToRect(lp.x, lp.y, elemento.width, elemento.height, layerW, layerH)
+      return toStageCoords(c)
+    }
+  } catch {
+    return pos
+  }
 }
 
 // RAF + Perf mode state per element
@@ -1082,7 +1099,7 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   if (rec && rec.ctrl) rec.ctrl.move({ x, y })
 }
 
-const endElementDrag = (elementId) => {
+const endElementDrag = async (elementId) => {
   // console.log('Finalizando arrastre del elemento:', elementId)
   isElementDragging.value = false
   stageDragEnabled.value = true // Rehabilitar arrastre del canvas
@@ -1091,46 +1108,59 @@ const endElementDrag = (elementId) => {
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (!elemento) return
 
-  let final = lastValidPositions.value.get(elementId) || { x: elemento.x, y: elemento.y }
+  // Ejecutar clamp final con ajuste de stroke y orden especificado
+  try {
+    const stage = stageRef.value.getNode()
+    const layer = layerRef.value.getNode()
+    const shape = stage.findOne(`#${elementId}`)
+    if (shape && layer) {
+      const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+      const others = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
+      await runFinalClamp({
+        shape,
+        el: elemento,
+        areaBounds,
+        grid: canvasStore.gridSize || 50,
+        elements: others,
+        lastValidPos: lastValidPositions.value.get(elementId) || { x: elemento.x, y: elemento.y },
+        CM_TO_PX,
+      })
 
-  // Orden final: clamp → snap → re-clamp
-  const boundary = computeBoundary()
-  if (boundary.type === 'rect') {
-    const area = { W: boundary.W, H: boundary.H }
-    // Clamp inicial
-    const c1 = clampRectToRect(final.x, final.y, elemento.width, elemento.height, area.W, area.H)
-    let xf = c1.x
-    let yf = c1.y
-
-    // Snap a grilla con umbral, solo para rects; para círculos snap al centro
-    if (elemento.forma === 'rectangular' || !elemento.forma) {
-      const snapped = snapToGrid(xf, yf, canvasStore.gridSize || 50)
-      // re-clamp
-      const c2 = clampRectToRect(snapped.x, snapped.y, elemento.width, elemento.height, area.W, area.H)
-      xf = c2.x
-      yf = c2.y
-      // Validar conflictos; si introduce bloqueo, mantener pre-snap
-      const test = { ...elemento, x: xf, y: yf }
-      const conflicts = detectConflictsFor(test, canvasStore.elementosVisibles).filter((c) => c.bloqueante)
-      if (conflicts.length > 0) {
-        xf = c1.x
-        yf = c1.y
-      }
-    } else if (elemento.forma === 'circular') {
-      const r = Math.min(elemento.width, elemento.height) / 2
-      const center = { x: xf + r, y: yf + r }
-      const snappedC = snapToGrid(center.x, center.y, canvasStore.gridSize || 50)
-      const c2x = Math.max(r, Math.min(snappedC.x, area.W - r))
-      const c2y = Math.max(r, Math.min(snappedC.y, area.H - r))
-      xf = c2x - r
-      yf = c2y - r
+      // Repaint sincronizado (doble rAF si hace falta) antes del commit
+      await nextTick()
+      await new Promise((r) => requestAnimationFrame(() => r()))
+      layer.clearCache?.()
+      layer.batchDraw?.()
+      await new Promise((r) => requestAnimationFrame(() => r()))
     }
+  } catch { /* ignore */ }
 
-    final = { x: xf, y: yf }
+  // Leer posición final del shape para persistir
+  let finalX, finalY
+  try {
+    const stage = stageRef.value.getNode()
+    const shape = stage.findOne(`#${elementId}`)
+    if (shape) {
+      if (shape.className === 'Circle' || elemento.forma === 'circular') {
+        const r = Math.min(elemento.width, elemento.height) / 2
+        finalX = shape.x() - r
+        finalY = shape.y() - r
+      } else {
+        finalX = shape.x()
+        finalY = shape.y()
+      }
+    }
+  } catch { /* ignore */ }
+
+  // Fallback si no se pudo leer shape
+  if (finalX == null || finalY == null) {
+    const last = lastValidPositions.value.get(elementId) || { x: elemento.x, y: elemento.y }
+    finalX = last.x
+    finalY = last.y
   }
 
   // Evaluar conflictos al finalizar (solo para pintar/estado, sin modal ni toasts)
-  const movingNow = { ...elemento, x: final.x, y: final.y }
+  const movingNow = { ...elemento, x: finalX, y: finalY }
   const conflicts = detectConflictsFor(movingNow, canvasStore.elementosVisibles)
   conflictsApi.setConflicts(conflicts, elementId)
 
@@ -1138,7 +1168,7 @@ const endElementDrag = (elementId) => {
   const rec = rafControllers.get(elementId)
   if (rec && rec.ctrl) {
     try {
-      rec.ctrl.end({ x: final.x, y: final.y, width: elemento.width, height: elemento.height })
+      rec.ctrl.end({ x: finalX, y: finalY, width: elemento.width, height: elemento.height })
     } catch {
       console.warn('Error al finalizar el arrastre del elemento:', elementId)
     }
@@ -1152,11 +1182,11 @@ const endElementDrag = (elementId) => {
   }
   perfContexts.delete(elementId)
 
-  // Actualizar posición final y guardar historial una sola vez
+  // Persistir posición final en el store y guardar snapshot
   canvasStore.actualizarPosicionConHistorial(
     elementId,
-    final.x,
-    final.y,
+    finalX,
+    finalY,
     `Elemento movido: ${elemento.nombre || elemento.tipo || elementId}`,
   )
 
