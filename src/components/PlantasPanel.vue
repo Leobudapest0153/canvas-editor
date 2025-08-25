@@ -53,7 +53,7 @@
             <div class="relative ml-2">
               <button
                 @click.stop="toggleMenuPlanta(planta.id, $event)"
-                class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
                 title="Opciones de planta"
               >
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
