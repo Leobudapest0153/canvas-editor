@@ -167,7 +167,9 @@
             @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
             @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
             @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
-            @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
+              @transformstart="(e) => handleTransformStart(e, elemento.id)"
+              @transform="(e) => handleTransformMove(e, elemento.id, 'rectangular')"
+              @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
             @contextmenu="(e) => onShapeContextMenu(e, elemento)"
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
             @pointerup.passive="onShapePointerUp"
@@ -235,6 +237,8 @@
             @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
             @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id, 'circular')"
             @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @transformstart="(e) => handleTransformStart(e, elemento.id)"
+            @transform="(e) => handleTransformMove(e, elemento.id, 'circular')"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'circular')"
             @contextmenu="(e) => onShapeContextMenu(e, elemento)"
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
@@ -266,6 +270,8 @@
             @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
             @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
             @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @transformstart="(e) => handleTransformStart(e, elemento.id)"
+            @transform="(e) => handleTransformMove(e, elemento.id, 'rectangular')"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
             @contextmenu="(e) => onShapeContextMenu(e, elemento)"
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
@@ -588,6 +594,9 @@ import { isPlacementValid } from '@/utils/isPlacementValid'
 const props = defineProps({
   safeRight: { type: Number, default: 20 },
 })
+
+// Referencia segura a Konva (cuando está disponible globalmente via vue-konva)
+const Konva = typeof globalThis !== 'undefined' ? globalThis.Konva || (typeof window !== 'undefined' ? window.Konva : null) : null
 
 // Definir emits
 const emit = defineEmits(['select', 'drill-down'])
@@ -970,7 +979,7 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     const layerW = layerConfig.value.width
     const layerH = layerConfig.value.height
     const lp = toLayerCoords(pos)
-    if (forma === 'circular') {
+  if (forma === 'circular' || forma === 'circle') {
       const r = Math.min(elemento.width, elemento.height) / 2
       const cx = Math.max(r, Math.min(lp.x, layerW - r))
       const cy = Math.max(r, Math.min(lp.y, layerH - r))
@@ -1937,6 +1946,8 @@ const dragModeGlobal = ref(true)
 // Id del elemento actualmente en modo edición (transformer). Se activa al seleccionar un elemento cuando dragModeGlobal está ON
 const editingElementId = ref(null)
 const transformerRef = ref(null)
+// Estado para guardar dimensiones/pos antes de transformar (para poder revertir)
+const transformInitialState = new Map()
 
 const toggleSpeedDial = () => { speedDialOpen.value = !speedDialOpen.value }
 
@@ -2005,72 +2016,204 @@ const setupTransformer = () => {
         return { ...newBox, width: size, height: size }
       })
     } else {
-      trComp.boundBoxFunc(null)
+      // Para rectangulares, limitar al área y dejar que el usuario intente
+      // el resize; si el newBox queda fuera del área o crea colisiones se
+      // devolverá oldBox para evitar aplicar ese cambio en tiempo real.
+      trComp.boundBoxFunc((oldBox, newBox) => {
+        try {
+          const layerW = layerConfig.value.width
+          const layerH = layerConfig.value.height
+          // Clamp newBox dentro del área
+          const nx = Math.max(0, Math.min(newBox.x, layerW - newBox.width))
+          const ny = Math.max(0, Math.min(newBox.y, layerH - newBox.height))
+          const clamped = { ...newBox, x: nx, y: ny }
+
+          // Crear un objeto candidato tipo elemento para detectar conflictos
+          const sel = canvasStore.elementosVisibles.find(e => e.id === canvasStore.elementoSeleccionado)
+          if (!sel) return clamped
+          const candidate = {
+            id: sel.id,
+            x: clamped.x,
+            y: clamped.y,
+            width: clamped.width,
+            height: clamped.height,
+            forma: sel.forma || 'rectangular',
+            ubicacion: sel.ubicacion || 'suelo',
+          }
+
+          const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== sel.id)
+          // Si detectConflictsFor devuelve bloqueantes, rechazamos el newBox
+          const conflicts = detectConflictsFor(candidate, neighbors)
+          const blocking = conflicts.some(c => c.bloqueante)
+          if (blocking) return oldBox
+          return clamped
+        } catch { return oldBox }
+      })
     }
     trComp.getLayer()?.batchDraw?.()
   }
 }
 
-// Manejar fin de transformaciones (resize/rotate)
+
+// Guardar estado inicial de la transformación para posible revert
+const handleTransformStart = (e, elementId) => {
+  try {
+    const node = e.target
+    if (!node) return
+    const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
+    if (!elemento) return
+    let x = node.x()
+    let y = node.y()
+    let width = elemento.width
+    let height = elemento.height
+    if (elemento.forma === 'circular') {
+      const r = node.radius ? node.radius() * node.scaleX() : Math.min(elemento.width, elemento.height) / 2
+      width = r * 2
+      height = r * 2
+    } else {
+      width = node.width() * node.scaleX()
+      height = node.height() * node.scaleY()
+    }
+    // Convertir centro a top-left para círculos
+    if (elemento.forma === 'circular') {
+      const r = width / 2
+      x = node.x() - r
+      y = node.y() - r
+    }
+  const state = { x, y, width, height, rotation: node.rotation?.() || 0 }
+  transformInitialState.set(elementId, state)
+  console.debug('[transform-debug] start', elementId, state)
+  } catch { /* ignore */ }
+}
+
+// Manejar fin de transformación con validación y revert si no es válido
 const handleTransformEnd = (e, elementId, forma) => {
-  const node = e.target
-  let x = node.x()
-  let y = node.y()
-  let width
-  let height
-  let rotation = node.rotation?.() || 0
-  if (forma === 'circular') {
-    // Para círculos usamos radius y mantenemos proporción
-    const r = node.radius() * node.scaleX() // asumiendo escala uniforme
-    width = r * 2
-    height = r * 2
-    node.scaleX(1); node.scaleY(1)
-    // En render el círculo se posiciona usando centro, pero en store usamos top-left
-    x = node.x() - r
-    y = node.y() - r
-  } else {
-    width = node.width() * node.scaleX()
-    height = node.height() * node.scaleY()
-    node.scaleX(1); node.scaleY(1)
-  }
-  // Clamp mínimo para evitar tamaños cero
-  // width = Math.max(8, width)
-  // height = Math.max(8, height)
+  try {
+    // Reusar la implementación existente pero añadiendo validación explícita
+    const node = e.target
+    let x = node.x()
+    let y = node.y()
+    let width
+    let height
+    let rotation = node.rotation?.() || 0
+    if (forma === 'circular') {
+      const r = node.radius() * node.scaleX()
+      width = r * 2
+      height = r * 2
+      node.scaleX(1); node.scaleY(1)
+      x = node.x() - r
+      y = node.y() - r
+    } else {
+      width = node.width() * node.scaleX()
+      height = node.height() * node.scaleY()
+      node.scaleX(1); node.scaleY(1)
+    }
 
-  // Actualizar dimensiones físicas si existen
-  const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
-  let dimensiones = elemento?.dimensiones
-  let newDimensiones = dimensiones ? { ...dimensiones } : undefined
+    const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
+    if (!elemento) return
 
-  if (newDimensiones) {
-    // Actualizar las dimensiones correctas según la vista
-    const widthCm = Math.round(width / CM_TO_PX)
-    const heightCm = Math.round(height / CM_TO_PX)
+    // Validar con isPlacementValid contra vecinos y área
+    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
+    const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+    const isValidNow = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
 
-    if (canvasStore.vistaActiva === 'XY') {
-      // Vista superior (XY): width = ancho, height = largo
-      newDimensiones.ancho = widthCm
-      newDimensiones.largo = heightCm
-      // Mantener alto sin cambios
-    } else if (canvasStore.vistaActiva === 'XZ') {
-      // Vista frontal (XZ): width = ancho, height = alto
-      newDimensiones.ancho = widthCm
-      newDimensiones.alto = heightCm
+  console.debug('[transform-debug] end', elementId, { prev: transformInitialState.get(elementId), new: { x, y, width, height, rotation }, isValidNow })
+  if (!isValidNow) {
+      // Revertir al estado inicial guardado
+      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height }
+      try {
+        if (forma === 'circular') {
+          const r = Math.min(prev.width, prev.height) / 2
+          node.x(prev.x + r)
+          node.y(prev.y + r)
+        } else {
+          node.x(prev.x)
+          node.y(prev.y)
+          node.width && node.width(prev.width)
+          node.height && node.height(prev.height)
+        }
+        node.scaleX && node.scaleX(1); node.scaleY && node.scaleY(1)
+        node.rotation && node.rotation(prev.rotation || 0)
+        // Forzar repaint
+        const layer = layerRef.value?.getNode?.()
+        layer?.batchDraw?.()
+  } catch { /* ignore */ }
+  console.debug('[transform-debug] reverted', elementId, prev)
 
-      // Importante: Mantener el largo del elemento sin cambios
-      // (en la vista XZ, height es alto, pero necesitamos conservar largo)
-      // No actualizar largo aquí, pero asegurarse de que existe
-      if (newDimensiones.largo === undefined) {
-        // Si no tenía largo, asignar un valor por defecto
-        newDimensiones.largo = elemento.dimensiones?.largo || 60;
+      // Persistir la reversión en el store
+      try {
+        canvasStore.actualizarElemento(elementId, { x: prev.x, y: prev.y, width: prev.width, height: prev.height, rotation: prev.rotation })
+        lastValidPositions.value.set(elementId, { x: prev.x, y: prev.y })
+      } catch (err) { console.warn('Error persisting transform revert', err) }
+      nextTick(() => setupTransformer())
+      return
+    }
+
+    // Si es válido, persistir cambios como antes
+    let newDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
+    if (newDimensiones) {
+      const widthCm = Math.round(width / CM_TO_PX)
+      const heightCm = Math.round(height / CM_TO_PX)
+      if (canvasStore.vistaActiva === 'XY') {
+        newDimensiones.ancho = widthCm
+        newDimensiones.largo = heightCm
+      } else if (canvasStore.vistaActiva === 'XZ') {
+        newDimensiones.ancho = widthCm
+        newDimensiones.alto = heightCm
+        if (newDimensiones.largo === undefined) newDimensiones.largo = elemento.dimensiones?.largo || 60
       }
     }
-  }
 
-  canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones })
-  lastValidPositions.value.set(elementId, { x, y })
-  nextTick(() => setupTransformer())
+    canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones })
+    lastValidPositions.value.set(elementId, { x, y })
+    nextTick(() => setupTransformer())
+  } catch (err) {
+    console.warn('Error en handleTransformEnd:', err)
+  }
 }
+
+// Mientras se transforma (resize/rotate) dar feedback visual en tiempo real
+const handleTransformMove = (e, elementId, forma) => {
+  try {
+    const node = e.target
+    if (!node) return
+    const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
+    if (!elemento) return
+
+    let x = node.x()
+    let y = node.y()
+    let width
+    let height
+    if (forma === 'circular') {
+      const r = (node.radius ? node.radius() : Math.min(elemento.width, elemento.height) / 2) * (node.scaleX() || 1)
+      width = r * 2
+      height = r * 2
+      x = node.x() - r
+      y = node.y() - r
+    } else {
+      width = (node.width ? node.width() : elemento.width) * (node.scaleX() || 1)
+      height = (node.height ? node.height() : elemento.height) * (node.scaleY() || 1)
+    }
+
+    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
+    const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+    const valid = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+
+    // Aplicar stroke rojo si inválido, volver al color habitual si válido
+    try {
+      const stage = stageRef.value.getNode()
+      const shape = stage.findOne(`#${elementId}`)
+      if (shape) {
+        shape.stroke(valid ? (canvasStore.elementoSeleccionado === elementId ? '#000' : '#666') : '#ef4444')
+        shape.getLayer()?.batchDraw?.()
+      }
+    } catch { /* ignore */ }
+
+  } catch (err) {
+    console.warn('Error en handleTransformMove:', err)
+  }
+}
+
 
 // Ajustar startElementDrag para nuevo modo (ya no se necesita wrapper)
 // (Se elimina originalStartElementDrag no usado)
