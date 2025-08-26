@@ -422,6 +422,14 @@
       unit="m"
     />
 
+    <FloatingToolbar
+      :is-element-selected="canvasStore.elementoSeleccionado ? true : false"
+      :is-element-locked="selectedElementLocked"
+      :active-mode="isDragModeActive ? 'edit' : 'drag'"
+      @set-mode="toggleDragMode()"
+      @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
+    />
+
     <!-- Menú contextual -->
     <SpeedDialContext
       v-if="ctxVisible"
@@ -511,49 +519,6 @@
         </svg>
       </button>
 
-  <!-- Nuevo SpeedDial -->
-  <div class="relative">
-        <div class="relative">
-          <button @click="toggleSpeedDial" class="floating-btn btn-gear focus:outline-none" :class="{ 'ring-2 ring-blue-500': speedDialOpen }" title="Acciones del elemento">
-            <!-- Icono de acciones (tres puntos verticales) -->
-            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <circle cx="12" cy="5" r="1.75" />
-              <circle cx="12" cy="12" r="1.75" />
-              <circle cx="12" cy="19" r="1.75" />
-            </svg>
-          </button>
-            <!-- Acciones -->
-          <transition-group name="fade-scale">
-            <!-- Acción Modo Arrastre (siempre visible cuando el speedDial está abierto) -->
-            <button
-              v-if="speedDialOpen"
-              key="hand"
-              @click="toggleDragMode"
-              class="speed-action"
-              :style="{ top: canvasStore.elementoSeleccionado ? '116px' : '60px' }"
-              :class="isDragModeActive ? 'bg-emerald-600': 'bg-white'"
-              :title="isDragModeActive ? 'Desactivar modo edición' : 'Activar modo edición'"
-            >
-              <svg class="w-5 h-5" :class="isDragModeActive ? 'text-white' : 'text-emerald-600'" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11V6a1 1 0 012 0v5m2-3V6a1 1 0 112 0v5m2-2V9a1 1 0 112 0v4.5c0 3.59-2.91 6.5-6.5 6.5h-.55A6.95 6.95 0 019 19" /></svg>
-            </button>
-            <!-- Acción Bloquear / Desbloquear solo si hay elemento seleccionado -->
-            <button
-              v-if="speedDialOpen && canvasStore.elementoSeleccionado"
-              key="lock"
-              @mousedown.stop.prevent
-              @click.stop="() => toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
-              class="speed-action group"
-              :class="selectedElementLocked ? 'bg-amber-500': 'bg-blue-500'"
-              style="top:60px;"
-              :title="selectedElementLocked ? 'Desbloquear' : 'Bloquear'"
-            >
-              <span class="sr-only">Bloquear</span>
-              <svg v-if="selectedElementLocked" class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-amber-400/40 stroke-white" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
-              <svg v-else class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-blue-400/20 stroke-white" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
-            </button>
-          </transition-group>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -590,6 +555,7 @@ import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
 import { makeInnerSession } from '@/composables/useInnerNoOverlap'
+import FloatingToolbar from './FloatingToolbar.vue'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
