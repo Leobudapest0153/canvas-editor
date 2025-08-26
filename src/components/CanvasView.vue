@@ -979,7 +979,7 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     const layerW = layerConfig.value.width
     const layerH = layerConfig.value.height
     const lp = toLayerCoords(pos)
-    if (forma === 'circular') {
+  if (forma === 'circular' || forma === 'circle') {
       const r = Math.min(elemento.width, elemento.height) / 2
       const cx = Math.max(r, Math.min(lp.x, layerW - r))
       const cy = Math.max(r, Math.min(lp.y, layerH - r))
