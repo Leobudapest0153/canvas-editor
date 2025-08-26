@@ -40,7 +40,7 @@ describe('makeInnerSession basic behaviours', () => {
     const moving = { id: 'm', dimensiones: { ancho: 5, largo: 5, alto: 5 }, posicion: { x: 0, y: 0 } }
     const sibling = { id: 's', dimensiones: { ancho: 5, largo: 5, alto: 5 }, posicion: { x: 5, y: 0 } }
     const sess = makeInnerSession({ parentEl: parent, movingEl: moving, siblings: [sibling], vista: 'XY', CM_TO_PX: CM })
-    const next = sess.dragBoundFuncLocal({ x: 3, y: 0 }, sess.lastGoodLocal, { x: 5, y: 0 })
+    const next = sess.dragBoundFuncLocal({ x: 3, y: 0 }, { x: 5, y: 0 })
     expect(next.x).toBe(0)
     expect(next.y).toBe(0)
   })

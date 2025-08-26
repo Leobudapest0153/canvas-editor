@@ -609,6 +609,19 @@ const layerRef = ref(null)
 
 const innerSessions = new Map()
 
+let rafId = null
+let needsDraw = false
+function scheduleDraw() {
+  if (rafId) return
+  rafId = requestAnimationFrame(() => {
+    rafId = null
+    if (needsDraw) {
+      layerRef.value.getNode()?.batchDraw()
+      needsDraw = false
+    }
+  })
+}
+
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
@@ -1808,9 +1821,10 @@ const onShapeDragMove = (e, el) => {
     data.lastPointer = pointer
     const posWorld = shape.position()
     const posLocal = session.toLocal(posWorld, parent)
-    const nextLocal = session.dragBoundFuncLocal(posLocal, session.lastGoodLocal, vel)
+    const nextLocal = session.dragBoundFuncLocal(posLocal, vel)
     shape.position(session.toWorld(nextLocal, parent))
-    layerRef.value.getNode()?.batchDraw()
+    needsDraw = true
+    scheduleDraw()
   } else {
     updateElementPosition(e, el.id, el.forma === 'circular' ? 'circular' : 'rectangular')
   }
@@ -1828,7 +1842,8 @@ const onShapeDragEnd = (e, el) => {
     let finalLocal = session.finalizeLocal(candLocal)
     const finalWorld = session.toWorld(finalLocal, parent)
     shape.position(finalWorld)
-    layerRef.value.getNode()?.batchDraw()
+    needsDraw = true
+    scheduleDraw()
     const changed =
       Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
     if (changed) {
