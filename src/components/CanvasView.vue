@@ -589,6 +589,7 @@ import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
+import { applyNoFlipResize, clampResizeWithinBounds } from '@/utils/resizeNoFlip'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -956,7 +957,7 @@ const getStrokeColor = (elementId) => {
 }
 
 // Convierte posición stage->layer considerando zoom/pan
-// eslint-disable-next-line no-unused-vars
+ 
 const toLayerCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -966,7 +967,7 @@ const toLayerCoords = (pos) => {
 }
 
 // Convierte posición layer->stage considerando zoom/pan
-// eslint-disable-next-line no-unused-vars
+ 
 const toStageCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -2091,22 +2092,19 @@ const handleTransformEnd = (e, elementId, forma) => {
   try {
     // Reusar la implementación existente pero añadiendo validación explícita
     const node = e.target
+    applyNoFlipResize(node)
+    clampResizeWithinBounds(node, { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height })
     let x = node.x()
     let y = node.y()
-    let width
-    let height
+    let width = node.width ? node.width() : 0
+    let height = node.height ? node.height() : 0
     let rotation = node.rotation?.() || 0
     if (forma === 'circular') {
-      const r = node.radius() * node.scaleX()
+      const r = node.radius ? node.radius() : Math.min(width, height) / 2
       width = r * 2
       height = r * 2
-      node.scaleX(1); node.scaleY(1)
       x = node.x() - r
       y = node.y() - r
-    } else {
-      width = node.width() * node.scaleX()
-      height = node.height() * node.scaleY()
-      node.scaleX(1); node.scaleY(1)
     }
 
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
@@ -2117,8 +2115,8 @@ const handleTransformEnd = (e, elementId, forma) => {
     const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
     const isValidNow = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
 
-  console.debug('[transform-debug] end', elementId, { prev: transformInitialState.get(elementId), new: { x, y, width, height, rotation }, isValidNow })
-  if (!isValidNow) {
+    console.debug('[transform-debug] end', elementId, { prev: transformInitialState.get(elementId), new: { x, y, width, height, rotation }, isValidNow })
+    if (!isValidNow) {
       // Revertir al estado inicial guardado
       const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height }
       try {
@@ -2137,8 +2135,8 @@ const handleTransformEnd = (e, elementId, forma) => {
         // Forzar repaint
         const layer = layerRef.value?.getNode?.()
         layer?.batchDraw?.()
-  } catch { /* ignore */ }
-  console.debug('[transform-debug] reverted', elementId, prev)
+      } catch { /* ignore */ }
+      console.debug('[transform-debug] reverted', elementId, prev)
 
       // Persistir la reversión en el store
       try {
@@ -2177,22 +2175,20 @@ const handleTransformMove = (e, elementId, forma) => {
   try {
     const node = e.target
     if (!node) return
+    applyNoFlipResize(node)
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
 
     let x = node.x()
     let y = node.y()
-    let width
-    let height
+    let width = node.width ? node.width() : elemento.width
+    let height = node.height ? node.height() : elemento.height
     if (forma === 'circular') {
-      const r = (node.radius ? node.radius() : Math.min(elemento.width, elemento.height) / 2) * (node.scaleX() || 1)
+      const r = node.radius ? node.radius() : Math.min(width, height) / 2
       width = r * 2
       height = r * 2
       x = node.x() - r
       y = node.y() - r
-    } else {
-      width = (node.width ? node.width() : elemento.width) * (node.scaleX() || 1)
-      height = (node.height ? node.height() : elemento.height) * (node.scaleY() || 1)
     }
 
     const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
