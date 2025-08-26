@@ -969,12 +969,33 @@ export const useCanvasStore = defineStore('canvas', () => {
       // Estado de elementos con propiedades estáticas y personalizadas
       elementos: elementos.value.map((elemento) => ({
         // Elevación y tolerancias
-        elevacion: elemento.elevacion || {
-          zBase: 0,
-          altura: elemento.dimensiones?.alto || elemento.alto || 0,
-          espesor: elemento.elevacion?.espesor || 0,
-        },
-        tolerancias: elemento.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
+        elevacion: (() => {
+          if (elemento.ubicacion === 'pared') {
+            const zBase = Number.isFinite(elemento.alturaRespectoAlSuelo)
+              ? elemento.alturaRespectoAlSuelo
+              : elemento.elevacion?.zBase || 0
+            const altura = Number.isFinite(elemento.dimensiones?.alto)
+              ? elemento.dimensiones.alto
+              : elemento.elevacion?.altura || 0
+            return { zBase, altura, espesor: elemento.elevacion?.espesor || 0 }
+          }
+          return (
+            elemento.elevacion || {
+              zBase: 0,
+              altura: elemento.dimensiones?.alto || elemento.alto || 0,
+              espesor: elemento.elevacion?.espesor || 0,
+            }
+          )
+        })(),
+        tolerancias: (() => {
+          const base = elemento.tolerancias || { junta: 0, paralelismo: 0 }
+          if (elemento.ubicacion === 'pared') {
+            return { ...base, zEpsilon: base.zEpsilon ?? 0.5 }
+          }
+          return { ...base, zEpsilon: base.zEpsilon ?? 0 }
+        })(),
+        alturaRespectoAlSuelo:
+          elemento.alturaRespectoAlSuelo || elemento.elevacion?.zBase || 0,
         id: elemento.id,
         nombre: elemento.nombre,
         tipo: elemento.tipo,
@@ -1121,6 +1142,32 @@ export const useCanvasStore = defineStore('canvas', () => {
         const width = elementoData.dimensiones?.ancho || 100
         const height = elementoData.dimensiones?.largo || 60
 
+        const ubicacion = elementoData.propiedades?.ubicacion || 'suelo'
+        const alturaSuelo = elementoData.alturaRespectoAlSuelo ?? elementoData.elevacion?.zBase ?? 0
+        const elevacion = (() => {
+          const base = elementoData.elevacion || {}
+          if (ubicacion === 'pared') {
+            return {
+              zBase: base.zBase ?? alturaSuelo,
+              altura: base.altura ?? (elementoData.dimensiones?.alto || 0),
+              espesor: base.espesor || 0,
+            }
+          }
+          return {
+            zBase: base.zBase ?? (elementoData.posicion?.z || 0),
+            altura: base.altura ?? (elementoData.dimensiones?.alto || 0),
+            espesor: base.espesor || 0,
+          }
+        })()
+
+        const tolerancias = (() => {
+          const base = elementoData.tolerancias || { junta: 0, paralelismo: 0 }
+          if (ubicacion === 'pared') {
+            return { ...base, zEpsilon: base.zEpsilon ?? 0.5 }
+          }
+          return { ...base, zEpsilon: base.zEpsilon ?? 0 }
+        })()
+
         elementos.value.push({
           id: elementoData.id,
           nombre: elementoData.nombre,
@@ -1128,12 +1175,8 @@ export const useCanvasStore = defineStore('canvas', () => {
           categoria: elementoData.categoria,
           plantaId: elementoData.plantaId,
 
-          elevacion: elementoData.elevacion || {
-            zBase: elementoData.posicion?.z || 0,
-            altura: elementoData.dimensiones?.alto || 0,
-            espesor: 0,
-          },
-          tolerancias: elementoData.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
+          elevacion,
+          tolerancias,
 
           // Propiedades físicas (estructura nueva)
           dimensiones: {
@@ -1146,7 +1189,7 @@ export const useCanvasStore = defineStore('canvas', () => {
           posicion: {
             x: posX,
             y: posY,
-            z: elementoData.posicion?.z || 0,
+            z: elevacion.zBase,
             rotation: elementoData.posicion?.rotation || 0,
           },
 
@@ -1164,8 +1207,10 @@ export const useCanvasStore = defineStore('canvas', () => {
 
           // Propiedades funcionales
           pesoMaximo: elementoData.propiedades?.pesoMaximo || 0,
-          ubicacion: elementoData.propiedades?.ubicacion || 'suelo',
+          ubicacion,
           descripcion: elementoData.propiedades?.descripcion || '',
+
+          alturaRespectoAlSuelo: alturaSuelo,
 
           // Jerarquía
           padre: elementoData.jerarquia?.padre || null,

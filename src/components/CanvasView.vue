@@ -589,6 +589,9 @@ import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
+import { isWallPlacementValid } from '@/utils/wallPlacement'
+import { attachToWall } from '@/utils/wallAttach'
+import { isWallFormValid } from '@/utils/validation'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -655,6 +658,35 @@ const getElementPixelDimensions = (elemento) => {
   return { width: 100, height: 60 }
 }
 const conflictsApi = useConflicts()
+
+function areaBoundsToPoly(bounds) {
+  if (!bounds) return []
+  return [
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
+    { x: bounds.minX, y: bounds.maxY },
+  ]
+}
+
+function isValidPlacementWrapper(params) {
+  const { pos, movingEl, neighbors, areaBounds, CM_TO_PX: CM } = params
+  void CM
+  if (movingEl?.ubicacion === 'pared') {
+    const planta = canvasStore.plantaActivaData
+    const poly = planta?.poligono || areaBoundsToPoly(areaBounds)
+    const bAlt = planta?.dimensiones?.alto
+    return isWallPlacementValid({
+      posXY: pos,
+      size: { width: movingEl.width, height: movingEl.height },
+      plantaPoly: poly,
+      bodegaAltura: bAlt,
+      el: movingEl,
+      vecinos: neighbors,
+    })
+  }
+    return isPlacementValid(params)
+  }
 
 // === BLOQUEO DE ELEMENTOS ===
 const isElementLocked = (elementId) => {
@@ -1066,7 +1098,7 @@ const startElementDrag = (elementId) => {
           ubicacion: elemento.ubicacion || 'suelo',
         }
         const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
-        const isOk = isPlacementValid({
+        const isOk = isValidPlacementWrapper({
           pos: { x: bbox.x, y: bbox.y },
           movingEl: moving,
           neighbors,
@@ -1125,7 +1157,7 @@ const startElementDrag = (elementId) => {
         if (!elemento) return false
         const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
         const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-        return isPlacementValid({ pos, movingEl: elemento, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+        return isValidPlacementWrapper({ pos, movingEl: elemento, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
       }
 
       const ctrl = setupRafDrag({
@@ -1158,6 +1190,10 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   }
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (!elemento) return
+  if (elemento.ubicacion === 'pared' && !isWallFormValid(elemento)) {
+    console.warn('Define la altura respecto al suelo')
+    return
+  }
 
   // Actualizar lastVelocity respecto a la última pos deseada conocida
   const prev = lastDesiredPosMap.value.get(elementId) || { x: elemento.x, y: elemento.y }
@@ -1242,8 +1278,8 @@ const endElementDrag = async (elementId) => {
           lastVelocity: lastVel,
         })
 
-        // 2. Verificar validez final con el MISMO predicado isPlacementValid (modelo puro)
-        const finalIsValid = isPlacementValid({
+        // 2. Verificar validez final con el predicado de colocación correspondiente
+        const finalIsValid = isValidPlacementWrapper({
           pos: { x: solved.x, y: solved.y },
           movingEl: elementoActual,
           neighbors,
@@ -1253,6 +1289,22 @@ const endElementDrag = async (elementId) => {
         })
 
         let finalPosition = { x: solved.x, y: solved.y }
+        if (elementoActual.ubicacion === 'pared') {
+          const planta = canvasStore.plantaActivaData
+          const poly = planta?.poligono || areaBoundsToPoly(areaBounds)
+          finalPosition = attachToWall(finalPosition, { width: elementoActual.width, height: elementoActual.height }, poly)
+          const snapValid = isValidPlacementWrapper({
+            pos: finalPosition,
+            movingEl: elementoActual,
+            neighbors,
+            areaBounds,
+            CM_TO_PX,
+            epsPx: 0.5,
+          })
+          if (!snapValid) {
+            finalPosition = { x: solved.x, y: solved.y }
+          }
+        }
         let fallbackUsed = false
 
         // 3. Si la posición final no es válida, usar lastGoodPos o lastValidPos
@@ -1284,7 +1336,7 @@ const endElementDrag = async (elementId) => {
           })
 
           // Validar el resultado del re-clamp
-          const reclampIsValid = isPlacementValid({
+          const reclampIsValid = isValidPlacementWrapper({
             pos: { x: reclampResult.x, y: reclampResult.y },
             movingEl: elementoActual,
             neighbors,
@@ -1383,7 +1435,7 @@ const endElementDrag = async (elementId) => {
       // Validar que la posición final está dentro del área y es válida según el validador común
       const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
       const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
-      const isValidNow = isPlacementValid({ pos: { x: finalX, y: finalY }, movingEl: storeEl, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+      const isValidNow = isValidPlacementWrapper({ pos: { x: finalX, y: finalY }, movingEl: storeEl, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
 
       if (isValidNow) {
         // Persistir posición final con historial
@@ -2079,10 +2131,10 @@ const handleTransformEnd = (e, elementId, forma) => {
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
 
-    // Validar con isPlacementValid contra vecinos y área
+    // Validar placement contra vecinos y área
     const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
     const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    const isValidNow = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+    const isValidNow = isValidPlacementWrapper({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
 
   console.debug('[transform-debug] end', elementId, { prev: transformInitialState.get(elementId), new: { x, y, width, height, rotation }, isValidNow })
   if (!isValidNow) {
@@ -2170,7 +2222,7 @@ const handleTransformMove = (e, elementId, forma) => {
 
     const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
     const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    const valid = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+    const valid = isValidPlacementWrapper({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
 
     // Aplicar stroke rojo si inválido, volver al color habitual si válido
     try {

@@ -311,12 +311,25 @@
           Eliminar
         </button>
       </div>
+      <p
+        v-if="elementoSeleccionado.ubicacion === 'pared' && !wallFormOk"
+        class="text-xs text-red-500 mb-2"
+      >
+        Define la altura y el alto antes de guardar
+      </p>
       <div class="flex gap-2">
         <button
           @click="resetearPropiedades"
           class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
         >
           Restablecer
+        </button>
+        <button
+          @click="guardarPropiedades"
+          :disabled="elementoSeleccionado.ubicacion === 'pared' && !wallFormOk"
+          class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm disabled:opacity-50"
+        >
+          Guardar
         </button>
         <button
           @click="deseleccionarElemento"
@@ -342,6 +355,8 @@ import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import TagFilter from './TagFilter.vue'
 import CreateTagModal from './CreateTagModal.vue'
+import { isWallFormValid } from '@/utils/validation'
+import { isWallPlacementValid } from '@/utils/wallPlacement'
 
 // Store
 const canvasStore = useCanvasStore()
@@ -362,6 +377,7 @@ const isLockedSelected = computed(() => {
   const el = elementoSeleccionado.value
   return !!(el && (el.bloqueado === true || el.locked === true))
 })
+const wallFormOk = computed(() => isWallFormValid(elementoSeleccionado.value))
 
 // Watchers
 watch(
@@ -421,6 +437,11 @@ const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
 }
 
+const guardarPropiedades = () => {
+  // Las propiedades ya se guardan reactivamente; este método es un placeholder
+  deseleccionarElemento()
+}
+
 const onDeleteClick = () => {
   deleteSelected({ withConfirm: true })
 }
@@ -456,6 +477,23 @@ const actualizarDimension = (dimension, valor) => {
   if (!elementoSeleccionado.value) return
   const valorNumerico = parseFloat(valor)
   if (isNaN(valorNumerico)) return // Evitar enviar valores no numéricos
+
+  const el = elementoSeleccionado.value
+  if (el.ubicacion === 'pared' && dimension === 'alto') {
+    const planta = canvasStore.plantaActivaData
+    const poly = planta?.poligono || []
+    const vecinos = canvasStore.elementosVisibles.filter(e => e.id !== el.id)
+    const candidate = { ...el, elevacion: { ...(el.elevacion || {}), altura: valorNumerico } }
+    const valid = isWallPlacementValid({
+      posXY: { x: el.x, y: el.y },
+      size: { width: el.width, height: el.height },
+      plantaPoly: poly,
+      bodegaAltura: planta?.dimensiones?.alto,
+      el: candidate,
+      vecinos,
+    })
+    if (!valid) return
+  }
 
   // Actualizar la dimensión en cm
   canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
@@ -496,6 +534,23 @@ const actualizarPropiedadSimple = (propiedad, valor) => {
   if (!elementoSeleccionado.value) return
   const valorNumerico = parseFloat(valor)
   if (isNaN(valorNumerico)) return
+
+  const el = elementoSeleccionado.value
+  if (el.ubicacion === 'pared' && propiedad === 'alturaRespectoAlSuelo') {
+    const planta = canvasStore.plantaActivaData
+    const poly = planta?.poligono || []
+    const vecinos = canvasStore.elementosVisibles.filter(e => e.id !== el.id)
+    const candidate = { ...el, alturaRespectoAlSuelo: valorNumerico, elevacion: { ...(el.elevacion || {}), zBase: valorNumerico } }
+    const valid = isWallPlacementValid({
+      posXY: { x: el.x, y: el.y },
+      size: { width: el.width, height: el.height },
+      plantaPoly: poly,
+      bodegaAltura: planta?.dimensiones?.alto,
+      el: candidate,
+      vecinos,
+    })
+    if (!valid) return
+  }
 
   canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
     [propiedad]: valorNumerico,
