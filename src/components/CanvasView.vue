@@ -164,9 +164,19 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => {
+              if (!canDragElement(elemento.id)) return
+              if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) handleInnerDragStart(e, elemento)
+              else startElementDrag(elemento.id)
+            }"
+            @dragmove="(e) => {
+              if (innerSessions.has(elemento.id)) handleInnerDragMove(e, elemento)
+              else if (canDragElement(elemento.id)) updateElementPosition(e, elemento.id)
+            }"
+            @dragend="(e) => {
+              if (innerSessions.has(elemento.id)) handleInnerDragEnd(e, elemento)
+              else if (canDragElement(elemento.id)) endElementDrag(elemento.id)
+            }"
               @transformstart="(e) => handleTransformStart(e, elemento.id)"
               @transform="(e) => handleTransformMove(e, elemento.id, 'rectangular')"
               @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
@@ -234,9 +244,19 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id, 'circular')"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => {
+              if (!canDragElement(elemento.id)) return
+              if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) handleInnerDragStart(e, elemento)
+              else startElementDrag(elemento.id)
+            }"
+            @dragmove="(e) => {
+              if (innerSessions.has(elemento.id)) handleInnerDragMove(e, elemento)
+              else if (canDragElement(elemento.id)) updateElementPosition(e, elemento.id, 'circular')
+            }"
+            @dragend="(e) => {
+              if (innerSessions.has(elemento.id)) handleInnerDragEnd(e, elemento)
+              else if (canDragElement(elemento.id)) endElementDrag(elemento.id)
+            }"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id, 'circular')"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'circular')"
@@ -267,9 +287,19 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => {
+              if (!canDragElement(elemento.id)) return
+              if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) handleInnerDragStart(e, elemento)
+              else startElementDrag(elemento.id)
+            }"
+            @dragmove="(e) => {
+              if (innerSessions.has(elemento.id)) handleInnerDragMove(e, elemento)
+              else if (canDragElement(elemento.id)) updateElementPosition(e, elemento.id)
+            }"
+            @dragend="(e) => {
+              if (innerSessions.has(elemento.id)) handleInnerDragEnd(e, elemento)
+              else if (canDragElement(elemento.id)) endElementDrag(elemento.id)
+            }"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id, 'rectangular')"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
@@ -589,6 +619,7 @@ import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
+import { makeInnerSession } from '@/composables/useInnerNoOverlap'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -996,6 +1027,7 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
 // RAF + Perf mode state per element
 const rafControllers = new Map()
 const perfContexts = new Map()
+const innerSessions = new Map()
 const throttle2 = throttleEveryNFrames(2)
 
 const startElementDrag = (elementId) => {
@@ -1171,6 +1203,62 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   // Dejar feedback visual y draw al rAF loop; NO escribir en store
   const rec = rafControllers.get(elementId)
   if (rec && rec.ctrl) rec.ctrl.move({ x, y })
+}
+
+function handleInnerDragStart(evt, el) {
+  const parentEl = canvasStore.elementoContenedorActual || canvasStore.elementoSeleccionadoCompleto
+  if (!parentEl) return
+  const session = makeInnerSession({
+    parentEl,
+    movingEl: el,
+    siblings: elementosVisiblesEnCanvas.value,
+    vista: canvasStore.vistaActiva,
+    CM_TO_PX
+  })
+  innerSessions.set(el.id, {
+    session,
+    parentEl,
+    startWorld: { x: el.posicion?.x || 0, y: el.posicion?.y || 0 },
+    lastPointer: { x: evt.evt?.clientX || 0, y: evt.evt?.clientY || 0 }
+  })
+}
+
+function handleInnerDragMove(evt, el) {
+  const data = innerSessions.get(el.id)
+  if (!data) return
+  const { session, parentEl } = data
+  const pointer = { x: evt.evt?.clientX || 0, y: evt.evt?.clientY || 0 }
+  const vel = {
+    x: evt.evt?.movementX ?? pointer.x - data.lastPointer.x,
+    y: evt.evt?.movementY ?? pointer.y - data.lastPointer.y
+  }
+  data.lastPointer = pointer
+  const shape = evt.target
+  const posWorld = shape.position()
+  const posLocal = session.toLocal(posWorld, parentEl)
+  const nextLocal = session.dragBoundFuncLocal(posLocal, session.lastGoodLocal, vel)
+  shape.position(session.toWorld(nextLocal, parentEl))
+  layerRef.value.getNode().batchDraw()
+}
+
+function handleInnerDragEnd(evt, el) {
+  const data = innerSessions.get(el.id)
+  if (!data) return
+  const { session, parentEl, startWorld } = data
+  const shape = evt.target
+  const candidateLocal = session.toLocal(shape.position(), parentEl)
+  const finalLocal = session.finalizeLocal(candidateLocal)
+  const finalWorld = session.toWorld(finalLocal, parentEl)
+  shape.position(finalWorld)
+  layerRef.value.getNode().batchDraw()
+  if (finalWorld.x !== startWorld.x || finalWorld.y !== startWorld.y) {
+    canvasStore.actualizarElementoConHistorial(
+      el.id,
+      { posicion: { x: finalWorld.x, y: finalWorld.y }, x: finalWorld.x, y: finalWorld.y },
+      `Elemento movido: ${el.nombre || el.tipo || el.id}`
+    )
+  }
+  innerSessions.delete(el.id)
 }
 
 const endElementDrag = async (elementId) => {
@@ -1572,74 +1660,97 @@ const createElementFromDrop = (data, dropEvent) => {
   const snapped = snapToGrid(candX, candY, GRID_SIZE)
   candX = snapped.x
   candY = snapped.y
-
-  // 4. Calcular bbox candidato y verificar área
-  const boundary = computeBoundary()
-
-  // 5. Verificar que esté dentro del área (clampToArea)
-  let isInsideArea = true
-  if (boundary.type === 'rect') {
-    isInsideArea =
-      candX >= 0 &&
-      candY >= 0 &&
-      candX + finalWidth <= boundary.W &&
-      candY + finalHeight <= boundary.H
-
-    // Si está fuera, intentar clamp
-    if (!isInsideArea) {
-      const clamped = clampRectToRect(candX, candY, finalWidth, finalHeight, boundary.W, boundary.H)
-      candX = clamped.x
-      candY = clamped.y
-    }
-  } else if (boundary.type === 'polygon') {
-    isInsideArea = rectInsidePolygon(candX, candY, finalWidth, finalHeight, boundary.points)
-  }
-
-  // 6. Crear elemento temporal para detectar conflictos
-  const tempElement = {
-    id: '__temp_drop__',
-    x: candX,
-    y: candY,
-    width: finalWidth,
-    height: finalHeight,
-    ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
-    tipo: elemento.tipo || elemento.categoria || 'elemento',
-    forma: elemento.forma || 'rectangular',
-  }
-
-  // 7. Ejecutar detectConflictsFor contra elementos existentes
-  const allElements = canvasStore.elementosVisibles
-  const conflicts = detectConflictsFor(tempElement, allElements)
-  const blockingConflicts = conflicts.filter((c) => c.bloqueante)
-
-  // 8. Si hay conflicto BLOQUEANTE o queda fuera de área, intentar nudgePlace
   let finalPosition = { x: candX, y: candY }
-  let placementSuccessful = blockingConflicts.length === 0 && isInsideArea
+  let placementSuccessful = true
+  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
+    const parentEl = canvasStore.elementoContenedorActual
+    const temp = {
+      id: '__temp_drop__',
+      dimensiones: elemento.dimensiones,
+      posicion: { x: candX, y: candY }
+    }
+    const session = makeInnerSession({
+      parentEl,
+      movingEl: temp,
+      siblings: elementosVisiblesEnCanvas.value,
+      vista: canvasStore.vistaActiva,
+      CM_TO_PX
+    })
+    const local = session.toLocal({ x: candX, y: candY }, parentEl)
+    const finalLocal = session.finalizeLocal(local)
+    if (!session.isValidLocal(finalLocal)) {
+      showToast('No hay espacio aquí para colocar el elemento', 'error')
+      return
+    }
+    finalPosition = session.toWorld(finalLocal, parentEl)
+  } else {
+    // 4. Calcular bbox candidato y verificar área
+    const boundary = computeBoundary()
 
-  if (!placementSuccessful) {
-    console.log(
-      '🔍 Posición inicial tiene conflictos o está fuera de área, intentando nudgePlace...',
-    )
+    // 5. Verificar que esté dentro del área (clampToArea)
+    let isInsideArea = true
+    if (boundary.type === 'rect') {
+      isInsideArea =
+        candX >= 0 &&
+        candY >= 0 &&
+        candX + finalWidth <= boundary.W &&
+        candY + finalHeight <= boundary.H
 
-    const nudgeResult = nudgePlace(
-      candX,
-      candY,
-      finalWidth,
-      finalHeight,
-      boundary,
-      allElements,
-      tempElement,
-      GRID_SIZE,
-      16, // máximo 16 intentos
-      detectConflictsFor, // Pasar la función como parámetro
-    )
+      // Si está fuera, intentar clamp
+      if (!isInsideArea) {
+        const clamped = clampRectToRect(candX, candY, finalWidth, finalHeight, boundary.W, boundary.H)
+        candX = clamped.x
+        candY = clamped.y
+      }
+    } else if (boundary.type === 'polygon') {
+      isInsideArea = rectInsidePolygon(candX, candY, finalWidth, finalHeight, boundary.points)
+    }
 
-    if (nudgeResult.found) {
-      finalPosition = { x: nudgeResult.x, y: nudgeResult.y }
-      placementSuccessful = true
-      console.log('✅ nudgePlace encontró posición válida:', finalPosition)
-    } else {
-      console.log('❌ nudgePlace no encontró posición válida')
+    // 6. Crear elemento temporal para detectar conflictos
+    const tempElement = {
+      id: '__temp_drop__',
+      x: candX,
+      y: candY,
+      width: finalWidth,
+      height: finalHeight,
+      ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
+      tipo: elemento.tipo || elemento.categoria || 'elemento',
+      forma: elemento.forma || 'rectangular'
+    }
+
+    // 7. Ejecutar detectConflictsFor contra elementos existentes
+    const allElements = canvasStore.elementosVisibles
+    const conflicts = detectConflictsFor(tempElement, allElements)
+    const blockingConflicts = conflicts.filter((c) => c.bloqueante)
+
+    // 8. Si hay conflicto BLOQUEANTE o queda fuera de área, intentar nudgePlace
+    placementSuccessful = blockingConflicts.length === 0 && isInsideArea
+
+    if (!placementSuccessful) {
+      console.log(
+        '🔍 Posición inicial tiene conflictos o está fuera de área, intentando nudgePlace...',
+      )
+
+      const nudgeResult = nudgePlace(
+        candX,
+        candY,
+        finalWidth,
+        finalHeight,
+        boundary,
+        allElements,
+        tempElement,
+        GRID_SIZE,
+        16, // máximo 16 intentos
+        detectConflictsFor // Pasar la función como parámetro
+      )
+
+      if (nudgeResult.found) {
+        finalPosition = { x: nudgeResult.x, y: nudgeResult.y }
+        placementSuccessful = true
+        console.log('✅ nudgePlace encontró posición válida:', finalPosition)
+      } else {
+        console.log('❌ nudgePlace no encontró posición válida')
+      }
     }
   }
 
