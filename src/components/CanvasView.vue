@@ -71,7 +71,6 @@
             y: 0,
             width: floorBoundary.width,
             height: floorBoundary.height,
-            fill: 'rgba(14,165,233,0.08)',
             stroke: '#3b82f6',
             strokeWidth: 2,
             opacity: 1,
@@ -1799,7 +1798,7 @@ watch(
 
             // La opacidad del aura "respira" entre 0.3 y 0.7
             nodeAura.opacity(0.3 + oscillation * 0.4)
-            
+
           }, nodeAura.getLayer())
 
           highlightAnimation.value.start()

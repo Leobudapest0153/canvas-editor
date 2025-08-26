@@ -135,7 +135,7 @@
           <div class="flex items-center gap-2">
             <button
               @click.stop="canvasStore.destacarElemento(elemento.id)"
-              class="p-1 text-gray-400 hover:text-blue-600"
+              class="p-1 text-gray-400 hover:text-blue-600 cursor-pointer"
               title="Encontrar en el canvas"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,7 +144,7 @@
             </button>
             <button
               @click.stop="canvasStore.toggleElementoVisibilidad(elemento.id)"
-              class="p-1 text-gray-400 hover:text-gray-600"
+              class="p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
               :title="elemento.visible === false ? 'Mostrar' : 'Ocultar'"
             >
               <svg
