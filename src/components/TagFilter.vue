@@ -16,7 +16,7 @@
         <span>{{ etiqueta.texto }}</span>
         <button
           @click.stop="onRemoveTag(etiqueta.id)"
-          class="w-4 h-4 flex items-center justify-center rounded-full opacity-70 hover:opacity-100"
+          class="px-2 py-1 flex items-center justify-center rounded-full opacity-70 hover:opacity-100"
           :style="{ backgroundColor: 'rgba(0,0,0,0.1)' }"
           title="Eliminar etiqueta"
         >
