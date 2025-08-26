@@ -17,6 +17,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { CM_TO_PX } from '@/utils/constants'
+import { validateWallPlacement, isWallFormValid } from '@/utils/wallRules'
 
 // Variable para evitar circular import - será inicializada por el composable de historial
 let historyComposable = null
@@ -204,6 +205,11 @@ export const useCanvasStore = defineStore('canvas', () => {
   const elementosEnPlanta = computed(() => (plantaId) => {
     return elementos.value.filter((el) => el.plantaId === plantaId)
   })
+
+  const getBodegaAltura = () =>
+    Number(plantaActivaData.value?.dimensiones?.alto) ||
+    Number(plantaActivaData.value?.altura) ||
+    0
 
   const elementoSeleccionadoCompleto = computed(() => {
     if (!elementoSeleccionado.value) return null
@@ -579,14 +585,65 @@ export const useCanvasStore = defineStore('canvas', () => {
   const actualizarPosicion = (id, x, y) => {
     const elemento = elementos.value.find((el) => el.id === id)
     if (elemento) {
+      if (elemento.ubicacion === 'Pared' || elemento.ubicacion === 'pared') {
+        const all = elementos.value.filter((el) => el.plantaId === elemento.plantaId)
+        const el = {
+          ...elemento,
+          x,
+          y,
+          ubicacion: 'Pared',
+          alturaRespectoSuelo:
+            elemento.alturaRespectoSuelo ?? elemento?.elevacion?.zBase ?? 0,
+        }
+        if (!isWallFormValid(el)) {
+          const reason = 'Falta altura respecto al suelo (>0) y alto'
+          window.__toasts?.show?.(reason, { type: 'warn' }) ||
+            console.warn('[WALL_RULES]', reason, elemento)
+          return false
+        }
+        const res = validateWallPlacement({ el, all, bodegaH: getBodegaAltura() })
+        if (!res.ok) {
+          window.__toasts?.show?.(res.reason, { type: 'warn' }) ||
+            console.warn('[WALL_RULES]', res.reason, elemento)
+          return false
+        }
+      }
       elemento.x = x
       elemento.y = y
+      return true
     }
+    return false
   }
 
   const actualizarElemento = (elementoId, propiedades) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (elemento) {
+      const candidato = {
+        ...elemento,
+        ...propiedades,
+        dimensiones: { ...elemento.dimensiones, ...propiedades.dimensiones },
+      }
+      if (candidato.ubicacion === 'Pared' || candidato.ubicacion === 'pared') {
+          const all = elementos.value.filter((el) => el.plantaId === candidato.plantaId)
+          const el = {
+            ...candidato,
+            ubicacion: 'Pared',
+            alturaRespectoSuelo:
+              candidato.alturaRespectoSuelo ?? candidato?.elevacion?.zBase ?? 0,
+          }
+          if (!isWallFormValid(el)) {
+            const reason = 'Falta altura respecto al suelo (>0) y alto'
+            window.__toasts?.show?.(reason, { type: 'warn' }) ||
+              console.warn('[WALL_RULES]', reason, elemento)
+            return false
+          }
+          const res = validateWallPlacement({ el, all, bodegaH: getBodegaAltura() })
+          if (!res.ok) {
+            window.__toasts?.show?.(res.reason, { type: 'warn' }) ||
+              console.warn('[WALL_RULES]', res.reason, elemento)
+            return false
+          }
+      }
       for (const key in propiedades) {
         if (typeof propiedades[key] === 'object' && propiedades[key] !== null && !Array.isArray(propiedades[key])) {
           // Si la propiedad es un objeto (como 'dimensiones'), la fusionamos recursivamente.
@@ -620,7 +677,9 @@ export const useCanvasStore = defineStore('canvas', () => {
           // Nota: largo no afecta a width/height en vista XZ
         }
       }
+      return true
     }
+    return false
   }
 
   const configurarZoom = (nuevoZoom) => {
@@ -738,6 +797,28 @@ export const useCanvasStore = defineStore('canvas', () => {
     ) {
       console.error('En contenedores solo se pueden agregar elementos u otros contenedores')
       return null
+    }
+
+    if (nuevoElemento.ubicacion === 'Pared' || nuevoElemento.ubicacion === 'pared') {
+      const all = elementos.value.filter((el) => el.plantaId === contextoNavegacion.value.id)
+      const el = {
+        ...nuevoElemento,
+        ubicacion: 'Pared',
+        alturaRespectoSuelo:
+          nuevoElemento.alturaRespectoSuelo ?? nuevoElemento?.elevacion?.zBase ?? 0,
+      }
+      if (!isWallFormValid(el)) {
+        const reason = 'Falta altura respecto al suelo (>0) y alto'
+        window.__toasts?.show?.(reason, { type: 'warn' }) ||
+          console.warn('[WALL_RULES]', reason, nuevoElemento)
+        return false
+      }
+      const res = validateWallPlacement({ el, all, bodegaH: getBodegaAltura() })
+      if (!res.ok) {
+        window.__toasts?.show?.(res.reason, { type: 'warn' }) ||
+          console.warn('[WALL_RULES]', res.reason, nuevoElemento)
+        return false
+      }
     }
 
     // Si estamos dentro de un elemento o contenedor, el nuevo elemento es hijo
@@ -883,20 +964,23 @@ export const useCanvasStore = defineStore('canvas', () => {
    * Versiones con historial de las acciones principales
    */
   const actualizarElementoConHistorial = (elementoId, propiedades, description) => {
-    actualizarElemento(elementoId, propiedades)
+    const ok = actualizarElemento(elementoId, propiedades)
+    if (!ok) return false
 
     const descripcionAuto =
       description || `Propiedades actualizadas: ${Object.keys(propiedades).join(', ')}`
     saveToHistory(descripcionAuto)
+    return true
   }
 
   const actualizarPosicionConHistorial = (elementoId, x, y, description) => {
-    actualizarPosicion(elementoId, x, y)
+    const ok = actualizarPosicion(elementoId, x, y)
 
     // Solo guardar en historial al finalizar el arrastre, no en cada movimiento
-    if (description) {
+    if (ok && description) {
       saveToHistory(description)
     }
+    return ok
   }
 
   const seleccionarPlantaConHistorial = (plantaId) => {

@@ -13,6 +13,7 @@
 
 import { ref, computed } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
+import { validateWallPlacement, isWallFormValid } from '@/utils/wallRules'
 
 // Estado global del buffer (singleton)
 const bufferItems = ref([])
@@ -231,8 +232,35 @@ export const useCanvasBuffer = () => {
       }
     }
 
+    if (newElement.ubicacion === 'Pared' || newElement.ubicacion === 'pared') {
+      const all = canvasStore.elementosEnPlanta(canvasStore.plantaActiva)
+      const el = {
+        ...newElement,
+        ubicacion: 'Pared',
+        alturaRespectoSuelo:
+          newElement.alturaRespectoSuelo ?? newElement?.elevacion?.zBase ?? 0,
+      }
+      if (!isWallFormValid(el)) {
+        const reason = 'Falta altura respecto al suelo (>0) y alto'
+        window.__toasts?.show?.(reason, { type: 'warn' }) ||
+          console.warn('[WALL_RULES]', reason, newElement)
+        return false
+      }
+      const bodegaH =
+        Number(canvasStore.plantaActivaData?.dimensiones?.alto) ||
+        Number(canvasStore.plantaActivaData?.altura) ||
+        0
+      const res = validateWallPlacement({ el, all, bodegaH })
+      if (!res.ok) {
+        window.__toasts?.show?.(res.reason, { type: 'warn' }) ||
+          console.warn('[WALL_RULES]', res.reason, newElement)
+        return false
+      }
+    }
+
     // Agregar al canvas
-    canvasStore.agregarElemento(newElement)
+    const newId = canvasStore.agregarElemento(newElement)
+    if (!newId) return false
     console.log('📋 Elemento pegado desde buffer:', newElement.nombre)
 
     // Si era un elemento movido (no copiado), remover del buffer
@@ -240,7 +268,7 @@ export const useCanvasBuffer = () => {
       removeFromBuffer(bufferItemId)
     }
 
-    return newElement.id
+    return newId
   }
 
   /**
