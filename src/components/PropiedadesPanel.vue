@@ -320,10 +320,22 @@
         </button>
         <button
           @click="deseleccionarElemento"
-          class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+          :disabled="elementoSeleccionado?.ubicacion === 'Pared' && !wallFormValid"
+          :class="[
+            'flex-1 px-4 py-2 rounded-lg transition-colors text-sm',
+            elementoSeleccionado?.ubicacion === 'Pared' && !wallFormValid
+              ? 'bg-blue-400 text-white cursor-not-allowed opacity-60'
+              : 'bg-blue-500 text-white hover:bg-blue-600',
+          ]"
         >
-          Deseleccionar
+          Guardar
         </button>
+        <p
+          v-if="elementoSeleccionado?.ubicacion === 'Pared' && !wallFormValid"
+          class="text-xs text-yellow-600 mt-2 text-center"
+        >
+          Falta altura respecto al suelo (>0) y alto
+        </p>
       </div>
     </div>
   </div>
@@ -340,6 +352,7 @@ import { ref, watch, computed } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore.js'
 import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
 import { useDeleteElement } from '@/composables/useDeleteElement'
+import { isWallFormValid } from '@/utils/wallRules.js'
 import TagFilter from './TagFilter.vue'
 import CreateTagModal from './CreateTagModal.vue'
 
@@ -361,6 +374,11 @@ const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoComp
 const isLockedSelected = computed(() => {
   const el = elementoSeleccionado.value
   return !!(el && (el.bloqueado === true || el.locked === true))
+})
+
+const wallFormValid = computed(() => {
+  const el = elementoSeleccionado.value
+  return isWallFormValid(el)
 })
 
 // Watchers

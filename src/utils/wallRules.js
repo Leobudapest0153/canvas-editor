@@ -1,0 +1,43 @@
+export const isWallFormValid = (el) =>
+  el?.ubicacion === 'Pared'
+    ? Number(el?.alturaRespectoSuelo) > 0 && Number(el?.dimensiones?.alto) > 0
+    : true;
+
+export const wallZOk = (el, bodegaH, eps = 0.5) =>
+  el?.ubicacion !== 'Pared'
+    ? true
+    : Number(el.alturaRespectoSuelo) + Number(el?.dimensiones?.alto) <=
+        Number(bodegaH) + eps;
+
+export const wallNoZOverlap = (el, vec, eps = 0.5) => {
+  if (el?.ubicacion !== 'Pared' || vec?.ubicacion !== 'Pared') return true;
+  const a0 = Number(el.alturaRespectoSuelo);
+  const a1 = a0 + Number(el?.dimensiones?.alto);
+  const b0 = Number(vec.alturaRespectoSuelo);
+  const b1 = b0 + Number(vec?.dimensiones?.alto);
+  return a1 <= b0 + eps || b1 <= a0 + eps;
+};
+
+export const wallVsFloorOk = (el, vecSuelo, eps = 0.5) => {
+  if (el?.ubicacion !== 'Pared' || vecSuelo?.ubicacion !== 'Suelo') return true;
+  const sueloH = Number(vecSuelo?.dimensiones?.alto) || 0;
+  return Number(el.alturaRespectoSuelo) >= sueloH + eps;
+};
+
+export const validateWallPlacement = ({ el, all, bodegaH }) => {
+  if (!isWallFormValid(el))
+    return { ok: false, reason: 'Falta altura respecto al suelo (>0) y alto' };
+  if (!wallZOk(el, bodegaH))
+    return { ok: false, reason: 'Supera altura de bodega' };
+  for (const v of all) {
+    if (v.id === el.id) continue;
+    if (!wallNoZOverlap(el, v))
+      return { ok: false, reason: 'Solape vertical con otra pared' };
+    if (!wallVsFloorOk(el, v))
+      return {
+        ok: false,
+        reason: 'Choca con elemento de suelo (altura insuficiente)',
+      };
+  }
+  return { ok: true };
+};

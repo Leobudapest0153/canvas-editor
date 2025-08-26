@@ -17,6 +17,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { CM_TO_PX } from '@/utils/constants'
+import { validateWallPlacement, isWallFormValid } from '@/utils/wallRules.js'
 
 // Variable para evitar circular import - será inicializada por el composable de historial
 let historyComposable = null
@@ -200,6 +201,11 @@ export const useCanvasStore = defineStore('canvas', () => {
   const plantaActivaData = computed(() => {
     return plantas.value.find((planta) => planta.id === plantaActiva.value)
   })
+
+  const getBodegaAltura = () =>
+    Number(plantaActivaData.value?.dimensiones?.alto) ||
+    Number(plantaActivaData.value?.altura) ||
+    0
 
   const elementosEnPlanta = computed(() => (plantaId) => {
     return elementos.value.filter((el) => el.plantaId === plantaId)
@@ -579,30 +585,93 @@ export const useCanvasStore = defineStore('canvas', () => {
   const actualizarPosicion = (id, x, y) => {
     const elemento = elementos.value.find((el) => el.id === id)
     if (elemento) {
+      const elDraft = { ...elemento, x, y }
+      if (elDraft.ubicacion === 'Pared') {
+        if (!isWallFormValid(elDraft)) {
+          const reason = 'Falta altura respecto al suelo (>0) y alto'
+          window.__toasts?.show?.(reason, { type: 'warn' }) ||
+            console.warn('[WALL_RULES]', reason, elDraft)
+          return false
+        }
+        const all = elementos.value.filter((e) => e.plantaId === elDraft.plantaId)
+        const res = validateWallPlacement({
+          el: {
+            ...elDraft,
+            alturaRespectoSuelo:
+              elDraft.alturaRespectoSuelo ?? elDraft?.elevacion?.zBase ?? 0,
+          },
+          all,
+          bodegaH: getBodegaAltura(),
+        })
+        if (!res.ok) {
+          window.__toasts?.show?.(res.reason, { type: 'warn' }) ||
+            console.warn('[WALL_RULES]', res.reason, elDraft)
+          return false
+        }
+      }
       elemento.x = x
       elemento.y = y
+      return true
     }
+    return false
   }
 
   const actualizarElemento = (elementoId, propiedades) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (elemento) {
+      const draft = JSON.parse(JSON.stringify(elemento))
       for (const key in propiedades) {
-        if (typeof propiedades[key] === 'object' && propiedades[key] !== null && !Array.isArray(propiedades[key])) {
-          // Si la propiedad es un objeto (como 'dimensiones'), la fusionamos recursivamente.
-          if (!elemento[key]) elemento[key] = {}
-          Object.assign(elemento[key], propiedades[key]);
+        if (
+          typeof propiedades[key] === 'object' &&
+          propiedades[key] !== null &&
+          !Array.isArray(propiedades[key])
+        ) {
+          if (!draft[key]) draft[key] = {}
+          Object.assign(draft[key], propiedades[key])
         } else {
-          // Si es un valor simple, lo asignamos directamente.
-          elemento[key] = propiedades[key];
+          draft[key] = propiedades[key]
         }
       }
 
-      // Correcciones en los datos de ancho y alto a base de las dimensiones
+      if (draft.ubicacion === 'Pared') {
+        if (!isWallFormValid(draft)) {
+          const reason = 'Falta altura respecto al suelo (>0) y alto'
+          window.__toasts?.show?.(reason, { type: 'warn' }) ||
+            console.warn('[WALL_RULES]', reason, draft)
+          return false
+        }
+        const all = elementos.value.filter((e) => e.plantaId === draft.plantaId)
+        const res = validateWallPlacement({
+          el: {
+            ...draft,
+            alturaRespectoSuelo:
+              draft.alturaRespectoSuelo ?? draft?.elevacion?.zBase ?? 0,
+          },
+          all,
+          bodegaH: getBodegaAltura(),
+        })
+        if (!res.ok) {
+          window.__toasts?.show?.(res.reason, { type: 'warn' }) ||
+            console.warn('[WALL_RULES]', res.reason, draft)
+          return false
+        }
+      }
+
+      for (const key in propiedades) {
+        if (
+          typeof propiedades[key] === 'object' &&
+          propiedades[key] !== null &&
+          !Array.isArray(propiedades[key])
+        ) {
+          if (!elemento[key]) elemento[key] = {}
+          Object.assign(elemento[key], propiedades[key])
+        } else {
+          elemento[key] = propiedades[key]
+        }
+      }
+
       if (propiedades.dimensiones) {
-        // Actualizar width/height dependiendo de la vista activa
         if (vistaActiva.value === 'XY') {
-          // En vista XY (superior): ancho->width, largo->height
           if (propiedades.dimensiones.ancho !== undefined) {
             elemento.width = elemento.dimensiones.ancho * CM_TO_PX
           }
@@ -610,17 +679,17 @@ export const useCanvasStore = defineStore('canvas', () => {
             elemento.height = elemento.dimensiones.largo * CM_TO_PX
           }
         } else if (vistaActiva.value === 'XZ') {
-          // En vista XZ (frontal): ancho->width, alto->height
           if (propiedades.dimensiones.ancho !== undefined) {
             elemento.width = elemento.dimensiones.ancho * CM_TO_PX
           }
           if (propiedades.dimensiones.alto !== undefined) {
             elemento.height = elemento.dimensiones.alto * CM_TO_PX
           }
-          // Nota: largo no afecta a width/height en vista XZ
         }
       }
+      return true
     }
+    return false
   }
 
   const configurarZoom = (nuevoZoom) => {
@@ -740,49 +809,78 @@ export const useCanvasStore = defineStore('canvas', () => {
       return null
     }
 
+    let elementoPadre = null
+    let planta = null
+
     // Si estamos dentro de un elemento o contenedor, el nuevo elemento es hijo
     if (
       contextoNavegacion.value.tipo === 'elementos' ||
       contextoNavegacion.value.tipo === 'contenedores'
     ) {
-      const elementoPadre = elementos.value.find((el) => el.id === contextoNavegacion.value.id)
+      elementoPadre = elementos.value.find(
+        (el) => el.id === contextoNavegacion.value.id,
+      )
       if (elementoPadre) {
-        // Agregar como hijo del elemento/contenedor actual
         nuevoElemento.padre = elementoPadre.id
         nuevoElemento.plantaId = elementoPadre.plantaId // Hereda la planta del padre
-
-        // Agregar el ID del hijo al array de hijos del padre
-        if (!elementoPadre.hijos) {
-          elementoPadre.hijos = []
-        }
-        elementoPadre.hijos.push(nuevoElemento.id)
-
-        console.log('Elemento agregado como hijo de:', {
-          padre: elementoPadre.nombre,
-          hijo: nuevoElemento.nombre,
-          tipoHijo: nuevoElemento.tipo,
-          hijosDelPadre: elementoPadre.hijos.length,
-        })
       }
     } else {
-      // Si estamos en una planta, agregar normalmente
+      // Si estamos en una planta, preparar datos
       nuevoElemento.plantaId = contextoNavegacion.value.id
-      nuevoElemento.padre = null;
-      nuevoElemento.etiquetas = []; // Sin etiquetas inicialmente
+      nuevoElemento.padre = null
+      nuevoElemento.etiquetas = []
+      planta = plantas.value.find((p) => p.id === contextoNavegacion.value.id)
+    }
 
-      // Actualizar el array de elementos en la planta
-      const planta = plantas.value.find((p) => p.id === contextoNavegacion.value.id)
-      if (planta) {
-        if (!planta.elementos) {
-          planta.elementos = []
-        }
-        planta.elementos.push(nuevoElemento.id)
-        console.log('Elemento agregado al array de elementos de la planta:', {
-          plantaId: planta.id,
-          elementoId: nuevoElemento.id,
-          totalElementosEnPlanta: planta.elementos.length,
-        })
+    if (nuevoElemento.ubicacion === 'Pared') {
+      if (!isWallFormValid(nuevoElemento)) {
+        const reason = 'Falta altura respecto al suelo (>0) y alto'
+        window.__toasts?.show?.(reason, { type: 'warn' }) ||
+          console.warn('[WALL_RULES]', reason, nuevoElemento)
+        return false
       }
+      const all = elementos.value.filter(
+        (e) => e.plantaId === nuevoElemento.plantaId,
+      )
+      const res = validateWallPlacement({
+        el: {
+          ...nuevoElemento,
+          alturaRespectoSuelo:
+            nuevoElemento.alturaRespectoSuelo ??
+            nuevoElemento?.elevacion?.zBase ??
+            0,
+        },
+        all,
+        bodegaH: getBodegaAltura(),
+      })
+      if (!res.ok) {
+        window.__toasts?.show?.(res.reason, { type: 'warn' }) ||
+          console.warn('[WALL_RULES]', res.reason, nuevoElemento)
+        return false
+      }
+    }
+
+    if (elementoPadre) {
+      if (!elementoPadre.hijos) {
+        elementoPadre.hijos = []
+      }
+      elementoPadre.hijos.push(nuevoElemento.id)
+      console.log('Elemento agregado como hijo de:', {
+        padre: elementoPadre.nombre,
+        hijo: nuevoElemento.nombre,
+        tipoHijo: nuevoElemento.tipo,
+        hijosDelPadre: elementoPadre.hijos.length,
+      })
+    } else if (planta) {
+      if (!planta.elementos) {
+        planta.elementos = []
+      }
+      planta.elementos.push(nuevoElemento.id)
+      console.log('Elemento agregado al array de elementos de la planta:', {
+        plantaId: planta.id,
+        elementoId: nuevoElemento.id,
+        totalElementosEnPlanta: planta.elementos.length,
+      })
     }
 
     elementos.value.push(nuevoElemento)
@@ -883,20 +981,23 @@ export const useCanvasStore = defineStore('canvas', () => {
    * Versiones con historial de las acciones principales
    */
   const actualizarElementoConHistorial = (elementoId, propiedades, description) => {
-    actualizarElemento(elementoId, propiedades)
+    const ok = actualizarElemento(elementoId, propiedades)
+    if (!ok) return false
 
     const descripcionAuto =
       description || `Propiedades actualizadas: ${Object.keys(propiedades).join(', ')}`
     saveToHistory(descripcionAuto)
+    return true
   }
 
   const actualizarPosicionConHistorial = (elementoId, x, y, description) => {
-    actualizarPosicion(elementoId, x, y)
+    const ok = actualizarPosicion(elementoId, x, y)
+    if (!ok) return false
 
-    // Solo guardar en historial al finalizar el arrastre, no en cada movimiento
     if (description) {
       saveToHistory(description)
     }
+    return true
   }
 
   const seleccionarPlantaConHistorial = (plantaId) => {
