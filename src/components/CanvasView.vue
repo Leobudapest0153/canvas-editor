@@ -2092,7 +2092,8 @@ const handleTransformEnd = (e, elementId, forma) => {
   try {
     const node = e.target
     // Aplicar corrección de flip y clamping final
-    let { x, y, width, height } = applyNoFlipResize(node, { minW: 8, minH: 8 })
+    const active = transformerRef.value?.getNode?.().getActiveAnchor?.() || ''
+    let { x, y, width, height } = applyNoFlipResize(node, { minW: 8, minH: 8, anchor: active })
     if (forma === 'circular') {
       const r = Math.min(width, height) / 2
       node.x(x + r)
@@ -2101,7 +2102,7 @@ const handleTransformEnd = (e, elementId, forma) => {
       height = r * 2
     }
     const bounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    ;({ x, y, width, height } = clampResizeWithinBounds(node, bounds, { minW: 8, minH: 8 }))
+    ;({ x, y, width, height } = clampResizeWithinBounds(node, bounds, { minW: 8, minH: 8, anchor: active }))
     const rotation = node.rotation?.() || 0
 
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
@@ -2175,7 +2176,8 @@ const handleTransformMove = (e, elementId, forma) => {
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
 
-    let { x, y, width, height } = applyNoFlipResize(node, { minW: 8, minH: 8 })
+    const active = transformerRef.value?.getNode?.().getActiveAnchor?.() || ''
+    let { x, y, width, height } = applyNoFlipResize(node, { minW: 8, minH: 8, anchor: active })
     if (forma === 'circular') {
       const r = Math.min(width, height) / 2
       node.x(x + r)

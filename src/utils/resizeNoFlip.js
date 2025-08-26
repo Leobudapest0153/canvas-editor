@@ -1,33 +1,61 @@
-export function applyNoFlipResize(node, { minW = 8, minH = 8 } = {}) {
+export function applyNoFlipResize(node, { minW = 8, minH = 8, anchor = '' } = {}) {
   if (!node) return { x: 0, y: 0, width: 0, height: 0 }
-  const width = typeof node.width === 'function' ? node.width() : 0
-  const height = typeof node.height === 'function' ? node.height() : 0
-  const scaleX = typeof node.scaleX === 'function' ? node.scaleX() : 1
-  const scaleY = typeof node.scaleY === 'function' ? node.scaleY() : 1
 
-  let newWidth = Math.abs(width * scaleX)
-  let newHeight = Math.abs(height * scaleY)
-  if (newWidth < minW) newWidth = minW
-  if (newHeight < minH) newHeight = minH
+  const width = node.width()
+  const height = node.height()
+  const scaleX = node.scaleX()
+  const scaleY = node.scaleY()
 
-  let x = typeof node.x === 'function' ? node.x() : 0
-  let y = typeof node.y === 'function' ? node.y() : 0
+  let x = node.x()
+  let y = node.y()
 
-  if (scaleX < 0) {
-    x = x + width * scaleX - newWidth
+  let newW = width * scaleX
+  let newH = height * scaleY
+
+  let left = x
+  let right = x + newW
+  let top = y
+  let bottom = y + newH
+
+  if (newW < 0) {
+    ;[left, right] = [right, left]
+    newW = Math.abs(newW)
   }
-  if (scaleY < 0) {
-    y = y + height * scaleY - newHeight
+
+  if (newH < 0) {
+    ;[top, bottom] = [bottom, top]
+    newH = Math.abs(newH)
   }
 
-  if (typeof node.x === 'function') node.x(x)
-  if (typeof node.y === 'function') node.y(y)
-  if (typeof node.width === 'function') node.width(newWidth)
-  if (typeof node.height === 'function') node.height(newHeight)
-  if (typeof node.scaleX === 'function') node.scaleX(1)
-  if (typeof node.scaleY === 'function') node.scaleY(1)
+  if (newW < minW) {
+    if (anchor.includes('left')) {
+      left = right - minW
+    } else {
+      right = left + minW
+    }
+    newW = minW
+  }
 
-  return { x, y, width: newWidth, height: newHeight }
+  if (newH < minH) {
+    if (anchor.includes('top')) {
+      top = bottom - minH
+    } else {
+      bottom = top + minH
+    }
+    newH = minH
+  }
+
+  x = left
+  y = top
+
+  node.x(x)
+  node.y(y)
+  node.width(newW)
+  node.height(newH)
+  node.scaleX(1)
+  node.scaleY(1)
+
+  return { x, y, width: newW, height: newH }
 }
 
 export function clampResizeWithinBounds(node, bounds = {}, opts = {}) {
@@ -40,10 +68,10 @@ export function clampResizeWithinBounds(node, bounds = {}, opts = {}) {
   if (x + width > maxX) x = maxX - width
   if (y + height > maxY) y = maxY - height
 
-  if (typeof node.x === 'function') node.x(x)
-  if (typeof node.y === 'function') node.y(y)
-  if (typeof node.width === 'function') node.width(width)
-  if (typeof node.height === 'function') node.height(height)
+  node.x(x)
+  node.y(y)
+  node.width(width)
+  node.height(height)
 
   return { x, y, width, height }
 }
