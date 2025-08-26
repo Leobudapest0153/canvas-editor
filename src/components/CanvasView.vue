@@ -64,24 +64,10 @@
 
         <!-- Aquí podrías añadir v-circle, etc., si tienes otras formas -->
       </template>
-        <!-- Fondo de la planta - área delimitada -->
-        <v-rect
-          :config="{
-            x: 0,
-            y: 0,
-            width: floorBoundary.width,
-            height: floorBoundary.height,
-            fill: 'rgba(14,165,233,0.08)',
-            stroke: '#3b82f6',
-            strokeWidth: 2,
-            opacity: 1,
-            listening: false,
-          }"
-        />
         <v-line
-          v-if="!canvasStore.estaEnElemento && !canvasStore.estaEnContenedor"
+          v-if="plantPolygon.length"
           :config="{
-            points: floorBoundary.points,
+            points: plantPolygonFlat,
             closed: true,
             stroke: '#0ea5e9',
             fill: 'rgba(14,165,233,0.08)',
@@ -574,11 +560,11 @@ import {
   projectMTDAgainstBoundary,
 } from '@/utils/collision'
 import {
-  rectInsidePolygon,
   clampRectToRect,
   snapToGrid,
   nudgePlace,
 } from '@/utils/geometry'
+import { clampRectToPolygon, pointInPolygon } from '@/utils/polygonBounds'
 import { GRID_SIZE, CM_TO_PX } from '@/utils/constants'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -778,28 +764,29 @@ const stageConfig = computed(() => {
   }
 })
 
-const floorBoundary = computed(() => {
-  // Empezamos con las dimensiones base del layer
-  let width = layerConfig.value.width
-  let height = layerConfig.value.height
-  let points = []
-
-  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
-    return { width, height, points }
-  }
-
+const plantPolygon = computed(() => {
   const poligono = canvasStore.plantaActivaData?.poligono
+  if (poligono && Array.isArray(poligono) && poligono.length >= 3) return poligono
+  const w = canvasStore.plantaActivaData?.dimensiones?.ancho || layerConfig.value.width
+  const h = canvasStore.plantaActivaData?.dimensiones?.largo || layerConfig.value.height
+  return [
+    { x: 0, y: 0 },
+    { x: w, y: 0 },
+    { x: w, y: h },
+    { x: 0, y: h }
+  ]
+})
 
-  // Si hay un polígono, lo usamos para expandir los límites y obtener los puntos
-  if (poligono && Array.isArray(poligono) && poligono.length > 0) {
-    poligono.forEach((coord) => {
-      width = Math.max(coord.x, width)
-      height = Math.max(coord.y, height)
-    })
-    points = poligono.flatMap((p) => [p.x, p.y])
-  }
+const plantPolygonFlat = computed(() => plantPolygon.value.flatMap(p => [p.x, p.y]))
 
-  return { width, height, points }
+const floorBoundary = computed(() => {
+  const xs = plantPolygon.value.map(p => p.x)
+  const ys = plantPolygon.value.map(p => p.y)
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+  const minY = Math.min(...ys)
+  const maxY = Math.max(...ys)
+  return { width: maxX - minX, height: maxY - minY }
 })
 
 // Configuración del layer - SIEMPRE USA CANVAS ADAPTATIVO
@@ -836,6 +823,22 @@ const gridLines = computed(() => {
 
   return { vertical, horizontal }
 })
+
+watch(
+  plantPolygon,
+  (poly) => {
+    const layer = layerRef.value?.getNode?.()
+    if (layer && poly?.length) {
+      layer.clipFunc((ctx) => {
+        ctx.beginPath()
+        poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+        ctx.closePath()
+      })
+      layer.batchDraw?.()
+    }
+  },
+  { immediate: true },
+)
 
 // Obtiene el contorno de la planta activa como rect o polígono
 const computeBoundary = () => {
@@ -979,14 +982,23 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
     const layerW = layerConfig.value.width
     const layerH = layerConfig.value.height
     const lp = toLayerCoords(pos)
-  if (forma === 'circular' || forma === 'circle') {
+    const boundary = computeBoundary()
+    if (forma === 'circular' || forma === 'circle') {
       const r = Math.min(elemento.width, elemento.height) / 2
       const cx = Math.max(r, Math.min(lp.x, layerW - r))
       const cy = Math.max(r, Math.min(lp.y, layerH - r))
       return toStageCoords({ x: cx, y: cy })
     } else {
-      const c = clampRectToRect(lp.x, lp.y, elemento.width, elemento.height, layerW, layerH)
-      return toStageCoords(c)
+      if (boundary.type === 'polygon') {
+        const c = clampRectToPolygon(
+          { x: lp.x, y: lp.y, width: elemento.width, height: elemento.height },
+          boundary.points,
+        )
+        return toStageCoords(c)
+      } else {
+        const c = clampRectToRect(lp.x, lp.y, elemento.width, elemento.height, layerW, layerH)
+        return toStageCoords(c)
+      }
     }
   } catch {
     return pos
@@ -1592,7 +1604,16 @@ const createElementFromDrop = (data, dropEvent) => {
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInsideArea = rectInsidePolygon(candX, candY, finalWidth, finalHeight, boundary.points)
+    isInsideArea = pointInPolygon({
+      x: candX + finalWidth / 2,
+      y: candY + finalHeight / 2,
+    }, boundary.points)
+    if (!isInsideArea) {
+      const clamped = clampRectToPolygon({ x: candX, y: candY, width: finalWidth, height: finalHeight }, boundary.points)
+      candX = clamped.x
+      candY = clamped.y
+      isInsideArea = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.points)
+    }
   }
 
   // 6. Crear elemento temporal para detectar conflictos
@@ -1645,7 +1666,7 @@ const createElementFromDrop = (data, dropEvent) => {
 
   // 9. Si aún no hay posición válida, rechazar y mostrar toast
   if (!placementSuccessful) {
-    showToast('No hay espacio aquí para colocar el elemento', 'error')
+    showToast('Fuera de los límites de la planta', 'error')
     return // NO crear la instancia, NO comprometer historial
   }
 
@@ -1870,7 +1891,13 @@ const createElementFromBuffer = (data, dropEvent) => {
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.points)
+    isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.points)
+    if (!isInsideArea) {
+      const clamped = clampRectToPolygon({ x: candX, y: candY, width, height }, boundary.points)
+      candX = clamped.x
+      candY = clamped.y
+      isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.points)
+    }
   }
 
   // 5. Crear elemento temporal y detectar conflictos
@@ -1920,7 +1947,7 @@ const createElementFromBuffer = (data, dropEvent) => {
 
   // 7. Si no hay posición válida, rechazar
   if (!placementSuccessful) {
-    showToast('No hay espacio aquí para pegar el elemento', 'error')
+    showToast('Fuera de los límites de la planta', 'error')
     return // NO pegar, NO comprometer historial
   }
 
