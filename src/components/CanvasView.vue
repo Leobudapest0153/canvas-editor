@@ -589,6 +589,7 @@ import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
+import { applyNoFlipResize, clampResizeWithinBounds } from '@/utils/resizeNoFlip'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -956,7 +957,7 @@ const getStrokeColor = (elementId) => {
 }
 
 // Convierte posición stage->layer considerando zoom/pan
-// eslint-disable-next-line no-unused-vars
+ 
 const toLayerCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -966,7 +967,7 @@ const toLayerCoords = (pos) => {
 }
 
 // Convierte posición layer->stage considerando zoom/pan
-// eslint-disable-next-line no-unused-vars
+ 
 const toStageCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -2089,25 +2090,19 @@ const handleTransformStart = (e, elementId) => {
 // Manejar fin de transformación con validación y revert si no es válido
 const handleTransformEnd = (e, elementId, forma) => {
   try {
-    // Reusar la implementación existente pero añadiendo validación explícita
     const node = e.target
-    let x = node.x()
-    let y = node.y()
-    let width
-    let height
-    let rotation = node.rotation?.() || 0
+    // Aplicar corrección de flip y clamping final
+    let { x, y, width, height } = applyNoFlipResize(node, { minW: 8, minH: 8 })
     if (forma === 'circular') {
-      const r = node.radius() * node.scaleX()
+      const r = Math.min(width, height) / 2
+      node.x(x + r)
+      node.y(y + r)
       width = r * 2
       height = r * 2
-      node.scaleX(1); node.scaleY(1)
-      x = node.x() - r
-      y = node.y() - r
-    } else {
-      width = node.width() * node.scaleX()
-      height = node.height() * node.scaleY()
-      node.scaleX(1); node.scaleY(1)
     }
+    const bounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+    ;({ x, y, width, height } = clampResizeWithinBounds(node, bounds, { minW: 8, minH: 8 }))
+    const rotation = node.rotation?.() || 0
 
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
@@ -2180,19 +2175,14 @@ const handleTransformMove = (e, elementId, forma) => {
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
 
-    let x = node.x()
-    let y = node.y()
-    let width
-    let height
+    let { x, y, width, height } = applyNoFlipResize(node, { minW: 8, minH: 8 })
     if (forma === 'circular') {
-      const r = (node.radius ? node.radius() : Math.min(elemento.width, elemento.height) / 2) * (node.scaleX() || 1)
-      width = r * 2
-      height = r * 2
+      const r = Math.min(width, height) / 2
+      node.x(x + r)
+      node.y(y + r)
       x = node.x() - r
       y = node.y() - r
-    } else {
-      width = (node.width ? node.width() : elemento.width) * (node.scaleX() || 1)
-      height = (node.height ? node.height() : elemento.height) * (node.scaleY() || 1)
+      width = height = r * 2
     }
 
     const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
