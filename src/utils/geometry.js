@@ -1,7 +1,7 @@
 // Geometry and containment helpers for 2D canvas (XY view)
 // Units: use canvas world units (same as layer coordinates, pixels tied to cm in UI)
 
-import { clampRectToPolygon } from './polygonBounds'
+import { clampRectToPolygon, pointInPolygon } from './polygonBounds'
 
 export const EPSILON = 1e-6
 
@@ -339,12 +339,12 @@ export const nudgePlace = (
         return { valid: false, x: testX, y: testY }
       }
     } else if (boundary.type === 'polygon') {
-      const clamped = clampRectToPolygon({ x: testX, y: testY, width, height }, boundary.points)
+      const clamped = clampRectToPolygon({ x: testX, y: testY, width, height }, boundary.inset)
       testX = clamped.x
       testY = clamped.y
       const centerInside = pointInPolygon(
         { x: testX + width / 2, y: testY + height / 2 },
-        boundary.points,
+        boundary.inset,
       )
       if (!centerInside) return { valid: false, x: testX, y: testY }
     }

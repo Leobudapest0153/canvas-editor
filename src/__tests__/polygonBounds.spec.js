@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { pointInPolygon, clampRectToPolygon } from '@/utils/polygonBounds'
+import { polygonInset } from '@/utils/polygonInset'
 
 describe('polygonBounds utils', () => {
   it('pointInPolygon works with convex and concave polygons', () => {
@@ -34,5 +35,19 @@ describe('polygonBounds utils', () => {
     const c = clampRectToPolygon(rect, poly)
     expect(c.x).toBe(0)
     expect(c.y).toBe(10)
+  })
+
+  it('polygonInset keeps dragged rect inside', () => {
+    const poly = [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 0, y: 100 }
+    ]
+    const inset = polygonInset(poly, 1)
+    const rect = { x: -5, y: 50, width: 10, height: 10 }
+    const c = clampRectToPolygon(rect, inset)
+    const inside = pointInPolygon({ x: c.x + 5, y: c.y + 5 }, inset)
+    expect(inside).toBe(true)
   })
 })

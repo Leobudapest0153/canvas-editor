@@ -31,6 +31,41 @@
       @dragmove="handleStageDragMove"
       @dragend="handleStageDragEnd"
     >
+      <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
+        <v-line
+          v-if="plantPolygon.length"
+          :config="{
+            points: plantPolygonFlat,
+            closed: true,
+            stroke: '#0ea5e9',
+            fill: 'rgba(14,165,233,0.08)',
+            strokeWidth: 2,
+            listening: false,
+          }"
+        />
+        <v-line
+          v-for="i in gridLines.vertical"
+          :key="`v-${i}`"
+          :config="{
+            points: [i, 0, i, floorBoundary.height],
+            stroke: '#e5e7eb',
+            strokeWidth: 1,
+            opacity: 0.5,
+            listening: false,
+          }"
+        />
+        <v-line
+          v-for="i in gridLines.horizontal"
+          :key="`h-${i}`"
+          :config="{
+            points: [0, i, floorBoundary.width, i],
+            stroke: '#e5e7eb',
+            strokeWidth: 1,
+            opacity: 0.5,
+            listening: false,
+          }"
+        />
+      </v-layer>
       <v-layer ref="layerRef">
         <template v-if="canvasStore.elementoAura">
         <v-rect
@@ -64,17 +99,6 @@
 
         <!-- Aquí podrías añadir v-circle, etc., si tienes otras formas -->
       </template>
-        <v-line
-          v-if="plantPolygon.length"
-          :config="{
-            points: plantPolygonFlat,
-            closed: true,
-            stroke: '#0ea5e9',
-            fill: 'rgba(14,165,233,0.08)',
-            strokeWidth: 2,
-            listening: false,
-          }"
-        />
         <!-- Debug: mostrar información según el contexto -->
         <v-text
           :config="{
@@ -358,30 +382,8 @@
 
         <!-- Los contenedores se renderizan junto con los elementos en la sección principal -->
 
-        <!-- Grid de referencia de la planta -->
-        <v-line
-          v-for="i in gridLines.vertical"
-          :key="`v-${i}`"
-          :config="{
-            points: [i, 0, i, floorBoundary.height],
-            stroke: '#e5e7eb',
-            strokeWidth: 1,
-            opacity: 0.5,
-            listening: false,
-          }"
-        />
-        <v-line
-          v-for="i in gridLines.horizontal"
-          :key="`h-${i}`"
-          :config="{
-            points: [0, i, floorBoundary.width, i],
-            stroke: '#e5e7eb',
-            strokeWidth: 1,
-            opacity: 0.5,
-            listening: false,
-          }"
-        />
-        <!-- Transformer para modo edición -->
+      </v-layer>
+      <v-layer ref="overlaysLayerRef">
         <v-transformer
           v-if="isEditingSelected && canvasStore.elementoSeleccionado && !selectedElementLocked"
           ref="transformerRef"
@@ -564,7 +566,8 @@ import {
   snapToGrid,
   nudgePlace,
 } from '@/utils/geometry'
-import { clampRectToPolygon, pointInPolygon } from '@/utils/polygonBounds'
+import { clampRectToPolygon, pointInPolygon, clampPointToPolygon } from '@/utils/polygonBounds'
+import { polygonInset } from '@/utils/polygonInset'
 import { GRID_SIZE, CM_TO_PX } from '@/utils/constants'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -591,6 +594,8 @@ const emit = defineEmits(['select', 'drill-down'])
 const containerRef = ref(null)
 const stageRef = ref(null)
 const layerRef = ref(null)
+const backgroundLayerRef = ref(null)
+const overlaysLayerRef = ref(null)
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -682,6 +687,10 @@ const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
     const c = clampRectToRect(x, y, w, h, W, H)
     x = c.x
     y = c.y
+  } else if (boundary.type === 'polygon') {
+    const c = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
+    x = c.x
+    y = c.y
   }
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
@@ -718,7 +727,9 @@ const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
       x = c2.x
       y = c2.y
     } else if (boundary.type === 'polygon') {
-      // En polígono no hay clamp trivial; si sale, revertimos a última válida luego
+      const c2 = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
+      x = c2.x
+      y = c2.y
     }
 
     // Si la corrección fue nula, detener
@@ -728,11 +739,16 @@ const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
   // Validaciones finales: si aún hay colisión bloqueante o quedó fuera, volver a última válida
   const movingEnd = { ...elemento, x, y }
   const endConf = detectConflictsFor(movingEnd, all).filter((c) => c.bloqueante)
-  const outsideRect =
+  const outsideArea =
     boundary.type === 'rect'
       ? x < -1e-6 || y < -1e-6 || x + w > W + 1e-6 || y + h > H + 1e-6
-      : false
-  if (endConf.length > 0 || outsideRect) {
+      : !pointInPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.points)
+  if (outsideArea) {
+    const cp = clampPointToPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.inset)
+    x = cp.x - w / 2
+    y = cp.y - h / 2
+  }
+  if (endConf.length > 0 || outsideArea) {
     const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
     return { x: prev.x, y: prev.y, fellBack: true }
   }
@@ -776,6 +792,8 @@ const plantPolygon = computed(() => {
     { x: 0, y: h }
   ]
 })
+
+const insetPoly = computed(() => polygonInset(plantPolygon.value, 1))
 
 const plantPolygonFlat = computed(() => plantPolygon.value.flatMap(p => [p.x, p.y]))
 
@@ -853,7 +871,7 @@ const computeBoundary = () => {
   // Si estamos en una planta, verificar si tiene polígono
   const planta = canvasStore.plantaActivaData
   if (planta?.poligono && Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
-    return { type: 'polygon', points: planta.poligono }
+    return { type: 'polygon', points: plantPolygon.value, inset: insetPoly.value }
   }
   return { type: 'rect', W, H }
 }
@@ -992,7 +1010,7 @@ const dragBoundForElement = (pos, elemento, forma = 'rect') => {
       if (boundary.type === 'polygon') {
         const c = clampRectToPolygon(
           { x: lp.x, y: lp.y, width: elemento.width, height: elemento.height },
-          boundary.points,
+          boundary.inset,
         )
         return toStageCoords(c)
       } else {
@@ -1607,12 +1625,12 @@ const createElementFromDrop = (data, dropEvent) => {
     isInsideArea = pointInPolygon({
       x: candX + finalWidth / 2,
       y: candY + finalHeight / 2,
-    }, boundary.points)
+    }, boundary.inset)
     if (!isInsideArea) {
-      const clamped = clampRectToPolygon({ x: candX, y: candY, width: finalWidth, height: finalHeight }, boundary.points)
+      const clamped = clampRectToPolygon({ x: candX, y: candY, width: finalWidth, height: finalHeight }, boundary.inset)
       candX = clamped.x
       candY = clamped.y
-      isInsideArea = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.points)
+      isInsideArea = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
     }
   }
 
@@ -1668,6 +1686,14 @@ const createElementFromDrop = (data, dropEvent) => {
   if (!placementSuccessful) {
     showToast('Fuera de los límites de la planta', 'error')
     return // NO crear la instancia, NO comprometer historial
+  }
+
+  if (boundary.type === 'polygon') {
+    const c = clampRectToPolygon(
+      { x: finalPosition.x, y: finalPosition.y, width: finalWidth, height: finalHeight },
+      boundary.inset,
+    )
+    finalPosition = { x: c.x, y: c.y }
   }
 
   // 10. Crear el elemento solo si la validación fue exitosa
@@ -1891,12 +1917,12 @@ const createElementFromBuffer = (data, dropEvent) => {
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.points)
+    isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
     if (!isInsideArea) {
-      const clamped = clampRectToPolygon({ x: candX, y: candY, width, height }, boundary.points)
+      const clamped = clampRectToPolygon({ x: candX, y: candY, width, height }, boundary.inset)
       candX = clamped.x
       candY = clamped.y
-      isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.points)
+      isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
     }
   }
 
@@ -1949,6 +1975,14 @@ const createElementFromBuffer = (data, dropEvent) => {
   if (!placementSuccessful) {
     showToast('Fuera de los límites de la planta', 'error')
     return // NO pegar, NO comprometer historial
+  }
+
+  if (boundary.type === 'polygon') {
+    const c = clampRectToPolygon(
+      { x: finalPosition.x, y: finalPosition.y, width, height },
+      boundary.inset,
+    )
+    finalPosition = { x: c.x, y: c.y }
   }
 
   // 8. Pegar elemento desde buffer en posición válida
