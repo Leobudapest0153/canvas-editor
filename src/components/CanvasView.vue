@@ -589,7 +589,6 @@ import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
-import { applyNoFlipResize, clampResizeWithinBounds } from '@/utils/resizeNoFlip'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -2009,48 +2008,21 @@ const setupTransformer = () => {
   const node = stage.findOne(`#${canvasStore.elementoSeleccionado}`)
   if (node) {
     trComp.nodes([node])
-    // Si es círculo, mantener aspecto 1:1
     const elemento = canvasStore.elementosVisibles.find(e => e.id === canvasStore.elementoSeleccionado)
-    if (elemento?.forma === 'circular') {
-      trComp.boundBoxFunc((oldBox, newBox) => {
-        const size = Math.max(newBox.width, newBox.height)
-        return { ...newBox, width: size, height: size }
-      })
-    } else {
-      // Para rectangulares, limitar al área y dejar que el usuario intente
-      // el resize; si el newBox queda fuera del área o crea colisiones se
-      // devolverá oldBox para evitar aplicar ese cambio en tiempo real.
-      trComp.boundBoxFunc((oldBox, newBox) => {
-        try {
-          const layerW = layerConfig.value.width
-          const layerH = layerConfig.value.height
-          // Clamp newBox dentro del área
-          const nx = Math.max(0, Math.min(newBox.x, layerW - newBox.width))
-          const ny = Math.max(0, Math.min(newBox.y, layerH - newBox.height))
-          const clamped = { ...newBox, x: nx, y: ny }
-
-          // Crear un objeto candidato tipo elemento para detectar conflictos
-          const sel = canvasStore.elementosVisibles.find(e => e.id === canvasStore.elementoSeleccionado)
-          if (!sel) return clamped
-          const candidate = {
-            id: sel.id,
-            x: clamped.x,
-            y: clamped.y,
-            width: clamped.width,
-            height: clamped.height,
-            forma: sel.forma || 'rectangular',
-            ubicacion: sel.ubicacion || 'suelo',
-          }
-
-          const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== sel.id)
-          // Si detectConflictsFor devuelve bloqueantes, rechazamos el newBox
-          const conflicts = detectConflictsFor(candidate, neighbors)
-          const blocking = conflicts.some(c => c.bloqueante)
-          if (blocking) return oldBox
-          return clamped
-        } catch { return oldBox }
-      })
-    }
+    trComp.setAttrs({
+      flipEnabled: false,
+      boundBoxFunc: (oldBox, newBox) => {
+        const MINW = 10
+        const MINH = 10
+        if (newBox.width <= 0 || newBox.height <= 0) return oldBox
+        if (newBox.width < MINW || newBox.height < MINH) return oldBox
+        if (elemento?.forma === 'circular') {
+          const size = Math.max(newBox.width, newBox.height)
+          return { ...newBox, width: size, height: size }
+        }
+        return newBox
+      },
+    })
     trComp.getLayer()?.batchDraw?.()
   }
 }
@@ -2091,18 +2063,17 @@ const handleTransformStart = (e, elementId) => {
 const handleTransformEnd = (e, elementId, forma) => {
   try {
     const node = e.target
-    // Aplicar corrección de flip y clamping final
-    const active = transformerRef.value?.getNode?.().getActiveAnchor?.() || ''
-    let { x, y, width, height } = applyNoFlipResize(node, { minW: 8, minH: 8, anchor: active })
+    let width = node.width() * node.scaleX()
+    let height = node.height() * node.scaleY()
+    let x = node.x()
+    let y = node.y()
     if (forma === 'circular') {
-      const r = Math.min(width, height) / 2
-      node.x(x + r)
-      node.y(y + r)
-      width = r * 2
-      height = r * 2
+      x -= width / 2
+      y -= height / 2
     }
     const bounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    ;({ x, y, width, height } = clampResizeWithinBounds(node, bounds, { minW: 8, minH: 8, anchor: active }))
+    x = Math.max(bounds.minX, Math.min(x, bounds.maxX - width))
+    y = Math.max(bounds.minY, Math.min(y, bounds.maxY - height))
     const rotation = node.rotation?.() || 0
 
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
@@ -2122,6 +2093,8 @@ const handleTransformEnd = (e, elementId, forma) => {
           const r = Math.min(prev.width, prev.height) / 2
           node.x(prev.x + r)
           node.y(prev.y + r)
+          node.width && node.width(prev.width)
+          node.height && node.height(prev.height)
         } else {
           node.x(prev.x)
           node.y(prev.y)
@@ -2160,6 +2133,17 @@ const handleTransformEnd = (e, elementId, forma) => {
       }
     }
 
+    node.width(width)
+    node.height(height)
+    node.scaleX(1)
+    node.scaleY(1)
+    if (forma === 'circular') {
+      node.x(x + width / 2)
+      node.y(y + height / 2)
+    } else {
+      node.x(x)
+      node.y(y)
+    }
     canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones })
     lastValidPositions.value.set(elementId, { x, y })
     nextTick(() => setupTransformer())
@@ -2175,16 +2159,13 @@ const handleTransformMove = (e, elementId, forma) => {
     if (!node) return
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
-
-    const active = transformerRef.value?.getNode?.().getActiveAnchor?.() || ''
-    let { x, y, width, height } = applyNoFlipResize(node, { minW: 8, minH: 8, anchor: active })
+    let width = node.width() * node.scaleX()
+    let height = node.height() * node.scaleY()
+    let x = node.x()
+    let y = node.y()
     if (forma === 'circular') {
-      const r = Math.min(width, height) / 2
-      node.x(x + r)
-      node.y(y + r)
-      x = node.x() - r
-      y = node.y() - r
-      width = height = r * 2
+      x -= width / 2
+      y -= height / 2
     }
 
     const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
