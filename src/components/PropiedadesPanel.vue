@@ -319,11 +319,24 @@
           Restablecer
         </button>
         <button
+          @click="guardarCambios"
+          :disabled="elementoSeleccionado.ubicacion === 'pared' && !wallFormOk"
+          class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm disabled:opacity-50 cursor-pointer"
+        >
+          Guardar
+        </button>
+        <button
           @click="deseleccionarElemento"
           class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
         >
           Deseleccionar
         </button>
+      </div>
+      <div
+        v-if="elementoSeleccionado.ubicacion === 'pared' && !wallFormOk"
+        class="text-red-600 text-xs mt-2"
+      >
+        Define la altura respecto al suelo
       </div>
     </div>
   </div>
@@ -342,6 +355,7 @@ import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import TagFilter from './TagFilter.vue'
 import CreateTagModal from './CreateTagModal.vue'
+import { isWallFormValid } from '@/utils/validation'
 
 // Store
 const canvasStore = useCanvasStore()
@@ -362,6 +376,8 @@ const isLockedSelected = computed(() => {
   const el = elementoSeleccionado.value
   return !!(el && (el.bloqueado === true || el.locked === true))
 })
+
+const wallFormOk = computed(() => isWallFormValid(elementoSeleccionado.value))
 
 // Watchers
 watch(
@@ -419,6 +435,10 @@ const resetearPropiedades = () => {
 
 const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
+}
+
+const guardarCambios = () => {
+  // Cambios aplicados en tiempo real; esta función actúa como placeholder
 }
 
 const onDeleteClick = () => {

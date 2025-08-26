@@ -21,16 +21,16 @@
  * @returns {string} JSON serializado del estado
  */
 export function serializeCanvas(canvasState) {
-  // TODO: Implementar serialización del canvas
-  // - Convertir estado a formato JSON
-  // - Manejar referencias circulares
-  // - Incluir metadatos (versión, timestamp)
-  // - Validar integridad antes de serializar
+  // Normalizar elementos de pared antes de serializar
+  const clone = structuredClone(canvasState)
+  if (Array.isArray(clone?.elementos)) {
+    clone.elementos = clone.elementos.map((el) => ensureWallDefaults(structuredClone(el)))
+  }
 
   return JSON.stringify({
     version: '1.0.0',
     timestamp: new Date().toISOString(),
-    data: canvasState,
+    data: clone,
   })
 }
 
@@ -48,11 +48,28 @@ export function deserializeCanvas(jsonData) {
 
   try {
     const parsed = JSON.parse(jsonData)
+    if (Array.isArray(parsed?.data?.elementos)) {
+      parsed.data.elementos = parsed.data.elementos.map((el) => ensureWallDefaults(el))
+    }
     return parsed.data
   } catch (error) {
     console.error('Error deserializando canvas:', error)
     throw new Error('Formato de archivo inválido')
   }
+}
+
+// --- Helpers ---
+export function ensureWallDefaults(el) {
+  if (el && el.ubicacion === 'pared') {
+    const zBase = Number(el.alturaRespectoSuelo ?? el.alturaRespectoAlSuelo ?? el.elevacion?.zBase ?? 0)
+    const alto = Number(el.dimensiones?.alto ?? el.elevacion?.altura ?? 0)
+    el.elevacion = el.elevacion || {}
+    if (el.elevacion.zBase === undefined) el.elevacion.zBase = zBase
+    if (el.elevacion.altura === undefined) el.elevacion.altura = alto
+    el.tolerancias = el.tolerancias || {}
+    if (el.tolerancias.zEpsilon === undefined) el.tolerancias.zEpsilon = 0.5
+  }
+  return el
 }
 
 /**
