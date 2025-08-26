@@ -15,14 +15,14 @@
   <div
     ref="containerRef"
     class="canvas-container"
-    :class="{ 'drag-over': isDragOverCanvas }"
+    :class="{ 'drag-over': isDragOverCanvas, 'cursor-grab': !dragModeGlobal }"
     @drop="handleDrop"
     @dragover="handleDragOver"
     @dragenter="handleDragEnter"
     @dragleave="handleDragLeave"
   >
     <!-- Indicador de peso máximo (solo se muestra cuando hay un límite de peso) -->
-    <div
+    <!-- <div
       v-if="weightValidation.contextoActualTieneLimiteDePeso"
       class="weight-indicator"
       :class="{
@@ -41,7 +41,7 @@
         {{ Math.round(weightValidation.infoPesoContextoActual.usado) }} u/
         {{ weightValidation.infoPesoContextoActual.maximo }} m kg
       </div>
-    </div>
+    </div> -->
     <v-stage
       ref="stageRef"
       :config="stageConfig"
@@ -959,7 +959,7 @@ const getStrokeColor = (elementId) => {
 }
 
 // Convierte posición stage->layer considerando zoom/pan
- 
+
 const toLayerCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -969,7 +969,7 @@ const toLayerCoords = (pos) => {
 }
 
 // Convierte posición layer->stage considerando zoom/pan
- 
+
 const toStageCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
