@@ -64,20 +64,6 @@
 
         <!-- Aquí podrías añadir v-circle, etc., si tienes otras formas -->
       </template>
-        <!-- Fondo de la planta - área delimitada -->
-        <v-rect
-          :config="{
-            x: 0,
-            y: 0,
-            width: floorBoundary.width,
-            height: floorBoundary.height,
-            fill: 'rgba(14,165,233,0.08)',
-            stroke: '#3b82f6',
-            strokeWidth: 2,
-            opacity: 1,
-            listening: false,
-          }"
-        />
         <v-line
           v-if="!canvasStore.estaEnElemento && !canvasStore.estaEnContenedor"
           :config="{
@@ -573,18 +559,13 @@ import {
   computeMTD,
   projectMTDAgainstBoundary,
 } from '@/utils/collision'
-import {
-  rectInsidePolygon,
-  clampRectToRect,
-  snapToGrid,
-  nudgePlace,
-} from '@/utils/geometry'
+import { snapToGrid, nudgePlace } from '@/utils/geometry'
+import { pointInPolygon, clampRectToPolygon } from '@/utils/polygonBounds'
 import { GRID_SIZE, CM_TO_PX } from '@/utils/constants'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
-import { applyEdgeConstraint } from '@/utils/edgeConstraint'
 import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
@@ -688,15 +669,10 @@ const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
   // Iterar para resolver múltiples colisiones respetando contorno
   const MAX_ITERS = 3
   const boundary = computeBoundary()
-  const W = boundary.type === 'rect' ? boundary.W : Infinity
-  const H = boundary.type === 'rect' ? boundary.H : Infinity
 
-  // Paso (1): clamp al área primero
-  if (boundary.type === 'rect') {
-    const c = clampRectToRect(x, y, w, h, W, H)
-    x = c.x
-    y = c.y
-  }
+  const c = clampRectToPolygon({ x, y, width: w, height: h }, boundary.points)
+  x = c.x
+  y = c.y
 
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const moving = { ...elemento, x, y }
@@ -727,13 +703,9 @@ const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
     x += accDx
     y += accDy
 
-    if (boundary.type === 'rect') {
-      const c2 = clampRectToRect(x, y, w, h, W, H)
-      x = c2.x
-      y = c2.y
-    } else if (boundary.type === 'polygon') {
-      // En polígono no hay clamp trivial; si sale, revertimos a última válida luego
-    }
+    const c2 = clampRectToPolygon({ x, y, width: w, height: h }, boundary.points)
+    x = c2.x
+    y = c2.y
 
     // Si la corrección fue nula, detener
     if (Math.abs(accDx) < 1e-6 && Math.abs(accDy) < 1e-6) break
@@ -779,37 +751,56 @@ const stageConfig = computed(() => {
 })
 
 const floorBoundary = computed(() => {
-  // Empezamos con las dimensiones base del layer
   let width = layerConfig.value.width
   let height = layerConfig.value.height
   let points = []
 
   if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
+    points = [0, 0, width, 0, width, height, 0, height]
     return { width, height, points }
   }
 
   const poligono = canvasStore.plantaActivaData?.poligono
-
-  // Si hay un polígono, lo usamos para expandir los límites y obtener los puntos
   if (poligono && Array.isArray(poligono) && poligono.length > 0) {
     poligono.forEach((coord) => {
       width = Math.max(coord.x, width)
       height = Math.max(coord.y, height)
     })
     points = poligono.flatMap((p) => [p.x, p.y])
+  } else {
+    points = [0, 0, width, 0, width, height, 0, height]
   }
 
   return { width, height, points }
 })
 
-// Configuración del layer - SIEMPRE USA CANVAS ADAPTATIVO
+// Configuración del layer - siempre usa canvas adaptativo y aplica clipFunc
 const layerConfig = computed(() => {
-  // Usar siempre canvasAdaptativo como fuente única de verdad
   return {
     width: canvasStore.canvasAdaptativo.width,
     height: canvasStore.canvasAdaptativo.height,
+    clipFunc: (ctx) => {
+      const pts = floorBoundary.value.points
+      if (pts.length >= 2) {
+        ctx.beginPath()
+        ctx.moveTo(pts[0], pts[1])
+        for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1])
+        ctx.closePath()
+      }
+    },
   }
 })
+
+watch(
+  () => canvasStore.plantaActivaData?.poligono,
+  () => {
+    resetEdgeState()
+    nextTick(() => {
+      fitToPlanta()
+      stageRef.value?.getNode?.()?.batchDraw?.()
+    })
+  },
+)
 
 // Elementos visibles en el canvas (excluye elementos ocultos)
 const elementosVisiblesEnCanvas = computed(() => {
@@ -844,15 +835,30 @@ const computeBoundary = () => {
 
   // Si estamos en un elemento o contenedor, usar todo el canvas adaptativo como boundary
   if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
-    return { type: 'rect', W, H }
+    return {
+      type: 'polygon',
+      points: [
+        { x: 0, y: 0 },
+        { x: W, y: 0 },
+        { x: W, y: H },
+        { x: 0, y: H },
+      ],
+    }
   }
 
-  // Si estamos en una planta, verificar si tiene polígono
   const planta = canvasStore.plantaActivaData
   if (planta?.poligono && Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
     return { type: 'polygon', points: planta.poligono }
   }
-  return { type: 'rect', W, H }
+  return {
+    type: 'polygon',
+    points: [
+      { x: 0, y: 0 },
+      { x: W, y: 0 },
+      { x: W, y: H },
+      { x: 0, y: H },
+    ],
+  }
 }
 
 // === FUNCIONES DE ZOOM ===
@@ -976,18 +982,13 @@ const toStageCoords = (pos) => {
 // Drag bound para cada elemento y forma (clamp mínimo al contorno)
 const dragBoundForElement = (pos, elemento, forma = 'rect') => {
   try {
-    const layerW = layerConfig.value.width
-    const layerH = layerConfig.value.height
     const lp = toLayerCoords(pos)
-  if (forma === 'circular' || forma === 'circle') {
-      const r = Math.min(elemento.width, elemento.height) / 2
-      const cx = Math.max(r, Math.min(lp.x, layerW - r))
-      const cy = Math.max(r, Math.min(lp.y, layerH - r))
-      return toStageCoords({ x: cx, y: cy })
-    } else {
-      const c = clampRectToRect(lp.x, lp.y, elemento.width, elemento.height, layerW, layerH)
-      return toStageCoords(c)
-    }
+    const boundary = computeBoundary()
+    const c = clampRectToPolygon(
+      { x: lp.x, y: lp.y, width: elemento.width, height: elemento.height },
+      boundary.points,
+    )
+    return toStageCoords(c)
   } catch {
     return pos
   }
@@ -1089,20 +1090,20 @@ const startElementDrag = (elementId) => {
         if (!shape) return
         const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
         if (!elemento) return
-        const W = layerConfig.value.width
-        const H = layerConfig.value.height
-        const areaBounds = { minX: 0, minY: 0, maxX: W, maxY: H }
-
         // Para círculos, desiredPos ya es top-left (convertido en updateElementPosition)
         const asRect = elemento.forma === 'circular'
           ? { ...elemento, width: Math.min(elemento.width, elemento.height), height: Math.min(elemento.width, elemento.height) }
           : elemento
 
-        const { pos } = applyEdgeConstraint({ x: desiredPos.x, y: desiredPos.y }, asRect, areaBounds)
+        const boundary = computeBoundary()
+        const clamped = clampRectToPolygon(
+          { x: desiredPos.x, y: desiredPos.y, width: asRect.width, height: asRect.height },
+          boundary.points,
+        )
 
         // Resolver colisiones después del clamp a borde
-        let x = pos.x
-        let y = pos.y
+        let x = clamped.x
+        let y = clamped.y
         const res = resolveAgainstBlockingObstacles(x, y, asRect)
         x = res.x
         y = res.y
@@ -1575,24 +1576,21 @@ const createElementFromDrop = (data, dropEvent) => {
 
   // 4. Calcular bbox candidato y verificar área
   const boundary = computeBoundary()
-
-  // 5. Verificar que esté dentro del área (clampToArea)
-  let isInsideArea = true
-  if (boundary.type === 'rect') {
-    isInsideArea =
-      candX >= 0 &&
-      candY >= 0 &&
-      candX + finalWidth <= boundary.W &&
-      candY + finalHeight <= boundary.H
-
-    // Si está fuera, intentar clamp
-    if (!isInsideArea) {
-      const clamped = clampRectToRect(candX, candY, finalWidth, finalHeight, boundary.W, boundary.H)
-      candX = clamped.x
-      candY = clamped.y
-    }
-  } else if (boundary.type === 'polygon') {
-    isInsideArea = rectInsidePolygon(candX, candY, finalWidth, finalHeight, boundary.points)
+  const center = { x: candX + finalWidth / 2, y: candY + finalHeight / 2 }
+  let isInsideArea = pointInPolygon(center, boundary.points)
+  if (!isInsideArea) {
+    const clamped = clampRectToPolygon(
+      { x: candX, y: candY, width: finalWidth, height: finalHeight },
+      boundary.points,
+    )
+    candX = clamped.x
+    candY = clamped.y
+    const newCenter = { x: candX + finalWidth / 2, y: candY + finalHeight / 2 }
+    isInsideArea = pointInPolygon(newCenter, boundary.points)
+  }
+  if (!isInsideArea) {
+    showToast('Fuera de los límites de la planta', 'error')
+    return
   }
 
   // 6. Crear elemento temporal para detectar conflictos
@@ -1614,7 +1612,7 @@ const createElementFromDrop = (data, dropEvent) => {
 
   // 8. Si hay conflicto BLOQUEANTE o queda fuera de área, intentar nudgePlace
   let finalPosition = { x: candX, y: candY }
-  let placementSuccessful = blockingConflicts.length === 0 && isInsideArea
+  let placementSuccessful = blockingConflicts.length === 0
 
   if (!placementSuccessful) {
     console.log(
@@ -1858,19 +1856,21 @@ const createElementFromBuffer = (data, dropEvent) => {
 
   // 4. Verificar área y conflictos
   const boundary = computeBoundary()
-
-  let isInsideArea = true
-  if (boundary.type === 'rect') {
-    isInsideArea =
-      candX >= 0 && candY >= 0 && candX + width <= boundary.W && candY + height <= boundary.H
-
-    if (!isInsideArea) {
-      const clamped = clampRectToRect(candX, candY, width, height, boundary.W, boundary.H)
-      candX = clamped.x
-      candY = clamped.y
-    }
-  } else if (boundary.type === 'polygon') {
-    isInsideArea = rectInsidePolygon(candX, candY, width, height, boundary.points)
+  const center = { x: candX + width / 2, y: candY + height / 2 }
+  let isInsideArea = pointInPolygon(center, boundary.points)
+  if (!isInsideArea) {
+    const clamped = clampRectToPolygon(
+      { x: candX, y: candY, width, height },
+      boundary.points,
+    )
+    candX = clamped.x
+    candY = clamped.y
+    const newCenter = { x: candX + width / 2, y: candY + height / 2 }
+    isInsideArea = pointInPolygon(newCenter, boundary.points)
+  }
+  if (!isInsideArea) {
+    showToast('Fuera de los límites de la planta', 'error')
+    return
   }
 
   // 5. Crear elemento temporal y detectar conflictos
@@ -1891,7 +1891,7 @@ const createElementFromBuffer = (data, dropEvent) => {
 
   // 6. Si hay conflictos o está fuera de área, intentar nudgePlace
   let finalPosition = { x: candX, y: candY }
-  let placementSuccessful = blockingConflicts.length === 0 && isInsideArea
+  let placementSuccessful = blockingConflicts.length === 0
 
   if (!placementSuccessful) {
     console.log('🔍 Elemento del buffer tiene conflictos, intentando nudgePlace...')

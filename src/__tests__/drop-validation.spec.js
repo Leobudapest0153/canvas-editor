@@ -100,6 +100,33 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
     }
   })
 
+  it('rechaza drop fuera del polígono activo', async () => {
+    wrapper.vm.canvasStore.plantaActivaData.poligono = [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 0, y: 100 },
+    ]
+
+    const dropData = {
+      tipo: 'elemento-catalogo',
+      elemento: { tipo: 'mesa', width: 40, height: 40, ubicacion: 'suelo' },
+    }
+    const dropEvent = {
+      preventDefault: vi.fn(),
+      dataTransfer: { getData: vi.fn().mockReturnValue(JSON.stringify(dropData)) },
+      clientX: 250,
+      clientY: 250,
+    }
+
+    await wrapper.vm.createElementFromDrop(dropData, dropEvent)
+    expect(window.__toasts.show).toHaveBeenCalledWith(
+      'Fuera de los límites de la planta',
+      { type: 'error', timeout: 4000 },
+    )
+    expect(wrapper.vm.canvasStore.agregarElemento).not.toHaveBeenCalled()
+  })
+
   describe('Test 1: Drop sobre suelo–suelo se rechaza o reubica sin quedar bloqueado', () => {
     it('debería rechazar drop cuando hay conflicto suelo-suelo y no hay espacio alternativo', async () => {
       // Preparar escenario con elemento existente que bloquea

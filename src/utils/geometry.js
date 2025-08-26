@@ -1,6 +1,8 @@
 // Geometry and containment helpers for 2D canvas (XY view)
 // Units: use canvas world units (same as layer coordinates, pixels tied to cm in UI)
 
+import { pointInPolygon, clampRectToPolygon } from './polygonBounds'
+
 export const EPSILON = 1e-6
 
 // Basic math helpers
@@ -12,21 +14,6 @@ export const snapToGrid = (x, y, gridSize = 50) => {
   const sx = Math.round(x / gridSize) * gridSize
   const sy = Math.round(y / gridSize) * gridSize
   return { x: sx, y: sy }
-}
-
-// Point in polygon (ray casting), supports concave polygons
-export const pointInPolygon = (pt, polygon) => {
-  const { x, y } = pt
-  let inside = false
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x,
-      yi = polygon[i].y
-    const xj = polygon[j].x,
-      yj = polygon[j].y
-    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi + EPSILON) + xi
-    if (intersect) inside = !inside
-  }
-  return inside
 }
 
 // Segment intersection
@@ -186,7 +173,16 @@ export const snapRectElementInside = (elem, boundary, gridSize = null) => {
     }
     return clampRectToRect(nx, ny, elem.width, elem.height, boundary.W, boundary.H)
   }
-  // For polygons, snapping is non-trivial; return null to signal unsupported
+  if (boundary.type === 'polygon') {
+    let nx = elem.x
+    let ny = elem.y
+    if (gridSize) {
+      const s = snapToGrid(nx, ny, gridSize)
+      nx = s.x
+      ny = s.y
+    }
+    return clampRectToPolygon({ x: nx, y: ny, width: elem.width, height: elem.height }, boundary.points)
+  }
   return null
 }
 
@@ -246,8 +242,13 @@ export const boundedRectDrag = (candidateX, candidateY, w, h, boundary, snapEps 
     return { x, y, atEdge, snapped, inside }
   }
   if (boundary.type === 'polygon') {
-    const inside = rectInsidePolygon(candidateX, candidateY, w, h, boundary.points)
-    return { x: candidateX, y: candidateY, atEdge: false, snapped: false, inside }
+    const clamped = clampRectToPolygon(
+      { x: candidateX, y: candidateY, width: w, height: h },
+      boundary.points,
+    )
+    const atEdge = clamped.x !== candidateX || clamped.y !== candidateY
+    const inside = pointInPolygon({ x: clamped.x + w / 2, y: clamped.y + h / 2 }, boundary.points)
+    return { x: clamped.x, y: clamped.y, atEdge, snapped: false, inside }
   }
   return { x: candidateX, y: candidateY, atEdge: false, snapped: false, inside: true }
 }
