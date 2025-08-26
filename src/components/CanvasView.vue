@@ -164,9 +164,9 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
               @transformstart="(e) => handleTransformStart(e, elemento.id)"
               @transform="(e) => handleTransformMove(e, elemento.id, 'rectangular')"
               @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
@@ -234,9 +234,9 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id, 'circular')"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id, 'circular')"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'circular')"
@@ -267,9 +267,9 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id, 'rectangular')"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
@@ -589,6 +589,7 @@ import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
+import { makeInnerSession } from '@/composables/useInnerNoOverlap'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -605,6 +606,8 @@ const emit = defineEmits(['select', 'drill-down'])
 const containerRef = ref(null)
 const stageRef = ref(null)
 const layerRef = ref(null)
+
+const innerSessions = new Map()
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -1573,6 +1576,34 @@ const createElementFromDrop = (data, dropEvent) => {
   candX = snapped.x
   candY = snapped.y
 
+  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
+    if (elemento.tipo === 'contenedores') {
+      const parent = canvasStore.elementoContenedorActual
+      const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
+      const temp = {
+        id: '__temp',
+        dimensiones: { ancho: anchoCm, largo: largoCm, alto: altoCm },
+        posicion: { x: candX, y: candY },
+      }
+      const sess = makeInnerSession({
+        parentEl: parent,
+        movingEl: temp,
+        siblings,
+        vista: canvasStore.vistaActiva,
+        CM_TO_PX,
+      })
+      let local = sess.toLocal({ x: candX, y: candY }, parent)
+      local = sess.finalizeLocal(local)
+      if (!sess.isValidLocal(local)) {
+        showToast('No hay espacio aquí', 'error')
+        return
+      }
+      const world = sess.toWorld(local, parent)
+      candX = world.x
+      candY = world.y
+    }
+  }
+
   // 4. Calcular bbox candidato y verificar área
   const boundary = computeBoundary()
 
@@ -1735,6 +1766,81 @@ const createElementFromDrop = (data, dropEvent) => {
 
   // Seleccionar el elemento recién creado
   canvasStore.seleccionarElemento(nuevoElemento.id)
+}
+
+const onShapeDragStart = (e, el) => {
+  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
+    const shape = e.target
+    const parent =
+      canvasStore.elementoContenedorActual || canvasStore.elementoPorId(canvasStore.elementoSeleccionado)
+    const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
+    const session = makeInnerSession({
+      parentEl: parent,
+      movingEl: el,
+      siblings,
+      vista: canvasStore.vistaActiva,
+      CM_TO_PX,
+    })
+    const pointer = e.evt ? { x: e.evt.clientX || 0, y: e.evt.clientY || 0 } : { x: 0, y: 0 }
+    innerSessions.set(el.id, {
+      session,
+      parent,
+      lastPointer: pointer,
+      initial: { x: el.posicion?.x ?? el.x ?? 0, y: el.posicion?.y ?? el.y ?? 0 },
+    })
+    isElementDragging.value = true
+    stageDragEnabled.value = false
+  } else {
+    startElementDrag(el.id)
+  }
+}
+
+const onShapeDragMove = (e, el) => {
+  const data = innerSessions.get(el.id)
+  if (data) {
+    const { session, parent } = data
+    const shape = e.target
+    const pointer = e.evt ? { x: e.evt.clientX || 0, y: e.evt.clientY || 0 } : { x: 0, y: 0 }
+    const vel = {
+      x: e.evt?.movementX ?? pointer.x - data.lastPointer.x,
+      y: e.evt?.movementY ?? pointer.y - data.lastPointer.y,
+    }
+    data.lastPointer = pointer
+    const posWorld = shape.position()
+    const posLocal = session.toLocal(posWorld, parent)
+    const nextLocal = session.dragBoundFuncLocal(posLocal, session.lastGoodLocal, vel)
+    shape.position(session.toWorld(nextLocal, parent))
+    layerRef.value.getNode()?.batchDraw()
+  } else {
+    updateElementPosition(e, el.id, el.forma === 'circular' ? 'circular' : 'rectangular')
+  }
+}
+
+const onShapeDragEnd = (e, el) => {
+  const data = innerSessions.get(el.id)
+  if (data) {
+    const { session, parent, initial } = data
+    innerSessions.delete(el.id)
+    isElementDragging.value = false
+    stageDragEnabled.value = true
+    const shape = e.target
+    let candLocal = session.toLocal(shape.position(), parent)
+    let finalLocal = session.finalizeLocal(candLocal)
+    const finalWorld = session.toWorld(finalLocal, parent)
+    shape.position(finalWorld)
+    layerRef.value.getNode()?.batchDraw()
+    const changed =
+      Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
+    if (changed) {
+      canvasStore.actualizarElementoConHistorial(
+        el.id,
+        { posicion: { x: finalWorld.x, y: finalWorld.y }, x: finalWorld.x, y: finalWorld.y },
+        `Elemento movido: ${el.id}`,
+      )
+    }
+  } else {
+    endElementDrag(el.id)
+  }
 }
 
 const getElementShadow = (elemento) => {
