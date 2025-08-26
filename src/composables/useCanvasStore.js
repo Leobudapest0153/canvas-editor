@@ -589,22 +589,35 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (elemento) {
       for (const key in propiedades) {
         if (typeof propiedades[key] === 'object' && propiedades[key] !== null && !Array.isArray(propiedades[key])) {
-        // Si la propiedad es un objeto (como 'dimensiones'), la fusionamos recursivamente.
-        if (!elemento[key]) elemento[key] = {}
+          // Si la propiedad es un objeto (como 'dimensiones'), la fusionamos recursivamente.
+          if (!elemento[key]) elemento[key] = {}
           Object.assign(elemento[key], propiedades[key]);
         } else {
           // Si es un valor simple, lo asignamos directamente.
           elemento[key] = propiedades[key];
         }
       }
-     
-      // Correciones en los datos de ancho y largo a base de las dimensiones
+
+      // Correcciones en los datos de ancho y alto a base de las dimensiones
       if (propiedades.dimensiones) {
-        if (propiedades.dimensiones.ancho !== undefined) {
-          elemento.width = elemento.dimensiones.ancho * CM_TO_PX
-        }
-        if (propiedades.dimensiones.largo !== undefined) {
-          elemento.height = elemento.dimensiones.largo * CM_TO_PX
+        // Actualizar width/height dependiendo de la vista activa
+        if (vistaActiva.value === 'XY') {
+          // En vista XY (superior): ancho->width, largo->height
+          if (propiedades.dimensiones.ancho !== undefined) {
+            elemento.width = elemento.dimensiones.ancho * CM_TO_PX
+          }
+          if (propiedades.dimensiones.largo !== undefined) {
+            elemento.height = elemento.dimensiones.largo * CM_TO_PX
+          }
+        } else if (vistaActiva.value === 'XZ') {
+          // En vista XZ (frontal): ancho->width, alto->height
+          if (propiedades.dimensiones.ancho !== undefined) {
+            elemento.width = elemento.dimensiones.ancho * CM_TO_PX
+          }
+          if (propiedades.dimensiones.alto !== undefined) {
+            elemento.height = elemento.dimensiones.alto * CM_TO_PX
+          }
+          // Nota: largo no afecta a width/height en vista XZ
         }
       }
     }
