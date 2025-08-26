@@ -167,8 +167,8 @@
           </div>
 
           <p class="text-xs text-gray-500 mt-2">
-            Vista desde arriba: Ancho=X, Largo=Y. Las dimensiones se modifican directamente en el
-            canvas
+            Vista desde arriba: Ancho=X, Largo=Y.
+            Vista de frente: Ancho=X, Largo=Z.
           </p>
 
           <!-- Dimensiones físicas adicionales (si están disponibles) -->
@@ -182,7 +182,7 @@
                   id="prop-ancho"
                   type="number"
                   :value="elementoSeleccionado.dimensiones?.ancho"
-                  @keyup="actualizarDimension('ancho', $event.target.value)"
+                  @change="actualizarDimension('ancho', $event.target.value)"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                 />
             </div>
@@ -192,8 +192,9 @@
               <input
                 id="prop-largo"
                 type="number"
+                :disabled="!canvasStore.estaEnPlanta"
                 :value="elementoSeleccionado.dimensiones?.largo"
-                @keyup="actualizarDimension('largo', $event.target.value)"
+                @change="actualizarDimension('largo', $event.target.value)"
                 class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -203,11 +204,17 @@
               <input
                 id="prop-alto"
                 type="number"
+                :disabled="canvasStore.estaEnPlanta"
                 :value="elementoSeleccionado.dimensiones?.alto"
                 @change="actualizarDimension('alto', $event.target.value)"
                 class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
+            <p class="text-xs text-gray-500 mt-2">
+            Vista desde arriba: Ancho y Largo del elemento.
+            <br />
+            Vista de frente: Ancho y Alto del elemento.
+          </p>
       </div>
     </div>
 
@@ -289,31 +296,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Vista Previa -->
-        <!-- <div class="bg-gray-50 rounded-lg p-4">
-          <h3 class="text-sm font-medium text-gray-700 mb-3">Vista Previa</h3>
-          <div
-            class="flex items-center justify-center p-4 bg-white border border-gray-200 rounded-lg overflow-hidden isolate shadow-sm"
-            style="transform: translateZ(0)"
-          >
-            <div
-              class="flex items-center justify-center border border-gray-300 rounded"
-              :style="{
-                backgroundColor: propiedadesEditables.color,
-                width: Math.min(120, elementoSeleccionado.width / 2) + 'px',
-                height: Math.min(80, elementoSeleccionado.height / 2) + 'px',
-              }"
-            >
-              <span class="text-white font-bold text-xs">
-                {{
-                  propiedadesEditables.nombre?.charAt(0)?.toUpperCase() ||
-                  elementoSeleccionado.tipo.charAt(0).toUpperCase()
-                }}
-              </span>
-            </div>
-          </div>
-        </div> -->
       </div>
     </div>
 
@@ -475,11 +457,39 @@ const actualizarDimension = (dimension, valor) => {
   const valorNumerico = parseFloat(valor)
   if (isNaN(valorNumerico)) return // Evitar enviar valores no numéricos
 
+  // Actualizar la dimensión en cm
   canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
     dimensiones: {
       [dimension]: valorNumerico,
     },
   })
+
+  // También actualizar las propiedades de renderizado width/height según la vista actual
+  const CM_TO_PX = 10; // Factor de conversión
+  if (canvasStore.vistaActiva === 'XY') {
+    // Vista superior: ancho->width, largo->height
+    if (dimension === 'ancho') {
+      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+        width: valorNumerico * CM_TO_PX
+      });
+    } else if (dimension === 'largo') {
+      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+        height: valorNumerico * CM_TO_PX
+      });
+    }
+  } else if (canvasStore.vistaActiva === 'XZ') {
+    // Vista frontal: ancho->width, alto->height
+    if (dimension === 'ancho') {
+      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+        width: valorNumerico * CM_TO_PX
+      });
+    } else if (dimension === 'alto') {
+      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+        height: valorNumerico * CM_TO_PX
+      });
+    }
+    // El largo no afecta a width/height en vista XZ
+  }
 }
 
 const actualizarPropiedadSimple = (propiedad, valor) => {
