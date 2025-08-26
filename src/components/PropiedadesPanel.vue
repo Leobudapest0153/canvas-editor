@@ -252,6 +252,18 @@
         <div v-if="infoPesoContenedor.mostrar" class="mt-2 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-md text-sm">
           {{ infoPesoContenedor.mensaje }}
         </div>
+        <div class="grid grid-cols-2 items-center">
+          <label for="prop-volumen-max" class="text-sm text-gray-500">Volumen (m³)</label>
+          <input
+            id="prop-volumen-max"
+            type="number"
+            :value="volumen"
+            disabled
+            @change="actualizarPropiedadSimple('pesoMaximo', $event.target.value)"
+            class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Ej: 100"
+          />
+        </div>
       </div>
     </div>
 
@@ -350,6 +362,12 @@
         >
           Restablecer
         </button>
+        <!-- <button
+          @click="cambiarBloqueo"
+          class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+        >
+        {{ elementoSeleccionado.bloqueado ? 'Desploquear' : 'Bloquear' }}
+        </button> -->
         <button
           @click="deseleccionarElemento"
           class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
@@ -453,6 +471,15 @@ const infoPesoContenedor = computed(() => {
   return { mostrar: false, mensaje: '' }
 })
 
+
+const volumen = computed(() => {
+  const ancho = elementoSeleccionado.value.dimensiones?.ancho;
+  const alto = elementoSeleccionado.value.dimensiones?.alto;
+  const largo = elementoSeleccionado.value.dimensiones?.largo;
+  const v = ancho * alto * largo;
+  return (v / 1000000).toFixed(2);
+});
+
 // Watchers
 watch(
   elementoSeleccionado,
@@ -537,6 +564,10 @@ const resetearPropiedades = () => {
   // Limpiar mensajes de error
   errorValidacion.value = ''
 }
+
+// const cambiarBloqueo = () => {
+//   canvasStore.actualizarElemento(elementoSeleccionado.value.id, { bloqueado: !elementoSeleccionado.value.bloqueado })
+// }
 
 const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
