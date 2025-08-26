@@ -80,10 +80,23 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
   beforeEach(() => {
     pinia = createPinia()
     setActivePinia(pinia)
-    
+    global.ResizeObserver = class { observe(){} unobserve(){} disconnect(){} }
+
+    const stubs = {
+      'v-stage': { template: '<div><slot/></div>' },
+      'v-layer': { props: ['config', 'clipFunc'], template: '<div><slot/></div>' },
+      'v-rect': { template: '<div></div>' },
+      'v-circle': { template: '<div></div>' },
+      'v-text': { template: '<div></div>' },
+      'v-group': { template: '<div><slot/></div>' },
+      'v-line': { template: '<div></div>' },
+      'v-transformer': { template: '<div></div>' }
+    }
+
     wrapper = mount(CanvasView, {
       global: {
-        plugins: [pinia]
+        plugins: [pinia],
+        stubs
       }
     })
 

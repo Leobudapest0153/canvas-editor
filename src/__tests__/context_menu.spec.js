@@ -46,6 +46,10 @@ const VLine = defineComponent({ name: 'VLine', setup: () => () => h('div') })
 const VText = defineComponent({ name: 'VText', setup: () => () => h('div') })
 const VTransformer = defineComponent({ name: 'VTransformer', setup: () => () => h('div') })
 
+beforeEach(() => {
+  global.ResizeObserver = class { observe(){} unobserve(){} disconnect(){} }
+})
+
 const mountCanvas = async () => {
   const pinia = createPinia()
   setActivePinia(pinia)

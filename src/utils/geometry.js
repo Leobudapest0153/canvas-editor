@@ -1,6 +1,8 @@
 // Geometry and containment helpers for 2D canvas (XY view)
 // Units: use canvas world units (same as layer coordinates, pixels tied to cm in UI)
 
+import { clampRectToPolygon } from './polygonBounds'
+
 export const EPSILON = 1e-6
 
 // Basic math helpers
@@ -332,40 +334,35 @@ export const nudgePlace = (
 ) => {
   // Función auxiliar para verificar si una posición es válida
   const isValidPosition = (testX, testY) => {
-    // Verificar que esté dentro del área
     if (boundary.type === 'rect') {
       if (testX < 0 || testY < 0 || testX + width > boundary.W || testY + height > boundary.H) {
-        return false
+        return { valid: false, x: testX, y: testY }
       }
     } else if (boundary.type === 'polygon') {
-      if (!rectInsidePolygon(testX, testY, width, height, boundary.points)) {
-        return false
-      }
+      const pts = boundary.inset || boundary.points
+      const clamped = clampRectToPolygon({ x: testX, y: testY, width, height }, pts)
+      testX = clamped.x
+      testY = clamped.y
+      const centerInside = pointInPolygon(
+        { x: testX + width / 2, y: testY + height / 2 },
+        pts,
+      )
+      if (!centerInside) return { valid: false, x: testX, y: testY }
     }
 
-    // Solo verificar conflictos si se proporciona la función
     if (detectConflictsFn) {
-      // Crear elemento temporal para verificar conflictos
-      const tempElement = {
-        ...elementToPlace,
-        x: testX,
-        y: testY,
-        width,
-        height,
-      }
-
+      const tempElement = { ...elementToPlace, x: testX, y: testY, width, height }
       const conflicts = detectConflictsFn(tempElement, allElements)
       const blockingConflicts = conflicts.filter((c) => c.bloqueante)
-
-      return blockingConflicts.length === 0
+      return { valid: blockingConflicts.length === 0, x: testX, y: testY }
     }
 
-    return true
+    return { valid: true, x: testX, y: testY }
   }
 
-  // Verificar posición inicial
-  if (isValidPosition(x, y)) {
-    return { x, y, found: true }
+  const initial = isValidPosition(x, y)
+  if (initial.valid) {
+    return { x: initial.x, y: initial.y, found: true }
   }
 
   // Búsqueda en espiral
@@ -395,8 +392,9 @@ export const nudgePlace = (
 
     // Probar cada punto en esta distancia
     for (const point of spiralPoints) {
-      if (isValidPosition(point.x, point.y)) {
-        return { x: point.x, y: point.y, found: true }
+      const res = isValidPosition(point.x, point.y)
+      if (res.valid) {
+        return { x: res.x, y: res.y, found: true }
       }
     }
   }
