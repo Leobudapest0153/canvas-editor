@@ -164,9 +164,9 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
               @transformstart="(e) => handleTransformStart(e, elemento.id)"
               @transform="(e) => handleTransformMove(e, elemento.id, 'rectangular')"
               @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
@@ -234,9 +234,9 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id, 'circular')"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id, 'circular')"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'circular')"
@@ -267,9 +267,9 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id, 'rectangular')"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
@@ -589,6 +589,7 @@ import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
+import { makeInnerSession } from '@/composables/useInnerNoOverlap'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -605,6 +606,20 @@ const emit = defineEmits(['select', 'drill-down'])
 const containerRef = ref(null)
 const stageRef = ref(null)
 const layerRef = ref(null)
+
+const innerSessions = new Map()
+let needsDraw = false
+let rafId = null
+function scheduleDraw() {
+  if (rafId) return
+  rafId = requestAnimationFrame(() => {
+    rafId = null
+    if (needsDraw) {
+      layerRef.value?.getNode()?.batchDraw()
+      needsDraw = false
+    }
+  })
+}
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -956,7 +971,7 @@ const getStrokeColor = (elementId) => {
 }
 
 // Convierte posición stage->layer considerando zoom/pan
-// eslint-disable-next-line no-unused-vars
+ 
 const toLayerCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -966,7 +981,7 @@ const toLayerCoords = (pos) => {
 }
 
 // Convierte posición layer->stage considerando zoom/pan
-// eslint-disable-next-line no-unused-vars
+ 
 const toStageCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -1573,6 +1588,34 @@ const createElementFromDrop = (data, dropEvent) => {
   candX = snapped.x
   candY = snapped.y
 
+  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
+    if (elemento.tipo === 'contenedores') {
+      const parent = canvasStore.elementoContenedorActual
+      const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
+      const temp = {
+        id: '__temp',
+        dimensiones: { ancho: anchoCm, largo: largoCm, alto: altoCm },
+        posicion: { x: candX, y: candY },
+      }
+      const sess = makeInnerSession({
+        parentEl: parent,
+        movingEl: temp,
+        siblings,
+        vista: canvasStore.vistaActiva,
+        CM_TO_PX,
+      })
+      let local = sess.toLocal({ x: candX, y: candY }, parent)
+      local = sess.finalizeLocal(local)
+      if (!sess.isValidLocal(local)) {
+        showToast('No hay espacio aquí', 'error')
+        return
+      }
+      const world = sess.toWorld(local, parent)
+      candX = world.x
+      candY = world.y
+    }
+  }
+
   // 4. Calcular bbox candidato y verificar área
   const boundary = computeBoundary()
 
@@ -1735,6 +1778,83 @@ const createElementFromDrop = (data, dropEvent) => {
 
   // Seleccionar el elemento recién creado
   canvasStore.seleccionarElemento(nuevoElemento.id)
+}
+
+const onShapeDragStart = (e, el) => {
+  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
+    const shape = e.target
+    const parent =
+      canvasStore.elementoContenedorActual || canvasStore.elementoPorId(canvasStore.elementoSeleccionado)
+    const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
+    const session = makeInnerSession({
+      parentEl: parent,
+      movingEl: el,
+      siblings,
+      vista: canvasStore.vistaActiva,
+      CM_TO_PX,
+    })
+    const pointer = e.evt ? { x: e.evt.clientX || 0, y: e.evt.clientY || 0 } : { x: 0, y: 0 }
+    innerSessions.set(el.id, {
+      session,
+      parent,
+      lastPointer: pointer,
+      initial: { x: el.posicion?.x ?? el.x ?? 0, y: el.posicion?.y ?? el.y ?? 0 },
+    })
+    isElementDragging.value = true
+    stageDragEnabled.value = false
+  } else {
+    startElementDrag(el.id)
+  }
+}
+
+const onShapeDragMove = (e, el) => {
+  const data = innerSessions.get(el.id)
+  if (data) {
+    const { session, parent } = data
+    const shape = e.target
+    const pointer = e.evt ? { x: e.evt.clientX || 0, y: e.evt.clientY || 0 } : { x: 0, y: 0 }
+    const vel = {
+      x: e.evt?.movementX ?? pointer.x - data.lastPointer.x,
+      y: e.evt?.movementY ?? pointer.y - data.lastPointer.y,
+    }
+    data.lastPointer = pointer
+    const posWorld = shape.position()
+    const posLocal = session.toLocal(posWorld, parent)
+    const nextLocal = session.dragBoundFuncLocal(posLocal, vel)
+    shape.position(session.toWorld(nextLocal, parent))
+    needsDraw = true
+    scheduleDraw()
+  } else {
+    updateElementPosition(e, el.id, el.forma === 'circular' ? 'circular' : 'rectangular')
+  }
+}
+
+const onShapeDragEnd = (e, el) => {
+  const data = innerSessions.get(el.id)
+  if (data) {
+    const { session, parent, initial } = data
+    innerSessions.delete(el.id)
+    isElementDragging.value = false
+    stageDragEnabled.value = true
+    const shape = e.target
+    let candLocal = session.toLocal(shape.position(), parent)
+    let finalLocal = session.finalizeLocal(candLocal)
+    const finalWorld = session.toWorld(finalLocal, parent)
+    shape.position(finalWorld)
+    needsDraw = true
+    scheduleDraw()
+    const changed =
+      Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
+    if (changed) {
+      canvasStore.actualizarElementoConHistorial(
+        el.id,
+        { posicion: { x: finalWorld.x, y: finalWorld.y }, x: finalWorld.x, y: finalWorld.y },
+        `Elemento movido: ${el.id}`,
+      )
+    }
+  } else {
+    endElementDrag(el.id)
+  }
 }
 
 const getElementShadow = (elemento) => {
@@ -2008,48 +2128,21 @@ const setupTransformer = () => {
   const node = stage.findOne(`#${canvasStore.elementoSeleccionado}`)
   if (node) {
     trComp.nodes([node])
-    // Si es círculo, mantener aspecto 1:1
     const elemento = canvasStore.elementosVisibles.find(e => e.id === canvasStore.elementoSeleccionado)
-    if (elemento?.forma === 'circular') {
-      trComp.boundBoxFunc((oldBox, newBox) => {
-        const size = Math.max(newBox.width, newBox.height)
-        return { ...newBox, width: size, height: size }
-      })
-    } else {
-      // Para rectangulares, limitar al área y dejar que el usuario intente
-      // el resize; si el newBox queda fuera del área o crea colisiones se
-      // devolverá oldBox para evitar aplicar ese cambio en tiempo real.
-      trComp.boundBoxFunc((oldBox, newBox) => {
-        try {
-          const layerW = layerConfig.value.width
-          const layerH = layerConfig.value.height
-          // Clamp newBox dentro del área
-          const nx = Math.max(0, Math.min(newBox.x, layerW - newBox.width))
-          const ny = Math.max(0, Math.min(newBox.y, layerH - newBox.height))
-          const clamped = { ...newBox, x: nx, y: ny }
-
-          // Crear un objeto candidato tipo elemento para detectar conflictos
-          const sel = canvasStore.elementosVisibles.find(e => e.id === canvasStore.elementoSeleccionado)
-          if (!sel) return clamped
-          const candidate = {
-            id: sel.id,
-            x: clamped.x,
-            y: clamped.y,
-            width: clamped.width,
-            height: clamped.height,
-            forma: sel.forma || 'rectangular',
-            ubicacion: sel.ubicacion || 'suelo',
-          }
-
-          const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== sel.id)
-          // Si detectConflictsFor devuelve bloqueantes, rechazamos el newBox
-          const conflicts = detectConflictsFor(candidate, neighbors)
-          const blocking = conflicts.some(c => c.bloqueante)
-          if (blocking) return oldBox
-          return clamped
-        } catch { return oldBox }
-      })
-    }
+    trComp.setAttrs({
+      flipEnabled: false,
+      boundBoxFunc: (oldBox, newBox) => {
+        const MINW = 10
+        const MINH = 10
+        if (newBox.width <= 0 || newBox.height <= 0) return oldBox
+        if (newBox.width < MINW || newBox.height < MINH) return oldBox
+        if (elemento?.forma === 'circular') {
+          const size = Math.max(newBox.width, newBox.height)
+          return { ...newBox, width: size, height: size }
+        }
+        return newBox
+      },
+    })
     trComp.getLayer()?.batchDraw?.()
   }
 }
@@ -2089,25 +2182,19 @@ const handleTransformStart = (e, elementId) => {
 // Manejar fin de transformación con validación y revert si no es válido
 const handleTransformEnd = (e, elementId, forma) => {
   try {
-    // Reusar la implementación existente pero añadiendo validación explícita
     const node = e.target
+    let width = node.width() * node.scaleX()
+    let height = node.height() * node.scaleY()
     let x = node.x()
     let y = node.y()
-    let width
-    let height
-    let rotation = node.rotation?.() || 0
     if (forma === 'circular') {
-      const r = node.radius() * node.scaleX()
-      width = r * 2
-      height = r * 2
-      node.scaleX(1); node.scaleY(1)
-      x = node.x() - r
-      y = node.y() - r
-    } else {
-      width = node.width() * node.scaleX()
-      height = node.height() * node.scaleY()
-      node.scaleX(1); node.scaleY(1)
+      x -= width / 2
+      y -= height / 2
     }
+    const bounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+    x = Math.max(bounds.minX, Math.min(x, bounds.maxX - width))
+    y = Math.max(bounds.minY, Math.min(y, bounds.maxY - height))
+    const rotation = node.rotation?.() || 0
 
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
@@ -2126,6 +2213,8 @@ const handleTransformEnd = (e, elementId, forma) => {
           const r = Math.min(prev.width, prev.height) / 2
           node.x(prev.x + r)
           node.y(prev.y + r)
+          node.width && node.width(prev.width)
+          node.height && node.height(prev.height)
         } else {
           node.x(prev.x)
           node.y(prev.y)
@@ -2164,6 +2253,17 @@ const handleTransformEnd = (e, elementId, forma) => {
       }
     }
 
+    node.width(width)
+    node.height(height)
+    node.scaleX(1)
+    node.scaleY(1)
+    if (forma === 'circular') {
+      node.x(x + width / 2)
+      node.y(y + height / 2)
+    } else {
+      node.x(x)
+      node.y(y)
+    }
     canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones })
     lastValidPositions.value.set(elementId, { x, y })
     nextTick(() => setupTransformer())
@@ -2179,20 +2279,13 @@ const handleTransformMove = (e, elementId, forma) => {
     if (!node) return
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
-
+    let width = node.width() * node.scaleX()
+    let height = node.height() * node.scaleY()
     let x = node.x()
     let y = node.y()
-    let width
-    let height
     if (forma === 'circular') {
-      const r = (node.radius ? node.radius() : Math.min(elemento.width, elemento.height) / 2) * (node.scaleX() || 1)
-      width = r * 2
-      height = r * 2
-      x = node.x() - r
-      y = node.y() - r
-    } else {
-      width = (node.width ? node.width() : elemento.width) * (node.scaleX() || 1)
-      height = (node.height ? node.height() : elemento.height) * (node.scaleY() || 1)
+      x -= width / 2
+      y -= height / 2
     }
 
     const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
