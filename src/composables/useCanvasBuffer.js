@@ -13,12 +13,14 @@
 
 import { ref, computed } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
+import { useWeightValidation } from './useWeightValidation'
 
 // Estado global del buffer (singleton)
 const bufferItems = ref([])
 
 export const useCanvasBuffer = () => {
   const canvasStore = useCanvasStore()
+  const weightValidation = useWeightValidation()
 
   // Computed properties
   const hasItems = computed(() => bufferItems.value.length > 0)
@@ -177,6 +179,28 @@ export const useCanvasBuffer = () => {
     }
 
     const { elemento } = bufferItem
+
+    // Validar peso máximo - esta validación debe coincidir con la de CanvasView.vue
+    // La validación aquí es por si el elemento se pega con el atajo de teclado
+    const resultadoValidacionPeso = weightValidation.validarPesoElemento(
+      elemento,
+      canvasStore.contextoActual.id,
+      canvasStore.contextoActual.tipo
+    )
+
+    if (!resultadoValidacionPeso.valido) {
+      console.warn('⚠️ No se puede pegar: excedería el peso máximo soportado', resultadoValidacionPeso)
+
+      // Si hay una función global para mostrar toast, usarla
+      if (typeof window !== 'undefined' && window.__toasts?.show) {
+        window.__toasts.show(
+          `No se puede pegar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
+          { type: 'error', timeout: 3000 }
+        )
+      }
+
+      return false
+    }
 
     // Crear nuevo elemento en la posición especificada
     const newElement = {

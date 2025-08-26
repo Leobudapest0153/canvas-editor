@@ -21,6 +21,27 @@
     @dragenter="handleDragEnter"
     @dragleave="handleDragLeave"
   >
+    <!-- Indicador de peso máximo (solo se muestra cuando hay un límite de peso) -->
+    <div
+      v-if="weightValidation.contextoActualTieneLimiteDePeso"
+      class="weight-indicator"
+      :class="{
+        'weight-warning': weightValidation.infoPesoContextoActual.porcentajeUsado > 75,
+        'weight-danger': weightValidation.infoPesoContextoActual.porcentajeUsado > 90
+      }"
+    >
+      <div class="weight-icon">⚖️</div>
+      <div class="weight-bar">
+        <div
+          class="weight-progress"
+          :style="{ width: `${Math.min(100, weightValidation.infoPesoContextoActual.porcentajeUsado)}%` }"
+        ></div>
+      </div>
+      <div class="weight-text">
+        {{ Math.round(weightValidation.infoPesoContextoActual.usado) }} u/
+        {{ weightValidation.infoPesoContextoActual.maximo }} m kg
+      </div>
+    </div>
     <v-stage
       ref="stageRef"
       :config="stageConfig"
@@ -583,6 +604,7 @@ import SpeedDialContext from '@/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
+import { useWeightValidation } from '@/composables/useWeightValidation'
 import { applyEdgeConstraint } from '@/utils/edgeConstraint'
 import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
@@ -612,6 +634,7 @@ const ctx = useContextMenu()
 const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId: ctxElementId } = ctx
 const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
+const weightValidation = useWeightValidation()
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -1337,9 +1360,7 @@ const endElementDrag = async (elementId) => {
             finalPosition.y,
             `Elemento movido: ${elementoActual.nombre || elementoActual.tipo || elementId}`,
           )
-        }
-
-        // Actualizar lastValidPositions con la posición final
+        }        // Actualizar lastValidPositions con la posición final
         lastValidPositions.value.set(elementId, finalPosition)
       }
     }
@@ -1541,6 +1562,23 @@ const createElementFromDrop = (data, dropEvent) => {
     tipoElemento !== 'contenedores'
   ) {
     showToast('En contenedores solo se pueden agregar elementos u otros contenedores', 'error')
+    return
+  }
+
+  // ===== VALIDACIÓN DE PESO MÁXIMO =====
+  const resultadoValidacionPeso = weightValidation.validarPesoElemento(
+    elemento,
+    canvasStore.contextoActual.id,
+    canvasStore.contextoActual.tipo
+  )
+
+  if (!resultadoValidacionPeso.valido) {
+    // El elemento excedería el peso máximo permitido
+    showToast(
+      `No se puede agregar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
+      'error'
+    )
+    console.log('Validación de peso fallida:', resultadoValidacionPeso)
     return
   }
 
@@ -1759,7 +1797,7 @@ const getElementShadow = (elemento) => {
 
 watch(
   () => canvasStore.elementoDestacadoId,
-  (newId, oldId) => {
+  (newId) => {
     // Detener animación anterior
     if (highlightAnimation.value) {
       highlightAnimation.value.stop()
@@ -1817,6 +1855,23 @@ const createElementFromBuffer = (data, dropEvent) => {
   }
 
   const elemento = bufferItem.elemento
+
+  // ===== VALIDACIÓN DE PESO MÁXIMO =====
+  const resultadoValidacionPeso = weightValidation.validarPesoElemento(
+    elemento,
+    canvasStore.contextoActual.id,
+    canvasStore.contextoActual.tipo
+  )
+
+  if (!resultadoValidacionPeso.valido) {
+    // El elemento excedería el peso máximo permitido
+    showToast(
+      `No se puede pegar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
+      'error'
+    )
+    console.log('Validación de peso fallida en buffer:', resultadoValidacionPeso)
+    return
+  }
 
   // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
   let { width, height } = getElementPixelDimensions(elemento)
@@ -2659,4 +2714,56 @@ const onDelete = async (id) => {
 .speed-action:hover { transform: translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,.2); }
 
 .btn-fit { position: relative; z-index: 30; }
+
+/* Indicador de peso máximo */
+.weight-indicator {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  max-width: 200px;
+  font-size: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.weight-icon {
+  font-size: 16px;
+}
+
+.weight-bar {
+  flex: 1;
+  height: 8px;
+  background-color: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.weight-progress {
+  height: 100%;
+  background-color: #3b82f6;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.weight-text {
+  font-weight: 500;
+  color: #475569;
+  white-space: nowrap;
+}
+
+/* Estados de advertencia */
+.weight-warning .weight-progress {
+  background-color: #f59e0b;
+}
+
+.weight-danger .weight-progress {
+  background-color: #dc2626;
+}
 </style>

@@ -181,7 +181,7 @@
                 <input
                   id="prop-ancho"
                   type="number"
-                  :value="elementoSeleccionado.dimensiones?.ancho"
+                  :value="cambiosPendientes.dimensiones.ancho !== null ? cambiosPendientes.dimensiones.ancho : elementoSeleccionado.dimensiones?.ancho"
                   @change="actualizarDimension('ancho', $event.target.value)"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -193,7 +193,7 @@
                 id="prop-largo"
                 type="number"
                 :disabled="!canvasStore.estaEnPlanta"
-                :value="elementoSeleccionado.dimensiones?.largo"
+                :value="cambiosPendientes.dimensiones.largo !== null ? cambiosPendientes.dimensiones.largo : elementoSeleccionado.dimensiones?.largo"
                 @change="actualizarDimension('largo', $event.target.value)"
                 class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
@@ -205,7 +205,7 @@
                 id="prop-alto"
                 type="number"
                 :disabled="canvasStore.estaEnPlanta"
-                :value="elementoSeleccionado.dimensiones?.alto"
+                :value="cambiosPendientes.dimensiones.alto !== null ? cambiosPendientes.dimensiones.alto : elementoSeleccionado.dimensiones?.alto"
                 @change="actualizarDimension('alto', $event.target.value)"
                 class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
@@ -222,17 +222,35 @@
     <div class="mt-6">
       <h4 class="font-semibold text-gray-700 mb-3">Propiedades Adicionales</h4>
       <div class="space-y-3">
-        <!-- Campo Peso Máximo -->
+        <!-- Campo Capacidad de Carga -->
         <div class="grid grid-cols-2 items-center">
-          <label for="prop-peso-max" class="text-sm text-gray-500">Peso Máximo (kg)</label>
+          <label for="prop-peso-max" class="text-sm text-gray-500">Capacidad de Carga (kg)</label>
           <input
             id="prop-peso-max"
             type="number"
-            :value="elementoSeleccionado.pesoMaximo"
+            :value="cambiosPendientes.pesoMaximo !== null ? cambiosPendientes.pesoMaximo : elementoSeleccionado.pesoMaximo"
             @change="actualizarPropiedadSimple('pesoMaximo', $event.target.value)"
             class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             placeholder="Ej: 100"
           />
+        </div>
+        <p class="text-xs text-gray-500">
+          Peso máximo teórico que este elemento puede soportar
+        </p>
+
+        <!-- Mensaje de validación de peso (si existe) -->
+        <div v-if="errorValidacion" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+          {{ errorValidacion }}
+        </div>
+
+        <!-- Información de peso total si tiene elementos hijos -->
+        <div v-if="elementoSeleccionado.hijos && elementoSeleccionado.hijos.length > 0" class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md text-sm">
+          Este elemento contiene {{ elementoSeleccionado.hijos.length }} elementos con una capacidad de carga total requerida.
+        </div>
+
+        <!-- Información sobre capacidad del padre o planta contenedora -->
+        <div v-if="infoPesoContenedor.mostrar" class="mt-2 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-md text-sm">
+          {{ infoPesoContenedor.mensaje }}
         </div>
       </div>
     </div>
@@ -301,6 +319,19 @@
 
     <!-- Footer fijo con acciones -->
     <div v-if="elementoSeleccionado" class="p-4 border-t border-gray-200 bg-white">
+      <div v-if="cambiosPendientes.dimensiones.ancho !== null ||
+                  cambiosPendientes.dimensiones.largo !== null ||
+                  cambiosPendientes.dimensiones.alto !== null ||
+                  cambiosPendientes.pesoMaximo !== null"
+           class="mb-2">
+        <button
+          @click="aplicarCambios"
+          class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+        >
+          Confirmar Cambios
+        </button>
+      </div>
+
       <div class="flex gap-2 mb-2">
         <button
           @click="onDeleteClick"
@@ -311,6 +342,7 @@
           Eliminar
         </button>
       </div>
+
       <div class="flex gap-2">
         <button
           @click="resetearPropiedades"
@@ -338,6 +370,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore.js'
+import { useWeightValidation } from '@/composables/useWeightValidation.js'
 import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import TagFilter from './TagFilter.vue'
@@ -346,6 +379,7 @@ import CreateTagModal from './CreateTagModal.vue'
 // Store
 const canvasStore = useCanvasStore()
 const { deleteSelected } = useDeleteElement()
+const weightValidation = useWeightValidation()
 
 // Referencias reactivas
 const propiedadesEditables = ref({
@@ -353,14 +387,70 @@ const propiedadesEditables = ref({
   color: '#3B82F6',
 })
 
-const modalCrearEtiquetaVisible = ref(false);
-const textoNuevaEtiqueta = ref('');
+// Referencias para los cambios pendientes
+const cambiosPendientes = ref({
+  dimensiones: {
+    ancho: null,
+    largo: null,
+    alto: null
+  },
+  pesoMaximo: null
+})
+
+// Estado para almacenar errores
+const errorValidacion = ref('')
+
+const modalCrearEtiquetaVisible = ref(false)
+const textoNuevaEtiqueta = ref('')
 
 // Computed
 const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoCompleto)
 const isLockedSelected = computed(() => {
   const el = elementoSeleccionado.value
   return !!(el && (el.bloqueado === true || el.locked === true))
+})
+
+// Información sobre la capacidad del contenedor padre o planta
+const infoPesoContenedor = computed(() => {
+  const elemento = elementoSeleccionado.value
+  if (!elemento) return { mostrar: false, mensaje: '' }
+
+  // Verificar si el elemento tiene un padre
+  if (elemento.padre) {
+    const padreId = elemento.padre
+    const padre = canvasStore.elementoPorId(padreId)
+
+    if (padre && padre.pesoMaximo > 0) {
+      const nombrePadre = padre.nombre || obtenerNombreElementoPorId(padreId)
+      const tipoElementoPadre = padre.tipo || 'elementos'
+      const resultado = weightValidation.calcularPesoDisponible(padreId, tipoElementoPadre)
+
+      if (resultado.limiteDePeso) {
+        return {
+          mostrar: true,
+          mensaje: `Contenedor: "${nombrePadre}" - Capacidad disponible: ${Math.round(resultado.disponible * 10) / 10} kg de ${resultado.maximo} kg (${Math.round(resultado.porcentajeUsado)}% en uso)`
+        }
+      }
+    }
+  }
+  // Verificar si el elemento está en una planta sin padre (elemento de primer nivel)
+  else if (elemento.plantaId) {
+    const plantaId = elemento.plantaId
+    const planta = canvasStore.plantaPorId(plantaId)
+
+    if (planta && planta.pesoMaximoSoportado > 0) {
+      const resultado = weightValidation.calcularPesoDisponible(plantaId, 'plantas')
+
+      if (resultado.limiteDePeso) {
+        return {
+          mostrar: true,
+          mensaje: `Planta: "${planta.nombre}" - Capacidad disponible: ${Math.round(resultado.disponible * 10) / 10} kg de ${resultado.maximo} kg (${Math.round(resultado.porcentajeUsado)}% en uso)`
+        }
+      }
+    }
+  }
+
+  return { mostrar: false, mensaje: '' }
 })
 
 // Watchers
@@ -373,6 +463,19 @@ watch(
         nombre: nuevoElemento.nombre || generarNombrePorDefecto(nuevoElemento),
         color: nuevoElemento.color || '#3B82F6',
       }
+
+      // Inicializar cambios pendientes con los valores actuales
+      cambiosPendientes.value = {
+        dimensiones: {
+          ancho: nuevoElemento.dimensiones?.ancho || null,
+          largo: nuevoElemento.dimensiones?.largo || null,
+          alto: nuevoElemento.dimensiones?.alto || null
+        },
+        pesoMaximo: nuevoElemento.pesoMaximo || null
+      }
+
+      // Limpiar mensajes de error
+      errorValidacion.value = ''
     }
   },
   { immediate: true },
@@ -392,6 +495,8 @@ const getCategoriaDisplay = (categoria) => {
 const generarNombrePorDefecto = (elemento) => {
   return `${elemento.tipo.charAt(0).toUpperCase() + elemento.tipo.slice(1)} ${elemento.id.split('_')[1] || ''}`
 }
+
+// La función obtenerNombreElementoPorId se define más adelante en el componente
 
 const actualizarPropiedad = (propiedad, valor) => {
   if (!elementoSeleccionado.value) return
@@ -413,8 +518,24 @@ const resetearPropiedades = () => {
     color: '#3B82F6',
   }
 
+  // Restaurar propiedades editables
   propiedadesEditables.value = { ...propiedadesOriginales }
+
+  // Actualizar en tiempo real solo para el nombre y color
   canvasStore.actualizarElemento(elementoSeleccionado.value.id, propiedadesOriginales)
+
+  // Restablecer los cambios pendientes
+  cambiosPendientes.value = {
+    dimensiones: {
+      ancho: null,
+      largo: null,
+      alto: null
+    },
+    pesoMaximo: null
+  }
+
+  // Limpiar mensajes de error
+  errorValidacion.value = ''
 }
 
 const deseleccionarElemento = () => {
@@ -457,39 +578,11 @@ const actualizarDimension = (dimension, valor) => {
   const valorNumerico = parseFloat(valor)
   if (isNaN(valorNumerico)) return // Evitar enviar valores no numéricos
 
-  // Actualizar la dimensión en cm
-  canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-    dimensiones: {
-      [dimension]: valorNumerico,
-    },
-  })
+  // Almacenar en cambios pendientes
+  cambiosPendientes.value.dimensiones[dimension] = valorNumerico
 
-  // También actualizar las propiedades de renderizado width/height según la vista actual
-  const CM_TO_PX = 10; // Factor de conversión
-  if (canvasStore.vistaActiva === 'XY') {
-    // Vista superior: ancho->width, largo->height
-    if (dimension === 'ancho') {
-      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-        width: valorNumerico * CM_TO_PX
-      });
-    } else if (dimension === 'largo') {
-      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-        height: valorNumerico * CM_TO_PX
-      });
-    }
-  } else if (canvasStore.vistaActiva === 'XZ') {
-    // Vista frontal: ancho->width, alto->height
-    if (dimension === 'ancho') {
-      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-        width: valorNumerico * CM_TO_PX
-      });
-    } else if (dimension === 'alto') {
-      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-        height: valorNumerico * CM_TO_PX
-      });
-    }
-    // El largo no afecta a width/height en vista XZ
-  }
+  // Limpiar error si existe
+  errorValidacion.value = ''
 }
 
 const actualizarPropiedadSimple = (propiedad, valor) => {
@@ -497,9 +590,147 @@ const actualizarPropiedadSimple = (propiedad, valor) => {
   const valorNumerico = parseFloat(valor)
   if (isNaN(valorNumerico)) return
 
-  canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-    [propiedad]: valorNumerico,
-  })
+  // Almacenar en cambios pendientes
+  cambiosPendientes.value[propiedad] = valorNumerico
+
+  // Limpiar error si existe
+  errorValidacion.value = ''
+}
+
+const aplicarCambios = () => {
+  if (!elementoSeleccionado.value) return
+
+  const nuevoPesoMaximo = cambiosPendientes.value.pesoMaximo
+
+  // 1. Validar el peso máximo si hay elementos hijos (validación hacia abajo)
+  if (elementoSeleccionado.value.hijos && elementoSeleccionado.value.hijos.length > 0 && nuevoPesoMaximo !== null) {
+    const elementoId = elementoSeleccionado.value.id
+    const tipoElemento = elementoSeleccionado.value.tipo || 'elementos'
+
+    // Calcular el peso total actual de los elementos hijos
+    const resultado = weightValidation.calcularPesoDisponible(elementoId, tipoElemento)
+    const pesoActualHijos = resultado.usado
+
+    // Si el nuevo peso máximo es menor que el peso actual de los hijos, mostrar error
+    if (resultado.limiteDePeso && nuevoPesoMaximo < pesoActualHijos) {
+      errorValidacion.value = `La capacidad de carga debe ser al menos ${pesoActualHijos} kg para soportar los elementos actuales contenidos.`
+      return
+    }
+  }
+
+  // 2. Validar si el nuevo peso máximo excede la capacidad del padre (validación hacia arriba)
+  if (nuevoPesoMaximo !== null && elementoSeleccionado.value.padre) {
+    const padreId = elementoSeleccionado.value.padre
+    const padre = canvasStore.elementoPorId(padreId)
+
+    if (padre && padre.pesoMaximo > 0) { // Si el padre tiene límite de peso definido
+      // Obtener la diferencia entre el nuevo y viejo peso máximo
+      const pesoMaximoActual = elementoSeleccionado.value.pesoMaximo || 0
+      const diferenciaPeso = nuevoPesoMaximo - pesoMaximoActual
+
+      if (diferenciaPeso > 0) {
+        // Calcular el peso disponible en el padre
+        const tipoElementoPadre = padre.tipo || 'elementos'
+        const resultadoPadre = weightValidation.calcularPesoDisponible(padreId, tipoElementoPadre)
+
+        // Si el incremento de peso excede la capacidad disponible en el padre
+        if (resultadoPadre.limiteDePeso && diferenciaPeso > resultadoPadre.disponible) {
+          errorValidacion.value = `El incremento de capacidad de carga (${diferenciaPeso} kg) excede la capacidad disponible del elemento padre (${resultadoPadre.disponible} kg).`
+          return
+        }
+      }
+    }
+  }
+
+  // También validar si el elemento está en una planta con límite de peso
+  if (nuevoPesoMaximo !== null && !elementoSeleccionado.value.padre && elementoSeleccionado.value.plantaId) {
+    const plantaId = elementoSeleccionado.value.plantaId
+    const planta = canvasStore.plantaPorId(plantaId)
+
+    if (planta && planta.pesoMaximoSoportado > 0) {
+      // Obtener la diferencia entre el nuevo y viejo peso máximo
+      const pesoMaximoActual = elementoSeleccionado.value.pesoMaximo || 0
+      const diferenciaPeso = nuevoPesoMaximo - pesoMaximoActual
+
+      if (diferenciaPeso > 0) {
+        // Calcular el peso disponible en la planta
+        const resultadoPlanta = weightValidation.calcularPesoDisponible(plantaId, 'plantas')
+
+        // Si el incremento de peso excede la capacidad disponible en la planta
+        if (resultadoPlanta.limiteDePeso && diferenciaPeso > resultadoPlanta.disponible) {
+          errorValidacion.value = `El incremento de capacidad de carga (${diferenciaPeso} kg) excede la capacidad disponible de la planta (${resultadoPlanta.disponible} kg).`
+          return
+        }
+      }
+    }
+  }
+
+  // Si no hay errores, aplicar cambios
+  const actualizaciones = {}
+
+  // Actualizar dimensiones
+  if (cambiosPendientes.value.dimensiones.ancho !== null ||
+      cambiosPendientes.value.dimensiones.largo !== null ||
+      cambiosPendientes.value.dimensiones.alto !== null) {
+
+    const dimensionesActuales = elementoSeleccionado.value.dimensiones || {}
+
+    actualizaciones.dimensiones = {
+      ancho: cambiosPendientes.value.dimensiones.ancho !== null
+        ? cambiosPendientes.value.dimensiones.ancho
+        : dimensionesActuales.ancho,
+      largo: cambiosPendientes.value.dimensiones.largo !== null
+        ? cambiosPendientes.value.dimensiones.largo
+        : dimensionesActuales.largo,
+      alto: cambiosPendientes.value.dimensiones.alto !== null
+        ? cambiosPendientes.value.dimensiones.alto
+        : dimensionesActuales.alto
+    }
+  }
+
+  // Actualizar peso máximo
+  if (cambiosPendientes.value.pesoMaximo !== null) {
+    actualizaciones.pesoMaximo = cambiosPendientes.value.pesoMaximo
+  }
+
+  // Si hay actualizaciones, aplicarlas
+  if (Object.keys(actualizaciones).length > 0) {
+    canvasStore.actualizarElemento(elementoSeleccionado.value.id, actualizaciones)
+
+    // También actualizar las propiedades de renderizado width/height según la vista actual
+    const CM_TO_PX = 10 // Factor de conversión
+
+    if (actualizaciones.dimensiones) {
+      if (canvasStore.vistaActiva === 'XY') {
+        // Vista superior: ancho->width, largo->height
+        if (actualizaciones.dimensiones.ancho !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            width: actualizaciones.dimensiones.ancho * CM_TO_PX
+          })
+        }
+        if (actualizaciones.dimensiones.largo !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            height: actualizaciones.dimensiones.largo * CM_TO_PX
+          })
+        }
+      } else if (canvasStore.vistaActiva === 'XZ') {
+        // Vista frontal: ancho->width, alto->height
+        if (actualizaciones.dimensiones.ancho !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            width: actualizaciones.dimensiones.ancho * CM_TO_PX
+          })
+        }
+        if (actualizaciones.dimensiones.alto !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            height: actualizaciones.dimensiones.alto * CM_TO_PX
+          })
+        }
+      }
+    }
+
+    // Limpiar mensaje de error si existe
+    errorValidacion.value = ''
+  }
 }
 </script>
 
