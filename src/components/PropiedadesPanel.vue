@@ -234,6 +234,18 @@
             placeholder="Ej: 100"
           />
         </div>
+        <div class="grid grid-cols-2 items-center">
+          <label for="prop-volumen-max" class="text-sm text-gray-500">Volumen (m³)</label>
+          <input
+            id="prop-volumen-max"
+            type="number"
+            :value="volumen"
+            disabled
+            @change="actualizarPropiedadSimple('pesoMaximo', $event.target.value)"
+            class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            placeholder="Ej: 100"
+          />
+        </div>
       </div>
     </div>
 
@@ -313,10 +325,10 @@
       </div>
       <div class="flex gap-2">
         <button
-          @click="resetearPropiedades"
+          @click="cambiarBloqueo"
           class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
         >
-          Restablecer
+        {{ elementoSeleccionado.bloqueado ? 'Desploquear' : 'Bloquear' }}
         </button>
         <button
           @click="deseleccionarElemento"
@@ -362,6 +374,15 @@ const isLockedSelected = computed(() => {
   const el = elementoSeleccionado.value
   return !!(el && (el.bloqueado === true || el.locked === true))
 })
+
+
+const volumen = computed(() => {
+  const ancho = elementoSeleccionado.value.dimensiones?.ancho;
+  const alto = elementoSeleccionado.value.dimensiones?.alto;
+  const largo = elementoSeleccionado.value.dimensiones?.largo;
+  const v = ancho * alto * largo;
+  return (v / 1000000).toFixed(2);
+});
 
 // Watchers
 watch(
@@ -415,6 +436,10 @@ const resetearPropiedades = () => {
 
   propiedadesEditables.value = { ...propiedadesOriginales }
   canvasStore.actualizarElemento(elementoSeleccionado.value.id, propiedadesOriginales)
+}
+
+const cambiarBloqueo = () => {
+  canvasStore.actualizarElemento(elementoSeleccionado.value.id, { bloqueado: !elementoSeleccionado.value.bloqueado })
 }
 
 const deseleccionarElemento = () => {
