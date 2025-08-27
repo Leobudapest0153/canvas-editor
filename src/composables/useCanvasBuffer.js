@@ -14,6 +14,7 @@
 import { ref, computed } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
 import { validateWallPlacement, isWallFormValid, debugWall } from '@/utils/wallRules'
+import { CM_TO_PX } from '@/utils/constants'
 
 // Estado global del buffer (singleton)
 const bufferItems = ref([])
@@ -198,14 +199,14 @@ export const useCanvasBuffer = () => {
       const elementoPadre = canvasStore.elementoContenedorActual
       if (elementoPadre && elementoPadre.dimensiones && elementoPadre.dimensiones.largo) {
         const largoPadreCm = elementoPadre.dimensiones.largo
-        const CM_TO_PX = 10 // Factor de conversión cm a píxeles
+        const cmToPx = CM_TO_PX
 
         // Ajustar dimensiones en cm
         if (!newElement.dimensiones) {
           newElement.dimensiones = {
-            ancho: newElement.width ? Math.round(newElement.width / CM_TO_PX) : 10,
+            ancho: newElement.width ? Math.round(newElement.width / cmToPx) : 10,
             largo: largoPadreCm,
-            alto: newElement.height ? Math.round(newElement.height / CM_TO_PX) : 10
+            alto: newElement.height ? Math.round(newElement.height / cmToPx) : 10
           }
         } else {
           // Asegurarse de que largo existe y se establece correctamente
@@ -218,7 +219,7 @@ export const useCanvasBuffer = () => {
           // Mantenemos el valor visual existente, ya que se corresponde con alto
         } else if (canvasStore.vistaActiva === 'XY') {
           // En vista XY, height refleja el largo
-          newElement.height = largoPadreCm * CM_TO_PX
+          newElement.height = largoPadreCm * cmToPx
         }
 
         console.log('Buffer: Contenedor pegado con largo ajustado al elemento padre:', {
@@ -242,17 +243,29 @@ export const useCanvasBuffer = () => {
             canvasStore.plantaActivaData?.altura ??
             0,
         )
-      if (!isWallFormValid(newElement)) {
+      if (!isWallFormValid(newElement, bH, CM_TO_PX)) {
         window.__toasts?.show?.('Falta altura respecto al suelo (>0) y alto', {
           type: 'warn',
-        }) ?? console.warn('[WALL_RULES]', 'Falta altura respecto al suelo (>0) y alto', debugWall(newElement, bH))
+        }) ??
+          console.warn(
+            '[WALL_RULES]',
+            'Falta altura respecto al suelo (>0) y alto',
+            debugWall(newElement, bH, CM_TO_PX),
+          )
         return false
       }
       const all = canvasStore.elementosEnPlanta(canvasStore.plantaActiva)
-      const res = validateWallPlacement({ el: newElement, all, bodegaH: bH })
+      if (import.meta.env.DEV)
+        console.debug('[WALL_RULES:CM]', debugWall(newElement, bH, CM_TO_PX))
+      const res = validateWallPlacement({
+        el: newElement,
+        all,
+        bodegaH: bH,
+        CM_TO_PX,
+      })
       if (!res.ok) {
         window.__toasts?.show?.(`${res.reason}`, { type: 'warn' }) ??
-          console.warn('[WALL_RULES]', res.reason, debugWall(newElement, bH))
+          console.warn('[WALL_RULES]', res.reason, debugWall(newElement, bH, CM_TO_PX))
         return false
       }
     }

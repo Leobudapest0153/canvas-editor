@@ -18,6 +18,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { CM_TO_PX } from '@/utils/constants'
 import { validateWallPlacement, isWallFormValid, debugWall } from '@/utils/wallRules'
+import { ensureWallCm, toCmSmart } from '@/utils/units'
 
 // Variable para evitar circular import - será inicializada por el composable de historial
 let historyComposable = null
@@ -592,16 +593,23 @@ export const useCanvasStore = defineStore('canvas', () => {
           )
         const all = elementos.value.filter((el) => el.plantaId === elemento.plantaId)
         const el = { ...elemento, x, y }
-        if (!isWallFormValid(el)) {
+        if (!isWallFormValid(el, bH, CM_TO_PX)) {
           window.__toasts?.show?.('Falta altura respecto al suelo (>0) y alto', {
             type: 'warn',
-          }) ?? console.warn('[WALL_RULES]', 'Falta altura respecto al suelo (>0) y alto', debugWall(el, bH))
+          }) ??
+            console.warn(
+              '[WALL_RULES]',
+              'Falta altura respecto al suelo (>0) y alto',
+              debugWall(el, bH, CM_TO_PX),
+            )
           return false
         }
-        const res = validateWallPlacement({ el, all, bodegaH: bH })
+        if (import.meta.env.DEV)
+          console.debug('[WALL_RULES:CM]', debugWall(el, bH, CM_TO_PX))
+        const res = validateWallPlacement({ el, all, bodegaH: bH, CM_TO_PX })
         if (!res.ok) {
           window.__toasts?.show?.(res.reason, { type: 'warn' }) ??
-            console.warn('[WALL_RULES]', res.reason, debugWall(el, bH))
+            console.warn('[WALL_RULES]', res.reason, debugWall(el, bH, CM_TO_PX))
           return false
         }
       }
@@ -631,16 +639,23 @@ export const useCanvasStore = defineStore('canvas', () => {
               0,
           )
         const all = elementos.value.filter((el) => el.plantaId === candidato.plantaId)
-        if (!isWallFormValid(candidato)) {
+        if (!isWallFormValid(candidato, bH, CM_TO_PX)) {
           window.__toasts?.show?.('Falta altura respecto al suelo (>0) y alto', {
             type: 'warn',
-          }) ?? console.warn('[WALL_RULES]', 'Falta altura respecto al suelo (>0) y alto', debugWall(candidato, bH))
+          }) ??
+            console.warn(
+              '[WALL_RULES]',
+              'Falta altura respecto al suelo (>0) y alto',
+              debugWall(candidato, bH, CM_TO_PX),
+            )
           return false
         }
-        const res = validateWallPlacement({ el: candidato, all, bodegaH: bH })
+        if (import.meta.env.DEV)
+          console.debug('[WALL_RULES:CM]', debugWall(candidato, bH, CM_TO_PX))
+        const res = validateWallPlacement({ el: candidato, all, bodegaH: bH, CM_TO_PX })
         if (!res.ok) {
           window.__toasts?.show?.(res.reason, { type: 'warn' }) ??
-            console.warn('[WALL_RULES]', res.reason, debugWall(candidato, bH))
+            console.warn('[WALL_RULES]', res.reason, debugWall(candidato, bH, CM_TO_PX))
           return false
         }
       }
@@ -809,19 +824,31 @@ export const useCanvasStore = defineStore('canvas', () => {
             plantaActivaData.value?.altura ??
             0,
         )
-      if (!isWallFormValid(nuevoElemento)) {
+      if (!isWallFormValid(nuevoElemento, bH, CM_TO_PX)) {
         window.__toasts?.show?.('Falta altura respecto al suelo (>0) y alto', {
           type: 'warn',
-        }) ?? console.warn('[WALL_RULES]', 'Falta altura respecto al suelo (>0) y alto', debugWall(nuevoElemento, bH))
+        }) ??
+          console.warn(
+            '[WALL_RULES]',
+            'Falta altura respecto al suelo (>0) y alto',
+            debugWall(nuevoElemento, bH, CM_TO_PX),
+          )
         return false
       }
       const all = elementos.value.filter(
         (el) => el.plantaId === contextoNavegacion.value.id,
       )
-      const res = validateWallPlacement({ el: nuevoElemento, all, bodegaH: bH })
+      if (import.meta.env.DEV)
+        console.debug('[WALL_RULES:CM]', debugWall(nuevoElemento, bH, CM_TO_PX))
+      const res = validateWallPlacement({
+        el: nuevoElemento,
+        all,
+        bodegaH: bH,
+        CM_TO_PX,
+      })
       if (!res.ok) {
         window.__toasts?.show?.(res.reason, { type: 'warn' }) ??
-          console.warn('[WALL_RULES]', res.reason, debugWall(nuevoElemento, bH))
+          console.warn('[WALL_RULES]', res.reason, debugWall(nuevoElemento, bH, CM_TO_PX))
         return false
       }
     }
@@ -1056,83 +1083,72 @@ export const useCanvasStore = defineStore('canvas', () => {
       }),
 
       // Estado de elementos con propiedades estáticas y personalizadas
-      elementos: elementos.value.map((elemento) => ({
-        // Elevación y tolerancias
-        elevacion: elemento.elevacion || {
-          zBase: 0,
-          altura: elemento.dimensiones?.alto || elemento.alto || 0,
-          espesor: elemento.elevacion?.espesor || 0,
-        },
-        tolerancias: elemento.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
-        id: elemento.id,
-        nombre: elemento.nombre,
-        tipo: elemento.tipo,
-        categoria: elemento.categoria,
-        plantaId: elemento.plantaId,
+      elementos: elementos.value.map((elemento) => {
+        const planta = plantas.value.find((p) => p.id === elemento.plantaId)
+        const bH = planta?.dimensiones?.alto || planta?.altura || 0
+        const norm = ensureWallCm(elemento, { CM_TO_PX, bodegaHcm: bH })
+        if (elemento.elevacion) elemento.elevacion.zBase = norm.zBase
+        else elemento.elevacion = { zBase: norm.zBase, altura: norm.alto, espesor: 0 }
+        if (elemento.dimensiones) elemento.dimensiones.alto = norm.alto
+        else if (elemento.alto != null) elemento.alto = norm.alto
+        return {
+          // Elevación y tolerancias
+          elevacion: {
+            zBase: norm.zBase,
+            altura: norm.alto,
+            espesor: elemento.elevacion?.espesor || 0,
+          },
+          tolerancias: elemento.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
+          id: elemento.id,
+          nombre: elemento.nombre,
+          tipo: elemento.tipo,
+          categoria: elemento.categoria,
+          plantaId: elemento.plantaId,
 
-        // Propiedades físicas (maneja formato nuevo y legacy)
-        dimensiones: elemento.dimensiones
-          ? {
-              ancho: elemento.dimensiones.ancho,
-              largo: elemento.dimensiones.largo,
-              alto: elemento.dimensiones.alto,
-            }
-          : elemento.width || elemento.height
-            ? {
-                // Fallback para formato legacy (width, height directos)
-                ancho: elemento.width || 100,
-                largo: elemento.height || 60,
-                alto: elemento.alto || 20,
-              }
-            : null,
+          // Propiedades físicas (maneja formato nuevo y legacy)
+          dimensiones: elemento.dimensiones
+            ? { ancho: elemento.dimensiones.ancho, largo: elemento.dimensiones.largo, alto: norm.alto }
+            : elemento.width || elemento.height
+              ? { ancho: elemento.width || 100, largo: elemento.height || 60, alto: norm.alto || 20 }
+              : null,
 
-        // Posición y transformación (maneja formato nuevo y legacy)
-        posicion: elemento.posicion
-          ? {
-              x: elemento.posicion.x,
-              y: elemento.posicion.y,
-              z: elemento.posicion.z || 0,
-              rotation: elemento.posicion.rotation || 0,
-            }
-          : {
-              // Fallback para formato legacy (x, y directos)
-              x: elemento.x || 0,
-              y: elemento.y || 0,
-              z: elemento.z || 0,
-              rotation: elemento.rotation || 0,
-            },
+          // Posición y transformación (maneja formato nuevo y legacy)
+          posicion: elemento.posicion
+            ? { x: elemento.posicion.x, y: elemento.posicion.y, z: elemento.posicion.z || 0, rotation: elemento.posicion.rotation || 0 }
+            : { x: elemento.x || 0, y: elemento.y || 0, z: elemento.z || 0, rotation: elemento.rotation || 0 },
 
-        // Propiedades visuales
-        visual: {
-          colorBase: elemento.colorBase || '#3b82f6',
-          forma: elemento.forma || 'rectangular',
-          visible: elemento.visible !== false, // Por defecto visible
-        },
+          // Propiedades visuales
+          visual: {
+            colorBase: elemento.colorBase || '#3b82f6',
+            forma: elemento.forma || 'rectangular',
+            visible: elemento.visible !== false, // Por defecto visible
+          },
 
-        // Propiedades funcionales
-        propiedades: {
-          pesoMaximo: elemento.pesoMaximo || 0,
-          ubicacion: elemento.ubicacion || 'suelo',
-          descripcion: elemento.descripcion || '',
-        },
+          // Propiedades funcionales
+          propiedades: {
+            pesoMaximo: elemento.pesoMaximo || 0,
+            ubicacion: elemento.ubicacion || 'suelo',
+            descripcion: elemento.descripcion || '',
+          },
 
-        // Jerarquía
-        jerarquia: {
-          padre: elemento.padre || null,
-          hijos: elemento.hijos || [],
-          nivel: elemento.nivel || 0,
-        },
+          // Jerarquía
+          jerarquia: {
+            padre: elemento.padre || null,
+            hijos: elemento.hijos || [],
+            nivel: elemento.nivel || 0,
+          },
 
-        // Propiedades personalizadas del usuario
-        propiedadesPersonalizadas: elemento.propiedadesPersonalizadas || {},
+          // Propiedades personalizadas del usuario
+          propiedadesPersonalizadas: elemento.propiedadesPersonalizadas || {},
 
-        // Metadatos adicionales
-        metadatos: {
-          fechaCreacion: elemento.fechaCreacion || new Date().toISOString(),
-          fechaModificacion: elemento.fechaModificacion || new Date().toISOString(),
-          creador: elemento.creador || 'usuario',
-        },
-      })),
+          // Metadatos adicionales
+          metadatos: {
+            fechaCreacion: elemento.fechaCreacion || new Date().toISOString(),
+            fechaModificacion: elemento.fechaModificacion || new Date().toISOString(),
+            creador: elemento.creador || 'usuario',
+          },
+        }
+      }),
 
       // Estado de navegación y configuración
       configuracion: {
@@ -1204,11 +1220,20 @@ export const useCanvasStore = defineStore('canvas', () => {
       const elementosData = state.elementos || []
 
       elementosData.forEach((elementoData) => {
-        // Extraer posición y dimensiones
+        const planta = plantas.value.find((p) => p.id === elementoData.plantaId)
+        const bH = planta?.dimensiones?.alto || planta?.altura || 0
         const posX = elementoData.posicion?.x || 0
         const posY = elementoData.posicion?.y || 0
         const width = elementoData.dimensiones?.ancho || 100
         const height = elementoData.dimensiones?.largo || 60
+        const zBase = toCmSmart(
+          elementoData.elevacion?.zBase ?? elementoData.posicion?.z || 0,
+          { CM_TO_PX, bodegaHcm: bH },
+        )
+        const alto = toCmSmart(
+          elementoData.dimensiones?.alto ?? 0,
+          { CM_TO_PX, bodegaHcm: bH },
+        )
 
         elementos.value.push({
           id: elementoData.id,
@@ -1217,58 +1242,36 @@ export const useCanvasStore = defineStore('canvas', () => {
           categoria: elementoData.categoria,
           plantaId: elementoData.plantaId,
 
-          elevacion: elementoData.elevacion || {
-            zBase: elementoData.posicion?.z || 0,
-            altura: elementoData.dimensiones?.alto || 0,
-            espesor: 0,
-          },
+          elevacion: { zBase, altura: alto, espesor: elementoData.elevacion?.espesor || 0 },
           tolerancias: elementoData.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
 
-          // Propiedades físicas (estructura nueva)
-          dimensiones: {
-            ancho: width,
-            largo: height,
-            alto: elementoData.dimensiones?.alto || 20,
-          },
+          dimensiones: { ancho: width, largo: height, alto },
 
-          // Posición (estructura nueva)
-          posicion: {
-            x: posX,
-            y: posY,
-            z: elementoData.posicion?.z || 0,
-            rotation: elementoData.posicion?.rotation || 0,
-          },
+          posicion: { x: posX, y: posY, z: zBase, rotation: elementoData.posicion?.rotation || 0 },
 
-          // Propiedades legacy para compatibilidad con Konva
           x: posX,
           y: posY,
           width: width,
           height: height,
 
-          // Propiedades visuales
           color: elementoData.visual?.colorBase || '#3b82f6',
           colorBase: elementoData.visual?.colorBase || '#3b82f6',
           forma: elementoData.visual?.forma || 'rectangular',
           visible: elementoData.visual?.visible !== false,
 
-          // Propiedades funcionales
           pesoMaximo: elementoData.propiedades?.pesoMaximo || 0,
           ubicacion: elementoData.propiedades?.ubicacion || 'suelo',
           descripcion: elementoData.propiedades?.descripcion || '',
 
-          // Jerarquía
           padre: elementoData.jerarquia?.padre || null,
           hijos: elementoData.jerarquia?.hijos || [],
           nivel: elementoData.jerarquia?.nivel || 0,
 
-          // Propiedades personalizadas
           propiedadesPersonalizadas: elementoData.propiedadesPersonalizadas || {},
 
-          // Metadatos
           metadata: {
             fechaCreacion: elementoData.metadatos?.fechaCreacion || new Date().toISOString(),
-            fechaModificacion:
-              elementoData.metadatos?.fechaModificacion || new Date().toISOString(),
+            fechaModificacion: elementoData.metadatos?.fechaModificacion || new Date().toISOString(),
             creador: elementoData.metadatos?.creador || 'usuario',
             descripcion: elementoData.propiedades?.descripcion || '',
             material: 'Estándar',

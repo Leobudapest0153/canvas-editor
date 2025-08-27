@@ -349,7 +349,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore.js'
-import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
+import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX } from '@/utils/constants'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import TagFilter from './TagFilter.vue'
 import CreateTagModal from './CreateTagModal.vue'
@@ -381,7 +381,12 @@ const wallHint = computed(() => {
   const ubic = (el.ubicacion ?? el.metadata?.ubicacion ?? '')
     .toString()
     .toLowerCase()
-  return ubic === 'pared' && !isWallFormValid(el)
+  const bH = Number(
+    canvasStore.plantaActivaData?.dimensiones?.alto ||
+      canvasStore.plantaActivaData?.altura ||
+      0,
+  )
+  return ubic === 'pared' && !isWallFormValid(el, bH, CM_TO_PX)
 })
 
 const canSave = computed(() => !wallHint.value)

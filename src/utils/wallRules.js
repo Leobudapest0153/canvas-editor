@@ -1,28 +1,22 @@
-export const normalizeWall = (el) => {
-  const ubic = (el?.ubicacion ?? el?.metadata?.ubicacion ?? '')
-    .toString()
-    .toLowerCase()
-  const zBase = Number(
-    el?.alturaRespectoAlSuelo ?? el?.alturaRespectoSuelo ?? el?.elevacion?.zBase ?? 0,
-  )
-  const alto = Number(el?.dimensiones?.alto ?? el?.altura ?? 0)
-  return { ubic, zBase, alto }
-}
+import { ensureWallCm, toCmSmart } from '@/utils/units'
 
-export const isWallFormValid = (el) => {
-  const n = normalizeWall(el)
+const normalizeWall = (el, bodegaHcm, CM_TO_PX) =>
+  ensureWallCm(el, { CM_TO_PX, bodegaHcm })
+
+export const isWallFormValid = (el, bodegaH, CM_TO_PX) => {
+  const n = normalizeWall(el, bodegaH, CM_TO_PX)
   return n.ubic === 'pared' ? n.zBase > 0 && n.alto > 0 : true
 }
 
-export const wallZOk = (el, bodegaH, eps = 0.5) => {
-  const n = normalizeWall(el)
+export const wallZOk = (el, bodegaH, CM_TO_PX, eps = 0.5) => {
+  const n = normalizeWall(el, bodegaH, CM_TO_PX)
   if (n.ubic !== 'pared') return true
   return n.zBase + n.alto <= (Number(bodegaH) || 0) + eps
 }
 
-export const wallNoZOverlap = (a, b, eps = 0.5) => {
-  const A = normalizeWall(a)
-  const B = normalizeWall(b)
+export const wallNoZOverlap = (a, b, bodegaH, CM_TO_PX, eps = 0.5) => {
+  const A = normalizeWall(a, bodegaH, CM_TO_PX)
+  const B = normalizeWall(b, bodegaH, CM_TO_PX)
   if (A.ubic !== 'pared' || B.ubic !== 'pared') return true
   const a0 = A.zBase
   const a1 = A.zBase + A.alto
@@ -31,33 +25,45 @@ export const wallNoZOverlap = (a, b, eps = 0.5) => {
   return a1 <= b0 + eps || b1 <= a0 + eps
 }
 
-export const wallVsFloorOk = (el, vecSuelo, eps = 0.5) => {
-  const A = normalizeWall(el)
+export const wallVsFloorOk = (el, vecSuelo, bodegaH, CM_TO_PX, eps = 0.5) => {
+  const A = normalizeWall(el, bodegaH, CM_TO_PX)
   const ubicSuelo = (vecSuelo?.ubicacion ?? vecSuelo?.metadata?.ubicacion ?? '')
     .toString()
     .toLowerCase()
   if (A.ubic !== 'pared' || ubicSuelo !== 'suelo') return true
-  const sueloH = Number(vecSuelo?.dimensiones?.alto ?? 0)
+  const sueloH = toCmSmart(vecSuelo?.dimensiones?.alto ?? 0, {
+    CM_TO_PX,
+    bodegaHcm: bodegaH,
+  })
   return A.zBase >= sueloH + eps
 }
 
-export const validateWallPlacement = ({ el, all, bodegaH }) => {
-  if (!isWallFormValid(el))
+export const validateWallPlacement = ({ el, all, bodegaH, CM_TO_PX }) => {
+  if (!isWallFormValid(el, bodegaH, CM_TO_PX))
     return { ok: false, reason: 'Falta altura respecto al suelo (>0) y alto' }
-  if (!wallZOk(el, bodegaH))
+  if (!wallZOk(el, bodegaH, CM_TO_PX))
     return { ok: false, reason: 'Supera la altura de la bodega' }
   for (const v of all) {
     if (v?.id === el?.id) continue
-    if (!wallNoZOverlap(el, v))
+    if (!wallNoZOverlap(el, v, bodegaH, CM_TO_PX))
       return { ok: false, reason: 'Solape vertical con otra pared' }
-    if (!wallVsFloorOk(el, v))
-      return { ok: false, reason: 'Altura insuficiente sobre elemento de suelo' }
+    if (!wallVsFloorOk(el, v, bodegaH, CM_TO_PX))
+      return {
+        ok: false,
+        reason: 'Altura insuficiente sobre elemento de suelo',
+      }
   }
   return { ok: true }
 }
 
-export const debugWall = (el, bodegaH) => {
-  const n = normalizeWall(el)
-  return { ubic: n.ubic, zBase: n.zBase, alto: n.alto, bodegaH: Number(bodegaH) || 0 }
+export const debugWall = (el, bodegaH, CM_TO_PX) => {
+  const n = normalizeWall(el, bodegaH, CM_TO_PX)
+  return {
+    ubic: n.ubic,
+    zBase: n.zBase,
+    alto: n.alto,
+    bodegaH: Number(bodegaH) || 0,
+    CM_TO_PX,
+  }
 }
 
