@@ -2325,7 +2325,7 @@ const handleTransformEnd = (e, elementId, forma) => {
   }
 }
 
-// Mientras se transforma (resize/rotate) dar feedback visual en tiempo real
+// Mientras se transforma (resize/rotate) dar feedback visual en tiempo real y actualizar propiedades
 const handleTransformMove = (e, elementId, forma) => {
   try {
     const node = e.target
@@ -2354,6 +2354,30 @@ const handleTransformMove = (e, elementId, forma) => {
         shape.getLayer()?.batchDraw?.()
       }
     } catch { /* ignore */ }
+
+    // Actualizar propiedades en tiempo real para reflejar cambios en PropiedadesPanel
+    let newDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
+    if (newDimensiones) {
+      const widthCm = Math.round(width / CM_TO_PX)
+      const heightCm = Math.round(height / CM_TO_PX)
+      if (canvasStore.vistaActiva === 'XY') {
+        newDimensiones.ancho = widthCm
+        newDimensiones.largo = heightCm
+      } else if (canvasStore.vistaActiva === 'XZ') {
+        newDimensiones.ancho = widthCm
+        newDimensiones.alto = heightCm
+        if (newDimensiones.largo === undefined) newDimensiones.largo = elemento.dimensiones?.largo || 60
+      }
+    }
+
+    // Actualizar en el store para reflejar cambios en tiempo real en PropiedadesPanel
+    canvasStore.actualizarElemento(elementId, { 
+      x, 
+      y, 
+      width, 
+      height, 
+      dimensiones: newDimensiones 
+    })
 
   } catch (err) {
     console.warn('Error en handleTransformMove:', err)
