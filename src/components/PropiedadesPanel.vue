@@ -313,6 +313,14 @@
       </div>
       <div class="flex gap-2">
         <button
+          @click="guardarCambios"
+          class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+          :disabled="!canSave"
+          :class="{ 'opacity-50 cursor-not-allowed': !canSave }"
+        >
+          Guardar
+        </button>
+        <button
           @click="resetearPropiedades"
           class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
         >
@@ -325,6 +333,9 @@
           Deseleccionar
         </button>
       </div>
+      <p v-if="wallHint" class="text-xs text-red-500 mt-2">
+        Falta altura respecto al suelo (>0) y alto
+      </p>
     </div>
   </div>
   <CreateTagModal
@@ -342,6 +353,7 @@ import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import TagFilter from './TagFilter.vue'
 import CreateTagModal from './CreateTagModal.vue'
+import { isWallFormValid } from '@/utils/wallRules'
 
 // Store
 const canvasStore = useCanvasStore()
@@ -362,6 +374,17 @@ const isLockedSelected = computed(() => {
   const el = elementoSeleccionado.value
   return !!(el && (el.bloqueado === true || el.locked === true))
 })
+
+const wallHint = computed(() => {
+  const el = elementoSeleccionado.value
+  if (!el) return false
+  const ubic = (el.ubicacion ?? el.metadata?.ubicacion ?? '')
+    .toString()
+    .toLowerCase()
+  return ubic === 'pared' && !isWallFormValid(el)
+})
+
+const canSave = computed(() => !wallHint.value)
 
 // Watchers
 watch(
@@ -419,6 +442,15 @@ const resetearPropiedades = () => {
 
 const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
+}
+
+const guardarCambios = () => {
+  if (!elementoSeleccionado.value) return
+  canvasStore.saveToHistory(
+    `Propiedades guardadas: ${
+      elementoSeleccionado.value.nombre || elementoSeleccionado.value.id
+    }`,
+  )
 }
 
 const onDeleteClick = () => {
