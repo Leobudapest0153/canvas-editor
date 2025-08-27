@@ -17,6 +17,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { CM_TO_PX } from '@/utils/constants'
+import { validateWallPlacement, isWallFormValid, debugWall } from '@/utils/wallRules'
+import { ensureWallCm } from '@/utils/units'
 
 // Variable para evitar circular import - será inicializada por el composable de historial
 let historyComposable = null
@@ -572,6 +574,18 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   // Actions
+  const fixWallUnits = (obj, bH) => {
+    const { ubic, zBase, alto } = ensureWallCm(obj, {
+      CM_TO_PX,
+      bodegaHcm: bH,
+    })
+    if (ubic !== 'pared') return
+    obj.alturaRespectoAlSuelo = zBase
+    obj.alturaRespectoSuelo = zBase
+    obj.elevacion = { ...(obj.elevacion || {}), zBase }
+    obj.dimensiones = { ...(obj.dimensiones || {}), alto }
+    obj.altura = alto
+  }
   const seleccionarElemento = (id) => {
     elementoSeleccionado.value = id
   }
@@ -579,14 +593,91 @@ export const useCanvasStore = defineStore('canvas', () => {
   const actualizarPosicion = (id, x, y) => {
     const elemento = elementos.value.find((el) => el.id === id)
     if (elemento) {
+      const ubic = (elemento.ubicacion ?? elemento.metadata?.ubicacion ?? '')
+        .toString()
+        .toLowerCase()
+      if (ubic === 'pared') {
+        const bH =
+          Number(
+            plantaActivaData.value?.dimensiones?.alto ??
+              plantaActivaData.value?.altura ??
+              0,
+          )
+        fixWallUnits(elemento, bH)
+        const all = elementos.value.filter((el) => el.plantaId === elemento.plantaId)
+        const el = { ...elemento, x, y }
+        if (!isWallFormValid(el, bH, CM_TO_PX)) {
+          window.__toasts?.show?.('Falta altura respecto al suelo (>0) y alto', {
+            type: 'warn',
+          }) ??
+            console.warn(
+              '[WALL_RULES]',
+              'Falta altura respecto al suelo (>0) y alto',
+              debugWall(el, bH, CM_TO_PX),
+            )
+          return false
+        }
+        if (import.meta.env.DEV)
+          console.debug('[WALL_RULES:CM]', debugWall(el, bH, CM_TO_PX))
+        const res = validateWallPlacement({ el, all, bodegaH: bH, CM_TO_PX })
+        if (!res.ok) {
+          window.__toasts?.show?.(res.reason, { type: 'warn' }) ??
+            console.warn('[WALL_RULES]', res.reason, debugWall(el, bH, CM_TO_PX))
+          return false
+        }
+      }
       elemento.x = x
       elemento.y = y
+      return true
     }
+    return false
   }
 
   const actualizarElemento = (elementoId, propiedades) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (elemento) {
+      const candidato = {
+        ...elemento,
+        ...propiedades,
+        dimensiones: { ...elemento.dimensiones, ...propiedades.dimensiones },
+      }
+      const ubic = (candidato.ubicacion ?? candidato.metadata?.ubicacion ?? '')
+        .toString()
+        .toLowerCase()
+      if (ubic === 'pared') {
+        const bH =
+          Number(
+            plantaActivaData.value?.dimensiones?.alto ??
+              plantaActivaData.value?.altura ??
+              0,
+          )
+        fixWallUnits(candidato, bH)
+        const all = elementos.value.filter((el) => el.plantaId === candidato.plantaId)
+        if (!isWallFormValid(candidato, bH, CM_TO_PX)) {
+          window.__toasts?.show?.('Falta altura respecto al suelo (>0) y alto', {
+            type: 'warn',
+          }) ??
+            console.warn(
+              '[WALL_RULES]',
+              'Falta altura respecto al suelo (>0) y alto',
+              debugWall(candidato, bH, CM_TO_PX),
+            )
+          return false
+        }
+        if (import.meta.env.DEV)
+          console.debug('[WALL_RULES:CM]', debugWall(candidato, bH, CM_TO_PX))
+        const res = validateWallPlacement({
+          el: candidato,
+          all,
+          bodegaH: bH,
+          CM_TO_PX,
+        })
+        if (!res.ok) {
+          window.__toasts?.show?.(res.reason, { type: 'warn' }) ??
+            console.warn('[WALL_RULES]', res.reason, debugWall(candidato, bH, CM_TO_PX))
+          return false
+        }
+      }
       for (const key in propiedades) {
         if (typeof propiedades[key] === 'object' && propiedades[key] !== null && !Array.isArray(propiedades[key])) {
           // Si la propiedad es un objeto (como 'dimensiones'), la fusionamos recursivamente.
@@ -620,7 +711,9 @@ export const useCanvasStore = defineStore('canvas', () => {
           // Nota: largo no afecta a width/height en vista XZ
         }
       }
+      return true
     }
+    return false
   }
 
   const configurarZoom = (nuevoZoom) => {
@@ -738,6 +831,46 @@ export const useCanvasStore = defineStore('canvas', () => {
     ) {
       console.error('En contenedores solo se pueden agregar elementos u otros contenedores')
       return null
+    }
+
+    const ubic = (nuevoElemento.ubicacion ?? nuevoElemento.metadata?.ubicacion ?? '')
+      .toString()
+      .toLowerCase()
+    if (ubic === 'pared') {
+      const bH =
+        Number(
+          plantaActivaData.value?.dimensiones?.alto ??
+            plantaActivaData.value?.altura ??
+            0,
+        )
+      fixWallUnits(nuevoElemento, bH)
+      if (!isWallFormValid(nuevoElemento, bH, CM_TO_PX)) {
+        window.__toasts?.show?.('Falta altura respecto al suelo (>0) y alto', {
+          type: 'warn',
+        }) ??
+          console.warn(
+            '[WALL_RULES]',
+            'Falta altura respecto al suelo (>0) y alto',
+            debugWall(nuevoElemento, bH, CM_TO_PX),
+          )
+        return false
+      }
+      const all = elementos.value.filter(
+        (el) => el.plantaId === contextoNavegacion.value.id,
+      )
+      if (import.meta.env.DEV)
+        console.debug('[WALL_RULES:CM]', debugWall(nuevoElemento, bH, CM_TO_PX))
+      const res = validateWallPlacement({
+        el: nuevoElemento,
+        all,
+        bodegaH: bH,
+        CM_TO_PX,
+      })
+      if (!res.ok) {
+        window.__toasts?.show?.(res.reason, { type: 'warn' }) ??
+          console.warn('[WALL_RULES]', res.reason, debugWall(nuevoElemento, bH, CM_TO_PX))
+        return false
+      }
     }
 
     // Si estamos dentro de un elemento o contenedor, el nuevo elemento es hijo
@@ -883,20 +1016,23 @@ export const useCanvasStore = defineStore('canvas', () => {
    * Versiones con historial de las acciones principales
    */
   const actualizarElementoConHistorial = (elementoId, propiedades, description) => {
-    actualizarElemento(elementoId, propiedades)
+    const ok = actualizarElemento(elementoId, propiedades)
+    if (!ok) return false
 
     const descripcionAuto =
       description || `Propiedades actualizadas: ${Object.keys(propiedades).join(', ')}`
     saveToHistory(descripcionAuto)
+    return true
   }
 
   const actualizarPosicionConHistorial = (elementoId, x, y, description) => {
-    actualizarPosicion(elementoId, x, y)
+    const ok = actualizarPosicion(elementoId, x, y)
 
     // Solo guardar en historial al finalizar el arrastre, no en cada movimiento
-    if (description) {
+    if (ok && description) {
       saveToHistory(description)
     }
+    return ok
   }
 
   const seleccionarPlantaConHistorial = (plantaId) => {

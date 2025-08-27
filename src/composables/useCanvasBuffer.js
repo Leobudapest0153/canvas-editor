@@ -13,6 +13,9 @@
 
 import { ref, computed } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
+import { validateWallPlacement, isWallFormValid, debugWall } from '@/utils/wallRules'
+import { CM_TO_PX } from '@/utils/constants'
+import { ensureWallCm } from '@/utils/units'
 
 // Estado global del buffer (singleton)
 const bufferItems = ref([])
@@ -231,8 +234,55 @@ export const useCanvasBuffer = () => {
       }
     }
 
+    const ubic = (newElement.ubicacion ?? newElement.metadata?.ubicacion ?? '')
+      .toString()
+      .toLowerCase()
+    if (ubic === 'pared') {
+      const bH =
+        Number(
+          canvasStore.plantaActivaData?.dimensiones?.alto ??
+            canvasStore.plantaActivaData?.altura ??
+            0,
+        )
+      const { zBase, alto } = ensureWallCm(newElement, {
+        CM_TO_PX,
+        bodegaHcm: bH,
+      })
+      newElement.alturaRespectoAlSuelo = zBase
+      newElement.alturaRespectoSuelo = zBase
+      newElement.elevacion = { ...(newElement.elevacion || {}), zBase }
+      newElement.dimensiones = { ...(newElement.dimensiones || {}), alto }
+      newElement.altura = alto
+      if (!isWallFormValid(newElement, bH, CM_TO_PX)) {
+        window.__toasts?.show?.('Falta altura respecto al suelo (>0) y alto', {
+          type: 'warn',
+        }) ??
+          console.warn(
+            '[WALL_RULES]',
+            'Falta altura respecto al suelo (>0) y alto',
+            debugWall(newElement, bH, CM_TO_PX),
+          )
+        return false
+      }
+      const all = canvasStore.elementosEnPlanta(canvasStore.plantaActiva)
+      if (import.meta.env.DEV)
+        console.debug('[WALL_RULES:CM]', debugWall(newElement, bH, CM_TO_PX))
+      const res = validateWallPlacement({
+        el: newElement,
+        all,
+        bodegaH: bH,
+        CM_TO_PX,
+      })
+      if (!res.ok) {
+        window.__toasts?.show?.(`${res.reason}`, { type: 'warn' }) ??
+          console.warn('[WALL_RULES]', res.reason, debugWall(newElement, bH, CM_TO_PX))
+        return false
+      }
+    }
+
     // Agregar al canvas
-    canvasStore.agregarElemento(newElement)
+    const newId = canvasStore.agregarElemento(newElement)
+    if (!newId) return false
     console.log('📋 Elemento pegado desde buffer:', newElement.nombre)
 
     // Si era un elemento movido (no copiado), remover del buffer
@@ -240,7 +290,7 @@ export const useCanvasBuffer = () => {
       removeFromBuffer(bufferItemId)
     }
 
-    return newElement.id
+    return newId
   }
 
   /**
