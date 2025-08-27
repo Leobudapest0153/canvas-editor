@@ -754,7 +754,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         alturaBodega
       })
       if (!valido) {
-        console.error(mensaje)
+        showToast(mensaje, 'error')
         return null
       }
     }
