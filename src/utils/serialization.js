@@ -2,18 +2,20 @@
  * serialization.js
  *
  * Utilidades para serialización y deserialización del estado del editor.
- *
- * Responsabilidades:
- * - Serializar estado completo del canvas a formato JSON
- * - Deserializar y restaurar estado desde JSON
- * - Manejar versionado de formatos de guardado
- * - Validar integridad de datos al cargar
- * - Comprimir/descomprimir datos para optimizar almacenamiento
- * - Exportar/importar en diferentes formatos
- * - Manejar referencias y jerarquías complejas
- * - Migración entre versiones de formato
- * - Backup automático y recuperación de errores
  */
+
+import { CM_TO_PX } from './constants'
+import { ensureWallCm } from './units'
+
+const fixWallUnits = (el, bodegaHcm) => {
+  const { ubic, zBase, alto } = ensureWallCm(el, { CM_TO_PX, bodegaHcm })
+  if (ubic !== 'pared') return
+  el.alturaRespectoAlSuelo = zBase
+  el.alturaRespectoSuelo = zBase
+  el.elevacion = { ...(el.elevacion || {}), zBase }
+  el.dimensiones = { ...(el.dimensiones || {}), alto }
+  el.altura = alto
+}
 
 /**
  * Serializa el estado completo del canvas a JSON
@@ -21,12 +23,14 @@
  * @returns {string} JSON serializado del estado
  */
 export function serializeCanvas(canvasState) {
-  // TODO: Implementar serialización del canvas
-  // - Convertir estado a formato JSON
-  // - Manejar referencias circulares
-  // - Incluir metadatos (versión, timestamp)
-  // - Validar integridad antes de serializar
-
+  const plantasHeights = {}
+  canvasState?.plantas?.forEach((p) => {
+    plantasHeights[p.id] = Number(p?.dimensiones?.alto ?? p?.altura ?? 0)
+  })
+  canvasState?.elementos?.forEach((el) => {
+    const bH = plantasHeights[el.plantaId]
+    fixWallUnits(el, bH)
+  })
   return JSON.stringify({
     version: '1.0.0',
     timestamp: new Date().toISOString(),
@@ -40,14 +44,16 @@ export function serializeCanvas(canvasState) {
  * @returns {Object} Estado deserializado del canvas
  */
 export function deserializeCanvas(jsonData) {
-  // TODO: Implementar deserialización del canvas
-  // - Parsear JSON y validar formato
-  // - Verificar versión y migrar si es necesario
-  // - Restaurar referencias y jerarquías
-  // - Validar integridad de elementos
-
   try {
     const parsed = JSON.parse(jsonData)
+    const plantasHeights = {}
+    parsed.data?.plantas?.forEach((p) => {
+      plantasHeights[p.id] = Number(p?.dimensiones?.alto ?? p?.altura ?? 0)
+    })
+    parsed.data?.elementos?.forEach((el) => {
+      const bH = plantasHeights[el.plantaId]
+      fixWallUnits(el, bH)
+    })
     return parsed.data
   } catch (error) {
     console.error('Error deserializando canvas:', error)
