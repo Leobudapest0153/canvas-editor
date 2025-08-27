@@ -1,7 +1,13 @@
-import { validateWallZBaseRequired, validateHeightWithinWarehouse, validateZStacking } from '@/validation/placementOrchestrator'
+import {
+  validateWallZBaseRequired,
+  validateHeightWithinWarehouse,
+  validateZStacking,
+  resolveZStackClamp,
+} from '@/validation/placementOrchestrator'
 import { useToast } from '@/composables/useToast'
 import { errorsPlacement } from '@/utils/errorsPlacement'
 import { getActiveBounds } from '@/utils/activeBounds'
+import { finalizeRectClampSnapReclamp } from '@/utils/edgeConstraint'
 
 function hydrateCandidate(element, partial) {
   const ubicacion = partial.ubicacion ?? element.ubicacion
@@ -34,6 +40,49 @@ function hydrateCandidate(element, partial) {
 export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
   void CM_TO_PX
   const toast = useToast()
+
+  const clampAbs = (absPos, elementId) => {
+    const base = store.elementos.find((e) => e.id === elementId)
+    if (!base) return absPos
+
+    const { boundsPx } = getActiveBounds(store)
+    const areaBounds = { minX: 0, minY: 0, maxX: boundsPx.width, maxY: boundsPx.height }
+
+    let x = Math.max(areaBounds.minX, Math.min(absPos.x, areaBounds.maxX - base.width))
+    let y = Math.max(areaBounds.minY, Math.min(absPos.y, areaBounds.maxY - base.height))
+
+    let cand = { ...base, x, y }
+
+    const neighbors = store.elementosVisibles.filter((n) => {
+      if (n.id === base.id) return false
+      if (n.plantaId && base.plantaId && n.plantaId !== base.plantaId) return false
+      return !(
+        x + base.width <= n.x ||
+        n.x + n.width <= x ||
+        y + base.height <= n.y ||
+        n.y + n.height <= y
+      )
+    })
+
+    const res = resolveZStackClamp(cand, neighbors, areaBounds)
+    if (res.collided && res.corrected) {
+      x = res.corrected.x
+      y = res.corrected.y
+      cand = { ...cand, x, y }
+    }
+
+    const grid = store.gridSize || 50
+    const snapped = finalizeRectClampSnapReclamp(x, y, cand.width, cand.height, areaBounds, grid)
+    if (snapped.x !== x || snapped.y !== y) {
+      const res2 = resolveZStackClamp({ ...cand, x: snapped.x, y: snapped.y }, neighbors, areaBounds)
+      if (!res2.collided) {
+        x = snapped.x
+        y = snapped.y
+      }
+    }
+
+    return { x, y }
+  }
 
   const runPipeline = (candidate, start) => {
     const base = store.elementos.find((e) => e.id === candidate.id) || candidate
@@ -105,7 +154,16 @@ export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
   const onDragEndGuard = (el) => handleEnd(el)
   const onTransformEndGuard = (el) => handleEnd(el)
 
-  return { onDragMoveGuard, onDragEndGuard, onTransformEndGuard }
+  const installDragBounds = (node, elementId) => {
+    node.dragBoundFunc((absPos) => clampAbs(absPos, elementId))
+    const cleanup = () => {
+      node.dragBoundFunc(null)
+      node.off('dragend', cleanup)
+    }
+    node.on('dragend', cleanup)
+  }
+
+  return { onDragMoveGuard, onDragEndGuard, onTransformEndGuard, installDragBounds }
 }
 
 export default usePlacementGuards

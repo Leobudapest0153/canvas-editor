@@ -8,6 +8,36 @@ import usePlacementGuards from '@/composables/usePlacementGuards'
 import { CM_TO_PX } from '@/utils/constants'
 import { errorsPlacement } from '@/utils/errorsPlacement'
 
+class DummyNode {
+  constructor({ x = 0, y = 0, width = 0, height = 0 } = {}) {
+    this._pos = { x, y }
+    this.width = width
+    this.height = height
+    this._dbf = (p) => p
+    this._events = {}
+  }
+  dragBoundFunc(f) {
+    if (typeof f === 'function') this._dbf = f
+    return this._dbf
+  }
+  absolutePosition(p) {
+    if (p) this._pos = { x: p.x, y: p.y }
+    return { ...this._pos }
+  }
+  getAbsolutePosition() {
+    return { ...this._pos }
+  }
+  on(evt, handler) {
+    this._events[evt] = handler
+  }
+  off(evt) {
+    delete this._events[evt]
+  }
+  fire(evt) {
+    if (this._events[evt]) this._events[evt]()
+  }
+}
+
 describe('placement guards integration', () => {
   it('drag de elemento Suelo no dispara ZBASE_REQUIRED', () => {
     setActivePinia(createPinia())
@@ -430,6 +460,59 @@ describe('placement guards integration', () => {
 
     store.elementos[1].x = moveRes.corrected.x
     const endRes = guards.onDragEndGuard({ ...store.elementos[1], start: { x: 40, y: 0 } })
+    if (endRes.valid) store.saveToHistory('drag wall')
+    expect(endRes.valid).toBe(true)
+    expect(showError).not.toHaveBeenCalled()
+    expect(spySave).toHaveBeenCalledTimes(1)
+  })
+
+  it('dragBoundFunc impide ingresar al vecino y drop válido no dispara toast', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.elementos.push(
+      {
+        id: 'floor',
+        plantaId: 'planta_1',
+        tipo: 'elementos',
+        ubicacion: 'Suelo',
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 20,
+        alto: 100,
+        elevacion: { zBase: 0, altura: 100 },
+      },
+      {
+        id: 'wall',
+        plantaId: 'planta_1',
+        tipo: 'elementos',
+        ubicacion: 'Pared',
+        x: 40,
+        y: 5,
+        width: 10,
+        height: 10,
+        alto: 100,
+        elevacion: { zBase: 50, altura: 100 },
+      },
+    )
+    const guards = usePlacementGuards({ store, alturaBodega: 500, CM_TO_PX })
+    const node = new DummyNode({ x: 40, y: 5, width: 10, height: 10 })
+    guards.installDragBounds(node, 'wall')
+
+    let next = node.dragBoundFunc()({ x: 10, y: 5 })
+    node.absolutePosition(next)
+    expect(node.getAbsolutePosition().x).toBe(20)
+    next = node.dragBoundFunc()({ x: 10, y: 5 })
+    node.absolutePosition(next)
+    expect(node.getAbsolutePosition().x).toBe(20)
+
+    node.fire('dragend')
+    store.elementos[1].x = node.getAbsolutePosition().x
+    store.elementos[1].y = node.getAbsolutePosition().y
+
+    const spySave = vi.spyOn(store, 'saveToHistory')
+    showError.mockClear()
+    const endRes = guards.onDragEndGuard({ ...store.elementos[1], start: { x: 40, y: 5 } })
     if (endRes.valid) store.saveToHistory('drag wall')
     expect(endRes.valid).toBe(true)
     expect(showError).not.toHaveBeenCalled()

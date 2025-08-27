@@ -191,7 +191,6 @@
               shadowColor: getElementShadow(elemento).color,
               shadowBlur: getElementShadow(elemento).blur / canvasStore.zoom,
               shadowOpacity: getElementShadow(elemento).opacity,
-              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
@@ -261,7 +260,6 @@
               shadowColor: getElementShadow(elemento).color,
               shadowBlur: getElementShadow(elemento).blur / canvasStore.zoom,
               shadowOpacity: getElementShadow(elemento).opacity,
-              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'circle'),
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
@@ -294,7 +292,6 @@
               shadowColor: 'black',
               shadowBlur: 4,
               shadowOpacity: 0.3,
-              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
@@ -611,7 +608,7 @@ const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
 
-const { onDragMoveGuard, onDragEndGuard, onTransformEndGuard } = usePlacementGuards({
+const { onDragMoveGuard, onDragEndGuard, onTransformEndGuard, installDragBounds } = usePlacementGuards({
   store: canvasStore,
   alturaBodega: canvasStore.plantaActivaData.value?.dimensiones?.alto || Infinity,
   CM_TO_PX,
@@ -956,53 +953,6 @@ const lastVelocityMap = ref(new Map())
 const getStrokeColor = (elementId) => {
   if (atEdgeMap.value.get(elementId)) return '#f59e0b' // advertencia en borde
   return canvasStore.elementoSeleccionado === elementId ? '#000' : '#666'
-}
-
-// Convierte posición stage->layer considerando zoom/pan
-
-const toLayerCoords = (pos) => {
-  const stage = stageRef.value.getNode()
-  const scale = stage.scaleX() || 1
-  const x = (pos.x - stage.x()) / scale
-  const y = (pos.y - stage.y()) / scale
-  return { x, y }
-}
-
-// Convierte posición layer->stage considerando zoom/pan
-
-const toStageCoords = (pos) => {
-  const stage = stageRef.value.getNode()
-  const scale = stage.scaleX() || 1
-  return { x: pos.x * scale + stage.x(), y: pos.y * scale + stage.y() }
-}
-
-// Drag bound para cada elemento y forma (clamp mínimo al contorno)
-const dragBoundForElement = (pos, elemento, forma = 'rect') => {
-  try {
-    const layerW = layerConfig.value.width
-    const layerH = layerConfig.value.height
-    const lp = toLayerCoords(pos)
-    const boundary = computeBoundary()
-    if (forma === 'circular' || forma === 'circle') {
-      const r = Math.min(elemento.width, elemento.height) / 2
-      const cx = Math.max(r, Math.min(lp.x, layerW - r))
-      const cy = Math.max(r, Math.min(lp.y, layerH - r))
-      return toStageCoords({ x: cx, y: cy })
-    } else {
-      if (boundary.type === 'polygon') {
-        const c = clampRectToPolygon(
-          { x: lp.x, y: lp.y, width: elemento.width, height: elemento.height },
-          boundary.inset,
-        )
-        return toStageCoords(c)
-      } else {
-        const c = clampRectToRect(lp.x, lp.y, elemento.width, elemento.height, layerW, layerH)
-        return toStageCoords(c)
-      }
-    }
-  } catch {
-    return pos
-  }
 }
 
 // RAF + Perf mode state per element
@@ -1832,15 +1782,13 @@ const onShapeDragStart = (e, el) => {
     isElementDragging.value = true
     stageDragEnabled.value = false
   } else {
+    installDragBounds(e.target, el.id)
     startElementDrag(el.id)
   }
 }
 
 const onShapeDragMove = (e, el) => {
-  const guardRes = onDragMoveGuard(el)
-  if (!guardRes.valid && guardRes.corrected) {
-    e.target.position(guardRes.corrected)
-  }
+  onDragMoveGuard(el)
   const data = innerSessions.get(el.id)
   if (data) {
     const { session, parent } = data
