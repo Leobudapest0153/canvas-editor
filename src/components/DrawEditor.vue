@@ -108,12 +108,12 @@ const { polygon, elements, worldWidth, worldHeight, adding, deleting } = toRefs(
 const PIXELS_PER_CM = 10
 const canvasW = ref(1400)
 const canvasH = ref(460)
-
 let resizeObserver = null;
 
 const selectedIdx = ref(-1)
 const dragging = ref(false)
 const guidePos = reactive({ x: 0, y: 0 })
+const polygonBeforeDrag = ref(null);
 
 const worldViewRect = computed(() => {
   const stage = stageRef.value?.getNode?.()
@@ -237,6 +237,8 @@ const segments = computed(() => {
   return segs
 })
 
+// --- FUNCIONES DE VALIDACIÓN (SIMPLIFICADAS Y CORREGIDAS) ---
+
 function isPointInPolygon(point, vs) {
   const x = point.x, y = point.y;
   let inside = false;
@@ -249,6 +251,51 @@ function isPointInPolygon(point, vs) {
   return inside;
 }
 
+function isPointInsideElements(point, elements) {
+  for (const el of elements) {
+    if (
+      point.x >= el.x &&
+      point.x <= el.x + el.width &&
+      point.y >= el.y &&
+      point.y <= el.y + el.height
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// --- FUNCIÓN DE VALIDACIÓN DE BORDES REEMPLAZADA ---
+// Revisa si algún borde del polígono cruza por DENTRO de un elemento.
+function isEdgeCrossingElement(polygon, elements) {
+  if (!elements || elements.length === 0) {
+    return { valid: true, message: '' };
+  }
+
+  for (let i = 0; i < polygon.length; i++) {
+    const p1 = polygon[i];
+    const p2 = polygon[(i + 1) % polygon.length];
+
+    const testPoints = [
+      { x: p1.x * 0.75 + p2.x * 0.25, y: p1.y * 0.75 + p2.y * 0.25 },
+      { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 },
+      { x: p1.x * 0.25 + p2.x * 0.75, y: p1.y * 0.25 + p2.y * 0.75 },
+    ];
+
+    for (const point of testPoints) {
+      // CAMBIO CLAVE: Usa la nueva función "Strictly" aquí
+      if (isPointStrictlyInsideElements(point, elements)) {
+        return {
+          valid: false,
+          message: 'El borde del área no puede cruzar un elemento.'
+        };
+      }
+    }
+  }
+  return { valid: true, message: '' };
+}
+
+
 function isPolygonValid(newPolygon, fixedElements) {
   if (!fixedElements || fixedElements.length === 0) {
     return { valid: true, message: '' };
@@ -257,27 +304,22 @@ function isPolygonValid(newPolygon, fixedElements) {
   const excludedElements = new Set();
 
   for (const el of fixedElements) {
-    const corners = [
-      { x: el.x, y: el.y },
-      { x: el.x + el.width, y: el.y },
-      { x: el.x + el.width, y: el.y + el.height },
-      { x: el.x, y: el.y + el.height },
-    ];
+    // 1. Calcular el punto central del elemento.
+    const centerPoint = {
+      x: el.x + el.width / 2,
+      y: el.y + el.height / 2,
+    };
 
-    for (const corner of corners) {
-      if (!isPointInPolygon(corner, newPolygon)) {
-        excludedElements.add(el.nombre || el.id);
-        break; // Si una esquina está fuera, todo el elemento lo está. Pasamos al siguiente.
-      }
+    // 2. Comprobar si el punto central está dentro del polígono.
+    // Este método es mucho más fiable para formas cóncavas que comprobar las 4 esquinas.
+    if (!isPointInPolygon(centerPoint, newPolygon)) {
+      excludedElements.add(el.nombre || el.id);
     }
   }
 
   if (excludedElements.size > 0) {
     const elementNames = Array.from(excludedElements).join(', ');
-    const messagePrefix = excludedElements.size === 1
-      ? `La modificación dejaría fuera al elemento: ${elementNames}.`
-      : `La modificación dejaría fuera a los elementos: ${elementNames}.`;
-    const message = `${messagePrefix} Por favor, ajusta el área para incluirlos.`;
+    const message = `La modificación dejaría fuera a ${excludedElements.size === 1 ? 'el elemento' : 'los elementos'}: ${elementNames}.`;
     return { valid: false, message };
   }
 
@@ -286,39 +328,76 @@ function isPolygonValid(newPolygon, fixedElements) {
 
 defineExpose({ fitStageToPolygon, isPolygonValid });
 
+// --- FUNCIONES DE SNAPPING ---
+
+function getSnappedPoint(point, elements, threshold) {
+  let snappedX = point.x; let snappedY = point.y;
+  let xSnapped = false; let ySnapped = false;
+  for (const el of elements) {
+    const left = el.x, right = el.x + el.width, top = el.y, bottom = el.y + el.height;
+    if (!xSnapped && Math.abs(point.x - left) < threshold) { snappedX = left; xSnapped = true; }
+    if (!xSnapped && Math.abs(point.x - right) < threshold) { snappedX = right; xSnapped = true; }
+    if (!ySnapped && Math.abs(point.y - top) < threshold) { snappedY = top; ySnapped = true; }
+    if (!ySnapped && Math.abs(point.y - bottom) < threshold) { snappedY = bottom; ySnapped = true; }
+    if (xSnapped && ySnapped) break;
+  }
+  return { x: snappedX, y: snappedY };
+}
+
+function getSnappedToBoundaryPoint(point, w, h, threshold) {
+  let snappedX = point.x; let snappedY = point.y;
+  if (Math.abs(point.x - 0) < threshold) { snappedX = 0; }
+  else if (Math.abs(point.x - w) < threshold) { snappedX = w; }
+  if (Math.abs(point.y - 0) < threshold) { snappedY = 0; }
+  else if (Math.abs(point.y - h) < threshold) { snappedY = h; }
+  return { x: snappedX, y: snappedY };
+}
+
+// --- FUNCIONES DE EVENTOS AJUSTADAS ---
+
 function onPointDrag(idx, e) {
   document.body.style.cursor = 'grabbing';
   dragging.value = true
   selectedIdx.value = idx
   const p = { x: e.target.x(), y: e.target.y() }
+  const snapThreshold = 10 / stageScale.value;
+  const snappedPoint = getSnappedPoint(p, elements.value, snapThreshold);
+  const clampedX = Math.max(0, Math.min(snappedPoint.x, worldWidth.value));
+  const clampedY = Math.max(0, Math.min(snappedPoint.y, worldHeight.value));
+  const newPoint = { x: Math.round(clampedX), y: Math.round(clampedY) };
 
-  const clampedX = Math.max(0, Math.min(p.x, worldWidth.value))
-  const clampedY = Math.max(0, Math.min(p.y, worldHeight.value))
-
-  const newPolygon = [...polygon.value];
-  newPolygon[idx] = { x: Math.round(clampedX), y: Math.round(clampedY) };
-
-  const validation = isPolygonValid(newPolygon, elements.value);
-
-  if (validation.valid) {
-    emit('update:polygon', newPolygon);
-    e.target.x(clampedX);
-    e.target.y(clampedY);
-  } else {
+  if (isPointInsideElements(newPoint, elements.value)) {
+    emit('notice', 'No se puede colocar un vértice sobre un elemento.');
     const lastValidPoint = polygon.value[idx];
-    e.target.x(lastValidPoint.x);
-    e.target.y(lastValidPoint.y);
+    e.target.x(lastValidPoint.x); e.target.y(lastValidPoint.y);
+    return;
   }
-
-  guidePos.x = Math.round(e.target.x())
-  guidePos.y = Math.round(e.target.y())
+  const newPolygon = [...polygon.value];
+  newPolygon[idx] = newPoint;
+  emit('update:polygon', newPolygon);
+  e.target.x(clampedX); e.target.y(clampedY);
+  guidePos.x = Math.round(e.target.x()); guidePos.y = Math.round(e.target.y());
 }
 
-function onPointDragEnd(idx, e) {
-  onPointDrag(idx, e)
+function onPointDragEnd() {
   dragging.value = false
   emit('notice', '');
   document.body.style.cursor = 'grab';
+
+  const edgeValidation = isEdgeCrossingElement(polygon.value, elements.value);
+  if (!edgeValidation.valid) {
+    emit('notice', edgeValidation.message);
+    if (polygonBeforeDrag.value) emit('update:polygon', polygonBeforeDrag.value);
+    polygonBeforeDrag.value = null;
+    return;
+  }
+
+  const inclusionValidation = isPolygonValid(polygon.value, elements.value);
+  if (!inclusionValidation.valid) {
+    emit('notice', inclusionValidation.message);
+    if (polygonBeforeDrag.value) emit('update:polygon', polygonBeforeDrag.value);
+  }
+  polygonBeforeDrag.value = null;
 }
 
 function stageToLocal(pos){
@@ -329,26 +408,20 @@ function stageToLocal(pos){
 }
 
 function findClosestSegmentIndex(point) {
-  let minDistance = Infinity
-  let insertIndex = -1
+  let minDistance = Infinity; let insertIndex = -1;
   const pts = polygon.value
   if (!pts || pts.length < 2) return 1
-
   for (let i = 0; i < pts.length; i++) {
-    const p1 = pts[i]
-    const p2 = pts[(i + 1) % pts.length]
-    const dx = p2.x - p1.x; const dy = p2.y - p1.y
+    const p1 = pts[i], p2 = pts[(i + 1) % pts.length];
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
     if (dx === 0 && dy === 0) continue
     const t = ((point.x - p1.x) * dx + (point.y - p1.y) * dy) / (dx * dx + dy * dy)
-    let closestX, closestY
+    let closestX, closestY;
     if (t < 0) { closestX = p1.x; closestY = p1.y }
     else if (t > 1) { closestX = p2.x; closestY = p2.y }
     else { closestX = p1.x + t * dx; closestY = p1.y + t * dy }
     const distance = Math.sqrt(Math.pow(point.x - closestX, 2) + Math.pow(point.y - closestY, 2))
-    if (distance < minDistance) {
-      minDistance = distance
-      insertIndex = i + 1
-    }
+    if (distance < minDistance) { minDistance = distance; insertIndex = i + 1; }
   }
   return insertIndex
 }
@@ -361,9 +434,28 @@ function onCanvasClick(e){
   const p = stageToLocal(pointer)
 
   if (adding.value){
-    const insertIndex = findClosestSegmentIndex(p)
+    const boundarySnapThreshold = 15 / stageScale.value;
+    const boundarySnappedPoint = getSnappedToBoundaryPoint(p, worldWidth.value, worldHeight.value, boundarySnapThreshold);
+    const clampedPoint = {
+      x: Math.max(0, Math.min(boundarySnappedPoint.x, worldWidth.value)),
+      y: Math.max(0, Math.min(boundarySnappedPoint.y, worldHeight.value))
+    };
+
+    if (isPointInsideElements(clampedPoint, elements.value)) {
+      emit('notice', 'No se puede añadir un vértice sobre un elemento.');
+      return;
+    }
+
+    const insertIndex = findClosestSegmentIndex(clampedPoint)
     const newPolygon = [...polygon.value];
-    newPolygon.splice(insertIndex, 0, { x: Math.round(p.x), y: Math.round(p.y) });
+    newPolygon.splice(insertIndex, 0, { x: Math.round(clampedPoint.x), y: Math.round(clampedPoint.y) });
+
+    const edgeValidation = isEdgeCrossingElement(newPolygon, elements.value);
+    if (!edgeValidation.valid) {
+      emit('notice', edgeValidation.message);
+      return;
+    }
+
     emit('update:polygon', newPolygon);
     selectedIdx.value = insertIndex
   } else {
@@ -375,6 +467,8 @@ function onVertexMouseDown(evt) {
   emit('notice', '');
   if (deleting.value) {
     evt.evt.stopPropagation();
+  } else {
+    polygonBeforeDrag.value = JSON.parse(JSON.stringify(polygon.value));
   }
 }
 
@@ -389,6 +483,13 @@ function onVertexClick(idx, evt) {
     }
     const newPolygon = [...polygon.value];
     newPolygon.splice(idx, 1);
+
+    const edgeValidation = isEdgeCrossingElement(newPolygon, elements.value);
+    if (!edgeValidation.valid) {
+      emit('notice', edgeValidation.message);
+      return;
+    }
+
     emit('update:polygon', newPolygon);
     selectedIdx.value = -1
   } else {
@@ -396,12 +497,23 @@ function onVertexClick(idx, evt) {
   }
 }
 
-function onVertexMouseOver() {
-  if (deleting.value) {
-    document.body.style.cursor = 'crosshair';
-  } else {
-    document.body.style.cursor = 'grab';
+function isPointStrictlyInsideElements(point, elements) {
+  for (const el of elements) {
+    if (
+      point.x > el.x &&
+      point.x < el.x + el.width &&
+      point.y > el.y &&
+      point.y < el.y + el.height
+    ) {
+      return true; // El punto está estrictamente dentro
+    }
   }
+  return false;
+}
+
+function onVertexMouseOver() {
+  if (deleting.value) { document.body.style.cursor = 'crosshair'; }
+  else { document.body.style.cursor = 'grab'; }
 }
 
 function onVertexMouseOut() {
