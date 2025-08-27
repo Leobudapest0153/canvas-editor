@@ -929,7 +929,7 @@ const getStrokeColor = (elementId) => {
 }
 
 // Convierte posición stage->layer considerando zoom/pan
- 
+
 const toLayerCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -939,7 +939,7 @@ const toLayerCoords = (pos) => {
 }
 
 // Convierte posición layer->stage considerando zoom/pan
- 
+
 const toStageCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -1903,7 +1903,7 @@ watch(
 
             // La opacidad del aura "respira" entre 0.3 y 0.7
             nodeAura.opacity(0.3 + oscillation * 0.4)
-            
+
           }, nodeAura.getLayer())
 
           highlightAnimation.value.start()
