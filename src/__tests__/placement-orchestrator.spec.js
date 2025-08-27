@@ -1,6 +1,11 @@
 /* eslint-env vitest, jsdom */
 import { describe, it, expect } from 'vitest'
-import { validateWallZBaseRequired, validateHeightWithinWarehouse, validateZStacking } from '@/validation/placementOrchestrator'
+import {
+  validateWallZBaseRequired,
+  validateHeightWithinWarehouse,
+  validateZStacking,
+  resolveZStackClamp,
+} from '@/validation/placementOrchestrator'
 import { resolveVerticalProps } from '@/validation/fieldResolvers'
 
 describe('validateWallZBaseRequired', () => {
@@ -55,7 +60,7 @@ describe('validateZStacking', () => {
     }
     const res = validateZStacking([base], cand)
     expect(res.valid).toBe(false)
-    expect(res.code).toBe('Z_STACKING_COLLISION')
+    expect(res.code).toBe('Z_STACK_CONFLICT')
   })
 
   it('permite tocar en Z', () => {
@@ -86,6 +91,34 @@ describe('validateZStacking', () => {
     }
     const res = validateZStacking([base], cand)
     expect(res.valid).toBe(true)
+  })
+})
+
+describe('resolveZStackClamp', () => {
+  it('corrige posición al borde no conflictivo', () => {
+    const base = {
+      id: 'a',
+      ubicacion: 'Pared',
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      alto: 100,
+      elevacion: { zBase: 0, altura: 100 },
+    }
+    const cand = {
+      id: 'b',
+      ubicacion: 'Pared',
+      x: 5,
+      y: 0,
+      width: 10,
+      height: 10,
+      alto: 100,
+      elevacion: { zBase: 50, altura: 100 },
+    }
+    const { corrected } = resolveZStackClamp(cand, [base])
+    expect(corrected.x).toBe(10)
+    expect(corrected.y).toBe(0)
   })
 })
 

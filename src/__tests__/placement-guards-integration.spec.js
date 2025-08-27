@@ -183,9 +183,10 @@ describe('placement guards integration', () => {
     store.elementos[1].x = 0
     const res = guards.onDragEndGuard({ ...store.elementos[1], start: { x: 20, y: 0 } })
     expect(res.valid).toBe(false)
+    expect(res.code).toBe('Z_STACK_CONFLICT')
     expect(spyUpdate).toHaveBeenCalledWith('b', { x: 20, y: 0 })
     expect(spySave).not.toHaveBeenCalled()
-    expect(showError).toHaveBeenCalledWith(errorsPlacement.Z_STACKING_COLLISION)
+    expect(showError).toHaveBeenCalledWith(errorsPlacement.Z_STACK_CONFLICT)
   })
 
   it('reviertes y no guardas si altura excede en drag end', () => {
@@ -334,7 +335,95 @@ describe('placement guards integration', () => {
     const resC = guards.onDragEndGuard({ ...store.elementos[2], start: { x: 40, y: 0 } })
     expect(resC.valid).toBe(false)
     expect(spyUpdate).toHaveBeenCalledWith('c', { x: 40, y: 0 })
-    expect(showError).toHaveBeenCalledWith(errorsPlacement.Z_STACKING_COLLISION)
+    expect(showError).toHaveBeenCalledWith(errorsPlacement.Z_STACK_CONFLICT)
     expect(spySave).toHaveBeenCalledTimes(1)
+  })
+
+  it('tope pared con pared evita solape y guarda al soltar', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.elementos.push(
+      {
+        id: 'a',
+        plantaId: 'planta_1',
+        tipo: 'elementos',
+        ubicacion: 'Pared',
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+        alto: 100,
+        elevacion: { zBase: 0, altura: 100 },
+      },
+      {
+        id: 'b',
+        plantaId: 'planta_1',
+        tipo: 'elementos',
+        ubicacion: 'Pared',
+        x: 20,
+        y: 0,
+        width: 10,
+        height: 10,
+        alto: 100,
+        elevacion: { zBase: 50, altura: 100 },
+      },
+    )
+    const guards = usePlacementGuards({ store, alturaBodega: 500, CM_TO_PX })
+    const spySave = vi.spyOn(store, 'saveToHistory')
+    showError.mockClear()
+    const el = store.elementos[1]
+    el.x = 5
+    const moveRes = guards.onDragMoveGuard(el)
+    expect(moveRes.reason).toBe('Z_STACK_CONFLICT')
+    expect(el.x).toBe(10)
+    const endRes = guards.onDragEndGuard({ ...el, start: { x: 20, y: 0 } })
+    if (endRes.valid) store.saveToHistory('move')
+    expect(endRes.valid).toBe(true)
+    expect(showError).not.toHaveBeenCalled()
+    expect(spySave).toHaveBeenCalled()
+  })
+
+  it('tope pared con suelo evita solape y guarda al soltar', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.elementos.push(
+      {
+        id: 'a',
+        plantaId: 'planta_1',
+        tipo: 'elementos',
+        ubicacion: 'Suelo',
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+        alto: 10,
+        elevacion: { zBase: 0, altura: 10 },
+      },
+      {
+        id: 'b',
+        plantaId: 'planta_1',
+        tipo: 'elementos',
+        ubicacion: 'Pared',
+        x: 20,
+        y: 0,
+        width: 10,
+        height: 10,
+        alto: 100,
+        elevacion: { zBase: 5, altura: 100 },
+      },
+    )
+    const guards = usePlacementGuards({ store, alturaBodega: 500, CM_TO_PX })
+    const spySave = vi.spyOn(store, 'saveToHistory')
+    showError.mockClear()
+    const el = store.elementos[1]
+    el.x = 5
+    const moveRes = guards.onDragMoveGuard(el)
+    expect(moveRes.reason).toBe('Z_STACK_CONFLICT')
+    expect(el.x).toBe(10)
+    const endRes = guards.onDragEndGuard({ ...el, start: { x: 20, y: 0 } })
+    if (endRes.valid) store.saveToHistory('move')
+    expect(endRes.valid).toBe(true)
+    expect(showError).not.toHaveBeenCalled()
+    expect(spySave).toHaveBeenCalled()
   })
 })

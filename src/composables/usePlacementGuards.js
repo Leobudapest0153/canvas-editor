@@ -1,6 +1,12 @@
-import { validateWallZBaseRequired, validateHeightWithinWarehouse, validateZStacking } from '@/validation/placementOrchestrator'
+import {
+  validateWallZBaseRequired,
+  validateHeightWithinWarehouse,
+  validateZStacking,
+  resolveZStackClamp,
+} from '@/validation/placementOrchestrator'
 import { useToast } from '@/composables/useToast'
 import { errorsPlacement } from '@/utils/errorsPlacement'
+import { getAABB, aabbIntersect } from '@/utils/collision'
 
 function hydrateCandidate(element, partial) {
   const ubicacion = partial.ubicacion ?? element.ubicacion
@@ -66,8 +72,13 @@ export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
       return { ...resHeight, candidate: cand }
     }
 
-    const resStack = validateZStacking(store.elementosVisibles, cand)
+    const aabb = getAABB(cand)
+    const neighbors = store.elementosVisibles.filter(
+      (e) => e.id !== cand.id && e.plantaId === cand.plantaId && aabbIntersect(aabb, getAABB(e)),
+    )
+    const resStack = validateZStacking(neighbors, cand)
     if (!resStack.valid) {
+      const { corrected } = resolveZStackClamp(cand, neighbors)
       if (start) {
         const { x, y, width, height } = start
         const payload = {}
@@ -77,7 +88,7 @@ export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
         if (height !== undefined) payload.height = height
         store.actualizarElemento(candidate.id, payload)
       }
-      return { ...resStack, candidate: cand }
+      return { ...resStack, reason: resStack.code, candidate: cand, corrected }
     }
 
     return { valid: true, candidate: cand }
@@ -86,6 +97,10 @@ export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
   const onDragMoveGuard = (el) => {
     const res = runPipeline(el)
     el.invalidPlacement = !res.valid
+    if (res.reason === 'Z_STACK_CONFLICT' && res.corrected) {
+      el.x = res.corrected.x
+      el.y = res.corrected.y
+    }
     return res
   }
 
