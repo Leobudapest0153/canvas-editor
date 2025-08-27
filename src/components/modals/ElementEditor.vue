@@ -83,7 +83,7 @@
             </div>
 
             <!-- Altura respecto al suelo (solo para elementos de pared) -->
-            <div v-if="localElemento.ubicacion === 'pared'" class="mb-6">
+            <div v-if="localElemento.ubicacion === 'Pared'" class="mb-6">
               <h3 class="text-lg font-medium text-gray-800 mb-3">Posicionamiento en Pared</h3>
               <div class="mb-2">
                 <label class="block text-sm font-medium text-gray-700"
@@ -196,7 +196,7 @@
                     localElemento.forma === 'circular' ? 'w-10 h-10' : 'w-12 h-8',
                     'rounded flex items-center justify-center relative shadow-sm border border-white/20',
                     `shape-${localElemento.forma}`,
-                    localElemento.ubicacion === 'pared' ? 'wall-mounted' : '',
+                    localElemento.ubicacion === 'Pared' ? 'wall-mounted' : '',
                   ]"
                   :style="{ backgroundColor: localElemento.colorBase || '#6b7280' }"
                 >
@@ -301,7 +301,7 @@ const localElemento = ref({
   colorBase: '#3b82f6',
   dimensiones: { ancho: 100, largo: 100, alto: 75 },
   pesoMaximo: 50,
-  ubicacion: 'suelo',
+  ubicacion: 'Suelo',
   alturaRespectoAlSuelo: 0,
   descripcion: '',
   icono: 'box',
@@ -372,7 +372,7 @@ const restablecerFormulario = () => {
     colorBase: '#3b82f6',
     dimensiones: { ancho: 100, largo: 100, alto: 75 },
     pesoMaximo: 50,
-    ubicacion: 'suelo',
+    ubicacion: 'Suelo',
     alturaRespectoAlSuelo: 0,
     descripcion: '',
     icono: 'box',
@@ -417,7 +417,7 @@ const validarFormulario = () => {
     alert('La capacidad de carga debe ser mayor a 0')
     return false
   }
-  if (elemento.ubicacion === 'pared') {
+  if (elemento.ubicacion === 'Pared') {
     const alturaBodega = canvasStore.plantaActivaData.value?.dimensiones?.alto || Infinity
     const { valido, mensaje } = validateWallPlacement({
       zBase: elemento.alturaRespectoAlSuelo,

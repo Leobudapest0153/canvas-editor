@@ -16,7 +16,7 @@ describe('placement guards integration', () => {
       id: 'a',
       plantaId: 'planta_1',
       tipo: 'elementos',
-      ubicacion: 'suelo',
+      ubicacion: 'Suelo',
       x: 0,
       y: 0,
       width: 10,
@@ -36,12 +36,57 @@ describe('placement guards integration', () => {
       id: 'a',
       plantaId: 'planta_1',
       tipo: 'elementos',
-      ubicacion: 'pared',
+      ubicacion: 'Pared',
       x: 0,
       y: 0,
       width: 10,
       height: 10,
+      alto: 100,
       elevacion: { zBase: 10, altura: 100 },
+    })
+    const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
+    showError.mockClear()
+    const res = guards.onDragEndGuard({ ...store.elementos[0], x: 5, y: 5, start: { x: 0, y: 0 } })
+    expect(res.valid).toBe(true)
+    expect(showError).not.toHaveBeenCalled()
+  })
+
+  it('elemento con alturaRespectoAlSuelo no dispara ZBASE_REQUIRED', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.elementos.push({
+      id: 'a',
+      plantaId: 'planta_1',
+      tipo: 'elementos',
+      ubicacion: 'Pared',
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      alturaRespectoAlSuelo: 10,
+      alto: 100,
+    })
+    const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
+    showError.mockClear()
+    const res = guards.onDragEndGuard({ ...store.elementos[0], x: 5, y: 5, start: { x: 0, y: 0 } })
+    expect(res.valid).toBe(true)
+    expect(showError).not.toHaveBeenCalled()
+  })
+
+  it('elemento con z_base pasa sin errores', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.elementos.push({
+      id: 'a',
+      plantaId: 'planta_1',
+      tipo: 'elementos',
+      ubicacion: 'Pared',
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      z_base: 15,
+      alto: 100,
     })
     const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
     showError.mockClear()
@@ -57,11 +102,12 @@ describe('placement guards integration', () => {
       id: 'a',
       plantaId: 'planta_1',
       tipo: 'elementos',
-      ubicacion: 'pared',
+      ubicacion: 'Pared',
       x: 0,
       y: 0,
       width: 10,
       height: 10,
+      alto: 100,
       elevacion: { zBase: 10, altura: 100 },
     })
     const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
@@ -84,11 +130,12 @@ describe('placement guards integration', () => {
       id: 'a',
       plantaId: 'planta_1',
       tipo: 'elementos',
-      ubicacion: 'pared',
+      ubicacion: 'Pared',
       x: 0,
       y: 0,
       width: 10,
       height: 10,
+      alto: 100,
       elevacion: { zBase: 0, altura: 100 },
     })
     const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
@@ -108,22 +155,24 @@ describe('placement guards integration', () => {
         id: 'a',
         plantaId: 'planta_1',
         tipo: 'elementos',
-        ubicacion: 'pared',
+        ubicacion: 'Pared',
         x: 0,
         y: 0,
         width: 10,
         height: 10,
+        alto: 100,
         elevacion: { zBase: 0, altura: 100 },
       },
       {
         id: 'b',
         plantaId: 'planta_1',
         tipo: 'elementos',
-        ubicacion: 'pared',
+        ubicacion: 'Pared',
         x: 20,
         y: 0,
         width: 10,
         height: 10,
+        alto: 100,
         elevacion: { zBase: 50, altura: 100 },
       },
     )
@@ -146,11 +195,12 @@ describe('placement guards integration', () => {
       id: 'a',
       plantaId: 'planta_1',
       tipo: 'elementos',
-      ubicacion: 'pared',
+      ubicacion: 'Pared',
       x: 0,
       y: 0,
       width: 10,
       height: 10,
+      alto: 100,
       elevacion: { zBase: 250, altura: 100 },
     })
     const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
@@ -170,11 +220,12 @@ describe('placement guards integration', () => {
       id: 'a',
       plantaId: 'planta_1',
       tipo: 'elementos',
-      ubicacion: 'pared',
+      ubicacion: 'Pared',
       x: 0,
       y: 0,
       width: 10,
       height: 10,
+      alto: 100,
       elevacion: { zBase: 100, altura: 100 },
     })
     const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
@@ -193,11 +244,12 @@ describe('placement guards integration', () => {
       id: 'a',
       plantaId: 'planta_1',
       tipo: 'elementos',
-      ubicacion: 'pared',
+      ubicacion: 'Pared',
       x: 0,
       y: 0,
       width: 10,
       height: 10,
+      alto: 100,
       elevacion: { zBase: 250, altura: 100 },
     })
     const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
@@ -215,11 +267,12 @@ describe('placement guards integration', () => {
       id: 'a',
       plantaId: 'planta_1',
       tipo: 'elementos',
-      ubicacion: 'pared',
+      ubicacion: 'Pared',
       x: 0,
       y: 0,
       width: 10,
       height: 10,
+      alto: 100,
       elevacion: { zBase: 100, altura: 100 },
     })
     const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
@@ -235,33 +288,36 @@ describe('placement guards integration', () => {
         id: 'a',
         plantaId: 'planta_1',
         tipo: 'elementos',
-        ubicacion: 'pared',
+        ubicacion: 'Pared',
         x: 0,
         y: 0,
         width: 10,
         height: 10,
+        alto: 100,
         elevacion: { zBase: 0, altura: 100 },
       },
       {
         id: 'b',
         plantaId: 'planta_1',
         tipo: 'elementos',
-        ubicacion: 'pared',
+        ubicacion: 'Pared',
         x: 20,
         y: 0,
         width: 10,
         height: 10,
+        alto: 100,
         elevacion: { zBase: 100, altura: 100 },
       },
       {
         id: 'c',
         plantaId: 'planta_1',
         tipo: 'elementos',
-        ubicacion: 'pared',
+        ubicacion: 'Pared',
         x: 40,
         y: 0,
         width: 10,
         height: 10,
+        alto: 100,
         elevacion: { zBase: 150, altura: 100 },
       },
     )

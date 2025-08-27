@@ -1,5 +1,6 @@
 import { validateWallPlacement } from '@/utils/placementValidity'
 import { narrowPhase2D, zOverlapCheck } from '@/utils/collision'
+import { resolveVerticalProps } from './fieldResolvers'
 
 const Z_EPS = 0.001
 
@@ -7,12 +8,11 @@ const Z_EPS = 0.001
  * Valida que elementos con ubicacion "pared" tengan zBase definido y > 0
  */
 export function validateWallZBaseRequired(element, candidate) {
-  const ubic = candidate.ubicacion ?? element.ubicacion
-  if (ubic !== 'pared') return { valid: true }
-  const zEff = candidate.zBase ?? candidate.elevacion?.zBase ?? element.zBase ?? element.elevacion?.zBase
-  const altoEff = candidate.alto ?? candidate.elevacion?.altura ?? element.alto ?? element.elevacion?.altura
-  void altoEff
-  if (zEff == null || zEff <= 0) {
+  const { ubic, zBaseCm, altoCm } = resolveVerticalProps(element, candidate)
+  void altoCm
+  if (ubic !== 'Pared') return { valid: true }
+  if (zBaseCm == null || zBaseCm <= 0) {
+    if (globalThis.__DEV__) console.debug('resolveVerticalProps', { ubic, zBaseCm, altoCm })
     return { valid: false, code: 'ZBASE_REQUIRED' }
   }
   return { valid: true }
@@ -21,14 +21,17 @@ export function validateWallZBaseRequired(element, candidate) {
 /**
  * Valida que la suma zBase + alto no exceda la altura de la bodega
  */
-export function validateHeightWithinWarehouse(candidate, alturaBodega) {
-  if (candidate.ubicacion !== 'pared') return { valid: true }
+export function validateHeightWithinWarehouse(element, candidate, alturaBodega) {
+  const { ubic, zBaseCm, altoCm } = resolveVerticalProps(element, candidate)
+  if (ubic !== 'Pared') return { valid: true }
+  if (zBaseCm == null || altoCm == null) return { valid: true }
   const { valido, mensaje } = validateWallPlacement({
-    zBase: candidate.zBase ?? candidate.elevacion?.zBase ?? 1,
-    alto: candidate.alto ?? candidate.elevacion?.altura,
+    zBase: zBaseCm,
+    alto: altoCm,
     alturaBodega,
   })
   if (!valido && mensaje.includes('excede')) {
+    if (globalThis.__DEV__) console.debug('resolveVerticalProps', { ubic, zBaseCm, altoCm })
     return { valid: false, code: 'HEIGHT_EXCEEDS_WAREHOUSE' }
   }
   return { valid: true }
@@ -42,20 +45,33 @@ export function validateHeightWithinWarehouse(candidate, alturaBodega) {
  * @param {number} [Z_EPS=0.001] - tolerancia para permitir contacto
  */
 export function validateZStacking(elements, candidate, Z_EPS = 0.001) {
+  const candProps = resolveVerticalProps(candidate, {})
   const m = {
     ...candidate,
+    elevacion: {
+      ...(candidate.elevacion || {}),
+      zBase: candProps.zBaseCm ?? candidate.elevacion?.zBase,
+      altura: candProps.altoCm ?? candidate.elevacion?.altura,
+    },
     tolerancias: { ...(candidate.tolerancias || {}), zEpsilon: Z_EPS },
   }
   for (const other of elements) {
     if (other.id === candidate.id) continue
     const { intersectXY } = narrowPhase2D(m, other)
     if (!intersectXY) continue
+    const otherProps = resolveVerticalProps(other, {})
     const o = {
       ...other,
+      elevacion: {
+        ...(other.elevacion || {}),
+        zBase: otherProps.zBaseCm ?? other.elevacion?.zBase,
+        altura: otherProps.altoCm ?? other.elevacion?.altura,
+      },
       tolerancias: { ...(other.tolerancias || {}), zEpsilon: Z_EPS },
     }
     const { overlap } = zOverlapCheck(m, o)
     if (overlap) {
+      if (globalThis.__DEV__) console.debug('resolveVerticalProps', { cand: candProps, other: otherProps })
       return { valid: false, code: 'Z_STACKING_COLLISION' }
     }
   }

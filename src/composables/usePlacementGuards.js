@@ -52,7 +52,7 @@ export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
       return { ...resBase, candidate: cand }
     }
 
-    const resHeight = validateHeightWithinWarehouse(cand, alturaBodega)
+    const resHeight = validateHeightWithinWarehouse(base, cand, alturaBodega)
     if (!resHeight.valid) {
       if (start) {
         const { x, y, width, height } = start

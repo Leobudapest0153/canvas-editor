@@ -16,8 +16,8 @@ describe('ElementEditor wall validation', () => {
     categorias: [{ id: 'cat', nombre: 'Cat' }],
     formas: [{ id: 'rectangular', nombre: 'Rect' }],
     ubicaciones: [
-      { id: 'suelo', nombre: 'Suelo' },
-      { id: 'pared', nombre: 'Pared' },
+      { id: 'Suelo', nombre: 'Suelo' },
+      { id: 'Pared', nombre: 'Pared' },
     ],
   }
 
@@ -33,7 +33,7 @@ describe('ElementEditor wall validation', () => {
   it('muestra error si zBase es inválido', async () => {
     const wrapper = mount(ElementEditor, { props: baseProps })
     fillRequired(wrapper)
-    wrapper.vm.localElemento.ubicacion = 'pared'
+    wrapper.vm.localElemento.ubicacion = 'Pared'
     wrapper.vm.localElemento.dimensiones.alto = 100
     wrapper.vm.localElemento.alturaRespectoAlSuelo = 0
     await wrapper.find('form').trigger('submit.prevent')
@@ -44,7 +44,7 @@ describe('ElementEditor wall validation', () => {
   it('muestra error si zBase + alto excede alturaBodega', async () => {
     const wrapper = mount(ElementEditor, { props: baseProps })
     fillRequired(wrapper)
-    wrapper.vm.localElemento.ubicacion = 'pared'
+    wrapper.vm.localElemento.ubicacion = 'Pared'
     wrapper.vm.localElemento.dimensiones.alto = 200
     wrapper.vm.localElemento.alturaRespectoAlSuelo = 150
     await wrapper.find('form').trigger('submit.prevent')
@@ -55,7 +55,7 @@ describe('ElementEditor wall validation', () => {
   it('emite save cuando zBase + alto es igual a alturaBodega', async () => {
     const wrapper = mount(ElementEditor, { props: baseProps })
     fillRequired(wrapper)
-    wrapper.vm.localElemento.ubicacion = 'pared'
+    wrapper.vm.localElemento.ubicacion = 'Pared'
     wrapper.vm.localElemento.dimensiones.alto = 100
     wrapper.vm.localElemento.alturaRespectoAlSuelo = 200
     await wrapper.find('form').trigger('submit.prevent')
