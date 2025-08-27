@@ -1,3 +1,4 @@
+/* eslint-env vitest, jsdom */
 import { describe, it, expect } from 'vitest'
 import { validateWallPlacement } from '@/utils/placementValidity'
 
