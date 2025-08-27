@@ -568,6 +568,7 @@ import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
 import { makeInnerSession } from '@/composables/useInnerNoOverlap'
 import FloatingToolbar from './FloatingToolbar.vue'
+import usePlacementGuards from '@/composables/usePlacementGuards'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -609,6 +610,12 @@ const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId:
 const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
+
+const { onDragMoveGuard, onDragEndGuard, onTransformEndGuard } = usePlacementGuards({
+  store: canvasStore,
+  alturaBodega: canvasStore.plantaActivaData.value?.dimensiones?.alto || Infinity,
+  CM_TO_PX,
+})
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -1830,6 +1837,10 @@ const onShapeDragStart = (e, el) => {
 }
 
 const onShapeDragMove = (e, el) => {
+  const guardRes = onDragMoveGuard(el)
+  if (!guardRes.valid && guardRes.corrected) {
+    e.target.position(guardRes.corrected)
+  }
   const data = innerSessions.get(el.id)
   if (data) {
     const { session, parent } = data
@@ -1861,23 +1872,34 @@ const onShapeDragEnd = (e, el) => {
     const shape = e.target
     let candLocal = session.toLocal(shape.position(), parent)
     let finalLocal = session.finalizeLocal(candLocal)
-    const finalWorld = session.toWorld(finalLocal, parent)
-    shape.position(finalWorld)
-    needsDraw = true
-    scheduleDraw()
-    const changed =
-      Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
-    if (changed) {
-      canvasStore.actualizarElementoConHistorial(
-        el.id,
-        { posicion: { x: finalWorld.x, y: finalWorld.y }, x: finalWorld.x, y: finalWorld.y },
-        `Elemento movido: ${el.id}`,
-      )
+      const finalWorld = session.toWorld(finalLocal, parent)
+      shape.position(finalWorld)
+      needsDraw = true
+      scheduleDraw()
+      const guardRes = onDragEndGuard({ ...el, x: finalWorld.x, y: finalWorld.y, start: initial })
+      if (!guardRes.valid && guardRes.corrected) {
+        shape.position(guardRes.corrected)
+        needsDraw = true
+        scheduleDraw()
+      }
+      if (guardRes.valid) {
+        const changed =
+          Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
+        if (changed) {
+          canvasStore.actualizarElementoConHistorial(
+            el.id,
+            { posicion: { x: finalWorld.x, y: finalWorld.y }, x: finalWorld.x, y: finalWorld.y },
+            `Elemento movido: ${el.id}`,
+          )
+        }
+      }
+    } else {
+      const guardRes = onDragEndGuard(el)
+      if (guardRes.valid) {
+        endElementDrag(el.id)
+      }
     }
-  } else {
-    endElementDrag(el.id)
   }
-}
 
 const getElementShadow = (elemento) => {
   if (canvasStore.elementoDestacadoId === elemento.id) {
@@ -2253,14 +2275,16 @@ const handleTransformEnd = (e, elementId, forma) => {
     if (!elemento) return
 
     // Validar con isPlacementValid contra vecinos y área
-    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
-    const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    const isValidNow = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+      const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
+      const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+      const isValidNow = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation }
+      const guardRes = onTransformEndGuard({ ...elemento, x, y, width, height, start: prev })
 
   console.debug('[transform-debug] end', elementId, { prev: transformInitialState.get(elementId), new: { x, y, width, height, rotation }, isValidNow })
-  if (!isValidNow) {
+    if (!isValidNow || !guardRes.valid) {
       // Revertir al estado inicial guardado
-      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height }
+      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation }
       try {
         if (forma === 'circular') {
           const r = Math.min(prev.width, prev.height) / 2

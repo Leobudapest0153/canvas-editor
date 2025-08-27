@@ -83,7 +83,7 @@
             </div>
 
             <!-- Altura respecto al suelo (solo para elementos de pared) -->
-            <div v-if="localElemento.ubicacion === 'pared'" class="mb-6">
+            <div v-if="localElemento.ubicacion === 'Pared'" class="mb-6">
               <h3 class="text-lg font-medium text-gray-800 mb-3">Posicionamiento en Pared</h3>
               <div class="mb-2">
                 <label class="block text-sm font-medium text-gray-700"
@@ -98,6 +98,9 @@
                 />
                 <p class="text-xs text-gray-500 mt-1">
                   Distancia desde el suelo hasta la base del elemento
+                </p>
+                <p v-if="errorAlturaPared" class="text-sm text-red-600 mt-1">
+                  {{ errorAlturaPared }}
                 </p>
               </div>
             </div>
@@ -193,7 +196,7 @@
                     localElemento.forma === 'circular' ? 'w-10 h-10' : 'w-12 h-8',
                     'rounded flex items-center justify-center relative shadow-sm border border-white/20',
                     `shape-${localElemento.forma}`,
-                    localElemento.ubicacion === 'pared' ? 'wall-mounted' : '',
+                    localElemento.ubicacion === 'Pared' ? 'wall-mounted' : '',
                   ]"
                   :style="{ backgroundColor: localElemento.colorBase || '#6b7280' }"
                 >
@@ -235,6 +238,8 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useWeightValidation } from '@/composables/useWeightValidation'
+import { useCanvasStore } from '@/composables/useCanvasStore'
+import { validateWallPlacement } from '@/utils/placementValidity'
 
 const props = defineProps({
   visible: Boolean,
@@ -246,6 +251,7 @@ const props = defineProps({
 const emit = defineEmits(['cancel', 'save'])
 
 const weightValidation = useWeightValidation()
+const canvasStore = useCanvasStore()
 
 const esFormaCircular = computed(() => localElemento.value.forma === 'circular')
 
@@ -295,12 +301,14 @@ const localElemento = ref({
   colorBase: '#3b82f6',
   dimensiones: { ancho: 100, largo: 100, alto: 75 },
   pesoMaximo: 50,
-  ubicacion: 'suelo',
+  ubicacion: 'Suelo',
   alturaRespectoAlSuelo: 0,
   descripcion: '',
   icono: 'box',
   contenedores: [],
 })
+
+const errorAlturaPared = ref('')
 
 watch(
   () => props.value,
@@ -333,6 +341,17 @@ watch(
   },
 )
 
+watch(
+  () => [
+    localElemento.value.alturaRespectoAlSuelo,
+    localElemento.value.dimensiones.alto,
+    localElemento.value.ubicacion,
+  ],
+  () => {
+    errorAlturaPared.value = ''
+  },
+)
+
 // Restablecer el formulario cuando el modal se abre
 watch(
   () => props.visible,
@@ -353,12 +372,13 @@ const restablecerFormulario = () => {
     colorBase: '#3b82f6',
     dimensiones: { ancho: 100, largo: 100, alto: 75 },
     pesoMaximo: 50,
-    ubicacion: 'suelo',
+    ubicacion: 'Suelo',
     alturaRespectoAlSuelo: 0,
     descripcion: '',
     icono: 'box',
-    contenedores: [],
+  contenedores: [],
   }
+  errorAlturaPared.value = ''
 }
 
 const onCancel = () => {
@@ -368,6 +388,7 @@ const onCancel = () => {
 
 const validarFormulario = () => {
   const elemento = localElemento.value
+  errorAlturaPared.value = ''
   if (!elemento.nombre.trim()) {
     alert('El nombre es requerido')
     return false
@@ -395,6 +416,18 @@ const validarFormulario = () => {
   if (elemento.pesoMaximo <= 0) {
     alert('La capacidad de carga debe ser mayor a 0')
     return false
+  }
+  if (elemento.ubicacion === 'Pared') {
+    const alturaBodega = canvasStore.plantaActivaData.value?.dimensiones?.alto || Infinity
+    const { valido, mensaje } = validateWallPlacement({
+      zBase: elemento.alturaRespectoAlSuelo,
+      alto: elemento.dimensiones.alto,
+      alturaBodega
+    })
+    if (!valido) {
+      errorAlturaPared.value = mensaje
+      return false
+    }
   }
   return true
 }
