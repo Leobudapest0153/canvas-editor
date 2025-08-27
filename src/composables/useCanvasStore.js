@@ -594,22 +594,26 @@ export const useCanvasStore = defineStore('canvas', () => {
         const all = elementos.value.filter((el) => el.plantaId === elemento.plantaId)
         const el = { ...elemento, x, y }
         if (!isWallFormValid(el, bH, CM_TO_PX)) {
-          window.__toasts?.show?.('Falta altura respecto al suelo (>0) y alto', {
-            type: 'warn',
-          }) ??
+          if (window.__toasts?.show) {
+            window.__toasts.show('Falta altura respecto al suelo (>0) y alto', { type: 'warn' })
+          } else {
             console.warn(
               '[WALL_RULES]',
               'Falta altura respecto al suelo (>0) y alto',
               debugWall(el, bH, CM_TO_PX),
             )
+          }
           return false
         }
         if (import.meta.env.DEV)
           console.debug('[WALL_RULES:CM]', debugWall(el, bH, CM_TO_PX))
         const res = validateWallPlacement({ el, all, bodegaH: bH, CM_TO_PX })
         if (!res.ok) {
-          window.__toasts?.show?.(res.reason, { type: 'warn' }) ??
+          if (window.__toasts?.show) {
+            window.__toasts.show(res.reason, { type: 'warn' })
+          } else {
             console.warn('[WALL_RULES]', res.reason, debugWall(el, bH, CM_TO_PX))
+          }
           return false
         }
       }
@@ -640,22 +644,26 @@ export const useCanvasStore = defineStore('canvas', () => {
           )
         const all = elementos.value.filter((el) => el.plantaId === candidato.plantaId)
         if (!isWallFormValid(candidato, bH, CM_TO_PX)) {
-          window.__toasts?.show?.('Falta altura respecto al suelo (>0) y alto', {
-            type: 'warn',
-          }) ??
+          if (window.__toasts?.show) {
+            window.__toasts.show('Falta altura respecto al suelo (>0) y alto', { type: 'warn' })
+          } else {
             console.warn(
               '[WALL_RULES]',
               'Falta altura respecto al suelo (>0) y alto',
               debugWall(candidato, bH, CM_TO_PX),
             )
+          }
           return false
         }
         if (import.meta.env.DEV)
           console.debug('[WALL_RULES:CM]', debugWall(candidato, bH, CM_TO_PX))
         const res = validateWallPlacement({ el: candidato, all, bodegaH: bH, CM_TO_PX })
         if (!res.ok) {
-          window.__toasts?.show?.(res.reason, { type: 'warn' }) ??
+          if (window.__toasts?.show) {
+            window.__toasts.show(res.reason, { type: 'warn' })
+          } else {
             console.warn('[WALL_RULES]', res.reason, debugWall(candidato, bH, CM_TO_PX))
+          }
           return false
         }
       }
@@ -825,14 +833,15 @@ export const useCanvasStore = defineStore('canvas', () => {
             0,
         )
       if (!isWallFormValid(nuevoElemento, bH, CM_TO_PX)) {
-        window.__toasts?.show?.('Falta altura respecto al suelo (>0) y alto', {
-          type: 'warn',
-        }) ??
+        if (window.__toasts?.show) {
+          window.__toasts.show('Falta altura respecto al suelo (>0) y alto', { type: 'warn' })
+        } else {
           console.warn(
             '[WALL_RULES]',
             'Falta altura respecto al suelo (>0) y alto',
             debugWall(nuevoElemento, bH, CM_TO_PX),
           )
+        }
         return false
       }
       const all = elementos.value.filter(
@@ -847,8 +856,11 @@ export const useCanvasStore = defineStore('canvas', () => {
         CM_TO_PX,
       })
       if (!res.ok) {
-        window.__toasts?.show?.(res.reason, { type: 'warn' }) ??
+        if (window.__toasts?.show) {
+          window.__toasts.show(res.reason, { type: 'warn' })
+        } else {
           console.warn('[WALL_RULES]', res.reason, debugWall(nuevoElemento, bH, CM_TO_PX))
+        }
         return false
       }
     }
@@ -961,7 +973,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (elemento) {
       // Si no tiene propiedad visible, por defecto está visible (true)
-      elemento.visible = elemento.visible === false ? true : false
+      elemento.visible = (elemento.visible === false)
 
       // Guardar estado en historial
       const estado = elemento.visible ? 'mostrado' : 'ocultado'
@@ -1227,12 +1239,12 @@ export const useCanvasStore = defineStore('canvas', () => {
         const width = elementoData.dimensiones?.ancho || 100
         const height = elementoData.dimensiones?.largo || 60
         const zBase = toCmSmart(
-          elementoData.elevacion?.zBase ?? elementoData.posicion?.z || 0,
-          { CM_TO_PX, bodegaHcm: bH },
+          elementoData.elevacion?.zBase ?? elementoData.posicion?.z ?? 0,
+          { CM_TO_PX, bodegaHcm: bH }
         )
         const alto = toCmSmart(
           elementoData.dimensiones?.alto ?? 0,
-          { CM_TO_PX, bodegaHcm: bH },
+          { CM_TO_PX, bodegaHcm: bH }
         )
 
         elementos.value.push({
@@ -1484,7 +1496,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     const paddingAura = 30 / zoom.value; // Píxeles extra de tamaño para el aura
     elementoAura.value = {
       // Usamos un ID único para el aura para evitar conflictos de key
-      id: `aura_${elemento.id}`, 
+      id: `aura_${elemento.id}`,
       forma: elemento.forma,
       x: elemento.x - paddingAura / 2,
       y: elemento.y - paddingAura / 2,
@@ -1501,7 +1513,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }, 2500) // Aumentamos un poco el tiempo a 2.5 segundos
   };
-  
+
 
   const actualizarIdsFiltrados = (ids) => {
     idsElementosFiltrados.value = ids
