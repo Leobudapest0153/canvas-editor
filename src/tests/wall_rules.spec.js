@@ -13,37 +13,44 @@ describe('wallRules utils', () => {
       isWallFormValid({ ubicacion: 'Pared', alturaRespectoSuelo: 10, dimensiones: { alto: 5 } }),
     ).toBe(true)
     expect(
-      isWallFormValid({ ubicacion: 'Pared', alturaRespectoSuelo: 0, dimensiones: { alto: 5 } }),
+      isWallFormValid({ ubicacion: 'pared', alturaRespectoSuelo: 0, dimensiones: { alto: 5 } }),
     ).toBe(false)
+    expect(
+      isWallFormValid({
+        metadata: { ubicacion: 'PARED' },
+        elevacion: { zBase: 20 },
+        altura: 10,
+      }),
+    ).toBe(true)
   })
 
   it('wallZOk with warehouse height', () => {
     expect(
       wallZOk(
-        { ubicacion: 'Pared', alturaRespectoSuelo: 100, dimensiones: { alto: 150 } },
+        { ubicacion: 'pared', alturaRespectoAlSuelo: 100, dimensiones: { alto: 150 } },
         300,
       ),
     ).toBe(true)
     expect(
       wallZOk(
-        { ubicacion: 'Pared', alturaRespectoSuelo: 200, dimensiones: { alto: 150 } },
+        { ubicacion: 'PARED', alturaRespectoAlSuelo: 200, dimensiones: { alto: 150 } },
         300,
       ),
     ).toBe(false)
   })
 
   it('wallNoZOverlap disjoint vs overlapping', () => {
-    const a = { ubicacion: 'Pared', alturaRespectoSuelo: 0, dimensiones: { alto: 100 } }
-    const b = { ubicacion: 'Pared', alturaRespectoSuelo: 110, dimensiones: { alto: 50 } }
-    const c = { ubicacion: 'Pared', alturaRespectoSuelo: 50, dimensiones: { alto: 80 } }
+    const a = { ubicacion: 'PARED', alturaRespectoAlSuelo: 0, dimensiones: { alto: 100 } }
+    const b = { ubicacion: 'pared', alturaRespectoAlSuelo: 110, dimensiones: { alto: 50 } }
+    const c = { metadata: { ubicacion: 'pareD' }, elevacion: { zBase: 50 }, dimensiones: { alto: 80 } }
     expect(wallNoZOverlap(a, b)).toBe(true)
     expect(wallNoZOverlap(a, c)).toBe(false)
   })
 
   it('wallVsFloorOk with high floor', () => {
-    const wall = { ubicacion: 'Pared', alturaRespectoSuelo: 15 }
-    const floor = { ubicacion: 'Suelo', dimensiones: { alto: 10 } }
-    const lowWall = { ubicacion: 'Pared', alturaRespectoSuelo: 9 }
+    const wall = { ubicacion: 'PARED', alturaRespectoAlSuelo: 15 }
+    const floor = { metadata: { ubicacion: 'suelo' }, dimensiones: { alto: 10 } }
+    const lowWall = { ubicacion: 'pared', alturaRespectoAlSuelo: 9 }
     expect(wallVsFloorOk(wall, floor)).toBe(true)
     expect(wallVsFloorOk(lowWall, floor)).toBe(false)
   })
@@ -51,15 +58,19 @@ describe('wallRules utils', () => {
   it('validateWallPlacement ok and ko', () => {
     const el = {
       id: 'w',
-      ubicacion: 'Pared',
-      alturaRespectoSuelo: 50,
+      metadata: { ubicacion: 'PARED' },
+      alturaRespectoAlSuelo: 50,
       dimensiones: { alto: 100 },
     }
-    const floor = { id: 'f', ubicacion: 'Suelo', dimensiones: { alto: 10 } }
+    const floor = {
+      id: 'f',
+      metadata: { ubicacion: 'suelo' },
+      dimensiones: { alto: 10 },
+    }
     const other = {
       id: 'o',
-      ubicacion: 'Pared',
-      alturaRespectoSuelo: 200,
+      ubicacion: 'pared',
+      alturaRespectoAlSuelo: 200,
       dimensiones: { alto: 50 },
     }
     expect(
@@ -67,8 +78,8 @@ describe('wallRules utils', () => {
     ).toEqual({ ok: true })
     const badOther = {
       id: 'b',
-      ubicacion: 'Pared',
-      alturaRespectoSuelo: 80,
+      ubicacion: 'PARED',
+      alturaRespectoAlSuelo: 80,
       dimensiones: { alto: 80 },
     }
     const res = validateWallPlacement({ el, all: [badOther], bodegaH: 300 })

@@ -17,7 +17,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { CM_TO_PX } from '@/utils/constants'
-import { validateWallPlacement, isWallFormValid } from '@/utils/wallRules'
+import {
+  validateWallPlacement,
+  isWallFormValid,
+  debugWall,
+} from '@/utils/wallRules'
 
 // Variable para evitar circular import - será inicializada por el composable de historial
 let historyComposable = null
@@ -206,10 +210,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     return elementos.value.filter((el) => el.plantaId === plantaId)
   })
 
-  const getBodegaAltura = () =>
-    Number(plantaActivaData.value?.dimensiones?.alto) ||
-    Number(plantaActivaData.value?.altura) ||
-    0
 
   const elementoSeleccionadoCompleto = computed(() => {
     if (!elementoSeleccionado.value) return null
@@ -585,26 +585,18 @@ export const useCanvasStore = defineStore('canvas', () => {
   const actualizarPosicion = (id, x, y) => {
     const elemento = elementos.value.find((el) => el.id === id)
     if (elemento) {
-      if (elemento.ubicacion === 'Pared' || elemento.ubicacion === 'pared') {
-        const all = elementos.value.filter((el) => el.plantaId === elemento.plantaId)
-        const el = {
-          ...elemento,
-          x,
-          y,
-          ubicacion: 'Pared',
-          alturaRespectoSuelo:
-            elemento.alturaRespectoSuelo ?? elemento?.elevacion?.zBase ?? 0,
-        }
-        if (!isWallFormValid(el)) {
-          const reason = 'Falta altura respecto al suelo (>0) y alto'
-          window.__toasts?.show?.(reason, { type: 'warn' }) ||
-            console.warn('[WALL_RULES]', reason, elemento)
-          return false
-        }
-        const res = validateWallPlacement({ el, all, bodegaH: getBodegaAltura() })
+      const el = { ...elemento, x, y }
+      const ubic = String((el.ubicacion ?? el.metadata?.ubicacion ?? '')).toLowerCase()
+      if (ubic === 'pared') {
+        const bH =
+          Number(plantaActivaData.value?.dimensiones?.alto ?? plantaActivaData.value?.altura ?? 0)
+        const all = elementos.value.filter((e) => e.plantaId === elemento.plantaId)
+        const res = validateWallPlacement({ el, all, bodegaH: bH })
         if (!res.ok) {
-          window.__toasts?.show?.(res.reason, { type: 'warn' }) ||
-            console.warn('[WALL_RULES]', res.reason, elemento)
+          ;(
+            window.__toasts?.show?.(`${res.reason}`, { type: 'warn' }) ??
+            console.warn('[WALL_RULES]', res.reason, debugWall(el, bH))
+          )
           return false
         }
       }
@@ -623,26 +615,20 @@ export const useCanvasStore = defineStore('canvas', () => {
         ...propiedades,
         dimensiones: { ...elemento.dimensiones, ...propiedades.dimensiones },
       }
-      if (candidato.ubicacion === 'Pared' || candidato.ubicacion === 'pared') {
-          const all = elementos.value.filter((el) => el.plantaId === candidato.plantaId)
-          const el = {
-            ...candidato,
-            ubicacion: 'Pared',
-            alturaRespectoSuelo:
-              candidato.alturaRespectoSuelo ?? candidato?.elevacion?.zBase ?? 0,
-          }
-          if (!isWallFormValid(el)) {
-            const reason = 'Falta altura respecto al suelo (>0) y alto'
-            window.__toasts?.show?.(reason, { type: 'warn' }) ||
-              console.warn('[WALL_RULES]', reason, elemento)
-            return false
-          }
-          const res = validateWallPlacement({ el, all, bodegaH: getBodegaAltura() })
-          if (!res.ok) {
-            window.__toasts?.show?.(res.reason, { type: 'warn' }) ||
-              console.warn('[WALL_RULES]', res.reason, elemento)
-            return false
-          }
+      const el = { ...candidato }
+      const ubic = String((el.ubicacion ?? el.metadata?.ubicacion ?? '')).toLowerCase()
+      if (ubic === 'pared') {
+        const bH =
+          Number(plantaActivaData.value?.dimensiones?.alto ?? plantaActivaData.value?.altura ?? 0)
+        const all = elementos.value.filter((e) => e.plantaId === candidato.plantaId)
+        const res = validateWallPlacement({ el, all, bodegaH: bH })
+        if (!res.ok) {
+          ;(
+            window.__toasts?.show?.(`${res.reason}`, { type: 'warn' }) ??
+            console.warn('[WALL_RULES]', res.reason, debugWall(el, bH))
+          )
+          return false
+        }
       }
       for (const key in propiedades) {
         if (typeof propiedades[key] === 'object' && propiedades[key] !== null && !Array.isArray(propiedades[key])) {
@@ -799,24 +785,19 @@ export const useCanvasStore = defineStore('canvas', () => {
       return null
     }
 
-    if (nuevoElemento.ubicacion === 'Pared' || nuevoElemento.ubicacion === 'pared') {
+    const ubicacion = String(
+      nuevoElemento.ubicacion ?? nuevoElemento.metadata?.ubicacion ?? '',
+    ).toLowerCase()
+    if (ubicacion === 'pared') {
+      const bH =
+        Number(plantaActivaData.value?.dimensiones?.alto ?? plantaActivaData.value?.altura ?? 0)
       const all = elementos.value.filter((el) => el.plantaId === contextoNavegacion.value.id)
-      const el = {
-        ...nuevoElemento,
-        ubicacion: 'Pared',
-        alturaRespectoSuelo:
-          nuevoElemento.alturaRespectoSuelo ?? nuevoElemento?.elevacion?.zBase ?? 0,
-      }
-      if (!isWallFormValid(el)) {
-        const reason = 'Falta altura respecto al suelo (>0) y alto'
-        window.__toasts?.show?.(reason, { type: 'warn' }) ||
-          console.warn('[WALL_RULES]', reason, nuevoElemento)
-        return false
-      }
-      const res = validateWallPlacement({ el, all, bodegaH: getBodegaAltura() })
+      const res = validateWallPlacement({ el: nuevoElemento, all, bodegaH: bH })
       if (!res.ok) {
-        window.__toasts?.show?.(res.reason, { type: 'warn' }) ||
-          console.warn('[WALL_RULES]', res.reason, nuevoElemento)
+        ;(
+          window.__toasts?.show?.(`${res.reason}`, { type: 'warn' }) ??
+          console.warn('[WALL_RULES]', res.reason, debugWall(nuevoElemento, bH))
+        )
         return false
       }
     }

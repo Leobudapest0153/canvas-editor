@@ -378,10 +378,7 @@ const isLockedSelected = computed(() => {
 const wallHint = computed(() => {
   const el = elementoSeleccionado.value
   if (!el) return false
-  if (el.ubicacion === 'Pared' || el.ubicacion === 'pared') {
-    return !isWallFormValid({ ...el, ubicacion: 'Pared' })
-  }
-  return false
+  return !isWallFormValid(el)
 })
 
 const canSave = computed(() => !wallHint.value)

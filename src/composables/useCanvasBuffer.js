@@ -13,7 +13,11 @@
 
 import { ref, computed } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
-import { validateWallPlacement, isWallFormValid } from '@/utils/wallRules'
+import {
+  validateWallPlacement,
+  isWallFormValid,
+  debugWall,
+} from '@/utils/wallRules'
 
 // Estado global del buffer (singleton)
 const bufferItems = ref([])
@@ -232,28 +236,23 @@ export const useCanvasBuffer = () => {
       }
     }
 
-    if (newElement.ubicacion === 'Pared' || newElement.ubicacion === 'pared') {
+    const ubic = String(
+      newElement.ubicacion ?? newElement.metadata?.ubicacion ?? '',
+    ).toLowerCase()
+    if (ubic === 'pared') {
       const all = canvasStore.elementosEnPlanta(canvasStore.plantaActiva)
-      const el = {
-        ...newElement,
-        ubicacion: 'Pared',
-        alturaRespectoSuelo:
-          newElement.alturaRespectoSuelo ?? newElement?.elevacion?.zBase ?? 0,
-      }
-      if (!isWallFormValid(el)) {
-        const reason = 'Falta altura respecto al suelo (>0) y alto'
-        window.__toasts?.show?.(reason, { type: 'warn' }) ||
-          console.warn('[WALL_RULES]', reason, newElement)
-        return false
-      }
       const bodegaH =
-        Number(canvasStore.plantaActivaData?.dimensiones?.alto) ||
-        Number(canvasStore.plantaActivaData?.altura) ||
-        0
-      const res = validateWallPlacement({ el, all, bodegaH })
+        Number(
+          canvasStore.plantaActivaData?.dimensiones?.alto ??
+            canvasStore.plantaActivaData?.altura ??
+            0,
+        )
+      const res = validateWallPlacement({ el: newElement, all, bodegaH })
       if (!res.ok) {
-        window.__toasts?.show?.(res.reason, { type: 'warn' }) ||
-          console.warn('[WALL_RULES]', res.reason, newElement)
+        ;(
+          window.__toasts?.show?.(`${res.reason}`, { type: 'warn' }) ??
+          console.warn('[WALL_RULES]', res.reason, debugWall(newElement, bodegaH))
+        )
         return false
       }
     }
