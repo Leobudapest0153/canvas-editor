@@ -1971,9 +1971,9 @@ const createElementFromBuffer = (data, dropEvent) => {
   if (!resultadoValidacionPeso.valido) {
     // El elemento excedería el peso máximo permitido
     showToast(
-      `No se puede pegar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
+      `No se puede pegar: habría un exceso de peso soportado de ${resultadoValidacionPeso.exceso} kg`,
       'error'
-    )
+    )|
     console.log('Validación de peso fallida en buffer:', resultadoValidacionPeso)
     return
   }
