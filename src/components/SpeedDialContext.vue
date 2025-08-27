@@ -32,7 +32,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount, nextTick, defineProps, defineEmits, defineOptions } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick, defineOptions } from 'vue'
 
 defineOptions({ name: 'SpeedDialContext' })
 
