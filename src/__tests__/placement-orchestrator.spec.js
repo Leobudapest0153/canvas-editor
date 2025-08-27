@@ -19,6 +19,7 @@ describe('validateHeightWithinWarehouse', () => {
   it('rechaza cuando excede altura de bodega', () => {
     const res = validateHeightWithinWarehouse({ ubicacion: 'pared', zBase: 250, alto: 100, alturaBodega: ALTURA })
     expect(res.valid).toBe(false)
+    expect(res.reason).toBe('HEIGHT_EXCEEDS_WAREHOUSE')
   })
 
   it('permite cuando zBase + alto es igual a alturaBodega', () => {

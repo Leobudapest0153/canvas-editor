@@ -1876,7 +1876,12 @@ const onShapeDragEnd = (e, el) => {
       shape.position(finalWorld)
       needsDraw = true
       scheduleDraw()
-      const guardRes = onDragEndGuard({ ...el, x: finalWorld.x, y: finalWorld.y })
+      const guardRes = onDragEndGuard({ ...el, x: finalWorld.x, y: finalWorld.y, start: initial })
+      if (!guardRes.valid && guardRes.corrected) {
+        shape.position(guardRes.corrected)
+        needsDraw = true
+        scheduleDraw()
+      }
       if (guardRes.valid) {
         const changed =
           Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
@@ -2273,12 +2278,13 @@ const handleTransformEnd = (e, elementId, forma) => {
       const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
       const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
       const isValidNow = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
-      const guardRes = onTransformEndGuard({ ...elemento, x, y, width, height })
+      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation }
+      const guardRes = onTransformEndGuard({ ...elemento, x, y, width, height, start: prev })
 
   console.debug('[transform-debug] end', elementId, { prev: transformInitialState.get(elementId), new: { x, y, width, height, rotation }, isValidNow })
     if (!isValidNow || !guardRes.valid) {
       // Revertir al estado inicial guardado
-      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height }
+      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation }
       try {
         if (forma === 'circular') {
           const r = Math.min(prev.width, prev.height) / 2
