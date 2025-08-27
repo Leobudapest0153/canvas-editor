@@ -174,9 +174,9 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
               @transformstart="(e) => handleTransformStart(e, elemento.id)"
               @transform="(e) => handleTransformMove(e, elemento.id, 'rectangular')"
               @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
@@ -244,9 +244,9 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id, 'circular')"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id, 'circular')"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'circular')"
@@ -277,9 +277,9 @@
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="() => canDragElement(elemento.id) && startElementDrag(elemento.id)"
-            @dragmove="(e) => canDragElement(elemento.id) && updateElementPosition(e, elemento.id)"
-            @dragend="() => canDragElement(elemento.id) && endElementDrag(elemento.id)"
+            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id, 'rectangular')"
             @transformend="(e) => handleTransformEnd(e, elemento.id, 'rectangular')"
@@ -410,6 +410,14 @@
       unit="m"
     />
 
+    <FloatingToolbar
+      :is-element-selected="canvasStore.elementoSeleccionado ? true : false"
+      :is-element-locked="selectedElementLocked"
+      :active-mode="isDragModeActive ? 'edit' : 'drag'"
+      @set-mode="toggleDragMode()"
+      @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
+    />
+
     <!-- Menú contextual -->
     <SpeedDialContext
       v-if="ctxVisible"
@@ -499,49 +507,6 @@
         </svg>
       </button>
 
-  <!-- Nuevo SpeedDial -->
-  <div class="relative">
-        <div class="relative">
-          <button @click="toggleSpeedDial" class="floating-btn btn-gear focus:outline-none" :class="{ 'ring-2 ring-blue-500': speedDialOpen }" title="Acciones del elemento">
-            <!-- Icono de acciones (tres puntos verticales) -->
-            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <circle cx="12" cy="5" r="1.75" />
-              <circle cx="12" cy="12" r="1.75" />
-              <circle cx="12" cy="19" r="1.75" />
-            </svg>
-          </button>
-            <!-- Acciones -->
-          <transition-group name="fade-scale">
-            <!-- Acción Modo Arrastre (siempre visible cuando el speedDial está abierto) -->
-            <button
-              v-if="speedDialOpen"
-              key="hand"
-              @click="toggleDragMode"
-              class="speed-action"
-              :style="{ top: canvasStore.elementoSeleccionado ? '116px' : '60px' }"
-              :class="isDragModeActive ? 'bg-emerald-600': 'bg-white'"
-              :title="isDragModeActive ? 'Desactivar modo edición' : 'Activar modo edición'"
-            >
-              <svg class="w-5 h-5" :class="isDragModeActive ? 'text-white' : 'text-emerald-600'" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 11V6a1 1 0 012 0v5m2-3V6a1 1 0 112 0v5m2-2V9a1 1 0 112 0v4.5c0 3.59-2.91 6.5-6.5 6.5h-.55A6.95 6.95 0 019 19" /></svg>
-            </button>
-            <!-- Acción Bloquear / Desbloquear solo si hay elemento seleccionado -->
-            <button
-              v-if="speedDialOpen && canvasStore.elementoSeleccionado"
-              key="lock"
-              @mousedown.stop.prevent
-              @click.stop="() => toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
-              class="speed-action group"
-              :class="selectedElementLocked ? 'bg-amber-500': 'bg-blue-500'"
-              style="top:60px;"
-              :title="selectedElementLocked ? 'Desbloquear' : 'Bloquear'"
-            >
-              <span class="sr-only">Bloquear</span>
-              <svg v-if="selectedElementLocked" class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-amber-400/40 stroke-white" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
-              <svg v-else class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0110 0v2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /><rect x="5" y="11" width="14" height="8" rx="2" stroke-width="2" class="fill-blue-400/20 stroke-white" /><circle cx="12" cy="15" r="2" fill="currentColor" /></svg>
-            </button>
-          </transition-group>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -579,6 +544,8 @@ import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
+import { makeInnerSession } from '@/composables/useInnerNoOverlap'
+import FloatingToolbar from './FloatingToolbar.vue'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -597,6 +564,20 @@ const stageRef = ref(null)
 const layerRef = ref(null)
 const backgroundLayerRef = ref(null)
 const overlaysLayerRef = ref(null)
+
+const innerSessions = new Map()
+let needsDraw = false
+let rafId = null
+function scheduleDraw() {
+  if (rafId) return
+  rafId = requestAnimationFrame(() => {
+    rafId = null
+    if (needsDraw) {
+      layerRef.value?.getNode()?.batchDraw()
+      needsDraw = false
+    }
+  })
+}
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -1574,6 +1555,34 @@ const createElementFromDrop = (data, dropEvent) => {
   candX = snapped.x
   candY = snapped.y
 
+  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
+    if (elemento.tipo === 'contenedores') {
+      const parent = canvasStore.elementoContenedorActual
+      const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
+      const temp = {
+        id: '__temp',
+        dimensiones: { ancho: anchoCm, largo: largoCm, alto: altoCm },
+        posicion: { x: candX, y: candY },
+      }
+      const sess = makeInnerSession({
+        parentEl: parent,
+        movingEl: temp,
+        siblings,
+        vista: canvasStore.vistaActiva,
+        CM_TO_PX,
+      })
+      let local = sess.toLocal({ x: candX, y: candY }, parent)
+      local = sess.finalizeLocal(local)
+      if (!sess.isValidLocal(local)) {
+        showToast('No hay espacio aquí', 'error')
+        return
+      }
+      const world = sess.toWorld(local, parent)
+      candX = world.x
+      candY = world.y
+    }
+  }
+
   // 4. Calcular bbox candidato y verificar área
   const boundary = computeBoundary()
 
@@ -1753,6 +1762,83 @@ const createElementFromDrop = (data, dropEvent) => {
 
   // Seleccionar el elemento recién creado
   canvasStore.seleccionarElemento(nuevoElemento.id)
+}
+
+const onShapeDragStart = (e, el) => {
+  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
+    const shape = e.target
+    const parent =
+      canvasStore.elementoContenedorActual || canvasStore.elementoPorId(canvasStore.elementoSeleccionado)
+    const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
+    const session = makeInnerSession({
+      parentEl: parent,
+      movingEl: el,
+      siblings,
+      vista: canvasStore.vistaActiva,
+      CM_TO_PX,
+    })
+    const pointer = e.evt ? { x: e.evt.clientX || 0, y: e.evt.clientY || 0 } : { x: 0, y: 0 }
+    innerSessions.set(el.id, {
+      session,
+      parent,
+      lastPointer: pointer,
+      initial: { x: el.posicion?.x ?? el.x ?? 0, y: el.posicion?.y ?? el.y ?? 0 },
+    })
+    isElementDragging.value = true
+    stageDragEnabled.value = false
+  } else {
+    startElementDrag(el.id)
+  }
+}
+
+const onShapeDragMove = (e, el) => {
+  const data = innerSessions.get(el.id)
+  if (data) {
+    const { session, parent } = data
+    const shape = e.target
+    const pointer = e.evt ? { x: e.evt.clientX || 0, y: e.evt.clientY || 0 } : { x: 0, y: 0 }
+    const vel = {
+      x: e.evt?.movementX ?? pointer.x - data.lastPointer.x,
+      y: e.evt?.movementY ?? pointer.y - data.lastPointer.y,
+    }
+    data.lastPointer = pointer
+    const posWorld = shape.position()
+    const posLocal = session.toLocal(posWorld, parent)
+    const nextLocal = session.dragBoundFuncLocal(posLocal, vel)
+    shape.position(session.toWorld(nextLocal, parent))
+    needsDraw = true
+    scheduleDraw()
+  } else {
+    updateElementPosition(e, el.id, el.forma === 'circular' ? 'circular' : 'rectangular')
+  }
+}
+
+const onShapeDragEnd = (e, el) => {
+  const data = innerSessions.get(el.id)
+  if (data) {
+    const { session, parent, initial } = data
+    innerSessions.delete(el.id)
+    isElementDragging.value = false
+    stageDragEnabled.value = true
+    const shape = e.target
+    let candLocal = session.toLocal(shape.position(), parent)
+    let finalLocal = session.finalizeLocal(candLocal)
+    const finalWorld = session.toWorld(finalLocal, parent)
+    shape.position(finalWorld)
+    needsDraw = true
+    scheduleDraw()
+    const changed =
+      Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
+    if (changed) {
+      canvasStore.actualizarElementoConHistorial(
+        el.id,
+        { posicion: { x: finalWorld.x, y: finalWorld.y }, x: finalWorld.x, y: finalWorld.y },
+        `Elemento movido: ${el.id}`,
+      )
+    }
+  } else {
+    endElementDrag(el.id)
+  }
 }
 
 const getElementShadow = (elemento) => {
