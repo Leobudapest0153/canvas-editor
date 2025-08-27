@@ -90,6 +90,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const idsElementosFiltrados = ref(null);
   const elementoAura = ref(null);
 
+  const isDraggable = ref(true);
   // Configuración de grilla y snap
   const gridSize = ref(50) // px entre líneas de grilla
   const snapGridEps = ref(6) // px de proximidad para aplicar snap al soltar
@@ -1415,6 +1416,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     idsElementosFiltrados.value = ids
   }
 
+  const setDraggableMode = (mode) => {
+    this.isDraggable = mode;
+  };
+
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
   watch(
     () => [contextoNavegacion.value.tipo, contextoNavegacion.value.id],
@@ -1462,6 +1467,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     elementoDestacadoId,
     idsElementosFiltrados,
     elementoAura,
+    isDraggable,
 
     // Getters
     elementosVisibles,
@@ -1546,5 +1552,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     // == Destacar
     destacarElemento,
     actualizarIdsFiltrados,
+
+    setDraggableMode,
   }
 })
