@@ -16,21 +16,6 @@ export const snapToGrid = (x, y, gridSize = 50) => {
   return { x: sx, y: sy }
 }
 
-// Point in polygon (ray casting), supports concave polygons
-export const pointInPolygon = (pt, polygon) => {
-  const { x, y } = pt
-  let inside = false
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x,
-      yi = polygon[i].y
-    const xj = polygon[j].x,
-      yj = polygon[j].y
-    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi + EPSILON) + xi
-    if (intersect) inside = !inside
-  }
-  return inside
-}
-
 // Segment intersection
 export const segmentsIntersect = (p1, p2, p3, p4) => {
   const r = { x: p2.x - p1.x, y: p2.y - p1.y }
