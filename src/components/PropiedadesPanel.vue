@@ -48,9 +48,6 @@
               disabled
               class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed"
             />
-            <p class="text-xs text-gray-500 mt-1">
-              El ID se genera automáticamente y no puede modificarse
-            </p>
           </div>
 
           <TagFilter
@@ -197,7 +194,6 @@
               <input
                 id="prop-largo"
                 type="number"
-                :disabled="!canvasStore.estaEnPlanta"
                 :value="cambiosPendientes.dimensiones.largo !== null ? cambiosPendientes.dimensiones.largo : elementoSeleccionado.dimensiones?.largo"
                 @change="actualizarDimension('largo', $event.target.value)"
                 class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
@@ -209,7 +205,6 @@
               <input
                 id="prop-alto"
                 type="number"
-                :disabled="canvasStore.estaEnPlanta"
                 :value="cambiosPendientes.dimensiones.alto !== null ? cambiosPendientes.dimensiones.alto : elementoSeleccionado.dimensiones?.alto"
                 @change="actualizarDimension('alto', $event.target.value)"
                 class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
@@ -244,14 +239,14 @@
         </p>
 
         <!-- Información de peso total si tiene elementos hijos -->
-        <div v-if="elementoSeleccionado.hijos && elementoSeleccionado.hijos.length > 0" class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md text-sm">
+        <!-- <div v-if="elementoSeleccionado.hijos && elementoSeleccionado.hijos.length > 0" class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md text-sm">
           Este elemento contiene {{ elementoSeleccionado.hijos.length }} elementos con una capacidad de carga total requerida.
-        </div>
+        </div> -->
 
         <!-- Información sobre capacidad del padre o planta contenedora -->
-        <div v-if="infoPesoContenedor.mostrar" class="mt-2 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-md text-sm">
+        <!-- <div v-if="infoPesoContenedor.mostrar" class="mt-2 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-md text-sm">
           {{ infoPesoContenedor.mensaje }}
-        </div>
+        </div> -->
         <div class="grid grid-cols-2 items-center">
           <label for="prop-volumen-max" class="text-sm text-gray-500">Volumen (m³)</label>
           <input
@@ -347,7 +342,7 @@
         </p>
       </div>
 
-      <div class="flex gap-2 mb-2">
+      <!-- <div class="flex gap-2 mb-2">
         <button
           @click="onDeleteClick"
           class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
@@ -356,7 +351,7 @@
         >
           Eliminar
         </button>
-      </div>
+      </div> -->
 
       <div class="flex gap-2">
         <button
@@ -394,7 +389,7 @@ import { useCanvasStore } from '@/composables/useCanvasStore.js'
 import { useWeightValidation } from '@/composables/useWeightValidation.js'
 import { useDimensionValidation } from '@/composables/useDimensionValidation.js'
 import { useToast } from '@/composables/useToast.js'
-import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
+import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX } from '@/utils/constants'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import TagFilter from './TagFilter.vue'
 import CreateTagModal from './CreateTagModal.vue'
@@ -430,53 +425,53 @@ const textoNuevaEtiqueta = ref('')
 
 // Computed
 const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoCompleto)
-const isLockedSelected = computed(() => {
-  const el = elementoSeleccionado.value
-  return !!(el && (el.bloqueado === true || el.locked === true))
-})
+// const isLockedSelected = computed(() => {
+//   const el = elementoSeleccionado.value
+//   return !!(el && (el.bloqueado === true || el.locked === true))
+// })
 
 // Información sobre la capacidad del contenedor padre o planta
-const infoPesoContenedor = computed(() => {
-  const elemento = elementoSeleccionado.value
-  if (!elemento) return { mostrar: false, mensaje: '' }
+// const infoPesoContenedor = computed(() => {
+//   const elemento = elementoSeleccionado.value
+//   if (!elemento) return { mostrar: false, mensaje: '' }
 
-  // Verificar si el elemento tiene un padre
-  if (elemento.padre) {
-    const padreId = elemento.padre
-    const padre = canvasStore.elementoPorId(padreId)
+//   // Verificar si el elemento tiene un padre
+//   if (elemento.padre) {
+//     const padreId = elemento.padre
+//     const padre = canvasStore.elementoPorId(padreId)
 
-    if (padre && padre.pesoMaximo > 0) {
-      const nombrePadre = padre.nombre || obtenerNombreElementoPorId(padreId)
-      const tipoElementoPadre = padre.tipo || 'elementos'
-      const resultado = weightValidation.calcularPesoDisponible(padreId, tipoElementoPadre)
+//     if (padre && padre.pesoMaximo > 0) {
+//       const nombrePadre = padre.nombre || obtenerNombreElementoPorId(padreId)
+//       const tipoElementoPadre = padre.tipo || 'elementos'
+//       const resultado = weightValidation.calcularPesoDisponible(padreId, tipoElementoPadre)
 
-      if (resultado.limiteDePeso) {
-        return {
-          mostrar: true,
-          mensaje: `Contenedor: "${nombrePadre}" - Capacidad disponible: ${Math.round(resultado.disponible * 10) / 10} kg de ${resultado.maximo} kg (${Math.round(resultado.porcentajeUsado)}% en uso)`
-        }
-      }
-    }
-  }
-  // Verificar si el elemento está en una planta sin padre (elemento de primer nivel)
-  else if (elemento.plantaId) {
-    const plantaId = elemento.plantaId
-    const planta = canvasStore.plantaPorId(plantaId)
+//       if (resultado.limiteDePeso) {
+//         return {
+//           mostrar: true,
+//           mensaje: `Contenedor: "${nombrePadre}" - Capacidad disponible: ${Math.round(resultado.disponible * 10) / 10} kg de ${resultado.maximo} kg (${Math.round(resultado.porcentajeUsado)}% en uso)`
+//         }
+//       }
+//     }
+//   }
+//   // Verificar si el elemento está en una planta sin padre (elemento de primer nivel)
+//   else if (elemento.plantaId) {
+//     const plantaId = elemento.plantaId
+//     const planta = canvasStore.plantaPorId(plantaId)
 
-    if (planta && planta.pesoMaximoSoportado > 0) {
-      const resultado = weightValidation.calcularPesoDisponible(plantaId, 'plantas')
+//     if (planta && planta.pesoMaximoSoportado > 0) {
+//       const resultado = weightValidation.calcularPesoDisponible(plantaId, 'plantas')
 
-      if (resultado.limiteDePeso) {
-        return {
-          mostrar: true,
-          mensaje: `Planta: "${planta.nombre}" - Capacidad disponible: ${Math.round(resultado.disponible * 10) / 10} kg de ${resultado.maximo} kg (${Math.round(resultado.porcentajeUsado)}% en uso)`
-        }
-      }
-    }
-  }
+//       if (resultado.limiteDePeso) {
+//         return {
+//           mostrar: true,
+//           mensaje: `Planta: "${planta.nombre}" - Capacidad disponible: ${Math.round(resultado.disponible * 10) / 10} kg de ${resultado.maximo} kg (${Math.round(resultado.porcentajeUsado)}% en uso)`
+//         }
+//       }
+//     }
+//   }
 
-  return { mostrar: false, mensaje: '' }
-})
+//   return { mostrar: false, mensaje: '' }
+// })
 
 
 const volumen = computed(() => {
@@ -582,9 +577,9 @@ const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
 }
 
-const onDeleteClick = () => {
-  deleteSelected({ withConfirm: true })
-}
+// const onDeleteClick = () => {
+//   deleteSelected({ withConfirm: true })
+// }
 
 // Funciones para obtener nombres de elementos por ID
 const obtenerNombreElementoPorId = (elementoId) => {
@@ -797,6 +792,34 @@ const aplicarCambios = () => {
     setTimeout(() => {
       cambiosPendientes.value.pesoMaximo = null
     }, 2000) // 2 segundos de delay
+
+    if (actualizaciones.dimensiones) {
+      if (canvasStore.vistaActiva === 'XY') {
+        // Vista superior: ancho->width, largo->height
+        if (actualizaciones.dimensiones.ancho !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            width: actualizaciones.dimensiones.ancho * CM_TO_PX
+          })
+        }
+        if (actualizaciones.dimensiones.largo !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            height: actualizaciones.dimensiones.largo * CM_TO_PX
+          })
+        }
+      } else if (canvasStore.vistaActiva === 'XZ') {
+        // Vista frontal: ancho->width, alto->height
+        if (actualizaciones.dimensiones.ancho !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            width: actualizaciones.dimensiones.ancho * CM_TO_PX
+          })
+        }
+        if (actualizaciones.dimensiones.alto !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            height: actualizaciones.dimensiones.alto * CM_TO_PX
+          })
+        }
+      }
+    }
   }
 }
 </script>

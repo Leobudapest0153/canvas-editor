@@ -1,6 +1,6 @@
 {
-  "name": "dv-canva-editor",
-  "version": "0.0.0",
+  "name": "inventory-smart",
+  "version": "0.0.1",
   "private": true,
   "type": "module",
   "engines": {
