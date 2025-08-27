@@ -17,7 +17,10 @@ export function getEdgeState(id) {
 export function setEdgeState(id, next) {
   if (!id) return
   const cur = edgeMap.get(id) || { edgeX: null, edgeY: null }
-  edgeMap.set(id, { edgeX: next.edgeX ?? cur.edgeX ?? null, edgeY: next.edgeY ?? cur.edgeY ?? null })
+  edgeMap.set(id, {
+    edgeX: next.edgeX !== undefined ? next.edgeX : cur.edgeX,
+    edgeY: next.edgeY !== undefined ? next.edgeY : cur.edgeY,
+  })
 }
 
 export function resetEdgeState(id) {
