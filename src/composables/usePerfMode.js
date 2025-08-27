@@ -25,7 +25,9 @@ export function enablePerfMode(layer, opts = {}) {
         strokeWidth: 1,
       })
     }
-  } catch (_) {}
+  } catch (_) {
+    // ignore errors from perf mode optimizations
+  }
 
   return {
     restore: () => disablePerfMode(layer, { shape, prev }),
@@ -52,5 +54,7 @@ export function disablePerfMode(layer, ctx = {}) {
       if (prev.shapeStrokeWidth !== undefined) attrs.strokeWidth = prev.shapeStrokeWidth
       shape.setAttrs(attrs)
     }
-  } catch (_) {}
+  } catch (_) {
+    // ignore errors when restoring perf mode
+  }
 }

@@ -1,3 +1,4 @@
+/* eslint-env vitest, jsdom */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useCanvasStore } from '@/composables/useCanvasStore'
@@ -164,7 +165,7 @@ describe('deleteSelected', () => {
 
     const toasts = { show: vi.fn() }
     // stub toasts
-    global.window.__toasts = toasts
+    globalThis.window.__toasts = toasts
 
     const ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(false)
@@ -186,7 +187,7 @@ describe('deleteSelected', () => {
     history.initializeHistory('pre')
 
     // Primero intenta y bloquea
-    global.window.__toasts = { show: vi.fn() }
+    globalThis.window.__toasts = { show: vi.fn() }
     let ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(false)
 
@@ -220,7 +221,7 @@ describe('deleteSelected', () => {
     const hBefore = history.historySize.value
 
     const toasts = { show: vi.fn() }
-    global.window.__toasts = toasts
+    globalThis.window.__toasts = toasts
 
     const ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(false)
@@ -249,7 +250,7 @@ describe('deleteSelected', () => {
 
     // Stub de toasts para capturar opciones
     const showSpy = vi.fn()
-    global.window.__toasts = { show: showSpy }
+    globalThis.window.__toasts = { show: showSpy }
 
     // Confirmación positiva
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)

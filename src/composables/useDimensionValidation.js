@@ -1,9 +1,7 @@
 import { useCanvasStore } from '@/composables/useCanvasStore'
 import { useToast } from '@/composables/useToast'
 import { detectConflictsFor } from '@/utils/collision'
-
-// Constante de conversión: 1cm = 10px
-const CM_TO_PX = 10
+import { CM_TO_PX } from '@/utils/constants'
 
 /**
  * Composable para validar dimensiones físicas de elementos
