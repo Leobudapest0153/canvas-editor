@@ -26,7 +26,17 @@
 
       <v-layer :config="{ listening: false }">
         <template v-for="el in elements" :key="el.id">
-          <v-rect :config="{
+
+          <v-circle v-if="el.forma === 'circular'" :config="{
+            x: el.x + el.width / 2,
+            y: el.y + el.height / 2,
+            radius: el.width / 2,
+            fill: '#94a3b8',
+            opacity: 0.5,
+            stroke: '#64748b',
+            strokeWidth: 1 / stageScale
+          }" />
+          <v-rect v-else :config="{
             x: el.x,
             y: el.y,
             width: el.width,
@@ -37,11 +47,15 @@
             strokeWidth: 1 / stageScale
           }" />
           <v-text :config="{
-            x: el.x + 4,
-            y: el.y + 4,
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+            align: 'center',
+            verticalAlign: 'middle',
             text: el.nombre || el.id,
             fontSize: 10 / stageScale,
-            fill: '#334155'
+            fill: '#334155',
           }" />
         </template>
       </v-layer>
