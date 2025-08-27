@@ -534,6 +534,7 @@ import {
 import { clampRectToPolygon, pointInPolygon, clampPointToPolygon } from '@/utils/polygonBounds'
 import { polygonInset } from '@/utils/polygonInset'
 import { GRID_SIZE, CM_TO_PX } from '@/utils/constants'
+import { getActiveBounds } from '@/utils/activeBounds'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useDeleteElement } from '@/composables/useDeleteElement'
@@ -761,32 +762,15 @@ const stageConfig = computed(() => {
   }
 })
 
-const plantPolygon = computed(() => {
-  const poligono = canvasStore.plantaActivaData?.poligono
-  if (poligono && Array.isArray(poligono) && poligono.length >= 3) return poligono
-  const w = canvasStore.plantaActivaData?.dimensiones?.ancho || layerConfig.value.width
-  const h = canvasStore.plantaActivaData?.dimensiones?.largo || layerConfig.value.height
-  return [
-    { x: 0, y: 0 },
-    { x: w, y: 0 },
-    { x: w, y: h },
-    { x: 0, y: h }
-  ]
-})
+const activeBounds = computed(() => getActiveBounds(canvasStore))
+
+const plantPolygon = computed(() => activeBounds.value.polygonPx)
 
 const insetPoly = computed(() => polygonInset(plantPolygon.value, 1))
 
-const plantPolygonFlat = computed(() => plantPolygon.value.flatMap(p => [p.x, p.y]))
+const plantPolygonFlat = computed(() => plantPolygon.value.flatMap((p) => [p.x, p.y]))
 
-const floorBoundary = computed(() => {
-  const xs = plantPolygon.value.map(p => p.x)
-  const ys = plantPolygon.value.map(p => p.y)
-  const minX = Math.min(...xs)
-  const maxX = Math.max(...xs)
-  const minY = Math.min(...ys)
-  const maxY = Math.max(...ys)
-  return { width: maxX - minX, height: maxY - minY }
-})
+const floorBoundary = computed(() => activeBounds.value.boundsPx)
 
 // Configuración del layer - SIEMPRE USA CANVAS ADAPTATIVO
 const layerConfig = computed(() => {
@@ -839,22 +823,9 @@ watch(
   { immediate: true },
 )
 
-// Obtiene el contorno de la planta activa como rect o polígono
+// Contorno activo siempre expresado como polígono
 const computeBoundary = () => {
-  const W = layerConfig.value.width
-  const H = layerConfig.value.height
-
-  // Si estamos en un elemento o contenedor, usar todo el canvas adaptativo como boundary
-  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
-    return { type: 'rect', W, H }
-  }
-
-  // Si estamos en una planta, verificar si tiene polígono
-  const planta = canvasStore.plantaActivaData
-  if (planta?.poligono && Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
-    return { type: 'polygon', points: plantPolygon.value, inset: insetPoly.value }
-  }
-  return { type: 'rect', W, H }
+  return { type: 'polygon', points: plantPolygon.value, inset: insetPoly.value }
 }
 
 // === FUNCIONES DE ZOOM ===

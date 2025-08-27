@@ -48,12 +48,17 @@ describe('fitToPlanta', () => {
 
     const wrapper = mount(CanvasView)
     wrapper.vm.stageRef = { getNode: () => ({}) }
-    wrapper.vm.stageSize = { width: 400, height: 400 }
+    // Ajustar tamaño del stage antes de llamar
+    wrapper.vm.stageSize.width = 400
+    wrapper.vm.stageSize.height = 400
 
     wrapper.vm.fitToPlanta()
 
     expect(mockStore.configurarZoom).toHaveBeenCalled()
     const zoom = mockStore.configurarZoom.mock.calls[0][0]
-    expect(zoom).toBeCloseTo(1.6)
+    const vw = Math.max(16, wrapper.vm.stageSize.width - 80)
+    const vh = Math.max(16, wrapper.vm.stageSize.height - 80)
+    const expected = Math.min(vw / 200, vh / 100)
+    expect(zoom).toBeCloseTo(expected)
   })
 })

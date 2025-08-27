@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { pointInPolygon } from '@/utils/polygonBounds'
 
 vi.mock('vue-konva', () => ({ VueKonva: {}, default: { install: () => {} } }))
 
@@ -10,7 +11,8 @@ vi.mock('@/composables/useCanvasWithHistory', () => ({
 }))
 
 vi.mock('@/utils/collision', () => ({
-  detectConflictsFor: vi.fn(() => [])
+  detectConflictsFor: vi.fn(() => []),
+  throttle: (fn) => fn,
 }))
 
 import CanvasView from '@/components/CanvasView.vue'
@@ -21,7 +23,7 @@ beforeEach(() => {
 })
 
 describe('drop outside polygon', () => {
-  it('rejects drop when outside active polygon', async () => {
+  it('clamps drop inside active polygon', async () => {
     mockStore = {
       zoom: 1,
       panX: 0,
@@ -53,14 +55,21 @@ describe('drop outside polygon', () => {
 
     const wrapper = mount(CanvasView)
     wrapper.vm.containerRef = { getBoundingClientRect: () => ({ left: 0, top: 0 }) }
-    wrapper.vm.stageRef = { getNode: () => ({}) }
+    wrapper.vm.stageRef = {
+      getNode: () => ({ x: () => 0, y: () => 0, scaleX: () => 1, scaleY: () => 1 })
+    }
+    wrapper.vm.stageSize.width = 100
+    wrapper.vm.stageSize.height = 100
 
     const data = { elemento: { dimensiones: { ancho: 20, largo: 20 }, tipo: 'elementos', forma: 'rectangular', color: '#f00' } }
     const dropEvent = { clientX: 150, clientY: 50, preventDefault: () => {} }
 
     wrapper.vm.createElementFromDrop(data, dropEvent)
 
-    expect(window.__toasts.show).toHaveBeenCalledWith('Fuera de los límites de la planta', { type: 'error', timeout: 4000 })
-    expect(mockStore.agregarElemento).not.toHaveBeenCalled()
+    expect(window.__toasts.show).not.toHaveBeenCalled()
+    expect(mockStore.agregarElemento).toHaveBeenCalled()
+    const added = mockStore.agregarElemento.mock.calls[0][0]
+    const inside = pointInPolygon({ x: added.x, y: added.y }, mockStore.plantaActivaData.poligono)
+    expect(inside).toBe(true)
   })
 })
