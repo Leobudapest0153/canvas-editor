@@ -195,6 +195,7 @@ function defaultRect(w_cm, l_cm) {
 const closeModal = () => {
   resetLocalState();
   canvasStore.cerrarEditor();
+  resetMode();
 }
 
 function resetLocalState() {
@@ -251,6 +252,12 @@ watch(() => canvasStore.plantaEnEdicion, (planta) => {
 
 const adding = ref(false)
 const deleting = ref(false)
+
+const resetMode = () => {
+  adding.value = false;
+  deleting.value = false;
+}
+
 
 function toggleAddMode(){
   adding.value = !adding.value
@@ -425,6 +432,7 @@ function onSave(){
   }
 
   resetLocalState();
+  resetMode();
   canvasStore.cerrarEditor();
 }
 </script>
