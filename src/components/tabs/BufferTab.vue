@@ -87,8 +87,8 @@
                 <span :class="['action-badge', 'action-copied']">
                   Copiado
                 </span>
-                <span class="item-time">
-                  {{ formatTime(item.addedToBuffer) }}
+                <span class="item-time" :title="`Copiado el ${getFullTimestamp(item)}`">
+                  {{ getFullTimestamp(item) }}
                 </span>
               </div>
             </div>
@@ -145,26 +145,26 @@ const getPlantaName = (plantaId) => {
   return planta?.nombre || 'Planta desconocida'
 }
 
-const formatTime = (timestamp) => {
-  const now = Date.now()
-  const diff = now - timestamp
-  const minutes = Math.floor(diff / 60000)
+const getFullTimestamp = (item) => {
+  // Priorizar copiedAt del sourceInfo si existe, sino usar addedToBuffer
+  if (item.sourceInfo?.copiedAt) {
+    return item.sourceInfo.copiedAt
+  }
 
-  if (minutes < 1) return 'hace un momento'
-  if (minutes < 60) return `hace ${minutes}m`
-
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `hace ${hours}h`
-
-  const days = Math.floor(hours / 24)
-  return `hace ${days}d`
+  // Fallback: formatear addedToBuffer
+  return new Date(item.addedToBuffer).toLocaleString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
 }
 
 // Handlers
 const handleClearBuffer = () => {
-  if (confirm('¿Estás seguro de que deseas limpiar todo el buffer?')) {
-    buffer.clearBuffer()
-  }
+  buffer.clearBuffer()
 }
 
 const handleRemove = (bufferItemId) => {
@@ -432,6 +432,31 @@ const handleDragEnd = () => {
 .item-time {
   font-size: 0.75rem;
   color: #9ca3af;
+}
+
+.item-timestamp {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  background: #f8fafc;
+  border-radius: 0.375rem;
+  border: 1px solid #e2e8f0;
+}
+
+.timestamp-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.timestamp-text {
+  font-size: 0.75rem;
+  color: #475569;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-weight: 500;
 }
 
 .item-actions {

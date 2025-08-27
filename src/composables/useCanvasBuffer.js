@@ -32,17 +32,26 @@ export const useCanvasBuffer = () => {
    * Crear un item del buffer con metadata de origen
    */
   const createBufferItem = (elemento, sourceInfo = {}) => {
+    const currentTimestamp = Date.now()
     return {
-      id: `buffer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `buffer_${currentTimestamp}_${Math.random().toString(36).substr(2, 9)}`,
       originalId: elemento.id,
       elemento: JSON.parse(JSON.stringify(elemento)), // Deep clone
       sourceInfo: {
         plantaId: elemento.plantaId || canvasStore.plantaActiva,
         position: { x: elemento.x, y: elemento.y },
-        timestamp: Date.now(),
+        timestamp: currentTimestamp,
+        copiedAt: new Date(currentTimestamp).toLocaleString('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        }),
         ...sourceInfo,
       },
-      addedToBuffer: Date.now(),
+      addedToBuffer: currentTimestamp,
     }
   }
 
@@ -61,12 +70,17 @@ export const useCanvasBuffer = () => {
     // Mapeo de IDs originales a nuevos IDs y elementos clonados
     const idMapping = new Map()
     const allClonedElements = new Map() // ID clonado -> elemento clonado
-    
+    const baseTimestamp = Date.now()
+    let counter = 0
+
     // Función recursiva para clonar un elemento y sus hijos
     const cloneElementRecursive = (elem, parentNewId = null, level = 0) => {
-      // Generar nuevo ID único usando el mismo patrón que el sistema principal
-      const newId = `${elem.tipo || elem.categoria || 'elemento'}_${Date.now()}`
+      // Generar nuevo ID único con timestamp incremental y sufijo aleatorio
+      const uniqueTimestamp = baseTimestamp + counter
+      const randomSuffix = Math.random().toString(36).substr(2, 9)
+      const newId = `${elem.tipo || elem.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
       idMapping.set(elem.id, newId)
+      counter++
 
       // Clonar el elemento
       const clonedElement = {
@@ -91,7 +105,7 @@ export const useCanvasBuffer = () => {
       // Si el elemento tiene hijos, clonarlos recursivamente
       if (elem.hijos && elem.hijos.length > 0) {
         console.log(`📋 Clonando ${elem.hijos.length} hijos para ${elem.nombre || elem.tipo}`)
-        
+
         for (const hijoId of elem.hijos) {
           const hijo = canvasStore.elementoPorId(hijoId)
           if (hijo) {
@@ -112,11 +126,9 @@ export const useCanvasBuffer = () => {
       })
 
       return clonedElement
-    }
-
-    // Iniciar clonado recursivo
+    }    // Iniciar clonado recursivo
     const rootClonedElement = cloneElementRecursive(elemento, null, 0)
-    
+
     if (rootClonedElement) {
       console.log('📋 Estructura clonada completa:', {
         elementoOriginal: elemento.nombre || elemento.tipo,
@@ -200,7 +212,7 @@ export const useCanvasBuffer = () => {
       // Mostrar mensaje de éxito
       if (typeof window !== 'undefined' && window.__toasts?.show) {
         const nombreElemento = elemento.nombre || elemento.tipo
-        const mensaje = totalElements > 1 
+        const mensaje = totalElements > 1
           ? `Estructura "${nombreElemento}" copiada (${totalElements} elementos)`
           : `Elemento "${nombreElemento}" copiado`
         window.__toasts.show(mensaje, { type: 'info' })
@@ -217,7 +229,7 @@ export const useCanvasBuffer = () => {
    */
   const countElementsInStructure = (elemento) => {
     let count = 1 // El elemento actual
-    
+
     if (elemento.hijos && elemento.hijos.length > 0) {
       for (const hijoId of elemento.hijos) {
         const hijo = canvasStore.elementoPorId(hijoId)
@@ -226,7 +238,7 @@ export const useCanvasBuffer = () => {
         }
       }
     }
-    
+
     return count
   }
 
@@ -297,7 +309,7 @@ export const useCanvasBuffer = () => {
     // Agregar hijos recursivamente
     if (elementoToPaste.hijos && elementoToPaste.hijos.length > 0) {
       console.log(`📋 Agregando ${elementoToPaste.hijos.length} hijos para ${elementoToPaste.nombre || elementoToPaste.tipo}`)
-      
+
       for (const hijoId of elementoToPaste.hijos) {
         const hijoElement = allElementsMap.get(hijoId)
         if (hijoElement) {
@@ -331,13 +343,13 @@ export const useCanvasBuffer = () => {
     // Configurar relación padre-hijo
     if (parentId) {
       console.log('📋 addElementDirectly - parentId:', parentId)
-      
+
       // Buscar el padre directamente en el array de elementos del store
       if (!canvasStore.elementos) {
         console.error('⚠️ canvasStore.elementos es undefined')
         return null
       }
-      
+
       const padreIndex = canvasStore.elementos.findIndex(el => el.id === parentId)
       if (padreIndex === -1) {
         console.error('⚠️ Padre no encontrado:', parentId)
@@ -375,6 +387,46 @@ export const useCanvasBuffer = () => {
   }
 
   /**
+   * Regenerar IDs únicos para una estructura antes del pegado
+   */
+  const regenerateUniqueIds = (allElementsMap) => {
+    const newIdMapping = new Map()
+    const newElementsMap = new Map()
+    const baseTimestamp = Date.now()
+    let counter = 0
+
+    // Primero, generar todos los nuevos IDs únicos
+    for (const [oldId, element] of allElementsMap) {
+      const uniqueTimestamp = baseTimestamp + counter
+      const randomSuffix = Math.random().toString(36).substr(2, 9)
+      const newId = `${element.tipo || element.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
+      newIdMapping.set(oldId, newId)
+      counter++
+
+      console.log('🔄 ID regenerado:', {
+        original: oldId,
+        nuevo: newId,
+        elemento: element.nombre || element.tipo
+      })
+    }
+
+    // Luego, crear los elementos con los nuevos IDs y referencias actualizadas
+    for (const [oldId, element] of allElementsMap) {
+      const newId = newIdMapping.get(oldId)
+      const newElement = {
+        ...JSON.parse(JSON.stringify(element)), // Deep clone
+        id: newId,
+        hijos: element.hijos ? element.hijos.map(hijoId => newIdMapping.get(hijoId)).filter(Boolean) : [],
+        padre: element.padre ? newIdMapping.get(element.padre) : null
+      }
+
+      newElementsMap.set(newId, newElement)
+    }
+
+    return { newElementsMap, newIdMapping }
+  }
+
+  /**
    * Pegar estructura completa desde buffer al canvas actual
    */
   const pasteFromBuffer = (bufferItemId, position = { x: 100, y: 100 }) => {
@@ -409,20 +461,34 @@ export const useCanvasBuffer = () => {
     // Verificar si es una estructura con elementos hijos
     if (sourceInfo.isStructure && sourceInfo.allElements) {
       console.log('📋 Pegando estructura completa con', sourceInfo.allElements.size, 'elementos')
-      
+
+      // REGENERAR IDs únicos para cada pegado
+      const { newElementsMap, newIdMapping } = regenerateUniqueIds(sourceInfo.allElements)
+
+      // Obtener el elemento raíz con el nuevo ID
+      const originalRootId = elemento.id
+      const newRootId = newIdMapping.get(originalRootId)
+      const newRootElement = newElementsMap.get(newRootId)
+
+      if (!newRootElement) {
+        console.error('⚠️ Error al regenerar IDs para el elemento raíz')
+        return false
+      }
+
       // Pegar la estructura de forma recursiva, respetando la jerarquía
-      const rootElementId = pasteStructureRecursive(elemento, position, sourceInfo.allElements)
-      
+      const rootElementId = pasteStructureRecursive(newRootElement, position, newElementsMap)
+
       if (rootElementId) {
-        console.log('📋 Estructura completa pegada:', {
+        console.log('📋 Estructura completa pegada con nuevos IDs únicos:', {
           elementoRaiz: elemento.nombre || elemento.tipo,
-          nuevoId: rootElementId
+          nuevoId: rootElementId,
+          elementosRegenerados: newElementsMap.size
         })
 
         // Mostrar mensaje de éxito para estructura
         if (typeof window !== 'undefined' && window.__toasts?.show) {
           const nombreElemento = elemento.nombre || elemento.tipo
-          const totalElements = sourceInfo.allElements.size
+          const totalElements = newElementsMap.size
           const mensaje = totalElements > 1
             ? `Estructura "${nombreElemento}" pegada (${totalElements} elementos)`
             : `Elemento "${nombreElemento}" pegado`
@@ -431,24 +497,31 @@ export const useCanvasBuffer = () => {
 
         return rootElementId
       }
-      
+
       return false
     } else {
-      // Pegar elemento simple (sin hijos)
+      // Pegar elemento simple (sin hijos) - generar nuevo ID único
+      const uniqueTimestamp = Date.now()
+      const randomSuffix = Math.random().toString(36).substr(2, 9)
+      const newId = `${elemento.tipo || elemento.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
+
       const newElement = {
         ...elemento,
+        id: newId, // Asignar nuevo ID único
         x: position.x,
         y: position.y,
-      }
-
-      // Limpiar propiedades que el store manejará
+      }      // Limpiar propiedades que el store manejará
       delete newElement.plantaId
       delete newElement.padre
 
       const finalElementId = canvasStore.agregarElemento(newElement)
-      
+
       if (finalElementId) {
-        console.log('📋 Elemento simple pegado desde buffer:', elemento.nombre || elemento.tipo)
+        console.log('📋 Elemento simple pegado desde buffer con nuevo ID único:', {
+          original: elemento.id,
+          nuevo: finalElementId,
+          nombre: elemento.nombre || elemento.tipo
+        })
 
         // Mostrar mensaje de éxito para elemento simple
         if (typeof window !== 'undefined' && window.__toasts?.show) {
