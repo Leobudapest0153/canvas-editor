@@ -5,7 +5,7 @@
  * proporcionando una interfaz unificada con funcionalidades de undo/redo.
  */
 
-import { onMounted } from 'vue'
+import { onMounted, nextTick } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
 import { useCanvasHistory } from './useCanvasHistory'
 
@@ -17,14 +17,21 @@ export const useCanvasWithHistory = () => {
   let isInitialized = false
 
   // Función de inicialización que se puede llamar múltiples veces de forma segura
-  const ensureInitialized = () => {
+  const ensureInitialized = async () => {
     if (!isInitialized) {
       console.log('🔗 Inicializando integración canvas-historial')
-      canvasStore.initializeHistory(history)
+
+      // Esperar a que todas las propiedades reactivas se estabilicen
+      await nextTick()
+
+      // Integrar el historial con el store de manera directa
+      canvasStore.setHistoryInstance(history)
 
       // Guardar estado inicial en el historial
       history.initializeHistory('Estado inicial del canvas')
       isInitialized = true
+
+      console.log('✅ Integración canvas-historial completada')
     }
   }
 

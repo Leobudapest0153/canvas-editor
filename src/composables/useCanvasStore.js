@@ -860,10 +860,18 @@ export const useCanvasStore = defineStore('canvas', () => {
   // === INTEGRACIÓN CON HISTORIAL ===
 
   /**
-   * Inicializar la integración con el historial
+   * Establecer la instancia del historial (resuelve dependencia circular)
+   */
+  const setHistoryInstance = (historyComposableInstance) => {
+    historyComposable = historyComposableInstance
+    console.log('🔗 Instancia de historial establecida en el store')
+  }
+
+  /**
+   * Inicializar la integración con el historial (solo para compatibilidad)
    */
   const initializeHistory = (historyComposableInstance) => {
-    historyComposable = historyComposableInstance
+    setHistoryInstance(historyComposableInstance)
 
     // Guardar estado inicial
     if (historyComposable) {
@@ -1393,7 +1401,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     const paddingAura = 30 / zoom.value; // Píxeles extra de tamaño para el aura
     elementoAura.value = {
       // Usamos un ID único para el aura para evitar conflictos de key
-      id: `aura_${elemento.id}`, 
+      id: `aura_${elemento.id}`,
       forma: elemento.forma,
       x: elemento.x - paddingAura / 2,
       y: elemento.y - paddingAura / 2,
@@ -1410,7 +1418,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }, 2500) // Aumentamos un poco el tiempo a 2.5 segundos
   };
-  
+
 
   const actualizarIdsFiltrados = (ids) => {
     idsElementosFiltrados.value = ids
@@ -1517,6 +1525,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     calcularCanvasAdaptativoPlanta,
 
     // === INTEGRACIÓN CON HISTORIAL ===
+    setHistoryInstance,
     initializeHistory,
     saveToHistory,
 
