@@ -95,9 +95,6 @@ const handleKeydown = (e) => {
     } else if (e.key === 'c') {
       e.preventDefault()
       handleCopyToBuffer()
-    } else if (e.key === 'x') {
-      e.preventDefault()
-      handleMoveToBuffer()
     }
   } else if (e.key === 'Delete' || e.key === 'Backspace') {
     // Supr o Retroceso -> eliminar seleccionado
@@ -115,15 +112,7 @@ const handleCopyToBuffer = () => {
   const elementoSeleccionado = canvasStore.elementoSeleccionado
   if (elementoSeleccionado) {
     buffer.copyToBuffer(elementoSeleccionado)
-    console.log('📋 Elemento copiado al buffer')
-  }
-}
-
-const handleMoveToBuffer = () => {
-  const elementoSeleccionado = canvasStore.elementoSeleccionado
-  if (elementoSeleccionado) {
-    buffer.moveToBuffer(elementoSeleccionado)
-    console.log('🔄 Elemento movido al buffer')
+    console.log('📋 Estructura copiada al buffer')
   }
 }
 

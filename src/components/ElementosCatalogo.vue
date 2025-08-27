@@ -270,30 +270,31 @@ const tituloContextual = computed(() => {
 
 // Computed: determina si se pueden crear elementos personalizados
 const puedeCrearElementosPersonalizados = computed(() => {
-  const contexto = canvasStore.contextoActual.tipo
+  return true
+  // const contexto = canvasStore.contextoActual.tipo
   // Solo permitir creación personalizada en plantas (elementos)
   // Los contenedores son solo predefinidos
-  return contexto === 'plantas'
+  // return contexto === 'plantas'
 })
 
 // Computed: categorías disponibles según el contexto
 const categoriasDisponibles = computed(() => {
-  const contexto = canvasStore.contextoActual.tipo
+  return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'elementos')
+  // const contexto = canvasStore.contextoActual.tipo
+  // if (contexto === 'plantas') {
+  //   // En plantas solo se pueden crear elementos
+  //   return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'elementos')
+  // } else if (contexto === 'elementos') {
+  //   // En elementos solo se pueden crear contenedores
+  //   return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'contenedores')
+  // } else if (contexto === 'contenedores') {
+  //   // En contenedores se pueden crear elementos Y contenedores
+  //   return TODAS_LAS_CATEGORIAS.filter(
+  //     (cat) => cat.tipo === 'elementos' || cat.tipo === 'contenedores',
+  //   )
+  // }
 
-  if (contexto === 'plantas') {
-    // En plantas solo se pueden crear elementos
-    return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'elementos')
-  } else if (contexto === 'elementos') {
-    // En elementos solo se pueden crear contenedores
-    return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'contenedores')
-  } else if (contexto === 'contenedores') {
-    // En contenedores se pueden crear elementos Y contenedores
-    return TODAS_LAS_CATEGORIAS.filter(
-      (cat) => cat.tipo === 'elementos' || cat.tipo === 'contenedores',
-    )
-  }
-
-  return TODAS_LAS_CATEGORIAS
+  // return TODAS_LAS_CATEGORIAS
 })
 
 // Computed: elementos filtrados según contexto y filtros

@@ -13,7 +13,7 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits, computed } from 'vue'
+import { computed } from 'vue'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import { useCanvasStore } from '@/composables/useCanvasStore'
 

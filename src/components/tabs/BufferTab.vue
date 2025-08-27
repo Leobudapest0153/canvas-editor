@@ -1,7 +1,7 @@
 <!--
   BufferTab.vue
-  Tab para almacén temporal de elementos (buffer/clipboard).
-  Permite almacenar, mover y restaurar elementos entre plantas.
+  Tab para almacén temporal de estructuras (buffer/clipboard).
+  Permite copiar estructuras completas de elementos con todos sus hijos.
 -->
 
 <template>
@@ -9,9 +9,9 @@
     <!-- Header del tab -->
     <div class="tab-header">
       <div class="header-info">
-        <h3 class="tab-title">Portapapeles de Elementos</h3>
+        <h3 class="tab-title">Portapapeles de Estructuras</h3>
         <div class="tab-subtitle">
-          {{ itemCount }} elemento{{ itemCount !== 1 ? 's' : '' }} en portapapeles
+          {{ itemCount }} estructura{{ itemCount !== 1 ? 's' : '' }} en portapapeles
         </div>
       </div>
       <div class="header-actions">
@@ -53,8 +53,7 @@
         <p class="empty-description">Selecciona elementos en el canvas y usa:</p>
 
         <div class="shortcuts">
-          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>X</kbd> <span>Mover al portapapeles</span></div>
-          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>C</kbd> <span>Copiar al portapapeles</span></div>
+          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>C</kbd> <span>Copiar estructura al portapapeles</span></div>
         </div>
       </div>
 
@@ -85,8 +84,8 @@
                 </span>
               </div>
               <div class="item-action">
-                <span :class="['action-badge', `action-${item.sourceInfo.action}`]">
-                  {{ item.sourceInfo.action === 'moved' ? 'Movido' : 'Copiado' }}
+                <span :class="['action-badge', 'action-copied']">
+                  Copiado
                 </span>
                 <span class="item-time">
                   {{ formatTime(item.addedToBuffer) }}
@@ -98,24 +97,9 @@
           <!-- Acciones del elemento -->
           <div class="item-actions">
             <button
-              @click="handleRestore(item.id)"
-              class="action-btn btn-restore"
-              title="Restaurar a ubicación original"
-            >
-              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                />
-              </svg>
-            </button>
-
-            <button
               @click="handleRemove(item.id)"
               class="action-btn btn-remove"
-              title="Eliminar del buffer"
+              title="Eliminar del portapapeles"
             >
               <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -181,10 +165,6 @@ const handleClearBuffer = () => {
   if (confirm('¿Estás seguro de que deseas limpiar todo el buffer?')) {
     buffer.clearBuffer()
   }
-}
-
-const handleRestore = (bufferItemId) => {
-  buffer.restoreToOriginal(bufferItemId)
 }
 
 const handleRemove = (bufferItemId) => {
