@@ -94,6 +94,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const elementoAura = ref(null);
 
   const isDraggable = ref(true);
+  const useDragBoundsClamp = ref(false);
   // Configuración de grilla y snap
   const gridSize = ref(50) // px entre líneas de grilla
   const snapGridEps = ref(6) // px de proximidad para aplicar snap al soltar
@@ -107,6 +108,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     const e = Number(epsPx)
     if (!Number.isFinite(e)) return
     snapGridEps.value = Math.max(0, Math.min(50, e))
+  }
+
+  const setUseDragBoundsClamp = (v) => {
+    useDragBoundsClamp.value = !!v
   }
 
   // === NAVEGACIÓN JERÁRQUICA ===
@@ -1541,6 +1546,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     idsElementosFiltrados,
     elementoAura,
     isDraggable,
+    useDragBoundsClamp,
 
     // Getters
     elementosVisibles,
@@ -1569,6 +1575,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     configurarPan,
     setGridSize,
     setSnapGridEps,
+    setUseDragBoundsClamp,
 
     // Actions - Plantas
     seleccionarPlanta,

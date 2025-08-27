@@ -7,6 +7,25 @@ vi.mock('@/composables/useToast', () => ({ useToast: () => ({ showError }) }))
 import usePlacementGuards from '@/composables/usePlacementGuards'
 import { CM_TO_PX } from '@/utils/constants'
 import { errorsPlacement } from '@/utils/errorsPlacement'
+import * as orchestrator from '@/validation/placementOrchestrator'
+
+class DummyTransform {
+  copy() {
+    return new DummyTransform()
+  }
+  invert() {
+    return this
+  }
+  point(p) {
+    return { ...p }
+  }
+}
+
+class DummyParent {
+  getAbsoluteTransform() {
+    return new DummyTransform()
+  }
+}
 
 class DummyNode {
   constructor({ x = 0, y = 0, width = 0, height = 0 } = {}) {
@@ -15,6 +34,7 @@ class DummyNode {
     this.height = height
     this._dbf = (p) => p
     this._events = {}
+    this._parent = new DummyParent()
   }
   dragBoundFunc(f) {
     if (typeof f === 'function') this._dbf = f
@@ -35,6 +55,9 @@ class DummyNode {
   }
   fire(evt) {
     if (this._events[evt]) this._events[evt]()
+  }
+  getParent() {
+    return this._parent
   }
 }
 
@@ -517,5 +540,133 @@ describe('placement guards integration', () => {
     expect(endRes.valid).toBe(true)
     expect(showError).not.toHaveBeenCalled()
     expect(spySave).toHaveBeenCalledTimes(1)
+  })
+
+  it('con flag on, dragBound evita entrar al vecino y cachea vecinos', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.useDragBoundsClamp = true
+    store.elementos.push(
+      {
+        id: 'a',
+        plantaId: 'planta_1',
+        tipo: 'elementos',
+        ubicacion: 'Suelo',
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 20,
+        alto: 100,
+        elevacion: { zBase: 0, altura: 100 },
+      },
+      {
+        id: 'wall',
+        plantaId: 'planta_1',
+        tipo: 'elementos',
+        ubicacion: 'Pared',
+        x: 40,
+        y: 5,
+        width: 10,
+        height: 10,
+        alto: 100,
+        elevacion: { zBase: 50, altura: 100 },
+      },
+    )
+    const guards = usePlacementGuards({ store, alturaBodega: 500, CM_TO_PX })
+    const node = new DummyNode({ x: 40, y: 5, width: 10, height: 10 })
+    const filterSpy = vi.spyOn(store.elementosVisibles, 'filter')
+    const zSpy = vi.spyOn(orchestrator, 'resolveZStackClamp')
+    guards.installDragBounds(node, 'wall')
+    expect(filterSpy).toHaveBeenCalledTimes(1)
+    let next = node.dragBoundFunc()({ x: 10, y: 5 })
+    node.absolutePosition(next)
+    expect(node.getAbsolutePosition().x).toBe(20)
+    next = node.dragBoundFunc()({ x: 10, y: 5 })
+    node.absolutePosition(next)
+    expect(node.getAbsolutePosition().x).toBe(20)
+    expect(filterSpy).toHaveBeenCalledTimes(1)
+    expect(zSpy.mock.calls.length).toBeGreaterThan(1)
+    const neighborsRef = zSpy.mock.calls[0][1]
+    for (const call of zSpy.mock.calls) expect(call[1]).toBe(neighborsRef)
+    zSpy.mockRestore()
+    filterSpy.mockRestore()
+  })
+
+  it('dragend con flag on hace snap seguro', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.useDragBoundsClamp = true
+    store.gridSize = 10
+    store.elementos.push({
+      id: 'wall',
+      plantaId: 'planta_1',
+      tipo: 'elementos',
+      ubicacion: 'Pared',
+      x: 40,
+      y: 5,
+      width: 10,
+      height: 10,
+      alto: 100,
+      elevacion: { zBase: 50, altura: 100 },
+    })
+    const guards = usePlacementGuards({ store, alturaBodega: 500, CM_TO_PX })
+    const node = new DummyNode({ x: 40, y: 5, width: 10, height: 10 })
+    guards.installDragBounds(node, 'wall')
+    let next = node.dragBoundFunc()({ x: 43, y: 5 })
+    node.absolutePosition(next)
+    node.fire('dragend')
+    store.elementos[0].x = node.getAbsolutePosition().x
+    store.elementos[0].y = node.getAbsolutePosition().y
+    showError.mockClear()
+    const res = guards.onDragEndGuard({ ...store.elementos[0], start: { x: 40, y: 5 } })
+    expect(res.valid).toBe(true)
+    expect(res.candidate.x).toBe(40)
+    expect(showError).not.toHaveBeenCalled()
+  })
+
+  it('dragend con flag on revierte si snap colisiona', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.useDragBoundsClamp = true
+    store.gridSize = 10
+    store.elementos.push(
+      {
+        id: 'neighbor',
+        plantaId: 'planta_1',
+        tipo: 'elementos',
+        ubicacion: 'Suelo',
+        x: 59,
+        y: 5,
+        width: 10,
+        height: 10,
+        alto: 100,
+        elevacion: { zBase: 0, altura: 100 },
+      },
+      {
+        id: 'wall',
+        plantaId: 'planta_1',
+        tipo: 'elementos',
+        ubicacion: 'Pared',
+        x: 40,
+        y: 5,
+        width: 10,
+        height: 10,
+        alto: 100,
+        elevacion: { zBase: 50, altura: 100 },
+      },
+    )
+    const guards = usePlacementGuards({ store, alturaBodega: 500, CM_TO_PX })
+    const node = new DummyNode({ x: 40, y: 5, width: 10, height: 10 })
+    guards.installDragBounds(node, 'wall')
+    let next = node.dragBoundFunc()({ x: 45, y: 5 })
+    node.absolutePosition(next)
+    node.fire('dragend')
+    store.elementos[1].x = node.getAbsolutePosition().x
+    store.elementos[1].y = node.getAbsolutePosition().y
+    showError.mockClear()
+    const res = guards.onDragEndGuard({ ...store.elementos[1], start: { x: 40, y: 5 } })
+    expect(res.valid).toBe(true)
+    expect(res.candidate.x).toBe(45)
+    expect(showError).not.toHaveBeenCalled()
   })
 })

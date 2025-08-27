@@ -7,6 +7,26 @@
 
 import { getEdgeState, setEdgeState, getLastPos, setLastPos } from '@/composables/useEdgeState'
 
+export function areaClamp(x, y, w, h, areaBounds) {
+  const minX = areaBounds?.minX ?? 0
+  const minY = areaBounds?.minY ?? 0
+  const maxX = areaBounds?.maxX ?? 0
+  const maxY = areaBounds?.maxY ?? 0
+  let nx
+  let ny
+  if (w <= maxX - minX) {
+    nx = Math.max(minX, Math.min(x, maxX - w))
+  } else {
+    nx = minX
+  }
+  if (h <= maxY - minY) {
+    ny = Math.max(minY, Math.min(y, maxY - h))
+  } else {
+    ny = minY
+  }
+  return { x: nx, y: ny }
+}
+
 export function applyEdgeConstraint(candidate, el, areaBounds, opts = {}) {
   const { epsEnter = 0.25, epsExit = 0.75 } = opts || {}
   const id = el?.id
