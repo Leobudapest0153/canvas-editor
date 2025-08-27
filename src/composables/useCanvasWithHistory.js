@@ -81,8 +81,60 @@ export const useCanvasWithHistory = () => {
 
       if (plantaAnterior !== plantaId) {
         const planta = canvasStore.plantas.find((p) => p.id === plantaId)
-        history.pushState(`Cambio a planta: ${planta?.nombre || plantaId}`)
+        // Limpiar historial al cambiar de planta (cambio de contexto)
+        history.clearHistoryOnContextChange(
+          { tipo: 'planta', id: plantaId },
+          `Navegación a planta: ${planta?.nombre || plantaId}`
+        )
       }
+    },
+
+    // Navegación jerárquica - limpiar historial en cambios de contexto
+    navegarAElemento: (elementoId) => {
+      const resultado = canvasStore.navegarAElemento(elementoId)
+      if (resultado) {
+        const elemento = canvasStore.elementoPorId(elementoId)
+        history.clearHistoryOnContextChange(
+          { tipo: 'elemento', id: elementoId },
+          `Navegación a elemento: ${elemento?.nombre || elemento?.tipo || elementoId}`
+        )
+      }
+      return resultado
+    },
+
+    navegarAlPadre: () => {
+      const resultado = canvasStore.navegarAlPadre()
+      if (resultado) {
+        const contexto = canvasStore.contextoActual
+        history.clearHistoryOnContextChange(
+          contexto,
+          `Navegación al padre: ${contexto?.tipo || 'contexto padre'}`
+        )
+      }
+      return resultado
+    },
+
+    navegarAContexto: (contexto) => {
+      const resultado = canvasStore.navegarAContexto(contexto)
+      if (resultado) {
+        history.clearHistoryOnContextChange(
+          contexto,
+          `Navegación a contexto: ${contexto?.tipo || 'contexto personalizado'}`
+        )
+      }
+      return resultado
+    },
+
+    navegarAPlanta: (plantaId) => {
+      const resultado = canvasStore.navegarAPlanta(plantaId)
+      if (resultado) {
+        const planta = canvasStore.plantas.find(p => p.id === plantaId)
+        history.clearHistoryOnContextChange(
+          { tipo: 'planta', id: plantaId },
+          `Navegación a planta: ${planta?.nombre || plantaId}`
+        )
+      }
+      return resultado
     },
 
     agregarPlanta: (nuevaPlanta) => {
@@ -108,12 +160,14 @@ export const useCanvasWithHistory = () => {
       }
     },
 
-    // Canvas/Vista
+    // Canvas/Vista - limpiar historial si cambia contexto significativamente
     cambiarVista: (nuevaVista) => {
       const vistaAnterior = canvasStore.vistaActiva
       canvasStore.cambiarVista(nuevaVista)
 
       if (vistaAnterior !== nuevaVista) {
+        // Para cambios de vista, solo agregar al historial normal (no limpiar)
+        // porque la vista no cambia fundamentalmente el contexto de navegación
         history.pushState(`Vista cambiada: ${vistaAnterior} → ${nuevaVista}`)
       }
     },
@@ -151,6 +205,7 @@ export const useCanvasWithHistory = () => {
 
     // Utilidades del historial
     clearHistory: history.clearHistory,
+    clearHistoryOnContextChange: history.clearHistoryOnContextChange,
     getHistoryInfo: history.getHistoryInfo,
     getHistoryList: history.getHistoryList,
     jumpToState: history.jumpToState,

@@ -58,7 +58,7 @@ export const useCanvasHistory = () => {
         plantas: JSON.parse(JSON.stringify(canvasStore.plantas)),
         plantaActiva: canvasStore.plantaActiva,
         elementoSeleccionado: canvasStore.elementoSeleccionado,
-        vistaActiva: canvasStore.vistaActiva,
+        // vistaActiva omitida porque es computed y depende del contexto
         zoom: canvasStore.zoom,
         panX: canvasStore.panX,
         panY: canvasStore.panY,
@@ -152,11 +152,10 @@ export const useCanvasHistory = () => {
       // Restaurar plantas
       canvasStore.plantas.splice(0, canvasStore.plantas.length, ...snapshot.plantas)
 
-      // Restaurar estado general
+      // Restaurar estado general (sin vistaActiva porque es computed)
       canvasStore.plantaActiva = snapshot.plantaActiva
       canvasStore.elementoSeleccionado = snapshot.elementoSeleccionado
-      console.log(snapshot)
-      canvasStore.vistaActiva = snapshot.vistaActiva
+      // Nota: vistaActiva se omite porque es una computed property que depende del contexto
       canvasStore.zoom = snapshot.zoom
       canvasStore.panX = snapshot.panX
       canvasStore.panY = snapshot.panY
@@ -365,6 +364,23 @@ export const useCanvasHistory = () => {
   }
 
   /**
+   * Limpiar historial al cambiar de contexto (navegación jerárquica)
+   * Esto evita problemas con computed properties que dependen del contexto
+   */
+  const clearHistoryOnContextChange = (newContext, description = 'Cambio de contexto') => {
+    // Limpiar el historial existente
+    clearHistory(false)
+
+    // Crear un nuevo estado inicial con el contexto actual
+    initializeHistory(description)
+
+    console.log('🔄 Historial reiniciado por cambio de contexto:', {
+      newContext: newContext?.tipo || 'desconocido',
+      description
+    })
+  }
+
+  /**
    * Limpiar todo el historial con opciones de preservación
    */
   const clearHistory = (keepInitial = false) => {
@@ -382,9 +398,7 @@ export const useCanvasHistory = () => {
     // Resetear contadores de eventos
     historyEvents.operationsCount = 0
     historyEvents.errors = []
-  }
-
-  /**
+  }  /**
    * Inicializar historial con estado inicial mejorado
    */
   const initializeHistory = (description = 'Estado inicial') => {
@@ -546,6 +560,7 @@ export const useCanvasHistory = () => {
 
     // Métodos de utilidad
     clearHistory,
+    clearHistoryOnContextChange,
     initializeHistory,
     getHistoryInfo,
     getHistoryList,
