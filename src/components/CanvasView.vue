@@ -378,6 +378,84 @@
               listening: false,
             }"
           />
+
+          <v-group
+            v-if="getUsoInfo(elemento)"
+            :config="{
+              listening: false
+            }"
+          >
+            <template v-for="(info, index) in getUsoInfo(elemento)" :key="info.tipo">
+              <template v-if="((
+        barHeight = 12,
+        barMargin = 12,
+        totalHeight = (barHeight + barMargin) * 2,
+        barWidth = elemento.width * 0.8 > 200 ? 200 : elemento.width * 0.8,
+        offsetX = (elemento.width - barWidth) / 2,
+        offsetY = elemento.height - totalHeight + (barHeight + barMargin) * index
+      ))">
+        <!-- 1. Texto del Título (Volumen / Peso) -->
+        <v-text
+          :config="{
+            x: elemento.x,
+            y: elemento.y + offsetY - 7,
+            width: elemento.width,
+            height: barHeight,
+            text: info.tipo,
+            fontSize: 9,
+            fontFamily: 'Arial',
+            fill: '#4b5563',
+            align: 'center',
+            verticalAlign: 'middle',
+          }"
+        />
+
+        <!-- 2. Barra de fondo (gris) -->
+        <v-rect
+          :config="{
+            x: elemento.x + offsetX,
+            y: elemento.y + offsetY + 4,
+            width: barWidth,
+            height: barHeight,
+            fill: '#FFF',
+            cornerRadius: 4,
+            stroke: '#242930',
+            strokeWidth: 0.5,
+          }"
+        />
+
+        <!-- 3. Barra de progreso (color dinámico) -->
+        <v-rect
+          :config="{
+            x: elemento.x + offsetX,
+            y: elemento.y + offsetY + 4,
+            width: barWidth * (info.porcentaje / 100),
+            height: barHeight,
+            fill: info.color,
+            cornerRadius: 4,
+          }"
+        />
+
+        <!-- 4. Texto del Porcentaje -->
+        <v-text
+          :config="{
+            x: elemento.x + offsetX,
+            y: elemento.y + offsetY + 5,
+            height: barHeight,
+            width: barWidth,
+            align: 'center',
+            text: `${info.porcentaje}%`,
+            fontSize: 9,
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            fill: '#242930',
+            verticalAlign: 'middle',
+          }"
+        />
+      </template>
+            </template>
+          </v-group>
+
         </template>
 
         <!-- Los contenedores se renderizan junto con los elementos en la sección principal -->
@@ -414,8 +492,11 @@
       :is-element-selected="canvasStore.elementoSeleccionado ? true : false"
       :is-element-locked="selectedElementLocked"
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
+
+      :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
+      @fill-container="() => simularLlenadoContenedor(canvasStore.elementoSeleccionado)"
     />
 
     <!-- Menú contextual -->
@@ -546,11 +627,14 @@ import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
 import { makeInnerSession } from '@/composables/useInnerNoOverlap'
 import FloatingToolbar from './FloatingToolbar.vue'
+import { getUsoInfo, useProductSimulation } from '@/utils/simulateProducts'
+import {config} from '@vue/test-utils'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
   safeRight: { type: Number, default: 20 },
 })
+
 
 // Referencia segura a Konva (cuando está disponible globalmente via vue-konva)
 const Konva = typeof globalThis !== 'undefined' ? globalThis.Konva || (typeof window !== 'undefined' ? window.Konva : null) : null
@@ -1482,6 +1566,13 @@ const showToast = (message, type = 'error') => {
   }
 }
 
+
+const { simularLlenadoContenedor} = useProductSimulation({
+  canvasStore,
+  showToast,
+  forceRedraw
+});
+
 // Función auxiliar para convertir coordenadas del puntero a coordenadas de mundo
 const getWorldCoordinatesFromPointer = (dropEvent) => {
   const stage = stageRef.value.getNode()
@@ -1741,6 +1832,11 @@ const createElementFromDrop = (data, dropEvent) => {
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
+    volumenMaximo: anchoCm * largoCmFinal * altoCm,
+    uso: {
+      volumen: 0,
+      peso: 0
+    },
     descripcion: elemento.descripcion || '',
 
     // Copiar contenedores del elemento original si los tiene
