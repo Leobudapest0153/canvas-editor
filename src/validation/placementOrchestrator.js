@@ -19,7 +19,7 @@ export function validateHeightWithinWarehouse({ ubicacion, zBase, alto, alturaBo
   if (ubicacion !== 'pared') return { valid: true }
   const { valido, mensaje } = validateWallPlacement({ zBase: zBase ?? 1, alto, alturaBodega })
   if (!valido && mensaje.includes('excede')) {
-    return { valid: false, reason: mensaje }
+    return { valid: false, reason: 'HEIGHT_EXCEEDS_WAREHOUSE' }
   }
   return { valid: true }
 }
