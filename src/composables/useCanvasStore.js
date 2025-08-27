@@ -608,7 +608,7 @@ export const useCanvasStore = defineStore('canvas', () => {
           alturaBodega
         })
         if (!valido) {
-          console.error(mensaje)
+          showToast(mensaje, 'error')
           return false
         }
       }
@@ -1438,7 +1438,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     const paddingAura = 30 / zoom.value; // Píxeles extra de tamaño para el aura
     elementoAura.value = {
       // Usamos un ID único para el aura para evitar conflictos de key
-      id: `aura_${elemento.id}`, 
+      id: `aura_${elemento.id}`,
       forma: elemento.forma,
       x: elemento.x - paddingAura / 2,
       y: elemento.y - paddingAura / 2,
@@ -1455,7 +1455,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }, 2500) // Aumentamos un poco el tiempo a 2.5 segundos
   };
-  
+
 
   const actualizarIdsFiltrados = (ids) => {
     idsElementosFiltrados.value = ids
@@ -1464,6 +1464,14 @@ export const useCanvasStore = defineStore('canvas', () => {
   const setDraggableMode = (mode) => {
     this.isDraggable = mode;
   };
+
+  const showToast = (message, type = 'error') => {
+    if (typeof window !== 'undefined' && window.__toasts) {
+      window.__toasts.show(message, { type, timeout: 4000 })
+    } else {
+      console.warn('Toast:', message)
+    }
+  }
 
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
   watch(
