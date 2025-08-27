@@ -6,20 +6,30 @@ const Z_EPS = 0.001
 /**
  * Valida que elementos con ubicacion "pared" tengan zBase definido y > 0
  */
-export function validateWallZBaseRequired({ ubicacion, zBase }) {
-  if (ubicacion !== 'pared') return { valid: true }
-  const { valido, mensaje } = validateWallPlacement({ zBase, alto: 0, alturaBodega: Infinity })
-  return { valid: valido, reason: valido ? '' : mensaje }
+export function validateWallZBaseRequired(element, candidate) {
+  const ubic = candidate.ubicacion ?? element.ubicacion
+  if (ubic !== 'pared') return { valid: true }
+  const zEff = candidate.zBase ?? candidate.elevacion?.zBase ?? element.zBase ?? element.elevacion?.zBase
+  const altoEff = candidate.alto ?? candidate.elevacion?.altura ?? element.alto ?? element.elevacion?.altura
+  void altoEff
+  if (zEff == null || zEff <= 0) {
+    return { valid: false, code: 'ZBASE_REQUIRED' }
+  }
+  return { valid: true }
 }
 
 /**
  * Valida que la suma zBase + alto no exceda la altura de la bodega
  */
-export function validateHeightWithinWarehouse({ ubicacion, zBase, alto, alturaBodega }) {
-  if (ubicacion !== 'pared') return { valid: true }
-  const { valido, mensaje } = validateWallPlacement({ zBase: zBase ?? 1, alto, alturaBodega })
+export function validateHeightWithinWarehouse(candidate, alturaBodega) {
+  if (candidate.ubicacion !== 'pared') return { valid: true }
+  const { valido, mensaje } = validateWallPlacement({
+    zBase: candidate.zBase ?? candidate.elevacion?.zBase ?? 1,
+    alto: candidate.alto ?? candidate.elevacion?.altura,
+    alturaBodega,
+  })
   if (!valido && mensaje.includes('excede')) {
-    return { valid: false, reason: 'HEIGHT_EXCEEDS_WAREHOUSE' }
+    return { valid: false, code: 'HEIGHT_EXCEEDS_WAREHOUSE' }
   }
   return { valid: true }
 }
@@ -46,7 +56,7 @@ export function validateZStacking(elements, candidate, Z_EPS = 0.001) {
     }
     const { overlap } = zOverlapCheck(m, o)
     if (overlap) {
-      return { valid: false, reason: 'Z_STACKING_COLLISION' }
+      return { valid: false, code: 'Z_STACKING_COLLISION' }
     }
   }
   return { valid: true }

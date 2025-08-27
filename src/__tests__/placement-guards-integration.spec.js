@@ -9,6 +9,97 @@ import { CM_TO_PX } from '@/utils/constants'
 import { errorsPlacement } from '@/utils/errorsPlacement'
 
 describe('placement guards integration', () => {
+  it('drag de elemento Suelo no dispara ZBASE_REQUIRED', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.elementos.push({
+      id: 'a',
+      plantaId: 'planta_1',
+      tipo: 'elementos',
+      ubicacion: 'suelo',
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+    })
+    const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
+    showError.mockClear()
+    const res = guards.onDragEndGuard({ ...store.elementos[0], x: 5, y: 5, start: { x: 0, y: 0 } })
+    expect(res.valid).toBe(true)
+    expect(showError).not.toHaveBeenCalled()
+  })
+
+  it('drag de elemento Pared con zBase válido no dispara error', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.elementos.push({
+      id: 'a',
+      plantaId: 'planta_1',
+      tipo: 'elementos',
+      ubicacion: 'pared',
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      elevacion: { zBase: 10, altura: 100 },
+    })
+    const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
+    showError.mockClear()
+    const res = guards.onDragEndGuard({ ...store.elementos[0], x: 5, y: 5, start: { x: 0, y: 0 } })
+    expect(res.valid).toBe(true)
+    expect(showError).not.toHaveBeenCalled()
+  })
+
+  it('candidate sin zBase pero con element.zBase válido pasa', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.elementos.push({
+      id: 'a',
+      plantaId: 'planta_1',
+      tipo: 'elementos',
+      ubicacion: 'pared',
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      elevacion: { zBase: 10, altura: 100 },
+    })
+    const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
+    showError.mockClear()
+    const res = guards.onDragEndGuard({
+      ...store.elementos[0],
+      elevacion: { altura: 100 },
+      x: 5,
+      y: 5,
+      start: { x: 0, y: 0 },
+    })
+    expect(res.valid).toBe(true)
+    expect(showError).not.toHaveBeenCalled()
+  })
+
+  it('falla cuando zBase <= 0', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.elementos.push({
+      id: 'a',
+      plantaId: 'planta_1',
+      tipo: 'elementos',
+      ubicacion: 'pared',
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      elevacion: { zBase: 0, altura: 100 },
+    })
+    const guards = usePlacementGuards({ store, alturaBodega: 300, CM_TO_PX })
+    const spyUpdate = vi.spyOn(store, 'actualizarElemento')
+    showError.mockClear()
+    const res = guards.onDragEndGuard({ ...store.elementos[0], x: 5, y: 5, start: { x: 0, y: 0 } })
+    expect(res.valid).toBe(false)
+    expect(res.code).toBe('ZBASE_REQUIRED')
+    expect(spyUpdate).toHaveBeenCalledWith('a', { x: 0, y: 0 })
+    expect(showError).toHaveBeenCalledWith(errorsPlacement.ZBASE_REQUIRED)
+  })
   it('reviertes y no guardas cuando hay colisión vertical', () => {
     setActivePinia(createPinia())
     const store = useCanvasStore()

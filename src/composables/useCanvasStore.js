@@ -632,7 +632,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
       const stackRes = validateZStacking(elementos.value, candidate)
       if (!stackRes.valid) {
-        console.error(errorsPlacement[stackRes.reason] || stackRes.reason)
+        console.error(errorsPlacement[stackRes.code || stackRes.reason] || stackRes.code || stackRes.reason)
         return false
       }
 
@@ -783,7 +783,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
     const stackRes = validateZStacking(elementos.value, nuevoElemento)
     if (!stackRes.valid) {
-      console.error(errorsPlacement[stackRes.reason] || stackRes.reason)
+      console.error(errorsPlacement[stackRes.code || stackRes.reason] || stackRes.code || stackRes.reason)
       return null
     }
 

@@ -4,12 +4,13 @@ import { validateWallZBaseRequired, validateHeightWithinWarehouse, validateZStac
 
 describe('validateWallZBaseRequired', () => {
   it('rechaza zBase faltante o <=0', () => {
-    const res = validateWallZBaseRequired({ ubicacion: 'pared', zBase: 0 })
+    const res = validateWallZBaseRequired({ ubicacion: 'pared', zBase: 0 }, {})
     expect(res.valid).toBe(false)
+    expect(res.code).toBe('ZBASE_REQUIRED')
   })
 
   it('acepta zBase mayor a 0', () => {
-    const res = validateWallZBaseRequired({ ubicacion: 'pared', zBase: 10 })
+    const res = validateWallZBaseRequired({ ubicacion: 'pared', zBase: 10 }, {})
     expect(res.valid).toBe(true)
   })
 })
@@ -17,13 +18,13 @@ describe('validateWallZBaseRequired', () => {
 describe('validateHeightWithinWarehouse', () => {
   const ALTURA = 300
   it('rechaza cuando excede altura de bodega', () => {
-    const res = validateHeightWithinWarehouse({ ubicacion: 'pared', zBase: 250, alto: 100, alturaBodega: ALTURA })
+    const res = validateHeightWithinWarehouse({ ubicacion: 'pared', zBase: 250, alto: 100 }, ALTURA)
     expect(res.valid).toBe(false)
-    expect(res.reason).toBe('HEIGHT_EXCEEDS_WAREHOUSE')
+    expect(res.code).toBe('HEIGHT_EXCEEDS_WAREHOUSE')
   })
 
   it('permite cuando zBase + alto es igual a alturaBodega', () => {
-    const res = validateHeightWithinWarehouse({ ubicacion: 'pared', zBase: 200, alto: 100, alturaBodega: ALTURA })
+    const res = validateHeightWithinWarehouse({ ubicacion: 'pared', zBase: 200, alto: 100 }, ALTURA)
     expect(res.valid).toBe(true)
   })
 })
@@ -51,7 +52,7 @@ describe('validateZStacking', () => {
     }
     const res = validateZStacking([base], cand)
     expect(res.valid).toBe(false)
-    expect(res.reason).toBe('Z_STACKING_COLLISION')
+    expect(res.code).toBe('Z_STACKING_COLLISION')
   })
 
   it('permite tocar en Z', () => {
