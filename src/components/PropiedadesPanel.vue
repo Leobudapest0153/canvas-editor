@@ -171,9 +171,14 @@
             Vista de frente: Ancho=X, Largo=Z.
           </p>
 
-          <!-- Dimensiones físicas adicionales (si están disponibles) -->
+            <!-- Dimensiones físicas adicionales (si están disponibles) -->
           <div class="mt-6">
-            <h4 class="font-semibold text-gray-700 mb-3">Dimensiones Físicas (cm)</h4>
+            <h4 class="font-semibold text-gray-700 mb-3">
+              Dimensiones Físicas (cm)
+              <span v-if="hayCambiosPendientesDimensiones" class="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                Cambios pendientes
+              </span>
+            </h4>
             <div class="space-y-3">
               <!-- Campo Ancho -->
               <div class="grid grid-cols-2 items-center">
@@ -237,11 +242,6 @@
         <p class="text-xs text-gray-500">
           Peso máximo teórico que este elemento puede soportar
         </p>
-
-        <!-- Mensaje de validación de peso (si existe) -->
-        <div v-if="errorValidacion" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
-          {{ errorValidacion }}
-        </div>
 
         <!-- Información de peso total si tiene elementos hijos -->
         <div v-if="elementoSeleccionado.hijos && elementoSeleccionado.hijos.length > 0" class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md text-sm">
@@ -338,10 +338,13 @@
            class="mb-2">
         <button
           @click="aplicarCambios"
-          class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+          class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold"
         >
-          Confirmar Cambios
+          Validar y Aplicar Cambios
         </button>
+        <p class="text-xs text-gray-500 mt-1 text-center">
+          Los cambios se validarán automáticamente antes de aplicarse
+        </p>
       </div>
 
       <div class="flex gap-2 mb-2">
@@ -389,6 +392,8 @@
 import { ref, watch, computed } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore.js'
 import { useWeightValidation } from '@/composables/useWeightValidation.js'
+import { useDimensionValidation } from '@/composables/useDimensionValidation.js'
+import { useToast } from '@/composables/useToast.js'
 import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import TagFilter from './TagFilter.vue'
@@ -398,6 +403,8 @@ import CreateTagModal from './CreateTagModal.vue'
 const canvasStore = useCanvasStore()
 const { deleteSelected } = useDeleteElement()
 const weightValidation = useWeightValidation()
+const dimensionValidation = useDimensionValidation()
+const { showSuccess, showError } = useToast()
 
 // Referencias reactivas
 const propiedadesEditables = ref({
@@ -415,8 +422,8 @@ const cambiosPendientes = ref({
   pesoMaximo: null
 })
 
-// Estado para almacenar errores
-const errorValidacion = ref('')
+// Estado para almacenar errores - Ya no necesario, usamos toasts
+// const errorValidacion = ref('')
 
 const modalCrearEtiquetaVisible = ref(false)
 const textoNuevaEtiqueta = ref('')
@@ -480,6 +487,12 @@ const volumen = computed(() => {
   return (v / 1000000).toFixed(2);
 });
 
+const hayCambiosPendientesDimensiones = computed(() => {
+  return cambiosPendientes.value.dimensiones.ancho !== null ||
+         cambiosPendientes.value.dimensiones.largo !== null ||
+         cambiosPendientes.value.dimensiones.alto !== null
+})
+
 // Watchers
 watch(
   elementoSeleccionado,
@@ -500,9 +513,6 @@ watch(
         },
         pesoMaximo: nuevoElemento.pesoMaximo || null
       }
-
-      // Limpiar mensajes de error
-      errorValidacion.value = ''
     }
   },
   { immediate: true },
@@ -561,8 +571,7 @@ const resetearPropiedades = () => {
     pesoMaximo: null
   }
 
-  // Limpiar mensajes de error
-  errorValidacion.value = ''
+  showSuccess('✅ Propiedades restablecidas', { timeout: 2000 })
 }
 
 // const cambiarBloqueo = () => {
@@ -612,8 +621,20 @@ const actualizarDimension = (dimension, valor) => {
   // Almacenar en cambios pendientes
   cambiosPendientes.value.dimensiones[dimension] = valorNumerico
 
-  // Limpiar error si existe
-  errorValidacion.value = ''
+  // Validación en tiempo real (solo para verificación, sin mostrar toasts)
+  if (valorNumerico > 0) {
+    const nuevasDimensiones = { [dimension]: valorNumerico }
+    const validacionPrevia = dimensionValidation.validarDimensiones(
+      elementoSeleccionado.value.id,
+      nuevasDimensiones,
+      { silencioso: true } // Validación silenciosa para evitar múltiples toasts
+    )
+    
+    // Solo log para debug, sin mostrar toast aquí para evitar duplicados
+    if (!validacionPrevia.valida && validacionPrevia.accion === 'rechazar') {
+      console.log('Validación previa:', validacionPrevia.razon)
+    }
+  }
 }
 
 const actualizarPropiedadSimple = (propiedad, valor) => {
@@ -623,9 +644,6 @@ const actualizarPropiedadSimple = (propiedad, valor) => {
 
   // Almacenar en cambios pendientes
   cambiosPendientes.value[propiedad] = valorNumerico
-
-  // Limpiar error si existe
-  errorValidacion.value = ''
 }
 
 const aplicarCambios = () => {
@@ -644,7 +662,7 @@ const aplicarCambios = () => {
 
     // Si el nuevo peso máximo es menor que el peso actual de los hijos, mostrar error
     if (resultado.limiteDePeso && nuevoPesoMaximo < pesoActualHijos) {
-      errorValidacion.value = `La capacidad de carga debe ser al menos ${pesoActualHijos} kg para soportar los elementos actuales contenidos.`
+      showError(`La capacidad de carga debe ser al menos ${pesoActualHijos} kg para soportar los elementos actuales contenidos.`)
       return
     }
   }
@@ -666,7 +684,7 @@ const aplicarCambios = () => {
 
         // Si el incremento de peso excede la capacidad disponible en el padre
         if (resultadoPadre.limiteDePeso && diferenciaPeso > resultadoPadre.disponible) {
-          errorValidacion.value = `El incremento de capacidad de carga (${diferenciaPeso} kg) excede la capacidad disponible del elemento padre (${resultadoPadre.disponible} kg).`
+          showError(`El incremento de capacidad de carga (${diferenciaPeso} kg) excede la capacidad disponible del elemento padre (${resultadoPadre.disponible} kg).`)
           return
         }
       }
@@ -689,78 +707,96 @@ const aplicarCambios = () => {
 
         // Si el incremento de peso excede la capacidad disponible en la planta
         if (resultadoPlanta.limiteDePeso && diferenciaPeso > resultadoPlanta.disponible) {
-          errorValidacion.value = `El incremento de capacidad de carga (${diferenciaPeso} kg) excede la capacidad disponible de la planta (${resultadoPlanta.disponible} kg).`
+          showError(`El incremento de capacidad de carga (${diferenciaPeso} kg) excede la capacidad disponible de la planta (${resultadoPlanta.disponible} kg).`)
           return
         }
       }
     }
   }
 
-  // Si no hay errores, aplicar cambios
-  const actualizaciones = {}
-
-  // Actualizar dimensiones
+  // 3. Validar dimensiones físicas si hay cambios en las dimensiones
   if (cambiosPendientes.value.dimensiones.ancho !== null ||
       cambiosPendientes.value.dimensiones.largo !== null ||
       cambiosPendientes.value.dimensiones.alto !== null) {
 
+    // Construir objeto completo de dimensiones (actuales + cambios)
     const dimensionesActuales = elementoSeleccionado.value.dimensiones || {}
-
-    actualizaciones.dimensiones = {
-      ancho: cambiosPendientes.value.dimensiones.ancho !== null
-        ? cambiosPendientes.value.dimensiones.ancho
-        : dimensionesActuales.ancho,
-      largo: cambiosPendientes.value.dimensiones.largo !== null
-        ? cambiosPendientes.value.dimensiones.largo
-        : dimensionesActuales.largo,
-      alto: cambiosPendientes.value.dimensiones.alto !== null
-        ? cambiosPendientes.value.dimensiones.alto
-        : dimensionesActuales.alto
+    const nuevasDimensiones = {
+      ancho: cambiosPendientes.value.dimensiones.ancho !== null 
+        ? cambiosPendientes.value.dimensiones.ancho 
+        : (dimensionesActuales.ancho || elementoSeleccionado.value.ancho || 50),
+      largo: cambiosPendientes.value.dimensiones.largo !== null 
+        ? cambiosPendientes.value.dimensiones.largo 
+        : (dimensionesActuales.largo || elementoSeleccionado.value.largo || 50),
+      alto: cambiosPendientes.value.dimensiones.alto !== null 
+        ? cambiosPendientes.value.dimensiones.alto 
+        : (dimensionesActuales.alto || elementoSeleccionado.value.alto || 100)
     }
+
+    // Validar las nuevas dimensiones
+    const validacionDimensiones = dimensionValidation.validarDimensiones(
+      elementoSeleccionado.value.id,
+      nuevasDimensiones
+    )
+
+    if (!validacionDimensiones.valida) {
+      // El validador ya mostró el toast de error, no necesitamos duplicarlo
+      console.log(`❌ Error de dimensiones: ${validacionDimensiones.razon}`)
+      return
+    }
+
+    // Aplicar el resultado de la validación de dimensiones
+    const resultadoAplicacion = dimensionValidation.aplicarResultadoValidacion(
+      elementoSeleccionado.value.id,
+      validacionDimensiones
+    )
+
+    if (!resultadoAplicacion.exito) {
+      showError(`❌ Error al aplicar dimensiones: ${resultadoAplicacion.mensaje}`)
+      return
+    }
+
+    // Mostrar mensaje informativo sobre qué se aplicó
+    // Los toasts ya son manejados por el validador, no necesitamos duplicarlos aquí
+    if (validacionDimensiones.accion === 'aplicar_parcial') {
+      console.log(`⚠️ ${resultadoAplicacion.mensaje}`)
+    } else if (validacionDimensiones.accion === 'reubicar') {
+      console.log(`✅ ${resultadoAplicacion.mensaje}`)
+    } else if (validacionDimensiones.accion === 'aplicar') {
+      if (resultadoAplicacion.posicionAjustada) {
+        console.log(`✅ Dimensiones aplicadas correctamente. Posición ajustada automáticamente.`)
+      } else {
+        console.log(`✅ Dimensiones aplicadas correctamente`)
+      }
+    }
+
+    // Limpiar cambios de dimensiones después de aplicarlos exitosamente
+    setTimeout(() => {
+      cambiosPendientes.value.dimensiones = {
+        ancho: null,
+        largo: null,
+        alto: null
+      }
+    }, 2000) // 2 segundos de delay
   }
 
-  // Actualizar peso máximo
+  // 4. Si no hay errores, aplicar cambios de peso máximo
+  const actualizaciones = {}
+
+  // Actualizar peso máximo si hay cambios
   if (cambiosPendientes.value.pesoMaximo !== null) {
     actualizaciones.pesoMaximo = cambiosPendientes.value.pesoMaximo
   }
 
-  // Si hay actualizaciones, aplicarlas
+  // Si hay actualizaciones de peso, aplicarlas
   if (Object.keys(actualizaciones).length > 0) {
     canvasStore.actualizarElemento(elementoSeleccionado.value.id, actualizaciones)
-
-    // También actualizar las propiedades de renderizado width/height según la vista actual
-    const CM_TO_PX = 10 // Factor de conversión
-
-    if (actualizaciones.dimensiones) {
-      if (canvasStore.vistaActiva === 'XY') {
-        // Vista superior: ancho->width, largo->height
-        if (actualizaciones.dimensiones.ancho !== undefined) {
-          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-            width: actualizaciones.dimensiones.ancho * CM_TO_PX
-          })
-        }
-        if (actualizaciones.dimensiones.largo !== undefined) {
-          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-            height: actualizaciones.dimensiones.largo * CM_TO_PX
-          })
-        }
-      } else if (canvasStore.vistaActiva === 'XZ') {
-        // Vista frontal: ancho->width, alto->height
-        if (actualizaciones.dimensiones.ancho !== undefined) {
-          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-            width: actualizaciones.dimensiones.ancho * CM_TO_PX
-          })
-        }
-        if (actualizaciones.dimensiones.alto !== undefined) {
-          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-            height: actualizaciones.dimensiones.alto * CM_TO_PX
-          })
-        }
-      }
-    }
-
-    // Limpiar mensaje de error si existe
-    errorValidacion.value = ''
+    showSuccess(`✅ Propiedades actualizadas correctamente`, { timeout: 3000 })
+    
+    // Limpiar cambios de peso después de aplicarlos exitosamente
+    setTimeout(() => {
+      cambiosPendientes.value.pesoMaximo = null
+    }, 2000) // 2 segundos de delay
   }
 }
 </script>
