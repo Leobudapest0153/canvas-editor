@@ -17,6 +17,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { CM_TO_PX } from '@/utils/constants'
+import { validateWallPlacement } from '@/utils/placementValidity'
 
 // Variable para evitar circular import - será inicializada por el composable de historial
 let historyComposable = null
@@ -588,14 +589,42 @@ export const useCanvasStore = defineStore('canvas', () => {
   const actualizarElemento = (elementoId, propiedades) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (elemento) {
+      const ubicacionFinal = propiedades.ubicacion || elemento.ubicacion
+      const zBaseFinal =
+        propiedades.alturaRespectoAlSuelo ??
+        propiedades.elevacion?.zBase ??
+        elemento.alturaRespectoAlSuelo ??
+        elemento.elevacion?.zBase
+      const altoFinal =
+        propiedades.dimensiones?.alto ??
+        elemento.dimensiones?.alto ??
+        elemento.alto ?? 0
+
+      if (ubicacionFinal === 'pared') {
+        const alturaBodega = plantaActivaData.value?.dimensiones?.alto || Infinity
+        const { valido, mensaje } = validateWallPlacement({
+          zBase: zBaseFinal,
+          alto: altoFinal,
+          alturaBodega
+        })
+        if (!valido) {
+          console.error(mensaje)
+          return false
+        }
+      }
+
       for (const key in propiedades) {
-        if (typeof propiedades[key] === 'object' && propiedades[key] !== null && !Array.isArray(propiedades[key])) {
+        if (
+          typeof propiedades[key] === 'object' &&
+          propiedades[key] !== null &&
+          !Array.isArray(propiedades[key])
+        ) {
           // Si la propiedad es un objeto (como 'dimensiones'), la fusionamos recursivamente.
           if (!elemento[key]) elemento[key] = {}
-          Object.assign(elemento[key], propiedades[key]);
+          Object.assign(elemento[key], propiedades[key])
         } else {
           // Si es un valor simple, lo asignamos directamente.
-          elemento[key] = propiedades[key];
+          elemento[key] = propiedades[key]
         }
       }
 
@@ -621,7 +650,9 @@ export const useCanvasStore = defineStore('canvas', () => {
           // Nota: largo no afecta a width/height en vista XZ
         }
       }
+      return true
     }
+    return false
   }
 
   const configurarZoom = (nuevoZoom) => {
@@ -712,6 +743,20 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!nuevoElemento.tipo) {
       console.error('El elemento debe tener un tipo definido')
       return null
+    }
+
+    // Validación específica para elementos ubicados en pared
+    if (nuevoElemento.ubicacion === 'pared') {
+      const alturaBodega = plantaActivaData.value?.dimensiones?.alto || Infinity
+      const { valido, mensaje } = validateWallPlacement({
+        zBase: nuevoElemento.alturaRespectoAlSuelo ?? nuevoElemento.elevacion?.zBase,
+        alto: nuevoElemento.dimensiones?.alto ?? nuevoElemento.alto ?? 0,
+        alturaBodega
+      })
+      if (!valido) {
+        console.error(mensaje)
+        return null
+      }
     }
 
     // Validar jerarquía según el contexto actual

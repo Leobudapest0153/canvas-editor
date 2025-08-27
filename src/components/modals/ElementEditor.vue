@@ -99,6 +99,9 @@
                 <p class="text-xs text-gray-500 mt-1">
                   Distancia desde el suelo hasta la base del elemento
                 </p>
+                <p v-if="errorAlturaPared" class="text-sm text-red-600 mt-1">
+                  {{ errorAlturaPared }}
+                </p>
               </div>
             </div>
 
@@ -235,6 +238,8 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useWeightValidation } from '@/composables/useWeightValidation'
+import { useCanvasStore } from '@/composables/useCanvasStore'
+import { validateWallPlacement } from '@/utils/placementValidity'
 
 const props = defineProps({
   visible: Boolean,
@@ -246,6 +251,7 @@ const props = defineProps({
 const emit = defineEmits(['cancel', 'save'])
 
 const weightValidation = useWeightValidation()
+const canvasStore = useCanvasStore()
 
 const esFormaCircular = computed(() => localElemento.value.forma === 'circular')
 
@@ -302,6 +308,8 @@ const localElemento = ref({
   contenedores: [],
 })
 
+const errorAlturaPared = ref('')
+
 watch(
   () => props.value,
   (val) => {
@@ -333,6 +341,17 @@ watch(
   },
 )
 
+watch(
+  () => [
+    localElemento.value.alturaRespectoAlSuelo,
+    localElemento.value.dimensiones.alto,
+    localElemento.value.ubicacion,
+  ],
+  () => {
+    errorAlturaPared.value = ''
+  },
+)
+
 // Restablecer el formulario cuando el modal se abre
 watch(
   () => props.visible,
@@ -357,8 +376,9 @@ const restablecerFormulario = () => {
     alturaRespectoAlSuelo: 0,
     descripcion: '',
     icono: 'box',
-    contenedores: [],
+  contenedores: [],
   }
+  errorAlturaPared.value = ''
 }
 
 const onCancel = () => {
@@ -368,6 +388,7 @@ const onCancel = () => {
 
 const validarFormulario = () => {
   const elemento = localElemento.value
+  errorAlturaPared.value = ''
   if (!elemento.nombre.trim()) {
     alert('El nombre es requerido')
     return false
@@ -395,6 +416,18 @@ const validarFormulario = () => {
   if (elemento.pesoMaximo <= 0) {
     alert('La capacidad de carga debe ser mayor a 0')
     return false
+  }
+  if (elemento.ubicacion === 'pared') {
+    const alturaBodega = canvasStore.plantaActivaData.value?.dimensiones?.alto || Infinity
+    const { valido, mensaje } = validateWallPlacement({
+      zBase: elemento.alturaRespectoAlSuelo,
+      alto: elemento.dimensiones.alto,
+      alturaBodega
+    })
+    if (!valido) {
+      errorAlturaPared.value = mensaje
+      return false
+    }
   }
   return true
 }
