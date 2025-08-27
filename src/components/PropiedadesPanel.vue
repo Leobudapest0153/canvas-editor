@@ -183,7 +183,7 @@
                 <input
                   id="prop-ancho"
                   type="number"
-                  :value="cambiosPendientes.dimensiones.ancho !== null ? cambiosPendientes.dimensiones.ancho : elementoSeleccionado.dimensiones?.ancho"
+                  :value="cambiosPendientes.dimensiones.ancho !== null ? cambiosPendientes.dimensiones.ancho : (elementoSeleccionado.dimensiones?.ancho || '')"
                   @change="actualizarDimension('ancho', $event.target.value)"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -194,7 +194,7 @@
               <input
                 id="prop-largo"
                 type="number"
-                :value="cambiosPendientes.dimensiones.largo !== null ? cambiosPendientes.dimensiones.largo : elementoSeleccionado.dimensiones?.largo"
+                :value="cambiosPendientes.dimensiones.largo !== null ? cambiosPendientes.dimensiones.largo : (elementoSeleccionado.dimensiones?.largo || '')"
                 @change="actualizarDimension('largo', $event.target.value)"
                 class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
@@ -205,7 +205,7 @@
               <input
                 id="prop-alto"
                 type="number"
-                :value="cambiosPendientes.dimensiones.alto !== null ? cambiosPendientes.dimensiones.alto : elementoSeleccionado.dimensiones?.alto"
+                :value="cambiosPendientes.dimensiones.alto !== null ? cambiosPendientes.dimensiones.alto : (elementoSeleccionado.dimensiones?.alto || '')"
                 @change="actualizarDimension('alto', $event.target.value)"
                 class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
@@ -228,7 +228,7 @@
           <input
             id="prop-peso-max"
             type="number"
-            :value="cambiosPendientes.pesoMaximo !== null ? cambiosPendientes.pesoMaximo : elementoSeleccionado.pesoMaximo"
+            :value="cambiosPendientes.pesoMaximo !== null ? cambiosPendientes.pesoMaximo : (elementoSeleccionado.pesoMaximo || '')"
             @change="actualizarPropiedadSimple('pesoMaximo', $event.target.value)"
             class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             placeholder="Ej: 100"
@@ -499,18 +499,37 @@ watch(
         color: nuevoElemento.color || '#3B82F6',
       }
 
-      // Inicializar cambios pendientes con los valores actuales
+      // Reinicializar cambios pendientes cuando se selecciona un nuevo elemento
+      // No preservar valores anteriores para evitar conflictos con actualizaciones del transformer
       cambiosPendientes.value = {
         dimensiones: {
-          ancho: nuevoElemento.dimensiones?.ancho || null,
-          largo: nuevoElemento.dimensiones?.largo || null,
-          alto: nuevoElemento.dimensiones?.alto || null
+          ancho: null,
+          largo: null,
+          alto: null
         },
-        pesoMaximo: nuevoElemento.pesoMaximo || null
+        pesoMaximo: null
       }
     }
   },
   { immediate: true },
+)
+
+// Watcher adicional para sincronizar con actualizaciones del transformer en tiempo real
+watch(
+  () => elementoSeleccionado.value?.dimensiones,
+  (nuevasDimensiones) => {
+    if (nuevasDimensiones && elementoSeleccionado.value) {
+      // Solo limpiar cambios pendientes si no han sido modificados manualmente por el usuario
+      // Esto permite que las actualizaciones del transformer se reflejen inmediatamente
+      if (cambiosPendientes.value.dimensiones.ancho === null &&
+          cambiosPendientes.value.dimensiones.largo === null &&
+          cambiosPendientes.value.dimensiones.alto === null) {
+        // Las dimensiones del transformer se reflejan automáticamente a través del computed
+        // No necesitamos hacer nada aquí, el reactive system maneja la actualización
+      }
+    }
+  },
+  { deep: true }
 )
 
 // Métodos

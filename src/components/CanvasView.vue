@@ -405,6 +405,17 @@
 
       </v-layer>
       <v-layer ref="overlaysLayerRef">
+        <!-- Líneas guía de object snapping -->
+        <SnapGuides 
+          :guides="snapGuides" 
+          :guide-color="'#00ff88'"
+          :guide-opacity="1.0"
+          :guide-stroke-width="3"
+          :guide-shadow-blur="4"
+          :guide-shadow-opacity="0.8"
+          :show-intersections="true"
+        />
+        
         <v-transformer
           v-if="isEditingSelected && canvasStore.elementoSeleccionado && !selectedElementLocked"
           ref="transformerRef"
@@ -434,9 +445,11 @@
     <FloatingToolbar
       :is-element-selected="canvasStore.elementoSeleccionado ? true : false"
       :is-element-locked="selectedElementLocked"
+      :is-snapping-enabled="isSnappingEnabled"
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
+      @toggle-snapping="toggleSnapping"
     />
 
     <!-- Menú contextual -->
@@ -567,7 +580,9 @@ import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
 import { makeInnerSession } from '@/composables/useInnerNoOverlap'
+import { useObjectSnapping } from '@/composables/useObjectSnapping'
 import FloatingToolbar from './FloatingToolbar.vue'
+import SnapGuides from './SnapGuides.vue'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -609,6 +624,17 @@ const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId:
 const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
+
+// Object snapping
+const { 
+  activeGuides: snapGuides, 
+  isSnapping, 
+  performSnap, 
+  clearGuides 
+} = useObjectSnapping()
+
+// Estado para controlar si el snapping está habilitado
+const isSnappingEnabled = ref(true)
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -899,6 +925,8 @@ const handleStageClick = (e) => {
   // Cerrar controles y edición cuando se hace click en el stage vacío
   speedDialOpen.value = false
   editingElementId.value = null
+  // Limpiar guías de snapping
+  clearGuides()
   }
 }
 
@@ -1164,6 +1192,19 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (!elemento) return
 
+  // Aplicar object snapping solo si está habilitado y hay movimiento activo
+  if (isSnappingEnabled.value && isElementDragging.value) {
+    const otherElements = canvasStore.elementosVisibles.filter(el => el.id !== elementId)
+    const snapResult = performSnap(elemento, x, y, otherElements)
+    
+    // Usar la posición ajustada por snapping
+    x = snapResult.x
+    y = snapResult.y
+  } else {
+    // Si el snapping está deshabilitado o no hay arrastre activo, limpiar guías
+    clearGuides()
+  }
+
   // Actualizar lastVelocity respecto a la última pos deseada conocida
   const prev = lastDesiredPosMap.value.get(elementId) || { x: elemento.x, y: elemento.y }
   lastVelocityMap.value.set(elementId, { x: x - prev.x, y: y - prev.y })
@@ -1182,6 +1223,9 @@ const endElementDrag = async (elementId) => {
   // console.log('Finalizando arrastre del elemento:', elementId)
   isElementDragging.value = false
   stageDragEnabled.value = true // Rehabilitar arrastre del canvas
+
+  // Limpiar guías de snapping
+  clearGuides()
 
   // Guardar en historial al finalizar el arrastre
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
@@ -1840,10 +1884,42 @@ const onShapeDragMove = (e, el) => {
       y: e.evt?.movementY ?? pointer.y - data.lastPointer.y,
     }
     data.lastPointer = pointer
-    const posWorld = shape.position()
+    let posWorld = shape.position()
+    
+    // Primero aplicar las restricciones de sesión
     const posLocal = session.toLocal(posWorld, parent)
     const nextLocal = session.dragBoundFuncLocal(posLocal, vel)
-    shape.position(session.toWorld(nextLocal, parent))
+    const constrainedWorld = session.toWorld(nextLocal, parent)
+    
+    // Luego aplicar object snapping si está habilitado
+    let finalWorld = constrainedWorld
+    if (isSnappingEnabled.value && isElementDragging.value) {
+      // Obtener elementos hermanos (otros elementos dentro del mismo contenedor)
+      const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
+      const otherElements = siblings.filter(sibling => sibling.id !== el.id)
+      
+      if (otherElements.length > 0) {
+        // Convertir posición del shape a coordenadas de elemento
+        let elementX = constrainedWorld.x
+        let elementY = constrainedWorld.y
+        if (el.forma === 'circular') {
+          elementX = constrainedWorld.x - el.width / 2
+          elementY = constrainedWorld.y - el.height / 2
+        }
+        
+        // Aplicar snapping
+        const snapResult = performSnap(el, elementX, elementY, otherElements)
+        
+        // Convertir de vuelta a coordenadas del shape
+        if (el.forma === 'circular') {
+          finalWorld = { x: snapResult.x + el.width / 2, y: snapResult.y + el.height / 2 }
+        } else {
+          finalWorld = { x: snapResult.x, y: snapResult.y }
+        }
+      }
+    }
+    
+    shape.position(finalWorld)
     needsDraw = true
     scheduleDraw()
   } else {
@@ -1858,6 +1934,10 @@ const onShapeDragEnd = (e, el) => {
     innerSessions.delete(el.id)
     isElementDragging.value = false
     stageDragEnabled.value = true
+    
+    // Limpiar guías de snapping
+    clearGuides()
+    
     const shape = e.target
     let candLocal = session.toLocal(shape.position(), parent)
     let finalLocal = session.finalizeLocal(candLocal)
@@ -2167,6 +2247,14 @@ const toggleDragMode = () => {
   }
 }
 
+const toggleSnapping = () => {
+  isSnappingEnabled.value = !isSnappingEnabled.value
+  // Si se desactiva el snapping, limpiar guías activas
+  if (!isSnappingEnabled.value) {
+    clearGuides()
+  }
+}
+
 const canDragElement = (id) => {
   // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
   if (isElementLocked(id)) return false
@@ -2325,7 +2413,7 @@ const handleTransformEnd = (e, elementId, forma) => {
   }
 }
 
-// Mientras se transforma (resize/rotate) dar feedback visual en tiempo real
+// Mientras se transforma (resize/rotate) dar feedback visual en tiempo real y actualizar propiedades
 const handleTransformMove = (e, elementId, forma) => {
   try {
     const node = e.target
@@ -2354,6 +2442,30 @@ const handleTransformMove = (e, elementId, forma) => {
         shape.getLayer()?.batchDraw?.()
       }
     } catch { /* ignore */ }
+
+    // Actualizar propiedades en tiempo real para reflejar cambios en PropiedadesPanel
+    let newDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
+    if (newDimensiones) {
+      const widthCm = Math.round(width / CM_TO_PX)
+      const heightCm = Math.round(height / CM_TO_PX)
+      if (canvasStore.vistaActiva === 'XY') {
+        newDimensiones.ancho = widthCm
+        newDimensiones.largo = heightCm
+      } else if (canvasStore.vistaActiva === 'XZ') {
+        newDimensiones.ancho = widthCm
+        newDimensiones.alto = heightCm
+        if (newDimensiones.largo === undefined) newDimensiones.largo = elemento.dimensiones?.largo || 60
+      }
+    }
+
+    // Actualizar en el store para reflejar cambios en tiempo real en PropiedadesPanel
+    canvasStore.actualizarElemento(elementId, { 
+      x, 
+      y, 
+      width, 
+      height, 
+      dimensiones: newDimensiones 
+    })
 
   } catch (err) {
     console.warn('Error en handleTransformMove:', err)
@@ -2403,6 +2515,8 @@ const handleKeyDown = (e) => {
     // Asegurar que el transformer/edición se cierre
   editingElementId.value = null
   speedDialOpen.value = false
+  // Limpiar guías de snapping
+  clearGuides()
   }
 }
 let resizeObserver = null

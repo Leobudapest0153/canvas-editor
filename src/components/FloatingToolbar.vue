@@ -44,6 +44,30 @@
       </button>
     </div>
 
+    <!-- Separador y Snapping -->
+    <div class="h-6 w-px bg-gray-100/70"></div>
+    <button @click.stop="$emit('toggle-snapping')"
+      class="flex cursor-pointer h-12 w-12 items-center justify-center rounded-full transition-all duration-200 relative"
+      :class="`${isSnappingEnabled ? 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-500/25' : 'hover:bg-gray-700/80'}`"
+      :title="isSnappingEnabled ? 'Desactivar Object Snapping' : 'Activar Object Snapping'">
+      <!-- Indicador de actividad -->
+      <div 
+        v-if="isSnappingEnabled"
+        class="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-gray-900 animate-pulse"
+      ></div>
+      <svg
+        class="h-6 w-6 transition-transform duration-200"
+        :class="[
+          isSnappingEnabled ? 'text-white scale-110' : 'text-gray-300 scale-100'
+        ]"
+        fill="currentColor"
+        viewBox="0 0 24 24">
+        <path
+          d="M12,2A2,2 0 0,1 14,4C14,5.11 13.1,6 12,6C10.89,6 10,5.1 10,4A2,2 0 0,1 12,2M21,9V7L17,3H15V5H16.59L19,7.41V9H21M15,19V21H17L21,17V15H19V16.59L16.59,19H15M9,21V19H7.41L5,16.59V15H3V17L7,21H9M3,9H5V7.41L7.41,5H9V3H7L3,7V9M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12A2,2 0 0,0 12,10Z"
+        />
+      </svg>
+    </button>
+
     <!-- Separador y Bloqueo -->
     <template v-if="isElementSelected">
       <div class="h-6 w-px bg-gray-100/70"></div>
@@ -80,8 +104,9 @@ defineProps({
   activeMode: { type: String, default: 'drag' },
   isElementSelected: { type: Boolean, default: false },
   isElementLocked: { type: Boolean, default: false },
+  isSnappingEnabled: { type: Boolean, default: true },
 })
 
-defineEmits(['set-mode', 'toggle-lock'])
+defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping'])
 </script>
 
