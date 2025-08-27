@@ -1,7 +1,31 @@
 import { ensureWallCm, toCmSmart } from './units'
 
-const normalizeWall = (el, bodegaHcm, CM_TO_PX) =>
-  ensureWallCm(el, { CM_TO_PX, bodegaHcm })
+// Extract XY rectangle in pixels for overlap checks
+const getXYRect = (el, CM_TO_PX) => {
+  const x = Number(el?.x ?? el?.posicion?.x ?? 0)
+  const y = Number(el?.y ?? el?.posicion?.y ?? 0)
+  const w = Number(
+    el?.width ?? (el?.dimensiones?.ancho ?? 0) * (CM_TO_PX || 0),
+  )
+  const h = Number(
+    el?.height ?? (el?.dimensiones?.largo ?? 0) * (CM_TO_PX || 0),
+  )
+  return { x, y, w, h }
+}
+
+const overlapXY = (a, b, eps = 0.5) => {
+  return !(
+    a.x + a.w <= b.x + eps ||
+    b.x + b.w <= a.x + eps ||
+    a.y + a.h <= b.y + eps ||
+    b.y + b.h <= a.y + eps
+  )
+}
+
+const normalizeWall = (el, bodegaHcm, CM_TO_PX) => ({
+  ...ensureWallCm(el, { CM_TO_PX, bodegaHcm }),
+  ...getXYRect(el, CM_TO_PX),
+})
 
 export const isWallFormValid = (el, bodegaHcm, CM_TO_PX) => {
   const n = normalizeWall(el, bodegaHcm, CM_TO_PX)
@@ -18,6 +42,7 @@ export const wallNoZOverlap = (a, b, bodegaHcm, CM_TO_PX, eps = 0.5) => {
   const A = normalizeWall(a, bodegaHcm, CM_TO_PX)
   const B = normalizeWall(b, bodegaHcm, CM_TO_PX)
   if (A.ubic !== 'pared' || B.ubic !== 'pared') return true
+  if (!overlapXY(A, B, eps)) return true
   const a0 = A.zBase
   const a1 = A.zBase + A.alto
   const b0 = B.zBase
@@ -25,12 +50,20 @@ export const wallNoZOverlap = (a, b, bodegaHcm, CM_TO_PX, eps = 0.5) => {
   return a1 <= b0 + eps || b1 <= a0 + eps
 }
 
-export const wallVsFloorOk = (el, vecSuelo, bodegaHcm, CM_TO_PX, eps = 0.5) => {
+export const wallVsFloorOk = (
+  el,
+  vecSuelo,
+  bodegaHcm,
+  CM_TO_PX,
+  eps = 0.5,
+) => {
   const A = normalizeWall(el, bodegaHcm, CM_TO_PX)
   const ubicSuelo = (vecSuelo?.ubicacion ?? vecSuelo?.metadata?.ubicacion ?? '')
     .toString()
     .toLowerCase()
   if (A.ubic !== 'pared' || ubicSuelo !== 'suelo') return true
+  const rectFloor = getXYRect(vecSuelo, CM_TO_PX)
+  if (!overlapXY(A, rectFloor, eps)) return true
   const sueloH = toCmSmart(vecSuelo?.dimensiones?.alto ?? 0, {
     CM_TO_PX,
     bodegaHcm,
@@ -55,5 +88,14 @@ export const validateWallPlacement = ({ el, all, bodegaH, CM_TO_PX }) => {
 
 export const debugWall = (el, bodegaHcm, CM_TO_PX) => {
   const n = normalizeWall(el, bodegaHcm, CM_TO_PX)
-  return { ubic: n.ubic, zBase: n.zBase, alto: n.alto, bodegaH: Number(bodegaHcm) || 0 }
+  return {
+    ubic: n.ubic,
+    zBase: n.zBase,
+    alto: n.alto,
+    x: n.x,
+    y: n.y,
+    w: n.w,
+    h: n.h,
+    bodegaH: Number(bodegaHcm) || 0,
+  }
 }
