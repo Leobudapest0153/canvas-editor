@@ -67,7 +67,7 @@ vi.mock('@/composables/useConflicts', () => ({
 }))
 
 // Mock del sistema de toast
-global.window = {
+globalThis.window = {
   __toasts: {
     show: vi.fn()
   }

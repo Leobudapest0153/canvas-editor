@@ -12,7 +12,7 @@ describe('makeInnerSession basic behaviours', () => {
       posicion: { x: 0, y: 0 },
       hijos: [],
     }
-    global.window = { __GRID_SIZE_PX: 1 }
+    globalThis.window = { __GRID_SIZE_PX: 1 }
   })
 
   it('isValidLocal prevents overlap but allows touching', () => {
