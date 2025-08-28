@@ -101,8 +101,11 @@
           <!-- Preview del elemento -->
           <div class="elemento-preview flex items-center justify-center mb-3">
             <div
-              class="preview-shape w-12 h-8 rounded flex items-center justify-center relative shadow-sm border border-white/20"
-              :class="getShapeClass(elemento.forma)"
+              :class="[
+                'preview-shape rounded flex items-center justify-center relative shadow-sm border border-white/20',
+                getShapeClass(elemento.forma),
+                elemento.forma === 'circular' ? 'w-10 h-10' : 'w-12 h-8'
+              ]"
               :style="{
                 backgroundColor:
                   elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria),
@@ -125,11 +128,11 @@
             <div class="elemento-specs space-y-1">
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Dim:</span>
-                <span class="spec-value text-gray-700"
-                  >{{ elemento.dimensiones.ancho }}×{{ elemento.dimensiones.largo }}×{{
-                    elemento.dimensiones.alto
-                  }}</span
-                >
+                <span class="spec-value text-gray-700">
+                    {{ elemento.dimensiones.ancho }}x{{ elemento.dimensiones.largo }}x{{
+                      elemento.dimensiones.alto
+                    }}
+                </span>
               </div>
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Peso:</span>
@@ -267,30 +270,31 @@ const tituloContextual = computed(() => {
 
 // Computed: determina si se pueden crear elementos personalizados
 const puedeCrearElementosPersonalizados = computed(() => {
-  const contexto = canvasStore.contextoActual.tipo
+  return true
+  // const contexto = canvasStore.contextoActual.tipo
   // Solo permitir creación personalizada en plantas (elementos)
   // Los contenedores son solo predefinidos
-  return contexto === 'plantas'
+  // return contexto === 'plantas'
 })
 
 // Computed: categorías disponibles según el contexto
 const categoriasDisponibles = computed(() => {
-  const contexto = canvasStore.contextoActual.tipo
+  return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'elementos')
+  // const contexto = canvasStore.contextoActual.tipo
+  // if (contexto === 'plantas') {
+  //   // En plantas solo se pueden crear elementos
+  //   return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'elementos')
+  // } else if (contexto === 'elementos') {
+  //   // En elementos solo se pueden crear contenedores
+  //   return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'contenedores')
+  // } else if (contexto === 'contenedores') {
+  //   // En contenedores se pueden crear elementos Y contenedores
+  //   return TODAS_LAS_CATEGORIAS.filter(
+  //     (cat) => cat.tipo === 'elementos' || cat.tipo === 'contenedores',
+  //   )
+  // }
 
-  if (contexto === 'plantas') {
-    // En plantas solo se pueden crear elementos
-    return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'elementos')
-  } else if (contexto === 'elementos') {
-    // En elementos solo se pueden crear contenedores
-    return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'contenedores')
-  } else if (contexto === 'contenedores') {
-    // En contenedores se pueden crear elementos Y contenedores
-    return TODAS_LAS_CATEGORIAS.filter(
-      (cat) => cat.tipo === 'elementos' || cat.tipo === 'contenedores',
-    )
-  }
-
-  return TODAS_LAS_CATEGORIAS
+  // return TODAS_LAS_CATEGORIAS
 })
 
 // Computed: elementos filtrados según contexto y filtros
@@ -370,7 +374,7 @@ const getShapeClass = (forma) => {
     case 'rectangular':
       return 'rounded-sm'
     case 'circular':
-      return 'rounded-full'
+      return 'rounded-full aspect-square' // Añadimos aspect-square para mantener la relación de aspecto 1:1
     default:
       return 'rounded-sm'
   }

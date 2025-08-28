@@ -12,8 +12,7 @@
       ></div>
       <button
         @click.stop="$emit('set-mode', 'drag')"
-        class="relative z-10 flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-200;
-"
+        class="relative z-10 flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-200 cursor-pointer"
         title="Modo Arrastre (Mover el lienzo)"
       >
         <!-- Icono de Mano (Arrastre) -->
@@ -29,7 +28,7 @@
       </button>
       <button
         @click.stop="$emit('set-mode', 'edit')"
-        class="relative z-10 flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-200"
+        class="relative cursor-pointer z-10 flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-200"
         title="Modo Edición (Seleccionar y mover elementos)"
       >
         <!-- Icono de Puntero (Edición) -->
@@ -47,51 +46,74 @@
       </button>
     </div>
 
-    <!-- Separador y Bloqueo -->
-    <template v-if="isElementSelected">
-      <div class="h-6 w-px bg-gray-300/70"></div>
-      <button @click.stop="$emit('toggle-lock')" 
-        class="flex h-8 w-8 items-center group justify-center rounded-xl transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40" 
-        :class="`${isElementLocked ? 'bg-amber-500 hover:bg-amber-600' : 'hover:bg-gray-400/80'}`"
-        :title="isElementLocked ? 'Desbloquear' : 'Bloquear'">
-        <svg 
-          v-if="isElementLocked" 
-          class="h-6 w-6 text-white" 
-          fill="currentColor" 
-          viewBox="0 0 24 24"
-        >
-          <path 
-            d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z" 
-          />
-        </svg>
-        <svg 
-          v-else 
-          class="h-6 w-6 text-gray-400 group-hover:text-gray-100" 
-          fill="currentColor" 
-          viewBox="0 0 24 24">
-          <path 
-            d="M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10A2,2 0 0,1 6,8H15V6A3,3 0 0,0 12,3A3,3 0 0,0 9,6H7A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,17A2,2 0 0,0 14,15A2,2 0 0,0 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17Z" 
-          />
-        </svg>
-      </button>
-      <button 
-        v-if="isContainer"
-        @click.stop="$emit('fill-container')"
-        class="flex h-12 w-12 items-center justify-center rounded-full transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-gray-700/80 cursor-pointer"
-        title="Llenar contenedor"
+    <!-- Separador y Snapping -->
+    <div class="h-6 w-px bg-gray-300/70"></div>
+
+    <button @click.stop="$emit('toggle-snapping')"
+      class="flex cursor-pointer h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 relative group"
+      :class="`${isSnappingEnabled ? 'bg-red-600 hover:bg-red-500' : 'hover:bg-gray-700/80'}`"
+      :title="isSnappingEnabled ? 'Desactivar Object Snapping' : 'Activar Object Snapping'">
+      <!-- Indicador de actividad -->
+      <div 
+        v-if="isSnappingEnabled"
+        class="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-xl border-2 border-gray-900 animate-pulse"
+      ></div>
+      <svg
+        class="h-6 w-6 transition-transform duration-200"
+        :class="[
+          isSnappingEnabled ? 'text-white scale-110' : 'text-gray-400 group-hover:text-gray-100 scale-100'
+        ]"
+        fill="currentColor"
+        viewBox="0 0 24 24">
+        <path
+          d="M12,2A2,2 0 0,1 14,4C14,5.11 13.1,6 12,6C10.89,6 10,5.1 10,4A2,2 0 0,1 12,2M21,9V7L17,3H15V5H16.59L19,7.41V9H21M15,19V21H17L21,17V15H19V16.59L16.59,19H15M9,21V19H7.41L5,16.59V15H3V17L7,21H9M3,9H5V7.41L7.41,5H9V3H7L3,7V9M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12A2,2 0 0,0 12,10Z"
+        />
+      </svg>
+    </button>
+    <button
+      v-if="isElementSelected"
+      @click.stop="$emit('toggle-lock')" 
+      class="flex h-8 w-8 cursor-pointer items-center group justify-center rounded-xl transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40" 
+      :class="`${isElementLocked ? 'bg-amber-500 hover:bg-amber-600' : 'hover:bg-gray-700/80'}`"
+      :title="isElementLocked ? 'Desbloquear' : 'Bloquear'"
+    >
+      <svg
+        v-if="isElementLocked"
+        class="h-6 w-6 text-white"
+        fill="currentColor"
+        viewBox="0 0 24 24"
       >
+        <path
+          d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"
+        />
+      </svg>
+      <svg 
+        v-else 
+        class="h-6 w-6 text-gray-400 group-hover:text-gray-100" 
+        fill="currentColor" 
+        viewBox="0 0 24 24"
+      >
+        <path
+            d="M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10A2,2 0 0,1 6,8H15V6A3,3 0 0,0 12,3A3,3 0 0,0 9,6H7A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,17A2,2 0 0,0 14,15A2,2 0 0,0 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17Z"
+        />
+      </svg>
+    </button>
+    <button 
+      v-if="isContainer && isElementSelected"
+      @click.stop="$emit('fill-container')"
+      class="flex h-8 w-8 items-center justify-center rounded-xl transition-colors duration-200 group disabled:cursor-not-allowed disabled:opacity-40 hover:bg-gray-700/80 cursor-pointer"
+      title="Llenar contenedor"
+    >
       <svg 
         xmlns="http://www.w3.org/2000/svg" 
         viewBox="0 0 24 24"
         fill="currentColor"
-        class="h-6 w-6 text-gray-300"
+        class="h-6 w-6 text-gray-400 group-hover:text-gray-100"
       >
         <path d="M3,2H6V5H3V2M6,7H9V10H6V7M8,2H11V5H8V2M17,11L12,6H15V2H19V6H22L17,11M7.5,22C6.72,22 6.04,21.55 5.71,20.9V20.9L3.1,13.44L3,13A1,1 0 0,1 4,12H20A1,1 0 0,1 21,13L20.96,13.29L18.29,20.9C17.96,21.55 17.28,22 16.5,22H7.5M7.61,20H16.39L18.57,14H5.42L7.61,20Z" />
 
       </svg>
-
-      </button>
-    </template>
+    </button>
   </div>
 </template>
 
@@ -100,9 +122,10 @@ defineProps({
   activeMode: { type: String, default: 'drag' },
   isElementSelected: { type: Boolean, default: false },
   isElementLocked: { type: Boolean, default: false },
-  isContainer: { type: Boolean, default: false }
+  isContainer: { type: Boolean, default: false },
+  isSnappingEnabled: { type: Boolean, default: true },
 })
 
-defineEmits(['set-mode', 'toggle-lock', 'fill-container'])
+defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'fill-container'])
 </script>
 

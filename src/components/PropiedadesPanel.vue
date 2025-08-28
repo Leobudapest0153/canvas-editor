@@ -48,9 +48,6 @@
               disabled
               class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed"
             />
-            <p class="text-xs text-gray-500 mt-1">
-              El ID se genera automáticamente y no puede modificarse
-            </p>
           </div>
 
           <TagFilter
@@ -171,9 +168,14 @@
             Vista de frente: Ancho=X, Largo=Z.
           </p>
 
-          <!-- Dimensiones físicas adicionales (si están disponibles) -->
+            <!-- Dimensiones físicas adicionales (si están disponibles) -->
           <div class="mt-6">
-            <h4 class="font-semibold text-gray-700 mb-3">Dimensiones Físicas (cm)</h4>
+            <h4 class="font-semibold text-gray-700 mb-3">
+              Dimensiones Físicas (cm)
+              <span v-if="hayCambiosPendientesDimensiones" class="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">
+                Cambios pendientes
+              </span>
+            </h4>
             <div class="space-y-3">
               <!-- Campo Ancho -->
               <div class="grid grid-cols-2 items-center">
@@ -181,7 +183,7 @@
                 <input
                   id="prop-ancho"
                   type="number"
-                  :value="elementoSeleccionado.dimensiones?.ancho"
+                  :value="cambiosPendientes.dimensiones.ancho !== null ? cambiosPendientes.dimensiones.ancho : (elementoSeleccionado.dimensiones?.ancho || '')"
                   @change="actualizarDimension('ancho', $event.target.value)"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                 />
@@ -192,8 +194,7 @@
               <input
                 id="prop-largo"
                 type="number"
-                :disabled="!canvasStore.estaEnPlanta"
-                :value="elementoSeleccionado.dimensiones?.largo"
+                :value="cambiosPendientes.dimensiones.largo !== null ? cambiosPendientes.dimensiones.largo : (elementoSeleccionado.dimensiones?.largo || '')"
                 @change="actualizarDimension('largo', $event.target.value)"
                 class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
@@ -204,8 +205,7 @@
               <input
                 id="prop-alto"
                 type="number"
-                :disabled="canvasStore.estaEnPlanta"
-                :value="elementoSeleccionado.dimensiones?.alto"
+                :value="cambiosPendientes.dimensiones.alto !== null ? cambiosPendientes.dimensiones.alto : (elementoSeleccionado.dimensiones?.alto || '')"
                 @change="actualizarDimension('alto', $event.target.value)"
                 class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
               />
@@ -222,18 +222,31 @@
     <div class="mt-6">
       <h4 class="font-semibold text-gray-700 mb-3">Propiedades Adicionales</h4>
       <div class="space-y-3">
-        <!-- Campo Peso Máximo -->
+        <!-- Campo Capacidad de Carga -->
         <div class="grid grid-cols-2 items-center">
-          <label for="prop-peso-max" class="text-sm text-gray-500">Peso Máximo (kg)</label>
+          <label for="prop-peso-max" class="text-sm text-gray-500">Capacidad de Carga (kg)</label>
           <input
             id="prop-peso-max"
             type="number"
-            :value="elementoSeleccionado.pesoMaximo"
+            :value="cambiosPendientes.pesoMaximo !== null ? cambiosPendientes.pesoMaximo : (elementoSeleccionado.pesoMaximo || '')"
             @change="actualizarPropiedadSimple('pesoMaximo', $event.target.value)"
             class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
             placeholder="Ej: 100"
           />
         </div>
+        <p class="text-xs text-gray-500">
+          Peso máximo teórico que este elemento puede soportar
+        </p>
+
+        <!-- Información de peso total si tiene elementos hijos -->
+        <!-- <div v-if="elementoSeleccionado.hijos && elementoSeleccionado.hijos.length > 0" class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md text-sm">
+          Este elemento contiene {{ elementoSeleccionado.hijos.length }} elementos con una capacidad de carga total requerida.
+        </div> -->
+
+        <!-- Información sobre capacidad del padre o planta contenedora -->
+        <!-- <div v-if="infoPesoContenedor.mostrar" class="mt-2 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-md text-sm">
+          {{ infoPesoContenedor.mensaje }}
+        </div> -->
         <div class="grid grid-cols-2 items-center">
           <label for="prop-volumen-max" class="text-sm text-gray-500">Volumen (m³)</label>
           <input
@@ -313,7 +326,23 @@
 
     <!-- Footer fijo con acciones -->
     <div v-if="elementoSeleccionado" class="p-4 border-t border-gray-200 bg-white">
-      <div class="flex gap-2 mb-2">
+      <div v-if="cambiosPendientes.dimensiones.ancho !== null ||
+                  cambiosPendientes.dimensiones.largo !== null ||
+                  cambiosPendientes.dimensiones.alto !== null ||
+                  cambiosPendientes.pesoMaximo !== null"
+           class="mb-2">
+        <button
+          @click="aplicarCambios"
+          class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold"
+        >
+          Validar y Aplicar Cambios
+        </button>
+        <p class="text-xs text-gray-500 mt-1 text-center">
+          Los cambios se validarán automáticamente antes de aplicarse
+        </p>
+      </div>
+
+      <!-- <div class="flex gap-2 mb-2">
         <button
           @click="onDeleteClick"
           class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
@@ -322,14 +351,21 @@
         >
           Eliminar
         </button>
-      </div>
+      </div> -->
+
       <div class="flex gap-2">
         <button
+          @click="resetearPropiedades"
+          class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+        >
+          Restablecer
+        </button>
+        <!-- <button
           @click="cambiarBloqueo"
           class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
         >
         {{ elementoSeleccionado.bloqueado ? 'Desploquear' : 'Bloquear' }}
-        </button>
+        </button> -->
         <button
           @click="deseleccionarElemento"
           class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
@@ -350,7 +386,10 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore.js'
-import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
+import { useWeightValidation } from '@/composables/useWeightValidation.js'
+import { useDimensionValidation } from '@/composables/useDimensionValidation.js'
+import { useToast } from '@/composables/useToast.js'
+import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX } from '@/utils/constants'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import TagFilter from './TagFilter.vue'
 import CreateTagModal from './CreateTagModal.vue'
@@ -358,6 +397,9 @@ import CreateTagModal from './CreateTagModal.vue'
 // Store
 const canvasStore = useCanvasStore()
 const { deleteSelected } = useDeleteElement()
+const weightValidation = useWeightValidation()
+const dimensionValidation = useDimensionValidation()
+const { showSuccess, showError } = useToast()
 
 // Referencias reactivas
 const propiedadesEditables = ref({
@@ -365,15 +407,71 @@ const propiedadesEditables = ref({
   color: '#3B82F6',
 })
 
-const modalCrearEtiquetaVisible = ref(false);
-const textoNuevaEtiqueta = ref('');
+// Referencias para los cambios pendientes
+const cambiosPendientes = ref({
+  dimensiones: {
+    ancho: null,
+    largo: null,
+    alto: null
+  },
+  pesoMaximo: null
+})
+
+// Estado para almacenar errores - Ya no necesario, usamos toasts
+// const errorValidacion = ref('')
+
+const modalCrearEtiquetaVisible = ref(false)
+const textoNuevaEtiqueta = ref('')
 
 // Computed
 const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoCompleto)
-const isLockedSelected = computed(() => {
-  const el = elementoSeleccionado.value
-  return !!(el && (el.bloqueado === true || el.locked === true))
-})
+// const isLockedSelected = computed(() => {
+//   const el = elementoSeleccionado.value
+//   return !!(el && (el.bloqueado === true || el.locked === true))
+// })
+
+// Información sobre la capacidad del contenedor padre o planta
+// const infoPesoContenedor = computed(() => {
+//   const elemento = elementoSeleccionado.value
+//   if (!elemento) return { mostrar: false, mensaje: '' }
+
+//   // Verificar si el elemento tiene un padre
+//   if (elemento.padre) {
+//     const padreId = elemento.padre
+//     const padre = canvasStore.elementoPorId(padreId)
+
+//     if (padre && padre.pesoMaximo > 0) {
+//       const nombrePadre = padre.nombre || obtenerNombreElementoPorId(padreId)
+//       const tipoElementoPadre = padre.tipo || 'elementos'
+//       const resultado = weightValidation.calcularPesoDisponible(padreId, tipoElementoPadre)
+
+//       if (resultado.limiteDePeso) {
+//         return {
+//           mostrar: true,
+//           mensaje: `Contenedor: "${nombrePadre}" - Capacidad disponible: ${Math.round(resultado.disponible * 10) / 10} kg de ${resultado.maximo} kg (${Math.round(resultado.porcentajeUsado)}% en uso)`
+//         }
+//       }
+//     }
+//   }
+//   // Verificar si el elemento está en una planta sin padre (elemento de primer nivel)
+//   else if (elemento.plantaId) {
+//     const plantaId = elemento.plantaId
+//     const planta = canvasStore.plantaPorId(plantaId)
+
+//     if (planta && planta.pesoMaximoSoportado > 0) {
+//       const resultado = weightValidation.calcularPesoDisponible(plantaId, 'plantas')
+
+//       if (resultado.limiteDePeso) {
+//         return {
+//           mostrar: true,
+//           mensaje: `Planta: "${planta.nombre}" - Capacidad disponible: ${Math.round(resultado.disponible * 10) / 10} kg de ${resultado.maximo} kg (${Math.round(resultado.porcentajeUsado)}% en uso)`
+//         }
+//       }
+//     }
+//   }
+
+//   return { mostrar: false, mensaje: '' }
+// })
 
 
 const volumen = computed(() => {
@@ -383,6 +481,12 @@ const volumen = computed(() => {
   const v = ancho * alto * largo;
   return (v / 1000000).toFixed(2);
 });
+
+const hayCambiosPendientesDimensiones = computed(() => {
+  return cambiosPendientes.value.dimensiones.ancho !== null ||
+         cambiosPendientes.value.dimensiones.largo !== null ||
+         cambiosPendientes.value.dimensiones.alto !== null
+})
 
 // Watchers
 watch(
@@ -394,9 +498,38 @@ watch(
         nombre: nuevoElemento.nombre || generarNombrePorDefecto(nuevoElemento),
         color: nuevoElemento.color || '#3B82F6',
       }
+
+      // Reinicializar cambios pendientes cuando se selecciona un nuevo elemento
+      // No preservar valores anteriores para evitar conflictos con actualizaciones del transformer
+      cambiosPendientes.value = {
+        dimensiones: {
+          ancho: null,
+          largo: null,
+          alto: null
+        },
+        pesoMaximo: null
+      }
     }
   },
   { immediate: true },
+)
+
+// Watcher adicional para sincronizar con actualizaciones del transformer en tiempo real
+watch(
+  () => elementoSeleccionado.value?.dimensiones,
+  (nuevasDimensiones) => {
+    if (nuevasDimensiones && elementoSeleccionado.value) {
+      // Solo limpiar cambios pendientes si no han sido modificados manualmente por el usuario
+      // Esto permite que las actualizaciones del transformer se reflejen inmediatamente
+      if (cambiosPendientes.value.dimensiones.ancho === null &&
+          cambiosPendientes.value.dimensiones.largo === null &&
+          cambiosPendientes.value.dimensiones.alto === null) {
+        // Las dimensiones del transformer se reflejan automáticamente a través del computed
+        // No necesitamos hacer nada aquí, el reactive system maneja la actualización
+      }
+    }
+  },
+  { deep: true }
 )
 
 // Métodos
@@ -413,6 +546,8 @@ const getCategoriaDisplay = (categoria) => {
 const generarNombrePorDefecto = (elemento) => {
   return `${elemento.tipo.charAt(0).toUpperCase() + elemento.tipo.slice(1)} ${elemento.id.split('_')[1] || ''}`
 }
+
+// La función obtenerNombreElementoPorId se define más adelante en el componente
 
 const actualizarPropiedad = (propiedad, valor) => {
   if (!elementoSeleccionado.value) return
@@ -434,21 +569,36 @@ const resetearPropiedades = () => {
     color: '#3B82F6',
   }
 
+  // Restaurar propiedades editables
   propiedadesEditables.value = { ...propiedadesOriginales }
+
+  // Actualizar en tiempo real solo para el nombre y color
   canvasStore.actualizarElemento(elementoSeleccionado.value.id, propiedadesOriginales)
+
+  // Restablecer los cambios pendientes
+  cambiosPendientes.value = {
+    dimensiones: {
+      ancho: null,
+      largo: null,
+      alto: null
+    },
+    pesoMaximo: null
+  }
+
+  showSuccess('✅ Propiedades restablecidas', { timeout: 2000 })
 }
 
-const cambiarBloqueo = () => {
-  canvasStore.actualizarElemento(elementoSeleccionado.value.id, { bloqueado: !elementoSeleccionado.value.bloqueado })
-}
+// const cambiarBloqueo = () => {
+//   canvasStore.actualizarElemento(elementoSeleccionado.value.id, { bloqueado: !elementoSeleccionado.value.bloqueado })
+// }
 
 const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
 }
 
-const onDeleteClick = () => {
-  deleteSelected({ withConfirm: true })
-}
+// const onDeleteClick = () => {
+//   deleteSelected({ withConfirm: true })
+// }
 
 // Funciones para obtener nombres de elementos por ID
 const obtenerNombreElementoPorId = (elementoId) => {
@@ -482,38 +632,22 @@ const actualizarDimension = (dimension, valor) => {
   const valorNumerico = parseFloat(valor)
   if (isNaN(valorNumerico)) return // Evitar enviar valores no numéricos
 
-  // Actualizar la dimensión en cm
-  canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-    dimensiones: {
-      [dimension]: valorNumerico,
-    },
-  })
+  // Almacenar en cambios pendientes
+  cambiosPendientes.value.dimensiones[dimension] = valorNumerico
 
-  // También actualizar las propiedades de renderizado width/height según la vista actual
-  const CM_TO_PX = 10; // Factor de conversión
-  if (canvasStore.vistaActiva === 'XY') {
-    // Vista superior: ancho->width, largo->height
-    if (dimension === 'ancho') {
-      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-        width: valorNumerico * CM_TO_PX
-      });
-    } else if (dimension === 'largo') {
-      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-        height: valorNumerico * CM_TO_PX
-      });
+  // Validación en tiempo real (solo para verificación, sin mostrar toasts)
+  if (valorNumerico > 0) {
+    const nuevasDimensiones = { [dimension]: valorNumerico }
+    const validacionPrevia = dimensionValidation.validarDimensiones(
+      elementoSeleccionado.value.id,
+      nuevasDimensiones,
+      { silencioso: true } // Validación silenciosa para evitar múltiples toasts
+    )
+    
+    // Solo log para debug, sin mostrar toast aquí para evitar duplicados
+    if (!validacionPrevia.valida && validacionPrevia.accion === 'rechazar') {
+      console.log('Validación previa:', validacionPrevia.razon)
     }
-  } else if (canvasStore.vistaActiva === 'XZ') {
-    // Vista frontal: ancho->width, alto->height
-    if (dimension === 'ancho') {
-      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-        width: valorNumerico * CM_TO_PX
-      });
-    } else if (dimension === 'alto') {
-      canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-        height: valorNumerico * CM_TO_PX
-      });
-    }
-    // El largo no afecta a width/height en vista XZ
   }
 }
 
@@ -522,9 +656,190 @@ const actualizarPropiedadSimple = (propiedad, valor) => {
   const valorNumerico = parseFloat(valor)
   if (isNaN(valorNumerico)) return
 
-  canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
-    [propiedad]: valorNumerico,
-  })
+  // Almacenar en cambios pendientes
+  cambiosPendientes.value[propiedad] = valorNumerico
+}
+
+const aplicarCambios = () => {
+  if (!elementoSeleccionado.value) return
+
+  const nuevoPesoMaximo = cambiosPendientes.value.pesoMaximo
+
+  // 1. Validar el peso máximo si hay elementos hijos (validación hacia abajo)
+  if (elementoSeleccionado.value.hijos && elementoSeleccionado.value.hijos.length > 0 && nuevoPesoMaximo !== null) {
+    const elementoId = elementoSeleccionado.value.id
+    const tipoElemento = elementoSeleccionado.value.tipo || 'elementos'
+
+    // Calcular el peso total actual de los elementos hijos
+    const resultado = weightValidation.calcularPesoDisponible(elementoId, tipoElemento)
+    const pesoActualHijos = resultado.usado
+
+    // Si el nuevo peso máximo es menor que el peso actual de los hijos, mostrar error
+    if (resultado.limiteDePeso && nuevoPesoMaximo < pesoActualHijos) {
+      showError(`La capacidad de carga debe ser al menos ${pesoActualHijos} kg para soportar los elementos actuales contenidos.`)
+      return
+    }
+  }
+
+  // 2. Validar si el nuevo peso máximo excede la capacidad del padre (validación hacia arriba)
+  if (nuevoPesoMaximo !== null && elementoSeleccionado.value.padre) {
+    const padreId = elementoSeleccionado.value.padre
+    const padre = canvasStore.elementoPorId(padreId)
+
+    if (padre && padre.pesoMaximo > 0) { // Si el padre tiene límite de peso definido
+      // Obtener la diferencia entre el nuevo y viejo peso máximo
+      const pesoMaximoActual = elementoSeleccionado.value.pesoMaximo || 0
+      const diferenciaPeso = nuevoPesoMaximo - pesoMaximoActual
+
+      if (diferenciaPeso > 0) {
+        // Calcular el peso disponible en el padre
+        const tipoElementoPadre = padre.tipo || 'elementos'
+        const resultadoPadre = weightValidation.calcularPesoDisponible(padreId, tipoElementoPadre)
+
+        // Si el incremento de peso excede la capacidad disponible en el padre
+        if (resultadoPadre.limiteDePeso && diferenciaPeso > resultadoPadre.disponible) {
+          showError(`El incremento de capacidad de carga (${diferenciaPeso} kg) excede la capacidad disponible del elemento padre (${resultadoPadre.disponible} kg).`)
+          return
+        }
+      }
+    }
+  }
+
+  // También validar si el elemento está en una planta con límite de peso
+  if (nuevoPesoMaximo !== null && !elementoSeleccionado.value.padre && elementoSeleccionado.value.plantaId) {
+    const plantaId = elementoSeleccionado.value.plantaId
+    const planta = canvasStore.plantaPorId(plantaId)
+
+    if (planta && planta.pesoMaximoSoportado > 0) {
+      // Obtener la diferencia entre el nuevo y viejo peso máximo
+      const pesoMaximoActual = elementoSeleccionado.value.pesoMaximo || 0
+      const diferenciaPeso = nuevoPesoMaximo - pesoMaximoActual
+
+      if (diferenciaPeso > 0) {
+        // Calcular el peso disponible en la planta
+        const resultadoPlanta = weightValidation.calcularPesoDisponible(plantaId, 'plantas')
+
+        // Si el incremento de peso excede la capacidad disponible en la planta
+        if (resultadoPlanta.limiteDePeso && diferenciaPeso > resultadoPlanta.disponible) {
+          showError(`El incremento de capacidad de carga (${diferenciaPeso} kg) excede la capacidad disponible de la planta (${resultadoPlanta.disponible} kg).`)
+          return
+        }
+      }
+    }
+  }
+
+  // 3. Validar dimensiones físicas si hay cambios en las dimensiones
+  if (cambiosPendientes.value.dimensiones.ancho !== null ||
+      cambiosPendientes.value.dimensiones.largo !== null ||
+      cambiosPendientes.value.dimensiones.alto !== null) {
+
+    // Construir objeto completo de dimensiones (actuales + cambios)
+    const dimensionesActuales = elementoSeleccionado.value.dimensiones || {}
+    const nuevasDimensiones = {
+      ancho: cambiosPendientes.value.dimensiones.ancho !== null 
+        ? cambiosPendientes.value.dimensiones.ancho 
+        : (dimensionesActuales.ancho || elementoSeleccionado.value.ancho || 50),
+      largo: cambiosPendientes.value.dimensiones.largo !== null 
+        ? cambiosPendientes.value.dimensiones.largo 
+        : (dimensionesActuales.largo || elementoSeleccionado.value.largo || 50),
+      alto: cambiosPendientes.value.dimensiones.alto !== null 
+        ? cambiosPendientes.value.dimensiones.alto 
+        : (dimensionesActuales.alto || elementoSeleccionado.value.alto || 100)
+    }
+
+    // Validar las nuevas dimensiones
+    const validacionDimensiones = dimensionValidation.validarDimensiones(
+      elementoSeleccionado.value.id,
+      nuevasDimensiones
+    )
+
+    if (!validacionDimensiones.valida) {
+      // El validador ya mostró el toast de error, no necesitamos duplicarlo
+      console.log(`❌ Error de dimensiones: ${validacionDimensiones.razon}`)
+      return
+    }
+
+    // Aplicar el resultado de la validación de dimensiones
+    const resultadoAplicacion = dimensionValidation.aplicarResultadoValidacion(
+      elementoSeleccionado.value.id,
+      validacionDimensiones
+    )
+
+    if (!resultadoAplicacion.exito) {
+      showError(`❌ Error al aplicar dimensiones: ${resultadoAplicacion.mensaje}`)
+      return
+    }
+
+    // Mostrar mensaje informativo sobre qué se aplicó
+    // Los toasts ya son manejados por el validador, no necesitamos duplicarlos aquí
+    if (validacionDimensiones.accion === 'aplicar_parcial') {
+      console.log(`⚠️ ${resultadoAplicacion.mensaje}`)
+    } else if (validacionDimensiones.accion === 'reubicar') {
+      console.log(`✅ ${resultadoAplicacion.mensaje}`)
+    } else if (validacionDimensiones.accion === 'aplicar') {
+      if (resultadoAplicacion.posicionAjustada) {
+        console.log(`✅ Dimensiones aplicadas correctamente. Posición ajustada automáticamente.`)
+      } else {
+        console.log(`✅ Dimensiones aplicadas correctamente`)
+      }
+    }
+
+    // Limpiar cambios de dimensiones después de aplicarlos exitosamente
+    setTimeout(() => {
+      cambiosPendientes.value.dimensiones = {
+        ancho: null,
+        largo: null,
+        alto: null
+      }
+    }, 2000) // 2 segundos de delay
+  }
+
+  // 4. Si no hay errores, aplicar cambios de peso máximo
+  const actualizaciones = {}
+
+  // Actualizar peso máximo si hay cambios
+  if (cambiosPendientes.value.pesoMaximo !== null) {
+    actualizaciones.pesoMaximo = cambiosPendientes.value.pesoMaximo
+  }
+
+  // Si hay actualizaciones de peso, aplicarlas
+  if (Object.keys(actualizaciones).length > 0) {
+    canvasStore.actualizarElemento(elementoSeleccionado.value.id, actualizaciones)
+    showSuccess(`✅ Propiedades actualizadas correctamente`, { timeout: 3000 })
+    
+    // Limpiar cambios de peso después de aplicarlos exitosamente
+    setTimeout(() => {
+      cambiosPendientes.value.pesoMaximo = null
+    }, 2000) // 2 segundos de delay
+
+    if (actualizaciones.dimensiones) {
+      if (canvasStore.vistaActiva === 'XY') {
+        // Vista superior: ancho->width, largo->height
+        if (actualizaciones.dimensiones.ancho !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            width: actualizaciones.dimensiones.ancho * CM_TO_PX
+          })
+        }
+        if (actualizaciones.dimensiones.largo !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            height: actualizaciones.dimensiones.largo * CM_TO_PX
+          })
+        }
+      } else if (canvasStore.vistaActiva === 'XZ') {
+        // Vista frontal: ancho->width, alto->height
+        if (actualizaciones.dimensiones.ancho !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            width: actualizaciones.dimensiones.ancho * CM_TO_PX
+          })
+        }
+        if (actualizaciones.dimensiones.alto !== undefined) {
+          canvasStore.actualizarElemento(elementoSeleccionado.value.id, {
+            height: actualizaciones.dimensiones.alto * CM_TO_PX
+          })
+        }
+      }
+    }
+  }
 }
 </script>
 

@@ -150,9 +150,11 @@
 <script setup>
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore'
+import { useWeightValidation } from '@/composables/useWeightValidation'
 import DrawEditor from './DrawEditor.vue';
 
 const canvasStore = useCanvasStore();
+const weightValidation = useWeightValidation();
 const canvasEditorRef = ref(null);
 
 const ovalSamplePoints = (cx, cy, rx, ry, n) => Array.from({length:n},(_,i)=>{const a=i/n*2*Math.PI;return{x:cx+rx*Math.cos(a),y:cy+ry*Math.sin(a)}})
@@ -409,6 +411,16 @@ function onSave(){
   if ((local.polygon?.length || 0) < 3){
     notice.value = 'El polígono debe tener al menos 3 vértices.'
     return
+  }
+
+  // Validar que la capacidad de carga no sea menor a la capacidad de carga total de los hijos
+  if (local.id) { // Solo para edición de plantas existentes
+    const pesoTotalHijos = weightValidation.calcularPesoTotal(local.id, 'plantas');
+
+    if (local.maxWeight > 0 && pesoTotalHijos > local.maxWeight) {
+      window.__toasts?.show?.(`La capacidad de carga de la planta (${local.maxWeight} kg) es menor a la capacidad de carga total requerida por los elementos contenidos (${Math.round(pesoTotalHijos * 100) / 100} kg).`, { type: 'error' })
+      return;
+    }
   }
 
   const plantaData = {

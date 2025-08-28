@@ -15,12 +15,33 @@
   <div
     ref="containerRef"
     class="canvas-container"
-    :class="{ 'drag-over': isDragOverCanvas }"
+    :class="{ 'drag-over': isDragOverCanvas, 'cursor-grab': !dragModeGlobal }"
     @drop="handleDrop"
     @dragover="handleDragOver"
     @dragenter="handleDragEnter"
     @dragleave="handleDragLeave"
   >
+    <!-- Indicador de peso máximo (solo se muestra cuando hay un límite de peso) -->
+    <!-- <div
+      v-if="weightValidation.contextoActualTieneLimiteDePeso"
+      class="weight-indicator"
+      :class="{
+        'weight-warning': weightValidation.infoPesoContextoActual.porcentajeUsado > 75,
+        'weight-danger': weightValidation.infoPesoContextoActual.porcentajeUsado > 90
+      }"
+    >
+      <div class="weight-icon">⚖️</div>
+      <div class="weight-bar">
+        <div
+          class="weight-progress"
+          :style="{ width: `${Math.min(100, weightValidation.infoPesoContextoActual.porcentajeUsado)}%` }"
+        ></div>
+      </div>
+      <div class="weight-text">
+        {{ Math.round(weightValidation.infoPesoContextoActual.usado) }} u/
+        {{ weightValidation.infoPesoContextoActual.maximo }} m kg
+      </div>
+    </div> -->
     <v-stage
       ref="stageRef"
       :config="stageConfig"
@@ -472,11 +493,22 @@
 
       </v-layer>
       <v-layer ref="overlaysLayerRef">
+        <!-- Líneas guía de object snapping -->
+        <SnapGuides 
+          :guides="snapGuides" 
+          :guide-color="'#00ff88'"
+          :guide-opacity="1.0"
+          :guide-stroke-width="3"
+          :guide-shadow-blur="4"
+          :guide-shadow-opacity="0.8"
+          :show-intersections="true"
+        />
+        
         <v-transformer
           v-if="isEditingSelected && canvasStore.elementoSeleccionado && !selectedElementLocked"
           ref="transformerRef"
           :config="{
-            rotateEnabled: true,
+            rotateEnabled: false,
             ignoreStroke: true,
             anchorStroke: '#6366f1',
             anchorFill: '#ffffff',
@@ -501,12 +533,14 @@
     <FloatingToolbar
       :is-element-selected="canvasStore.elementoSeleccionado ? true : false"
       :is-element-locked="selectedElementLocked"
+      :is-snapping-enabled="isSnappingEnabled"
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
 
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
       @fill-container="() => simularLlenadoContenedor(canvasStore.elementoSeleccionado)"
+      @toggle-snapping="toggleSnapping"
     />
 
     <!-- Menú contextual -->
@@ -630,15 +664,18 @@ import SpeedDialContext from '@/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/composables/useContextMenu'
 import { useDeleteElement } from '@/composables/useDeleteElement'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
+import { useWeightValidation } from '@/composables/useWeightValidation'
 import { applyEdgeConstraint } from '@/utils/edgeConstraint'
 import { resetEdgeState } from '@/composables/useEdgeState'
 import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
 import { makeInnerSession } from '@/composables/useInnerNoOverlap'
+import { useObjectSnapping } from '@/composables/useObjectSnapping'
 import FloatingToolbar from './FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/utils/simulateProducts'
 import {config} from '@vue/test-utils'
+import SnapGuides from './SnapGuides.vue'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -680,6 +717,18 @@ const ctx = useContextMenu()
 const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId: ctxElementId } = ctx
 const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
+const weightValidation = useWeightValidation()
+
+// Object snapping
+const { 
+  activeGuides: snapGuides, 
+  isSnapping, 
+  performSnap, 
+  clearGuides 
+} = useObjectSnapping()
+
+// Estado para controlar si el snapping está habilitado
+const isSnappingEnabled = ref(true)
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -970,6 +1019,8 @@ const handleStageClick = (e) => {
   // Cerrar controles y edición cuando se hace click en el stage vacío
   speedDialOpen.value = false
   editingElementId.value = null
+  // Limpiar guías de snapping
+  clearGuides()
   }
 }
 
@@ -1023,7 +1074,7 @@ const getStrokeColor = (elementId) => {
 }
 
 // Convierte posición stage->layer considerando zoom/pan
- 
+
 const toLayerCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -1033,7 +1084,7 @@ const toLayerCoords = (pos) => {
 }
 
 // Convierte posición layer->stage considerando zoom/pan
- 
+
 const toStageCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -1235,6 +1286,19 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
   if (!elemento) return
 
+  // Aplicar object snapping solo si está habilitado y hay movimiento activo
+  if (isSnappingEnabled.value && isElementDragging.value) {
+    const otherElements = canvasStore.elementosVisibles.filter(el => el.id !== elementId)
+    const snapResult = performSnap(elemento, x, y, otherElements)
+    
+    // Usar la posición ajustada por snapping
+    x = snapResult.x
+    y = snapResult.y
+  } else {
+    // Si el snapping está deshabilitado o no hay arrastre activo, limpiar guías
+    clearGuides()
+  }
+
   // Actualizar lastVelocity respecto a la última pos deseada conocida
   const prev = lastDesiredPosMap.value.get(elementId) || { x: elemento.x, y: elemento.y }
   lastVelocityMap.value.set(elementId, { x: x - prev.x, y: y - prev.y })
@@ -1253,6 +1317,9 @@ const endElementDrag = async (elementId) => {
   // console.log('Finalizando arrastre del elemento:', elementId)
   isElementDragging.value = false
   stageDragEnabled.value = true // Rehabilitar arrastre del canvas
+
+  // Limpiar guías de snapping
+  clearGuides()
 
   // Guardar en historial al finalizar el arrastre
   const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
@@ -1414,9 +1481,7 @@ const endElementDrag = async (elementId) => {
             finalPosition.y,
             `Elemento movido: ${elementoActual.nombre || elementoActual.tipo || elementId}`,
           )
-        }
-
-        // Actualizar lastValidPositions con la posición final
+        }        // Actualizar lastValidPositions con la posición final
         lastValidPositions.value.set(elementId, finalPosition)
       }
     }
@@ -1625,6 +1690,23 @@ const createElementFromDrop = (data, dropEvent) => {
     tipoElemento !== 'contenedores'
   ) {
     showToast('En contenedores solo se pueden agregar elementos u otros contenedores', 'error')
+    return
+  }
+
+  // ===== VALIDACIÓN DE PESO MÁXIMO =====
+  const resultadoValidacionPeso = weightValidation.validarPesoElemento(
+    elemento,
+    canvasStore.contextoActual.id,
+    canvasStore.contextoActual.tipo
+  )
+
+  if (!resultadoValidacionPeso.valido) {
+    // El elemento excedería el peso máximo permitido
+    showToast(
+      `No se puede agregar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
+      'error'
+    )
+    console.log('Validación de peso fallida:', resultadoValidacionPeso)
     return
   }
 
@@ -1908,10 +1990,42 @@ const onShapeDragMove = (e, el) => {
       y: e.evt?.movementY ?? pointer.y - data.lastPointer.y,
     }
     data.lastPointer = pointer
-    const posWorld = shape.position()
+    let posWorld = shape.position()
+    
+    // Primero aplicar las restricciones de sesión
     const posLocal = session.toLocal(posWorld, parent)
     const nextLocal = session.dragBoundFuncLocal(posLocal, vel)
-    shape.position(session.toWorld(nextLocal, parent))
+    const constrainedWorld = session.toWorld(nextLocal, parent)
+    
+    // Luego aplicar object snapping si está habilitado
+    let finalWorld = constrainedWorld
+    if (isSnappingEnabled.value && isElementDragging.value) {
+      // Obtener elementos hermanos (otros elementos dentro del mismo contenedor)
+      const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
+      const otherElements = siblings.filter(sibling => sibling.id !== el.id)
+      
+      if (otherElements.length > 0) {
+        // Convertir posición del shape a coordenadas de elemento
+        let elementX = constrainedWorld.x
+        let elementY = constrainedWorld.y
+        if (el.forma === 'circular') {
+          elementX = constrainedWorld.x - el.width / 2
+          elementY = constrainedWorld.y - el.height / 2
+        }
+        
+        // Aplicar snapping
+        const snapResult = performSnap(el, elementX, elementY, otherElements)
+        
+        // Convertir de vuelta a coordenadas del shape
+        if (el.forma === 'circular') {
+          finalWorld = { x: snapResult.x + el.width / 2, y: snapResult.y + el.height / 2 }
+        } else {
+          finalWorld = { x: snapResult.x, y: snapResult.y }
+        }
+      }
+    }
+    
+    shape.position(finalWorld)
     needsDraw = true
     scheduleDraw()
   } else {
@@ -1926,6 +2040,10 @@ const onShapeDragEnd = (e, el) => {
     innerSessions.delete(el.id)
     isElementDragging.value = false
     stageDragEnabled.value = true
+    
+    // Limpiar guías de snapping
+    clearGuides()
+    
     const shape = e.target
     let candLocal = session.toLocal(shape.position(), parent)
     let finalLocal = session.finalizeLocal(candLocal)
@@ -1970,7 +2088,7 @@ const getElementShadow = (elemento) => {
 
 watch(
   () => canvasStore.elementoDestacadoId,
-  (newId, oldId) => {
+  (newId) => {
     // Detener animación anterior
     if (highlightAnimation.value) {
       highlightAnimation.value.stop()
@@ -2009,7 +2127,7 @@ watch(
 
             // La opacidad del aura "respira" entre 0.3 y 0.7
             nodeAura.opacity(0.3 + oscillation * 0.4)
-            
+
           }, nodeAura.getLayer())
 
           highlightAnimation.value.start()
@@ -2028,6 +2146,23 @@ const createElementFromBuffer = (data, dropEvent) => {
   }
 
   const elemento = bufferItem.elemento
+
+  // ===== VALIDACIÓN DE PESO MÁXIMO =====
+  const resultadoValidacionPeso = weightValidation.validarPesoElemento(
+    elemento,
+    canvasStore.contextoActual.id,
+    canvasStore.contextoActual.tipo
+  )
+
+  if (!resultadoValidacionPeso.valido) {
+    // El elemento excedería el peso máximo permitido
+    showToast(
+      `No se puede pegar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
+      'error'
+    )
+    console.log('Validación de peso fallida en buffer:', resultadoValidacionPeso)
+    return
+  }
 
   // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
   let { width, height } = getElementPixelDimensions(elemento)
@@ -2218,6 +2353,14 @@ const toggleDragMode = () => {
   }
 }
 
+const toggleSnapping = () => {
+  isSnappingEnabled.value = !isSnappingEnabled.value
+  // Si se desactiva el snapping, limpiar guías activas
+  if (!isSnappingEnabled.value) {
+    clearGuides()
+  }
+}
+
 const canDragElement = (id) => {
   // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
   if (isElementLocked(id)) return false
@@ -2376,7 +2519,7 @@ const handleTransformEnd = (e, elementId, forma) => {
   }
 }
 
-// Mientras se transforma (resize/rotate) dar feedback visual en tiempo real
+// Mientras se transforma (resize/rotate) dar feedback visual en tiempo real y actualizar propiedades
 const handleTransformMove = (e, elementId, forma) => {
   try {
     const node = e.target
@@ -2405,6 +2548,30 @@ const handleTransformMove = (e, elementId, forma) => {
         shape.getLayer()?.batchDraw?.()
       }
     } catch { /* ignore */ }
+
+    // Actualizar propiedades en tiempo real para reflejar cambios en PropiedadesPanel
+    let newDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
+    if (newDimensiones) {
+      const widthCm = Math.round(width / CM_TO_PX)
+      const heightCm = Math.round(height / CM_TO_PX)
+      if (canvasStore.vistaActiva === 'XY') {
+        newDimensiones.ancho = widthCm
+        newDimensiones.largo = heightCm
+      } else if (canvasStore.vistaActiva === 'XZ') {
+        newDimensiones.ancho = widthCm
+        newDimensiones.alto = heightCm
+        if (newDimensiones.largo === undefined) newDimensiones.largo = elemento.dimensiones?.largo || 60
+      }
+    }
+
+    // Actualizar en el store para reflejar cambios en tiempo real en PropiedadesPanel
+    canvasStore.actualizarElemento(elementId, { 
+      x, 
+      y, 
+      width, 
+      height, 
+      dimensiones: newDimensiones 
+    })
 
   } catch (err) {
     console.warn('Error en handleTransformMove:', err)
@@ -2454,6 +2621,8 @@ const handleKeyDown = (e) => {
     // Asegurar que el transformer/edición se cierre
   editingElementId.value = null
   speedDialOpen.value = false
+  // Limpiar guías de snapping
+  clearGuides()
   }
 }
 let resizeObserver = null
@@ -2857,4 +3026,56 @@ const onDelete = async (id) => {
 .speed-action:hover { transform: translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,.2); }
 
 .btn-fit { position: relative; z-index: 30; }
+
+/* Indicador de peso máximo */
+.weight-indicator {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  max-width: 200px;
+  font-size: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.weight-icon {
+  font-size: 16px;
+}
+
+.weight-bar {
+  flex: 1;
+  height: 8px;
+  background-color: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.weight-progress {
+  height: 100%;
+  background-color: #3b82f6;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.weight-text {
+  font-weight: 500;
+  color: #475569;
+  white-space: nowrap;
+}
+
+/* Estados de advertencia */
+.weight-warning .weight-progress {
+  background-color: #f59e0b;
+}
+
+.weight-danger .weight-progress {
+  background-color: #dc2626;
+}
 </style>

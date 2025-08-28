@@ -142,7 +142,7 @@
             <!-- Especificaciones -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div class="mb-2">
-                <label class="block text-sm font-medium text-gray-700">Peso Máximo (kg)</label>
+                <label class="block text-sm font-medium text-gray-700">Capacidad de Carga (kg)</label>
                 <input
                   v-model.number="localElemento.pesoMaximo"
                   type="number"
@@ -150,6 +150,12 @@
                   class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                   required
                 />
+                <p class="text-xs text-gray-500 mt-1">
+                  Peso máximo teórico que este elemento puede soportar
+                </p>
+                <p v-if="elementoEditandoInfo.mostrarInfo" class="text-xs mt-1" :class="elementoEditandoInfo.claseColor">
+                  {{ elementoEditandoInfo.mensaje }}
+                </p>
               </div>
               <div class="mb-2">
                 <label class="block text-sm font-medium text-gray-700">Color Base</label>
@@ -228,6 +234,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { useWeightValidation } from '@/composables/useWeightValidation'
 
 const props = defineProps({
   visible: Boolean,
@@ -238,7 +245,43 @@ const props = defineProps({
 })
 const emit = defineEmits(['cancel', 'save'])
 
+const weightValidation = useWeightValidation()
+
 const esFormaCircular = computed(() => localElemento.value.forma === 'circular')
+
+// Información sobre el peso para elementos que estamos editando
+const elementoEditandoInfo = computed(() => {
+  // Si no estamos editando un elemento existente o no tiene ID, no mostrar información
+  if (!props.value || !props.value.id) {
+    return { mostrarInfo: false, mensaje: '', claseColor: '' };
+  }
+
+  const elementoId = props.value.id;
+  const tipoElemento = props.value.tipo || 'elementos';
+  const resultado = weightValidation.calcularPesoDisponible(elementoId, tipoElemento);
+
+  // Si no hay límite de peso, no mostrar información
+  if (!resultado.limiteDePeso) {
+    return { mostrarInfo: false, mensaje: '', claseColor: '' };
+  }
+
+  // Mostrar información sobre el peso actual
+  const pesoActual = resultado.usado;
+  let mensaje = `Peso actual de elementos contenidos: ${pesoActual} kg`;
+  let claseColor = 'text-gray-600';
+
+  // Si el peso máximo que está configurando es menor al actual, mostrar advertencia
+  if (localElemento.value.pesoMaximo < pesoActual) {
+    mensaje += ` (¡La capacidad de carga debe ser al menos ${pesoActual} kg!)`;
+    claseColor = 'text-red-600';
+  }
+
+  return {
+    mostrarInfo: true,
+    mensaje,
+    claseColor
+  };
+})
 
 // const getIconComponent = (iconType) => {
 //   // Retorna un componente SVG simple (placeholder)
@@ -350,7 +393,7 @@ const validarFormulario = () => {
     return false
   }
   if (elemento.pesoMaximo <= 0) {
-    alert('El peso máximo debe ser mayor a 0')
+    alert('La capacidad de carga debe ser mayor a 0')
     return false
   }
   return true
@@ -358,6 +401,24 @@ const validarFormulario = () => {
 
 const handleSubmit = () => {
   if (!validarFormulario()) return
+
+  // Si estamos editando un elemento existente, validar el peso máximo
+  if (props.value && props.value.id) {
+    const elementoId = props.value.id;
+    const nuevoPesoMaximo = localElemento.value.pesoMaximo;
+
+    // Calculamos el peso total actual de los elementos hijos
+    const tipoElemento = props.value.tipo || 'elementos';
+    const resultado = weightValidation.calcularPesoDisponible(elementoId, tipoElemento);
+    const pesoActualHijos = resultado.usado;
+
+    // Si el nuevo peso máximo es menor que el peso actual de los hijos, mostrar error
+    if (resultado.limiteDePeso && nuevoPesoMaximo < pesoActualHijos) {
+      alert(`La capacidad de carga debe ser al menos ${pesoActualHijos} kg para soportar los elementos actuales contenidos.`);
+      return;
+    }
+  }
+
   emit('save', { ...localElemento.value })
   restablecerFormulario()
 }

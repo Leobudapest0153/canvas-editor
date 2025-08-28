@@ -1,7 +1,7 @@
 <!--
   BufferTab.vue
-  Tab para almacén temporal de elementos (buffer/clipboard).
-  Permite almacenar, mover y restaurar elementos entre plantas.
+  Tab para almacén temporal de estructuras (buffer/clipboard).
+  Permite copiar estructuras completas de elementos con todos sus hijos.
 -->
 
 <template>
@@ -9,9 +9,9 @@
     <!-- Header del tab -->
     <div class="tab-header">
       <div class="header-info">
-        <h3 class="tab-title">Portapapeles de Elementos</h3>
+        <h3 class="tab-title">Portapapeles de Estructuras</h3>
         <div class="tab-subtitle">
-          {{ itemCount }} elemento{{ itemCount !== 1 ? 's' : '' }} en portapapeles
+          {{ itemCount }} estructura{{ itemCount !== 1 ? 's' : '' }} en portapapeles
         </div>
       </div>
       <div class="header-actions">
@@ -53,8 +53,7 @@
         <p class="empty-description">Selecciona elementos en el canvas y usa:</p>
 
         <div class="shortcuts">
-          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>X</kbd> <span>Mover al portapapeles</span></div>
-          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>C</kbd> <span>Copiar al portapapeles</span></div>
+          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>C</kbd> <span>Copiar estructura al portapapeles</span></div>
         </div>
       </div>
 
@@ -85,11 +84,11 @@
                 </span>
               </div>
               <div class="item-action">
-                <span :class="['action-badge', `action-${item.sourceInfo.action}`]">
-                  {{ item.sourceInfo.action === 'moved' ? 'Movido' : 'Copiado' }}
+                <span :class="['action-badge', 'action-copied']">
+                  Copiado
                 </span>
-                <span class="item-time">
-                  {{ formatTime(item.addedToBuffer) }}
+                <span class="item-time" :title="`Copiado el ${getFullTimestamp(item)}`">
+                  {{ getFullTimestamp(item) }}
                 </span>
               </div>
             </div>
@@ -98,24 +97,9 @@
           <!-- Acciones del elemento -->
           <div class="item-actions">
             <button
-              @click="handleRestore(item.id)"
-              class="action-btn btn-restore"
-              title="Restaurar a ubicación original"
-            >
-              <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                />
-              </svg>
-            </button>
-
-            <button
               @click="handleRemove(item.id)"
               class="action-btn btn-remove"
-              title="Eliminar del buffer"
+              title="Eliminar del portapapeles"
             >
               <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -161,30 +145,26 @@ const getPlantaName = (plantaId) => {
   return planta?.nombre || 'Planta desconocida'
 }
 
-const formatTime = (timestamp) => {
-  const now = Date.now()
-  const diff = now - timestamp
-  const minutes = Math.floor(diff / 60000)
+const getFullTimestamp = (item) => {
+  // Priorizar copiedAt del sourceInfo si existe, sino usar addedToBuffer
+  if (item.sourceInfo?.copiedAt) {
+    return item.sourceInfo.copiedAt
+  }
 
-  if (minutes < 1) return 'hace un momento'
-  if (minutes < 60) return `hace ${minutes}m`
-
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `hace ${hours}h`
-
-  const days = Math.floor(hours / 24)
-  return `hace ${days}d`
+  // Fallback: formatear addedToBuffer
+  return new Date(item.addedToBuffer).toLocaleString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
 }
 
 // Handlers
 const handleClearBuffer = () => {
-  if (confirm('¿Estás seguro de que deseas limpiar todo el buffer?')) {
-    buffer.clearBuffer()
-  }
-}
-
-const handleRestore = (bufferItemId) => {
-  buffer.restoreToOriginal(bufferItemId)
+  buffer.clearBuffer()
 }
 
 const handleRemove = (bufferItemId) => {
@@ -452,6 +432,31 @@ const handleDragEnd = () => {
 .item-time {
   font-size: 0.75rem;
   color: #9ca3af;
+}
+
+.item-timestamp {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-top: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  background: #f8fafc;
+  border-radius: 0.375rem;
+  border: 1px solid #e2e8f0;
+}
+
+.timestamp-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.timestamp-text {
+  font-size: 0.75rem;
+  color: #475569;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-weight: 500;
 }
 
 .item-actions {

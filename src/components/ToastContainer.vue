@@ -43,6 +43,7 @@ if (typeof window !== 'undefined') {
 .toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:1100}
 .toast{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#111827;color:#fff;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
 .toast.info{background:#1f2937}
+.toast.success{background:#059669}
 .toast.warn{background:#b45309}
 .toast.error{background:#991b1b}
 .toast .msg{font-size:14px}
