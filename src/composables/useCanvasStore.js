@@ -99,6 +99,18 @@ export const useCanvasStore = defineStore('canvas', () => {
   const snapGridEps = ref(6) // px de proximidad para aplicar snap al soltar
   const useDragBoundsClamp = ref(false) // experimental drag clamping
 
+  if (typeof window !== 'undefined') {
+    const persisted = window.localStorage.getItem('useDragBoundsClamp')
+    if (persisted !== null) {
+      useDragBoundsClamp.value = persisted === 'true'
+    }
+    watch(
+      useDragBoundsClamp,
+      (v) => window.localStorage.setItem('useDragBoundsClamp', v ? 'true' : 'false'),
+      { flush: 'sync' },
+    )
+  }
+
   const setGridSize = (sizePx) => {
     const s = Number(sizePx)
     if (!Number.isFinite(s)) return

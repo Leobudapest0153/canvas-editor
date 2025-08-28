@@ -20,6 +20,11 @@ config.global.stubs = {
   'rulers-overlay': true
 }
 
+import { beforeEach } from 'vitest'
+beforeEach(() => {
+  localStorage.clear()
+})
+
 // Polyfill ResizeObserver for jsdom
 class ResizeObserver {
   observe() {}
