@@ -420,7 +420,7 @@
           v-if="isEditingSelected && canvasStore.elementoSeleccionado && !selectedElementLocked"
           ref="transformerRef"
           :config="{
-            rotateEnabled: true,
+            rotateEnabled: false,
             ignoreStroke: true,
             anchorStroke: '#6366f1',
             anchorFill: '#ffffff',
