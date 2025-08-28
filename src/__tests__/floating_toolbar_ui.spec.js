@@ -39,5 +39,16 @@ describe('FloatingToolbar UI', () => {
       expect(btn.attributes('aria-label')).toBeTruthy()
     })
   })
-})
 
+  it('puts active button above slider and icon is white', () => {
+    const wrapper = mountToolbar({ activeMode: 'drag' })
+    const group = wrapper.get('[role="group"]')
+    const toggleButtons = group.findAll('button')
+    // First button corresponds to 'drag'
+    const activeBtn = toggleButtons[0]
+    expect(activeBtn.classes()).toContain('z-10')
+    const svg = activeBtn.get('svg')
+    // Icon should be forced white
+    expect(svg.classes().some((c) => c === 'text-white' || c === '!text-white')).toBe(true)
+  })
+})
