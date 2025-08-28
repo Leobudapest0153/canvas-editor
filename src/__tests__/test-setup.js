@@ -1,3 +1,4 @@
+/* eslint-env vitest, jsdom */
 import { vi } from 'vitest'
 
 // Stub vue-konva components globally
@@ -26,7 +27,7 @@ class ResizeObserver {
   disconnect() {}
 }
 // @ts-ignore
-if (typeof global !== 'undefined') {
+if (typeof globalThis !== 'undefined') {
   // @ts-ignore
-  global.ResizeObserver = ResizeObserver
+  globalThis.ResizeObserver = ResizeObserver
 }
