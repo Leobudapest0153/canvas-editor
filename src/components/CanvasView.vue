@@ -581,6 +581,7 @@ import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
 import { makeInnerSession } from '@/composables/useInnerNoOverlap'
 import { useObjectSnapping } from '@/composables/useObjectSnapping'
+import { usePlacementGuards } from '@/composables/usePlacementGuards'
 import FloatingToolbar from './FloatingToolbar.vue'
 import SnapGuides from './SnapGuides.vue'
 
@@ -610,7 +611,8 @@ function scheduleDraw() {
   rafId = requestAnimationFrame(() => {
     rafId = null
     if (needsDraw) {
-      layerRef.value?.getNode()?.batchDraw()
+      const layerNode = layerRef.value?.getNode ? layerRef.value.getNode() : layerRef.value
+      layerNode?.batchDraw?.()
       needsDraw = false
     }
   })
@@ -618,6 +620,7 @@ function scheduleDraw() {
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
+const { onDragMoveGuard, onDragEndGuard, onTransformEndGuard } = usePlacementGuards()
 const buffer = useCanvasBuffer()
 const ctx = useContextMenu()
 const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId: ctxElementId } = ctx
@@ -1381,13 +1384,17 @@ const endElementDrag = async (elementId) => {
         const positionChanged = Math.abs(finalPosition.x - lastPos.x) > 1e-6 || Math.abs(finalPosition.y - lastPos.y) > 1e-6
 
         if (positionChanged) {
-          canvasStore.actualizarPosicionConHistorial(
-            elementId,
-            finalPosition.x,
-            finalPosition.y,
-            `Elemento movido: ${elementoActual.nombre || elementoActual.tipo || elementId}`,
-          )
-        }        // Actualizar lastValidPositions con la posición final
+          const guardRes = onDragEndGuard(elementoActual, finalPosition)
+          if (guardRes.valid) {
+            canvasStore.actualizarPosicionConHistorial(
+              elementId,
+              finalPosition.x,
+              finalPosition.y,
+              `Elemento movido: ${elementoActual.nombre || elementoActual.tipo || elementId}`,
+            )
+          }
+        }
+        // Actualizar lastValidPositions con la posición final
         lastValidPositions.value.set(elementId, finalPosition)
       }
     }
@@ -1433,16 +1440,19 @@ const endElementDrag = async (elementId) => {
       const isValidNow = isPlacementValid({ pos: { x: finalX, y: finalY }, movingEl: storeEl, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
 
       if (isValidNow) {
-        // Persistir posición final con historial
-        canvasStore.actualizarPosicionConHistorial(
-          elementId,
-          finalX,
-          finalY,
-          `Elemento movido: ${storeEl.nombre || storeEl.tipo || elementId}`,
-        )
-        // Actualizar lastValidPositions para evitar divergencias posteriores
-        lastValidPositions.value.set(elementId, { x: finalX, y: finalY })
-        console.debug('[finalize] persisted final pos for', elementId, { finalX, finalY })
+        const guardRes = onDragEndGuard(storeEl, { x: finalX, y: finalY })
+        if (guardRes.valid) {
+          // Persistir posición final con historial
+          canvasStore.actualizarPosicionConHistorial(
+            elementId,
+            finalX,
+            finalY,
+            `Elemento movido: ${storeEl.nombre || storeEl.tipo || elementId}`,
+          )
+          // Actualizar lastValidPositions para evitar divergencias posteriores
+          lastValidPositions.value.set(elementId, { x: finalX, y: finalY })
+          console.debug('[finalize] persisted final pos for', elementId, { finalX, finalY })
+        }
       } else {
         // Si la posición final NO es válida, revertir visualmente a la última válida y persistir esa última válida
         const revertPos = lastGoodPos || lastValidPositions.value.get(elementId) || { x: storeEl.x || 0, y: storeEl.y || 0 }
@@ -1467,13 +1477,16 @@ const endElementDrag = async (elementId) => {
 
         // Persistir la posición revertida para mantener consistencia
         try {
-          canvasStore.actualizarPosicionConHistorial(
-            elementId,
-            revertPos.x,
-            revertPos.y,
-            `Revertir posición inválida: ${storeEl.nombre || storeEl.tipo || elementId}`,
-          )
-          lastValidPositions.value.set(elementId, { x: revertPos.x, y: revertPos.y })
+          const guardRes = onDragEndGuard(storeEl, revertPos)
+          if (guardRes.valid) {
+            canvasStore.actualizarPosicionConHistorial(
+              elementId,
+              revertPos.x,
+              revertPos.y,
+              `Revertir posición inválida: ${storeEl.nombre || storeEl.tipo || elementId}`,
+            )
+            lastValidPositions.value.set(elementId, { x: revertPos.x, y: revertPos.y })
+          }
         } catch (err) {
           console.warn('Error persisting revert position', err)
         }
@@ -1918,12 +1931,18 @@ const onShapeDragMove = (e, el) => {
         }
       }
     }
-    
+    const guardRes = onDragMoveGuard(el, { x: finalWorld.x, y: finalWorld.y })
+    if (!guardRes.valid) return
+
     shape.position(finalWorld)
     needsDraw = true
     scheduleDraw()
   } else {
-    updateElementPosition(e, el.id, el.forma === 'circular' ? 'circular' : 'rectangular')
+    const candidate = { x: e.target?.x?.() ?? 0, y: e.target?.y?.() ?? 0 }
+    const guardRes = onDragMoveGuard(el, candidate)
+    if (guardRes.valid) {
+      updateElementPosition(e, el.id, el.forma === 'circular' ? 'circular' : 'rectangular')
+    }
   }
 }
 
@@ -1945,6 +1964,10 @@ const onShapeDragEnd = (e, el) => {
     shape.position(finalWorld)
     needsDraw = true
     scheduleDraw()
+
+    const guardRes = onDragEndGuard(el, { x: finalWorld.x, y: finalWorld.y })
+    if (!guardRes.valid) return
+
     const changed =
       Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
     if (changed) {
@@ -2339,6 +2362,9 @@ const handleTransformEnd = (e, elementId, forma) => {
 
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
+
+    const guardRes = onTransformEndGuard(elemento, { x, y, width, height, rotation })
+    if (!guardRes.valid) return
 
     // Validar con isPlacementValid contra vecinos y área
     const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
