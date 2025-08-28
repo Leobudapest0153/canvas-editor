@@ -4,7 +4,7 @@
  * Store principal para el estado y lógica del canvas del editor visual jerárquico.
  *
  * Responsabilidades:
- * - Estado global del canvas (elementos, plantas, vista  const eliminarElemento = (elementoId) => {
+ * - Estado global del canvas (elementos, plantas, vista)
  * - Estado de selección y herramientas activas
  * - Configuración de canvas (zoom, pan, grid)
  * - CRUD de elementos en el canvas
@@ -24,10 +24,11 @@ import {
   errorsPlacement,
 } from '@/validation/placementOrchestrator'
 
-// Variable para evitar circular import - será inicializada por el composable de historial
-let historyComposable = null
-
 export const useCanvasStore = defineStore('canvas', () => {
+  // === INTEGRACIÓN CON HISTORIAL ===
+  // Instancia del historial - se establece desde useCanvasWithHistory
+  const historyInstance = ref(null)
+
   // Estado de plantas
   const plantas = ref([
     {
@@ -99,7 +100,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const isDraggable = ref(true);
   // Configuración de grilla y snap
   const gridSize = ref(50) // px entre líneas de grilla
-  const snapGridEps = ref(6) // px de proximidad para aplicar snap al soltar
+  const snapGridEps = ref(10) // px de proximidad para aplicar snap al soltar
 
   const setGridSize = (sizePx) => {
     const s = Number(sizePx)
@@ -320,6 +321,12 @@ export const useCanvasStore = defineStore('canvas', () => {
       return
     }
 
+    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    clearZoomPanDebounce()
+    if (historyInstance.value) {
+      historyInstance.value.clearHistory()
+    }
+
     // Actualizar contexto de navegación
     const nuevoPath = [...contextoNavegacion.value.path]
     nuevoPath.push({
@@ -338,6 +345,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     calcularCanvasAdaptativo(elemento)
 
     // Reset zoom y pan
+    clearZoomPanDebounce() // Limpiar timer pendiente antes del reset
     zoom.value = 1
     panX.value = 0
     panY.value = 0
@@ -352,14 +360,18 @@ export const useCanvasStore = defineStore('canvas', () => {
       path: nuevoPath,
     })
 
-    // Guardar en historial
-    saveToHistory(`Navegación a ${elemento.nombre}`)
   }
 
   const navegarAlPadre = () => {
     if (contextoNavegacion.value.path.length <= 1) {
       console.warn('Ya estás en el nivel raíz')
       return
+    }
+
+    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    clearZoomPanDebounce()
+    if (historyInstance.value) {
+      historyInstance.value.clearHistory()
     }
 
     // Remover último elemento del path
@@ -394,6 +406,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     // Reset zoom y pan
+    clearZoomPanDebounce() // Limpiar timer pendiente antes del reset
     zoom.value = 1
     panX.value = 0
     panY.value = 0
@@ -406,8 +419,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       path: nuevoPath,
     })
 
-    // Guardar en historial
-    saveToHistory(`Navegación al padre`)
   }
 
   /**
@@ -416,6 +427,12 @@ export const useCanvasStore = defineStore('canvas', () => {
    */
   const navegarAContexto = (tipo, id, path) => {
     if (!path || !Array.isArray(path) || path.length === 0) return
+
+    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    clearZoomPanDebounce()
+    if (historyInstance.value) {
+      historyInstance.value.clearHistory()
+    }
 
     contextoNavegacion.value = {
       tipo: tipo,
@@ -433,12 +450,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     // Reset zoom/pan y deseleccionar
+    clearZoomPanDebounce() // Limpiar timer pendiente antes del reset
     zoom.value = 1
     panX.value = 0
     panY.value = 0
     elementoSeleccionado.value = null
 
-    saveToHistory(`Navegación a contexto: ${id}`)
   }
 
   const navegarAPlanta = (plantaId) => {
@@ -446,6 +463,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!planta) {
       console.error('Planta no encontrada:', plantaId)
       return
+    }
+
+    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    clearZoomPanDebounce()
+    if (historyInstance.value) {
+      historyInstance.value.clearHistory()
     }
 
     // Reset a vista de planta
@@ -468,6 +491,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     calcularCanvasAdaptativoPlanta(planta)
 
     // Reset zoom y pan
+    clearZoomPanDebounce() // Limpiar timer pendiente antes del reset
     zoom.value = 1
     panX.value = 0
     panY.value = 0
@@ -480,8 +504,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       nombre: planta.nombre,
     })
 
-    // Guardar en historial
-    saveToHistory(`Navegación a ${planta.nombre}`)
   }
 
   const calcularCanvasAdaptativo = (elemento) => {
@@ -583,15 +605,20 @@ export const useCanvasStore = defineStore('canvas', () => {
     elementoSeleccionado.value = id
   }
 
-  const actualizarPosicion = (id, x, y) => {
+  const actualizarPosicion = (id, x, y, saveHistory = false, description = null) => {
     const elemento = elementos.value.find((el) => el.id === id)
     if (elemento) {
       elemento.x = x
       elemento.y = y
+
+      // Solo guardar en historial si se especifica explícitamente
+      if (saveHistory && description) {
+        saveToHistory(description)
+      }
     }
   }
 
-  const actualizarElemento = (elementoId, propiedades) => {
+  const actualizarElemento = (elementoId, propiedades, saveHistory = false, description = null) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (!elemento) return false
     if (!runPlacementValidators(elemento, propiedades)) return false
@@ -629,21 +656,64 @@ export const useCanvasStore = defineStore('canvas', () => {
           // Nota: largo no afecta a width/height en vista XZ
         }
       }
+
+      // Guardar en historial si se especifica
+      if (saveHistory) {
+        const descripcionAuto = description || `Propiedades actualizadas: ${Object.keys(propiedades).join(', ')}`
+        saveToHistory(descripcionAuto)
+      }
     }
     return true
   }
 
+  // Variables para debounce de historial de vista
+  let zoomPanDebounceTimer = null
+  const ZOOM_PAN_DEBOUNCE_DELAY = 1000 // 1 segundo
+
+  /**
+   * Guardar cambios de zoom/pan en historial con debounce
+   */
+  const saveZoomPanToHistory = () => {
+    if (zoomPanDebounceTimer) {
+      clearTimeout(zoomPanDebounceTimer)
+    }
+
+    zoomPanDebounceTimer = setTimeout(() => {
+      saveToHistory(`Vista ajustada: zoom ${zoom.value.toFixed(2)}x, pan (${Math.round(panX.value)}, ${Math.round(panY.value)})`)
+      zoomPanDebounceTimer = null
+    }, ZOOM_PAN_DEBOUNCE_DELAY)
+  }
+
   const configurarZoom = (nuevoZoom) => {
+    const zoomAnterior = zoom.value
     zoom.value = Math.max(0.1, Math.min(5, nuevoZoom))
+
+    // Solo guardar en historial si cambió significativamente
+    if (Math.abs(zoom.value - zoomAnterior) > 0.01) {
+      saveZoomPanToHistory()
+    }
   }
 
   const configurarPan = (x, y) => {
+    const panXAnterior = panX.value
+    const panYAnterior = panY.value
     panX.value = x
     panY.value = y
+
+    // Solo guardar en historial si cambió significativamente
+    if (Math.abs(x - panXAnterior) > 1 || Math.abs(y - panYAnterior) > 1) {
+      saveZoomPanToHistory()
+    }
   }
 
   // Actions para plantas
   const seleccionarPlanta = (plantaId) => {
+    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    clearZoomPanDebounce()
+    if (historyInstance.value) {
+      historyInstance.value.clearHistory()
+    }
+
     plantaActiva.value = plantaId
     // Deseleccionar elemento al cambiar de planta
     elementoSeleccionado.value = null
@@ -901,72 +971,29 @@ export const useCanvasStore = defineStore('canvas', () => {
   // === INTEGRACIÓN CON HISTORIAL ===
 
   /**
-   * Inicializar la integración con el historial
+   * Establecer la instancia del historial (resuelve dependencia circular)
    */
-  const initializeHistory = (historyComposableInstance) => {
-    historyComposable = historyComposableInstance
-
-    // Guardar estado inicial
-    if (historyComposable) {
-      historyComposable.initializeHistory('Estado inicial del canvas')
+  /**
+   * Limpiar timer de debounce de zoom/pan
+   */
+  const clearZoomPanDebounce = () => {
+    if (zoomPanDebounceTimer) {
+      clearTimeout(zoomPanDebounceTimer)
+      zoomPanDebounceTimer = null
     }
+  }
+
+  const setHistoryInstance = (historyComposableInstance) => {
+    historyInstance.value = historyComposableInstance
+    console.log('🔗 Instancia de historial establecida en el store')
   }
 
   /**
    * Guardar estado actual en el historial
    */
   const saveToHistory = (description) => {
-    if (historyComposable && !historyComposable.isUndoRedoOperation.value) {
-      historyComposable.pushState(description)
-    }
-  }
-
-  /**
-   * Versiones con historial de las acciones principales
-   */
-  const actualizarElementoConHistorial = (elementoId, propiedades, description) => {
-    const ok = actualizarElemento(elementoId, propiedades)
-    if (!ok) return
-
-    const descripcionAuto =
-      description || `Propiedades actualizadas: ${Object.keys(propiedades).join(', ')}`
-    saveToHistory(descripcionAuto)
-  }
-
-  const actualizarPosicionConHistorial = (elementoId, x, y, description) => {
-    actualizarPosicion(elementoId, x, y)
-
-    // Solo guardar en historial al finalizar el arrastre, no en cada movimiento
-    if (description) {
-      saveToHistory(description)
-    }
-  }
-
-  const seleccionarPlantaConHistorial = (plantaId) => {
-    const plantaAnterior = plantaActiva.value
-    seleccionarPlanta(plantaId)
-
-    if (plantaAnterior !== plantaId) {
-      const planta = plantas.value.find((p) => p.id === plantaId)
-      saveToHistory(`Cambio a planta: ${planta?.nombre || plantaId}`)
-    }
-  }
-
-  const agregarPlantaConHistorial = (nuevaPlanta) => {
-    const id = agregarPlanta(nuevaPlanta)
-    saveToHistory(`Nueva planta creada: ${nuevaPlanta.nombre || 'Sin nombre'}`)
-    return id
-  }
-
-  const eliminarPlantaConHistorial = (plantaId) => {
-    const planta = plantas.value.find((p) => p.id === plantaId)
-
-    // eslint-disable-next-line no-useless-catch
-    try {
-      eliminarPlanta(plantaId)
-      saveToHistory(`Planta eliminada: ${planta?.nombre || plantaId}`)
-    } catch (error) {
-      throw error // Re-lanzar error sin guardar en historial
+    if (historyInstance.value && !historyInstance.value.isUndoRedoOperation.value) {
+      historyInstance.value.pushState(description)
     }
   }
 
@@ -1264,30 +1291,14 @@ export const useCanvasStore = defineStore('canvas', () => {
         if (Number.isFinite(config.grid.snapEps)) snapGridEps.value = config.grid.snapEps
       }
 
-      // Guardar en historial
-      saveToHistory('Estado deserializado desde JSON')
-
-      // Recalcular canvas adaptativo según el contexto actual
-      if (contextoNavegacion.value.tipo === 'planta') {
-        const planta = plantaPorId.value(contextoNavegacion.value.id)
-        calcularCanvasAdaptativoPlanta(planta)
-      } else if (contextoNavegacion.value.tipo === 'elemento') {
-        const elemento = elementoPorId.value(contextoNavegacion.value.id)
-        if (elemento) {
-          calcularCanvasAdaptativo(elemento)
-        }
-      }
-
       console.log('Estado deserializado exitosamente:', {
         plantas: plantas.value.length,
         elementos: elementos.value.length,
         plantaActiva: plantaActiva.value,
       })
 
-      // Guardar en historial
-      saveToHistory(
-        `Canvas importado: ${elementos.value.length} elementos en ${plantas.value.length} plantas`,
-      )
+      // No guardar en historial - la importación es para restauración/copias de seguridad
+      // El historial se manejará por separado para las operaciones del usuario
 
       return true
     } catch (error) {
@@ -1435,7 +1446,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     const paddingAura = 30 / zoom.value; // Píxeles extra de tamaño para el aura
     elementoAura.value = {
       // Usamos un ID único para el aura para evitar conflictos de key
-      id: `aura_${elemento.id}`, 
+      id: `aura_${elemento.id}`,
       forma: elemento.forma,
       x: elemento.x - paddingAura / 2,
       y: elemento.y - paddingAura / 2,
@@ -1452,7 +1463,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }, 2500) // Aumentamos un poco el tiempo a 2.5 segundos
   };
-  
+
 
   const actualizarIdsFiltrados = (ids) => {
     idsElementosFiltrados.value = ids
@@ -1553,21 +1564,15 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Navegación jerárquica - Actions
     navegarAElemento,
     navegarAlPadre,
-  navegarAContexto,
+    navegarAContexto,
     navegarAPlanta,
     calcularCanvasAdaptativo,
     calcularCanvasAdaptativoPlanta,
 
     // === INTEGRACIÓN CON HISTORIAL ===
-    initializeHistory,
+    setHistoryInstance,
     saveToHistory,
-
-    // Actions con historial
-    actualizarElementoConHistorial,
-    actualizarPosicionConHistorial,
-    seleccionarPlantaConHistorial,
-    agregarPlantaConHistorial,
-    eliminarPlantaConHistorial,
+    clearZoomPanDebounce,
 
     // === FUNCIONES DE SERIALIZACIÓN ===
     serialize,

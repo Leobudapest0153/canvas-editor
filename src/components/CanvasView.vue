@@ -129,7 +129,7 @@
               canvasStore.estaEnElemento || canvasStore.estaEnContenedor
                 ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${layerConfig.width}x${layerConfig.height}px (Adaptativo)`
                 : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
-            fontSize: 12,
+            fontSize: 12 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#3b82f6',
             listening: false,
@@ -139,9 +139,9 @@
           v-if="canvasStore.estaEnPlanta"
           :config="{
             x: 10,
-            y: 30,
+            y: 10 + (12 / canvasStore.zoom) + (8 / canvasStore.zoom),
             text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
-            fontSize: 11,
+            fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#6b7280',
             listening: false,
@@ -151,9 +151,9 @@
           v-if="canvasStore.estaEnElemento"
           :config="{
             x: 10,
-            y: 30,
+            y: 10 + (12 / canvasStore.zoom) + (8 / canvasStore.zoom),
             text: `Contenedores: ${elementosVisiblesEnCanvas.length}`,
-            fontSize: 11,
+            fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#dc2626',
             listening: false,
@@ -162,10 +162,10 @@
         <v-text
           v-if="canvasStore.estaEnContenedor"
           :config="{
-            x: 10,
-            y: 30,
+            x: 5,
+            y: 10 + (11 / canvasStore.zoom) + (8 / canvasStore.zoom),
             text: `Items: ${elementosVisiblesEnCanvas.length} (elementos + contenedores)`,
-            fontSize: 11,
+            fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#dc2626',
             listening: false,
@@ -233,11 +233,14 @@
             />
             <!-- Icono de candado para elemento bloqueado -->
               <v-text
+                v-if="canvasStore.zoom > 0.8"
                 :config="{
-                  x: elemento.width / 2 - 16,
-                  y: elemento.height / 2 - 16,
+                  width: elemento.width,
+                  height: elemento.height,
+                  verticalAlign: 'middle',
+                  align: 'center',
                   text: '🔒',
-                  fontSize: 32,
+                  fontSize: 32 / canvasStore.zoom,
                   fontFamily: 'Arial',
                   fill: '#f59e0b',
                   listening: false,
@@ -334,11 +337,14 @@
             />
             <!-- Icono de candado para elemento circular bloqueado -->
             <v-text
+              v-if="canvasStore.zoom > 0.8"
               :config="{
-                x: elemento.width / 2 - 16,
-                y: elemento.height / 2 - 16,
+                width: elemento.width,
+                height: elemento.height,
+                align: 'center',
+                verticalAlign: 'center',
                 text: '🔒',
-                fontSize: 32,
+                fontSize: 32 / canvasStore.zoom,
                 fontFamily: 'Arial',
                 fill: '#f59e0b',
                 listening: false,
@@ -372,11 +378,14 @@
               }"
             />
             <v-text
+              v-if="canvasStore.zoom > 0.8"
               :config="{
-                x: elemento.width / 2 - 16,
-                y: elemento.height / 2 - 16,
+                width: elemento.width,
+                height: elemento.height,
+                verticalAlign: 'middle',
+                align: 'center',
                 text: '🔒',
-                fontSize: 32,
+                fontSize: 32 / canvasStore.zoom,
                 fontFamily: 'Arial',
                 fill: '#f59e0b',
                 listening: false,
@@ -386,11 +395,12 @@
 
           <!-- Texto con el nombre del elemento -->
           <v-text
+            v-if="canvasStore.zoom > 0.8 "
             :config="{
               x: elemento.x + 5,
               y: elemento.y + 5,
               text: elemento.nombre || elemento.tipo || 'Elemento',
-              fontSize: 12,
+              fontSize: 14 / canvasStore.zoom,
               fontFamily: 'Arial',
               fill: '#fff',
               shadowColor: 'black',
@@ -399,6 +409,84 @@
               listening: false,
             }"
           />
+
+          <v-group
+            v-if="getUsoInfo(elemento)"
+            :config="{
+              listening: false
+            }"
+          >
+            <template v-for="(info, index) in getUsoInfo(elemento)" :key="info.tipo">
+              <template v-if="((
+        barHeight = 12,
+        barMargin = 12,
+        totalHeight = (barHeight + barMargin) * 2,
+        barWidth = elemento.width * 0.8 > 200 ? 200 : elemento.width * 0.8,
+        offsetX = (elemento.width - barWidth) / 2,
+        offsetY = elemento.height - totalHeight + (barHeight + barMargin) * index
+      ))">
+        <!-- 1. Texto del Título (Volumen / Peso) -->
+        <v-text
+          :config="{
+            x: elemento.x,
+            y: elemento.y + offsetY - 7,
+            width: elemento.width,
+            height: barHeight,
+            text: info.tipo,
+            fontSize: 9,
+            fontFamily: 'Arial',
+            fill: '#4b5563',
+            align: 'center',
+            verticalAlign: 'middle',
+          }"
+        />
+
+        <!-- 2. Barra de fondo (gris) -->
+        <v-rect
+          :config="{
+            x: elemento.x + offsetX,
+            y: elemento.y + offsetY + 4,
+            width: barWidth,
+            height: barHeight,
+            fill: '#FFF',
+            cornerRadius: 4,
+            stroke: '#242930',
+            strokeWidth: 0.5,
+          }"
+        />
+
+        <!-- 3. Barra de progreso (color dinámico) -->
+        <v-rect
+          :config="{
+            x: elemento.x + offsetX,
+            y: elemento.y + offsetY + 4,
+            width: barWidth * (info.porcentaje / 100),
+            height: barHeight,
+            fill: info.color,
+            cornerRadius: 4,
+          }"
+        />
+
+        <!-- 4. Texto del Porcentaje -->
+        <v-text
+          :config="{
+            x: elemento.x + offsetX,
+            y: elemento.y + offsetY + 5,
+            height: barHeight,
+            width: barWidth,
+            align: 'center',
+            text: `${info.porcentaje}%`,
+            fontSize: 9,
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            fill: '#242930',
+            verticalAlign: 'middle',
+          }"
+        />
+      </template>
+            </template>
+          </v-group>
+
         </template>
 
         <!-- Los contenedores se renderizan junto con los elementos en la sección principal -->
@@ -406,8 +494,8 @@
       </v-layer>
       <v-layer ref="overlaysLayerRef">
         <!-- Líneas guía de object snapping -->
-        <SnapGuides 
-          :guides="snapGuides" 
+        <SnapGuides
+          :guides="snapGuides"
           :guide-color="'#00ff88'"
           :guide-opacity="1.0"
           :guide-stroke-width="3"
@@ -415,7 +503,7 @@
           :guide-shadow-opacity="0.8"
           :show-intersections="true"
         />
-        
+
         <v-transformer
           v-if="isEditingSelected && canvasStore.elementoSeleccionado && !selectedElementLocked"
           ref="transformerRef"
@@ -447,8 +535,11 @@
       :is-element-locked="selectedElementLocked"
       :is-snapping-enabled="isSnappingEnabled"
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
+
+      :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
+      @fill-container="() => simularLlenadoContenedor(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
     />
 
@@ -583,12 +674,15 @@ import { makeInnerSession } from '@/composables/useInnerNoOverlap'
 import { useObjectSnapping } from '@/composables/useObjectSnapping'
 import { usePlacementGuards } from '@/composables/usePlacementGuards'
 import FloatingToolbar from './FloatingToolbar.vue'
+import { getUsoInfo, useProductSimulation } from '@/utils/simulateProducts'
+import {config} from '@vue/test-utils'
 import SnapGuides from './SnapGuides.vue'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
   safeRight: { type: Number, default: 20 },
 })
+
 
 // Referencia segura a Konva (cuando está disponible globalmente via vue-konva)
 const Konva = typeof globalThis !== 'undefined' ? globalThis.Konva || (typeof window !== 'undefined' ? window.Konva : null) : null
@@ -634,11 +728,11 @@ const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
 
 // Object snapping
-const { 
-  activeGuides: snapGuides, 
-  isSnapping, 
-  performSnap, 
-  clearGuides 
+const {
+  activeGuides: snapGuides,
+  isSnapping,
+  performSnap,
+  clearGuides
 } = useObjectSnapping()
 
 // Estado para controlar si el snapping está habilitado
@@ -695,7 +789,7 @@ const isElementLocked = (elementId) => {
 const toggleLockElement = (elementId) => {
   const el = canvasStore.elementosVisibles.find((e) => e.id === elementId)
   if (!el) return
-  canvasStore.actualizarElemento(elementId, { bloqueado: !el.bloqueado })
+  canvasStore.actualizarElemento(elementId, { bloqueado: !el.bloqueado }, true, `Elemento ${!el.bloqueado ? 'bloqueado' : 'desbloqueado'}: ${el.nombre || el.tipo || elementId}`)
 }
 
 // Conflictos en vivo durante el arrastre
@@ -1204,7 +1298,7 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   if (isSnappingEnabled.value && isElementDragging.value) {
     const otherElements = canvasStore.elementosVisibles.filter(el => el.id !== elementId)
     const snapResult = performSnap(elemento, x, y, otherElements)
-    
+
     // Usar la posición ajustada por snapping
     x = snapResult.x
     y = snapResult.y
@@ -1391,10 +1485,11 @@ const endElementDrag = async (elementId) => {
         if (positionChanged) {
           const guardRes = onDragEndGuard(elementoActual, finalPosition)
           if (guardRes.valid) {
-            canvasStore.actualizarPosicionConHistorial(
+            canvasStore.actualizarPosicion(
               elementId,
               finalPosition.x,
               finalPosition.y,
+            true,
               `Elemento movido: ${elementoActual.nombre || elementoActual.tipo || elementId}`,
             )
           }
@@ -1448,10 +1543,11 @@ const endElementDrag = async (elementId) => {
         const guardRes = onDragEndGuard(storeEl, { x: finalX, y: finalY })
         if (guardRes.valid) {
           // Persistir posición final con historial
-          canvasStore.actualizarPosicionConHistorial(
+          canvasStore.actualizarPosicion(
             elementId,
             finalX,
             finalY,
+          true,
             `Elemento movido: ${storeEl.nombre || storeEl.tipo || elementId}`,
           )
           // Actualizar lastValidPositions para evitar divergencias posteriores
@@ -1484,10 +1580,11 @@ const endElementDrag = async (elementId) => {
         try {
           const guardRes = onDragEndGuard(storeEl, revertPos)
           if (guardRes.valid) {
-            canvasStore.actualizarPosicionConHistorial(
+            canvasStore.actualizarPosicion(
               elementId,
               revertPos.x,
               revertPos.y,
+            true,
               `Revertir posición inválida: ${storeEl.nombre || storeEl.tipo || elementId}`,
             )
             lastValidPositions.value.set(elementId, { x: revertPos.x, y: revertPos.y })
@@ -1564,6 +1661,13 @@ const showToast = (message, type = 'error') => {
     console.warn('Toast:', message)
   }
 }
+
+
+const { simularLlenadoContenedor} = useProductSimulation({
+  canvasStore,
+  showToast,
+  forceRedraw
+});
 
 // Función auxiliar para convertir coordenadas del puntero a coordenadas de mundo
 const getWorldCoordinatesFromPointer = (dropEvent) => {
@@ -1841,6 +1945,11 @@ const createElementFromDrop = (data, dropEvent) => {
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
+    volumenMaximo: anchoCm * largoCmFinal * altoCm,
+    uso: {
+      volumen: 0,
+      peso: 0
+    },
     descripcion: elemento.descripcion || '',
 
     // Copiar contenedores del elemento original si los tiene
@@ -1904,19 +2013,19 @@ const onShapeDragMove = (e, el) => {
     }
     data.lastPointer = pointer
     let posWorld = shape.position()
-    
+
     // Primero aplicar las restricciones de sesión
     const posLocal = session.toLocal(posWorld, parent)
     const nextLocal = session.dragBoundFuncLocal(posLocal, vel)
     const constrainedWorld = session.toWorld(nextLocal, parent)
-    
+
     // Luego aplicar object snapping si está habilitado
     let finalWorld = constrainedWorld
     if (isSnappingEnabled.value && isElementDragging.value) {
       // Obtener elementos hermanos (otros elementos dentro del mismo contenedor)
       const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
       const otherElements = siblings.filter(sibling => sibling.id !== el.id)
-      
+
       if (otherElements.length > 0) {
         // Convertir posición del shape a coordenadas de elemento
         let elementX = constrainedWorld.x
@@ -1925,10 +2034,10 @@ const onShapeDragMove = (e, el) => {
           elementX = constrainedWorld.x - el.width / 2
           elementY = constrainedWorld.y - el.height / 2
         }
-        
+
         // Aplicar snapping
         const snapResult = performSnap(el, elementX, elementY, otherElements)
-        
+
         // Convertir de vuelta a coordenadas del shape
         if (el.forma === 'circular') {
           finalWorld = { x: snapResult.x + el.width / 2, y: snapResult.y + el.height / 2 }
@@ -1937,9 +2046,8 @@ const onShapeDragMove = (e, el) => {
         }
       }
     }
-    const guardRes = onDragMoveGuard(el, { x: finalWorld.x, y: finalWorld.y })
+const guardRes = onDragMoveGuard(el, { x: finalWorld.x, y: finalWorld.y })
     if (!guardRes.valid) return
-
     shape.position(finalWorld)
     needsDraw = true
     scheduleDraw()
@@ -1959,10 +2067,10 @@ const onShapeDragEnd = (e, el) => {
     innerSessions.delete(el.id)
     isElementDragging.value = false
     stageDragEnabled.value = true
-    
+
     // Limpiar guías de snapping
     clearGuides()
-    
+
     const shape = e.target
     let candLocal = session.toLocal(shape.position(), parent)
     let finalLocal = session.finalizeLocal(candLocal)
@@ -1987,9 +2095,10 @@ const onShapeDragEnd = (e, el) => {
     const changed =
       Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
     if (changed) {
-      canvasStore.actualizarElementoConHistorial(
+      canvasStore.actualizarElemento(
         el.id,
         { posicion: { x: finalWorld.x, y: finalWorld.y }, x: finalWorld.x, y: finalWorld.y },
+        true,
         `Elemento movido: ${el.id}`,
       )
     }
@@ -2090,9 +2199,9 @@ const createElementFromBuffer = (data, dropEvent) => {
   if (!resultadoValidacionPeso.valido) {
     // El elemento excedería el peso máximo permitido
     showToast(
-      `No se puede pegar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
+      `No se puede pegar: habría un exceso de peso soportado de ${resultadoValidacionPeso.exceso} kg`,
       'error'
-    )
+    )|
     console.log('Validación de peso fallida en buffer:', resultadoValidacionPeso)
     return
   }
@@ -2474,7 +2583,7 @@ const handleTransformEnd = (e, elementId, forma) => {
       node.x(x)
       node.y(y)
     }
-    canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones })
+    canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones }, true, `Elemento redimensionado: ${elemento?.nombre || elemento?.tipo || elementId}`)
     lastValidPositions.value.set(elementId, { x, y })
     nextTick(() => setupTransformer())
   } catch (err) {
@@ -2528,12 +2637,12 @@ const handleTransformMove = (e, elementId, forma) => {
     }
 
     // Actualizar en el store para reflejar cambios en tiempo real en PropiedadesPanel
-    canvasStore.actualizarElemento(elementId, { 
-      x, 
-      y, 
-      width, 
-      height, 
-      dimensiones: newDimensiones 
+    canvasStore.actualizarElemento(elementId, {
+      x,
+      y,
+      width,
+      height,
+      dimensiones: newDimensiones
     })
 
   } catch (err) {
@@ -2598,6 +2707,9 @@ onMounted(async () => {
   }
   await nextTick()
   centrarPlantaEnCanvas()
+  // Aplicar fitToPlanta automáticamente al cargar la vista
+  await nextTick()
+  fitToPlanta()
   window.addEventListener('click', handleGlobalClick)
   window.addEventListener('keydown', handleKeyDown)
 })
@@ -2774,6 +2886,18 @@ const fitToPlanta = () => {
     console.error('fitToPlanta error', e)
   }
 }
+
+// Auto-ajustar siempre que cambia el contexto (planta / elemento / contenedor)
+watch(
+  () => [canvasStore.contextoActual.tipo, canvasStore.contextoActual.id],
+  async () => {
+    // Esperar a que el store recalcule canvasAdaptativo y layerConfig
+    await nextTick()
+    await nextTick()
+    fitToPlanta()
+  },
+  { immediate: false },
+)
 
 // === CONTEXT MENU HANDLERS ===
 // Stubs de stage drag para evitar warnings
