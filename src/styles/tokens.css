@@ -22,18 +22,29 @@
 }
 
 /* Utility helpers */
-.ui-surface,
-.ui-ring {
+.ui-surface {
   background: var(--ui-bg);
-  backdrop-filter: saturate(140%) blur(8px);
   border: 1px solid var(--ui-border);
-  box-shadow: var(--ui-shadow);
   border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+  backdrop-filter: saturate(140%) blur(10px);
 }
 
-.dark .ui-surface,
-.dark .ui-ring {
+.dark .ui-surface {
   background: var(--ui-bg-dark);
   border: 1px solid var(--ui-border-dark);
 }
 
+/* Keep .ui-ring consistent with surface look */
+.ui-ring {
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+  backdrop-filter: saturate(140%) blur(10px);
+}
+
+.dark .ui-ring {
+  background: var(--ui-bg-dark);
+  border: 1px solid var(--ui-border-dark);
+}

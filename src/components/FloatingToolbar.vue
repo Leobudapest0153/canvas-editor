@@ -7,7 +7,7 @@
   >
     <!-- Grupo conmutador Mano / Edición -->
     <div
-      class="relative flex items-center bg-[var(--ui-bg)]/0 border border-[var(--ui-border)] rounded-[12px] p-1"
+      class="relative flex items-center bg-[var(--ui-bg)]/0 border border-[var(--ui-border)] rounded-[12px] p-1 ring-1 ring-black/0"
       role="group"
       aria-label="Cambiar modo"
     >

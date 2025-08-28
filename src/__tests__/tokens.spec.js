@@ -17,4 +17,11 @@ describe('tokens.css import and utility classes', () => {
     expect(tokensCss).toMatch(/\.dark \.ui-surface/)
     expect(tokensCss).toMatch(/\.dark \.ui-ring/)
   })
+
+  it('ui-surface has glass blur and subtle 1px border', () => {
+    const tokensPath = path.resolve(process.cwd(), 'src/styles/tokens.css')
+    const tokensCss = fs.readFileSync(tokensPath, 'utf-8')
+    expect(tokensCss).toMatch(/backdrop-filter:\s*saturate\(140%\)\s*blur\(10px\)/)
+    expect(tokensCss).toMatch(/border:\s*1px\s+solid\s+var\(--ui-border\)/)
+  })
 })
