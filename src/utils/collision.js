@@ -173,6 +173,32 @@ export function computeMTD(ax, ay, aw, ah, bx, by, bw, bh) {
   return { dx: 0, dy: mtdY }
 }
 
+export function mtdAgainstSet(candidateRect, neighborsRects, XY_EPS = 0.01) {
+  let best = { dx: 0, dy: 0 }
+  let maxOverlap = XY_EPS
+  const ax = candidateRect.x
+  const ay = candidateRect.y
+  const aw = candidateRect.w
+  const ah = candidateRect.h
+  for (const r of neighborsRects) {
+    const left = Math.max(ax, r.x)
+    const right = Math.min(ax + aw, r.x + r.w)
+    const top = Math.max(ay, r.y)
+    const bottom = Math.min(ay + ah, r.y + r.h)
+    const w = right - left
+    const h = bottom - top
+    if (w > 0 && h > 0) {
+      const area = w * h
+      if (area > maxOverlap) {
+        const { dx, dy } = computeMTD(ax, ay, aw, ah, r.x, r.y, r.w, r.h)
+        maxOverlap = area
+        best = { dx, dy }
+      }
+    }
+  }
+  return best
+}
+
 // Proyección del MTD contra el contorno rectangular (prioridad de contorno)
 // Si el candidato está en minX y el MTD empuja hacia afuera (dx<0), anula dx, etc.
 export function projectMTDAgainstBoundary(candidateX, candidateY, mtdDx, mtdDy, w, h, W, H) {
