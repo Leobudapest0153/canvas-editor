@@ -74,7 +74,38 @@ export function isValidPlacement({ pos, movingEl, neighbors = [], areaBounds, CM
   return blockingConflicts.length === 0
 }
 
+/**
+ * Valida la elevación de un elemento cuando su ubicación es "pared".
+ * Verifica que la base respecto al suelo sea > 0 y que la suma
+ * de dicha base con el alto del elemento no exceda la altura total
+ * de la bodega.
+ *
+ * @param {Object} params - Parámetros de validación
+ * @param {number} params.zBase - Altura de la base respecto al suelo
+ * @param {number} params.alto - Altura del elemento
+ * @param {number} params.alturaBodega - Altura total disponible
+ * @returns {{valido: boolean, mensaje: string}}
+ */
+export function validateWallPlacement({ zBase, alto, alturaBodega }) {
+  if (zBase === undefined || zBase === null || zBase <= 0) {
+    return {
+      valido: false,
+      mensaje: 'La altura respecto al suelo es obligatoria y debe ser mayor a 0'
+    }
+  }
+
+  if (zBase + alto > alturaBodega) {
+    return {
+      valido: false,
+      mensaje: 'La base del elemento más su alto excede la altura de la bodega'
+    }
+  }
+
+  return { valido: true, mensaje: '' }
+}
+
 export default {
   isValidPlacement,
-  insideAreaStrokeSafe
+  insideAreaStrokeSafe,
+  validateWallPlacement
 }

@@ -17,6 +17,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { CM_TO_PX } from '@/utils/constants'
+import { validateWallPlacement } from '@/utils/placementValidity'
+import { validateZStacking } from '@/validation/placementOrchestrator'
+import { errorsPlacement } from '@/utils/errorsPlacement'
 
 // Variable para evitar circular import - será inicializada por el composable de historial
 let historyComposable = null
@@ -94,6 +97,19 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Configuración de grilla y snap
   const gridSize = ref(50) // px entre líneas de grilla
   const snapGridEps = ref(6) // px de proximidad para aplicar snap al soltar
+  const useDragBoundsClamp = ref(false) // experimental drag clamping
+
+  if (typeof window !== 'undefined') {
+    const persisted = window.localStorage.getItem('useDragBoundsClamp')
+    if (persisted !== null) {
+      useDragBoundsClamp.value = persisted === 'true'
+    }
+    watch(
+      useDragBoundsClamp,
+      (v) => window.localStorage.setItem('useDragBoundsClamp', v ? 'true' : 'false'),
+      { flush: 'sync' },
+    )
+  }
 
   const setGridSize = (sizePx) => {
     const s = Number(sizePx)
@@ -588,14 +604,63 @@ export const useCanvasStore = defineStore('canvas', () => {
   const actualizarElemento = (elementoId, propiedades) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (elemento) {
+      const ubicacionFinal = propiedades.ubicacion || elemento.ubicacion
+      const zBaseFinal =
+        propiedades.alturaRespectoAlSuelo ??
+        propiedades.elevacion?.zBase ??
+        elemento.alturaRespectoAlSuelo ??
+        elemento.elevacion?.zBase
+      const altoFinal =
+        propiedades.dimensiones?.alto ??
+        elemento.dimensiones?.alto ??
+        elemento.alto ?? 0
+
+      if (ubicacionFinal === 'pared') {
+        const alturaBodega = plantaActivaData.value?.dimensiones?.alto || Infinity
+        const { valido, mensaje } = validateWallPlacement({
+          zBase: zBaseFinal,
+          alto: altoFinal,
+          alturaBodega
+        })
+        if (!valido) {
+          console.error(mensaje)
+          return false
+        }
+      }
+
+      const candidate = {
+        ...elemento,
+        ...propiedades,
+        ubicacion: ubicacionFinal,
+        x: propiedades.x ?? elemento.x,
+        y: propiedades.y ?? elemento.y,
+        width: propiedades.width ?? elemento.width,
+        height: propiedades.height ?? elemento.height,
+        elevacion: {
+          ...(elemento.elevacion || {}),
+          ...(propiedades.elevacion || {}),
+          zBase: zBaseFinal,
+          altura: altoFinal,
+        },
+      }
+      const stackRes = validateZStacking(elementos.value, candidate)
+      if (!stackRes.valid) {
+        console.error(errorsPlacement[stackRes.code || stackRes.reason] || stackRes.code || stackRes.reason)
+        return false
+      }
+
       for (const key in propiedades) {
-        if (typeof propiedades[key] === 'object' && propiedades[key] !== null && !Array.isArray(propiedades[key])) {
+        if (
+          typeof propiedades[key] === 'object' &&
+          propiedades[key] !== null &&
+          !Array.isArray(propiedades[key])
+        ) {
           // Si la propiedad es un objeto (como 'dimensiones'), la fusionamos recursivamente.
           if (!elemento[key]) elemento[key] = {}
-          Object.assign(elemento[key], propiedades[key]);
+          Object.assign(elemento[key], propiedades[key])
         } else {
           // Si es un valor simple, lo asignamos directamente.
-          elemento[key] = propiedades[key];
+          elemento[key] = propiedades[key]
         }
       }
 
@@ -621,7 +686,9 @@ export const useCanvasStore = defineStore('canvas', () => {
           // Nota: largo no afecta a width/height en vista XZ
         }
       }
+      return true
     }
+    return false
   }
 
   const configurarZoom = (nuevoZoom) => {
@@ -711,6 +778,25 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Validar tipo de elemento
     if (!nuevoElemento.tipo) {
       console.error('El elemento debe tener un tipo definido')
+      return null
+    }
+
+    // Validación específica para elementos ubicados en pared
+    if (nuevoElemento.ubicacion === 'pared') {
+      const alturaBodega = plantaActivaData.value?.dimensiones?.alto || Infinity
+      const { valido, mensaje } = validateWallPlacement({
+        zBase: nuevoElemento.alturaRespectoAlSuelo ?? nuevoElemento.elevacion?.zBase,
+        alto: nuevoElemento.dimensiones?.alto ?? nuevoElemento.alto ?? 0,
+        alturaBodega
+      })
+      if (!valido) {
+        console.error(mensaje)
+        return null
+      }
+    }
+    const stackRes = validateZStacking(elementos.value, nuevoElemento)
+    if (!stackRes.valid) {
+      console.error(errorsPlacement[stackRes.code || stackRes.reason] || stackRes.code || stackRes.reason)
       return null
     }
 
@@ -1460,6 +1546,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     panY,
     gridSize,
     snapGridEps,
+    useDragBoundsClamp,
     crearPlanta,
     plantaEnEdicion,
     etiquetas,

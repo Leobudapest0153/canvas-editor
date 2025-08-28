@@ -54,7 +54,7 @@ function rectsIntersect(ax, ay, aw, ah, bx, by, bw, bh) {
   return !(ax + aw <= bx || bx + bw <= ax || ay + ah <= by || by + bh <= ay)
 }
 
-function inflateRectForWall(el) {
+export function inflateRectForWall(el) {
   const e = el.elevacion || {}
   const esp = e.espesor || 0
   // inflar por espesor en el eje menor
@@ -65,8 +65,8 @@ function inflateRectForWall(el) {
 }
 
 export function narrowPhase2D(a, b) {
-  const tipoA = a.ubicacion || 'suelo'
-  const tipoB = b.ubicacion || 'suelo'
+  const tipoA = (a.ubicacion || 'suelo').toLowerCase()
+  const tipoB = (b.ubicacion || 'suelo').toLowerCase()
 
   let ra, rb
   if (tipoA === 'pared') ra = inflateRectForWall(a)
@@ -96,8 +96,8 @@ export function zOverlapCheck(a, b) {
 }
 
 export function classifyPair(a, b) {
-  const tA = a.ubicacion || 'suelo'
-  const tB = b.ubicacion || 'suelo'
+  const tA = (a.ubicacion || 'suelo').toLowerCase()
+  const tB = (b.ubicacion || 'suelo').toLowerCase()
   if (tA === 'suelo' && tB === 'suelo') return 'suelo-suelo'
   if ((tA === 'suelo' && tB === 'pared') || (tA === 'pared' && tB === 'suelo')) return 'suelo-pared'
   if (tA === 'pared' && tB === 'pared') return 'pared-pared'
