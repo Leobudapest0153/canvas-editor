@@ -494,8 +494,8 @@
       </v-layer>
       <v-layer ref="overlaysLayerRef">
         <!-- Líneas guía de object snapping -->
-        <SnapGuides 
-          :guides="snapGuides" 
+        <SnapGuides
+          :guides="snapGuides"
           :guide-color="'#00ff88'"
           :guide-opacity="1.0"
           :guide-stroke-width="3"
@@ -503,7 +503,7 @@
           :guide-shadow-opacity="0.8"
           :show-intersections="true"
         />
-        
+
         <v-transformer
           v-if="isEditingSelected && canvasStore.elementoSeleccionado && !selectedElementLocked"
           ref="transformerRef"
@@ -720,11 +720,11 @@ const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
 
 // Object snapping
-const { 
-  activeGuides: snapGuides, 
-  isSnapping, 
-  performSnap, 
-  clearGuides 
+const {
+  activeGuides: snapGuides,
+  isSnapping,
+  performSnap,
+  clearGuides
 } = useObjectSnapping()
 
 // Estado para controlar si el snapping está habilitado
@@ -781,7 +781,7 @@ const isElementLocked = (elementId) => {
 const toggleLockElement = (elementId) => {
   const el = canvasStore.elementosVisibles.find((e) => e.id === elementId)
   if (!el) return
-  canvasStore.actualizarElemento(elementId, { bloqueado: !el.bloqueado })
+  canvasStore.actualizarElemento(elementId, { bloqueado: !el.bloqueado }, true, `Elemento ${!el.bloqueado ? 'bloqueado' : 'desbloqueado'}: ${el.nombre || el.tipo || elementId}`)
 }
 
 // Conflictos en vivo durante el arrastre
@@ -1290,7 +1290,7 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   if (isSnappingEnabled.value && isElementDragging.value) {
     const otherElements = canvasStore.elementosVisibles.filter(el => el.id !== elementId)
     const snapResult = performSnap(elemento, x, y, otherElements)
-    
+
     // Usar la posición ajustada por snapping
     x = snapResult.x
     y = snapResult.y
@@ -1475,10 +1475,11 @@ const endElementDrag = async (elementId) => {
         const positionChanged = Math.abs(finalPosition.x - lastPos.x) > 1e-6 || Math.abs(finalPosition.y - lastPos.y) > 1e-6
 
         if (positionChanged) {
-          canvasStore.actualizarPosicionConHistorial(
+          canvasStore.actualizarPosicion(
             elementId,
             finalPosition.x,
             finalPosition.y,
+            true,
             `Elemento movido: ${elementoActual.nombre || elementoActual.tipo || elementId}`,
           )
         }        // Actualizar lastValidPositions con la posición final
@@ -1528,10 +1529,11 @@ const endElementDrag = async (elementId) => {
 
       if (isValidNow) {
         // Persistir posición final con historial
-        canvasStore.actualizarPosicionConHistorial(
+        canvasStore.actualizarPosicion(
           elementId,
           finalX,
           finalY,
+          true,
           `Elemento movido: ${storeEl.nombre || storeEl.tipo || elementId}`,
         )
         // Actualizar lastValidPositions para evitar divergencias posteriores
@@ -1561,10 +1563,11 @@ const endElementDrag = async (elementId) => {
 
         // Persistir la posición revertida para mantener consistencia
         try {
-          canvasStore.actualizarPosicionConHistorial(
+          canvasStore.actualizarPosicion(
             elementId,
             revertPos.x,
             revertPos.y,
+            true,
             `Revertir posición inválida: ${storeEl.nombre || storeEl.tipo || elementId}`,
           )
           lastValidPositions.value.set(elementId, { x: revertPos.x, y: revertPos.y })
@@ -1991,19 +1994,19 @@ const onShapeDragMove = (e, el) => {
     }
     data.lastPointer = pointer
     let posWorld = shape.position()
-    
+
     // Primero aplicar las restricciones de sesión
     const posLocal = session.toLocal(posWorld, parent)
     const nextLocal = session.dragBoundFuncLocal(posLocal, vel)
     const constrainedWorld = session.toWorld(nextLocal, parent)
-    
+
     // Luego aplicar object snapping si está habilitado
     let finalWorld = constrainedWorld
     if (isSnappingEnabled.value && isElementDragging.value) {
       // Obtener elementos hermanos (otros elementos dentro del mismo contenedor)
       const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
       const otherElements = siblings.filter(sibling => sibling.id !== el.id)
-      
+
       if (otherElements.length > 0) {
         // Convertir posición del shape a coordenadas de elemento
         let elementX = constrainedWorld.x
@@ -2012,10 +2015,10 @@ const onShapeDragMove = (e, el) => {
           elementX = constrainedWorld.x - el.width / 2
           elementY = constrainedWorld.y - el.height / 2
         }
-        
+
         // Aplicar snapping
         const snapResult = performSnap(el, elementX, elementY, otherElements)
-        
+
         // Convertir de vuelta a coordenadas del shape
         if (el.forma === 'circular') {
           finalWorld = { x: snapResult.x + el.width / 2, y: snapResult.y + el.height / 2 }
@@ -2024,7 +2027,7 @@ const onShapeDragMove = (e, el) => {
         }
       }
     }
-    
+
     shape.position(finalWorld)
     needsDraw = true
     scheduleDraw()
@@ -2040,10 +2043,10 @@ const onShapeDragEnd = (e, el) => {
     innerSessions.delete(el.id)
     isElementDragging.value = false
     stageDragEnabled.value = true
-    
+
     // Limpiar guías de snapping
     clearGuides()
-    
+
     const shape = e.target
     let candLocal = session.toLocal(shape.position(), parent)
     let finalLocal = session.finalizeLocal(candLocal)
@@ -2054,9 +2057,10 @@ const onShapeDragEnd = (e, el) => {
     const changed =
       Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
     if (changed) {
-      canvasStore.actualizarElementoConHistorial(
+      canvasStore.actualizarElemento(
         el.id,
         { posicion: { x: finalWorld.x, y: finalWorld.y }, x: finalWorld.x, y: finalWorld.y },
+        true,
         `Elemento movido: ${el.id}`,
       )
     }
@@ -2157,9 +2161,9 @@ const createElementFromBuffer = (data, dropEvent) => {
   if (!resultadoValidacionPeso.valido) {
     // El elemento excedería el peso máximo permitido
     showToast(
-      `No se puede pegar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
+      `No se puede pegar: habría un exceso de peso soportado de ${resultadoValidacionPeso.exceso} kg`,
       'error'
-    )
+    )|
     console.log('Validación de peso fallida en buffer:', resultadoValidacionPeso)
     return
   }
@@ -2511,7 +2515,7 @@ const handleTransformEnd = (e, elementId, forma) => {
       node.x(x)
       node.y(y)
     }
-    canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones })
+    canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones }, true, `Elemento redimensionado: ${elemento?.nombre || elemento?.tipo || elementId}`)
     lastValidPositions.value.set(elementId, { x, y })
     nextTick(() => setupTransformer())
   } catch (err) {
@@ -2565,12 +2569,12 @@ const handleTransformMove = (e, elementId, forma) => {
     }
 
     // Actualizar en el store para reflejar cambios en tiempo real en PropiedadesPanel
-    canvasStore.actualizarElemento(elementId, { 
-      x, 
-      y, 
-      width, 
-      height, 
-      dimensiones: newDimensiones 
+    canvasStore.actualizarElemento(elementId, {
+      x,
+      y,
+      width,
+      height,
+      dimensiones: newDimensiones
     })
 
   } catch (err) {

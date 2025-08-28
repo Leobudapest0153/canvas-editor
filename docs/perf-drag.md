@@ -19,7 +19,7 @@ Flujo
    - `onValidateLight` usa `throttleEveryNFrames(2)` y `detectConflictsFor` para pintar el borde rojo en conflictos.
 3) `dragend`:
    - Clampear/snap final con `clampToAreaFast`/`computeSnapFast`.
-   - `disablePerfMode(layer)` y hacer un único `actualizarPosicionConHistorial(...)`.
+   - `disablePerfMode(layer)` y hacer un único `actualizarPosicion(..., true, description)`.
 
 Notas
 - Se eliminaron `batchDraw` redundantes en `dragmove`; el rAF controla los draws.

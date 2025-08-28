@@ -333,7 +333,7 @@
            class="mb-2">
         <button
           @click="aplicarCambios"
-          class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold"
+          class="w-full cursor-pointer px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold"
         >
           Validar y Aplicar Cambios
         </button>
@@ -356,7 +356,7 @@
       <div class="flex gap-2">
         <button
           @click="resetearPropiedades"
-          class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
+          class="flex-1 cursor-pointer px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
         >
           Restablecer
         </button>
@@ -364,11 +364,11 @@
           @click="cambiarBloqueo"
           class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
         >
-        {{ elementoSeleccionado.bloqueado ? 'Desploquear' : 'Bloquear' }}
+        {{ elementoSeleccionado.bloqueado ? 'Desbloquear' : 'Bloquear' }}
         </button> -->
         <button
           @click="deseleccionarElemento"
-          class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+          class="flex-1 cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
         >
           Deseleccionar
         </button>
@@ -643,7 +643,7 @@ const actualizarDimension = (dimension, valor) => {
       nuevasDimensiones,
       { silencioso: true } // Validación silenciosa para evitar múltiples toasts
     )
-    
+
     // Solo log para debug, sin mostrar toast aquí para evitar duplicados
     if (!validacionPrevia.valida && validacionPrevia.accion === 'rechazar') {
       console.log('Validación previa:', validacionPrevia.razon)
@@ -736,14 +736,14 @@ const aplicarCambios = () => {
     // Construir objeto completo de dimensiones (actuales + cambios)
     const dimensionesActuales = elementoSeleccionado.value.dimensiones || {}
     const nuevasDimensiones = {
-      ancho: cambiosPendientes.value.dimensiones.ancho !== null 
-        ? cambiosPendientes.value.dimensiones.ancho 
+      ancho: cambiosPendientes.value.dimensiones.ancho !== null
+        ? cambiosPendientes.value.dimensiones.ancho
         : (dimensionesActuales.ancho || elementoSeleccionado.value.ancho || 50),
-      largo: cambiosPendientes.value.dimensiones.largo !== null 
-        ? cambiosPendientes.value.dimensiones.largo 
+      largo: cambiosPendientes.value.dimensiones.largo !== null
+        ? cambiosPendientes.value.dimensiones.largo
         : (dimensionesActuales.largo || elementoSeleccionado.value.largo || 50),
-      alto: cambiosPendientes.value.dimensiones.alto !== null 
-        ? cambiosPendientes.value.dimensiones.alto 
+      alto: cambiosPendientes.value.dimensiones.alto !== null
+        ? cambiosPendientes.value.dimensiones.alto
         : (dimensionesActuales.alto || elementoSeleccionado.value.alto || 100)
     }
 
@@ -806,7 +806,7 @@ const aplicarCambios = () => {
   if (Object.keys(actualizaciones).length > 0) {
     canvasStore.actualizarElemento(elementoSeleccionado.value.id, actualizaciones)
     showSuccess(`✅ Propiedades actualizadas correctamente`, { timeout: 3000 })
-    
+
     // Limpiar cambios de peso después de aplicarlos exitosamente
     setTimeout(() => {
       cambiosPendientes.value.pesoMaximo = null
