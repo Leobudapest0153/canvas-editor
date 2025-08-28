@@ -7,18 +7,19 @@
   >
     <!-- Grupo conmutador Mano / Edición -->
     <div
-      class="relative flex items-center bg-[var(--ui-bg)]/0 border border-[var(--ui-border)] rounded-[12px] p-1 ring-1 ring-black/0"
+      class="relative flex items-center bg-[var(--ui-bg)]/0 border border-[var(--ui-border)] rounded-[14px] p-[6px] gap-[6px] ring-1 ring-black/0"
       role="group"
       aria-label="Cambiar modo"
     >
       <div
-        class="absolute left-1 top-1 z-0 h-[calc(var(--btn-size)-8px)] w-[calc(var(--btn-size)-8px)] rounded-[10px] bg-[var(--primary)] transition-transform will-change-transform"
-        :style="{ transform: activeMode === 'edit' ? 'translateX(100%)' : 'translateX(0%)' }"
+        class="absolute left-[6px] top-[6px] z-0 h-[calc(var(--btn-size)-8px)] w-[calc(var(--btn-size)-8px)] rounded-[12px] bg-[var(--primary)] transition-transform duration-200 ease-out will-change-transform"
+        :style="{ transform: activeMode === 'edit' ? 'translateX(calc(var(--btn-size) + 6px))' : 'translateX(0%)' }"
         aria-hidden="true"
       ></div>
       <button
         @click.stop="$emit('set-mode', 'drag')"
-        class="relative z-10 h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 hover:bg-black/5 dark:hover:bg-white/5 transition text-slate-600 dark:text-slate-200"
+        :data-state="activeMode === 'drag' ? 'on' : 'off'"
+        class="relative z-10 h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 transition text-slate-600 dark:text-slate-200 [data-state=off]:hover:bg-black/5 dark:[data-state=off]:hover:bg-white/5 [data-state=on]:hover:opacity-95"
         :class="{ '!text-white': activeMode === 'drag' }"
         aria-label="Modo mano (mover lienzo)"
       >
@@ -29,7 +30,8 @@
       </button>
       <button
         @click.stop="$emit('set-mode', 'edit')"
-        class="relative z-10 h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 hover:bg-black/5 dark:hover:bg-white/5 transition text-slate-600 dark:text-slate-200"
+        :data-state="activeMode === 'edit' ? 'on' : 'off'"
+        class="relative z-10 h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 transition text-slate-600 dark:text-slate-200 [data-state=off]:hover:bg-black/5 dark:[data-state=off]:hover:bg-white/5 [data-state=on]:hover:opacity-95"
         :class="{ '!text-white': activeMode === 'edit' }"
         aria-label="Modo edición"
       >
@@ -43,7 +45,8 @@
     <!-- Snapping -->
     <button
       @click.stop="$emit('toggle-snapping')"
-      class="relative z-10 h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 hover:bg-black/5 dark:hover:bg-white/5 transition text-slate-600 dark:text-slate-200"
+      :data-state="isSnappingEnabled ? 'on' : 'off'"
+      class="relative z-10 h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 transition text-slate-600 dark:text-slate-200 [data-state=off]:hover:bg-black/5 dark:[data-state=off]:hover:bg-white/5 [data-state=on]:hover:opacity-95"
       :aria-pressed="isSnappingEnabled ? 'true' : 'false'"
       aria-label="Alternar snapping"
     >
@@ -57,7 +60,8 @@
     <button
       v-if="isElementSelected"
       @click.stop="$emit('toggle-lock')"
-      class="relative z-10 h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 hover:bg-black/5 dark:hover:bg-white/5 transition text-slate-600 dark:text-slate-200 disabled:opacity-40 disabled:pointer-events-none"
+      :data-state="isElementLocked ? 'on' : 'off'"
+      class="relative z-10 h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 transition text-slate-600 dark:text-slate-200 disabled:opacity-40 disabled:pointer-events-none [data-state=off]:hover:bg-black/5 dark:[data-state=off]:hover:bg-white/5 [data-state=on]:hover:opacity-95"
       :aria-label="isElementLocked ? 'Desbloquear elemento' : 'Bloquear elemento'"
     >
       <!-- Icono candado -->
@@ -73,7 +77,8 @@
     <button
       v-if="isContainer && isElementSelected"
       @click.stop="$emit('fill-container')"
-      class="relative z-10 h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 hover:bg-black/5 dark:hover:bg-white/5 transition text-slate-600 dark:text-slate-200 disabled:opacity-40"
+      data-state="off"
+      class="relative z-10 h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 transition text-slate-600 dark:text-slate-200 disabled:opacity-40 [data-state=off]:hover:bg-black/5 dark:[data-state=off]:hover:bg-white/5 [data-state=on]:hover:opacity-95"
       aria-label="Llenar contenedor"
     >
       <!-- Icono fill -->
@@ -95,3 +100,4 @@ defineProps({
 
 defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'fill-container'])
 </script>
+
