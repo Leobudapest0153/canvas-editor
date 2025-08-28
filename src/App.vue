@@ -35,6 +35,7 @@
     <!-- Modal de confirmación global -->
     <ConfirmModal />
     <WorkspaceEditor/>
+    <DevSettings v-if="import.meta.env.DEV" />
   </div>
 </template>
 
@@ -51,6 +52,7 @@ import { useCanvasBuffer } from './composables/useCanvasBuffer'
 import { useDeleteElement } from './composables/useDeleteElement'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
+import DevSettings from './components/dev/DevSettings.vue'
 
 
 // Composable para undo/redo global
