@@ -1,0 +1,270 @@
+import {
+  validateWallZBaseRequired,
+  validateHeightWithinWarehouse,
+  validateCoplanarSameTypeNoOverlap,
+  validateZStacking,
+  resolveZStackClamp,
+  resolveCoplanarClamp,
+} from '@/validation/placementOrchestrator'
+import { useToast } from '@/composables/useToast'
+import { errorsPlacement } from '@/utils/errorsPlacement'
+import { getActiveBounds } from '@/utils/activeBounds'
+import { finalizeRectClampSnapReclamp } from '@/utils/edgeConstraint'
+import { clampToAreaFast } from '@/utils/dragMath'
+
+function hydrateCandidate(element, partial) {
+  const ubicacion = partial.ubicacion ?? element.ubicacion
+  const zBase =
+    partial.zBase ?? partial.elevacion?.zBase ?? element.zBase ?? element.elevacion?.zBase
+  const alto =
+    partial.alto ?? partial.elevacion?.altura ?? element.alto ?? element.elevacion?.altura
+  return {
+    ...element,
+    ...partial,
+    ubicacion,
+    zBase,
+    alto,
+    elevacion: {
+      ...(element.elevacion || {}),
+      ...(partial.elevacion || {}),
+      zBase,
+      altura: alto,
+    },
+  }
+}
+
+/**
+ * Provee guards de validación para movimientos y transformaciones
+ * @param {Object} ctx
+ * @param {Object} ctx.store - store de canvas
+ * @param {number} ctx.alturaBodega - altura máxima permitida
+ * @param {number} ctx.CM_TO_PX - factor de conversión
+ */
+export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
+  void CM_TO_PX
+  const toast = useToast()
+  const neighborsCache = new Map()
+  const lastGoodPos = new Map()
+
+  const runPipeline = (candidate, start, neighborsOverride) => {
+    const base = store.elementos.find((e) => e.id === candidate.id) || candidate
+    const cand = hydrateCandidate(base, candidate)
+
+    const resBase = validateWallZBaseRequired(base, cand)
+    if (!resBase.valid) {
+      if (start) {
+        const { x, y, width, height } = start
+        const payload = {}
+        if (x !== undefined) payload.x = x
+        if (y !== undefined) payload.y = y
+        if (width !== undefined) payload.width = width
+        if (height !== undefined) payload.height = height
+        store.actualizarElemento(candidate.id, payload)
+      }
+      return { ...resBase, candidate: cand, neighbors: [] }
+    }
+
+    const resHeight = validateHeightWithinWarehouse(base, cand, alturaBodega)
+    if (!resHeight.valid) {
+      if (start) {
+        const { x, y, width, height } = start
+        const payload = {}
+        if (x !== undefined) payload.x = x
+        if (y !== undefined) payload.y = y
+        if (width !== undefined) payload.width = width
+        if (height !== undefined) payload.height = height
+        store.actualizarElemento(candidate.id, payload)
+      }
+      return { ...resHeight, candidate: cand, neighbors: [] }
+    }
+
+    const { boundsPx } = getActiveBounds(store)
+    const areaBounds = { minX: 0, minY: 0, maxX: boundsPx.width, maxY: boundsPx.height }
+    const neighborsAll =
+      neighborsOverride || store.elementosVisibles.map((n) => hydrateCandidate(n, {}))
+    const neighbors = neighborsAll.filter((n) => {
+      if (n.id === cand.id) return false
+      if (n.plantaId && cand.plantaId && n.plantaId !== cand.plantaId) return false
+      return !(
+        cand.x + cand.width <= n.x ||
+        n.x + n.width <= cand.x ||
+        cand.y + cand.height <= n.y ||
+        n.y + n.height <= cand.y
+      )
+    })
+
+    const resCop = validateCoplanarSameTypeNoOverlap(neighbors, base, cand)
+    if (!resCop.valid) {
+      if (start) {
+        const { x, y, width, height } = start
+        const payload = {}
+        if (x !== undefined) payload.x = x
+        if (y !== undefined) payload.y = y
+        if (width !== undefined) payload.width = width
+        if (height !== undefined) payload.height = height
+        store.actualizarElemento(candidate.id, payload)
+      }
+      return { ...resCop, candidate: cand, neighbors }
+    }
+
+    const resStack = validateZStacking(neighbors, cand, areaBounds)
+    if (!resStack.valid) {
+      if (start) {
+        const { x, y, width, height } = start
+        const payload = {}
+        if (x !== undefined) payload.x = x
+        if (y !== undefined) payload.y = y
+        if (width !== undefined) payload.width = width
+        if (height !== undefined) payload.height = height
+        store.actualizarElemento(candidate.id, payload)
+      }
+      return { ...resStack, candidate: cand, neighbors }
+    }
+
+    return { valid: true, candidate: cand, neighbors }
+  }
+
+  const onDragMoveGuard = (el) => {
+    const neighbors = store.useDragBoundsClamp ? neighborsCache.get(el.id) : undefined
+    const res = runPipeline(el, undefined, neighbors)
+    if (!res.valid) {
+      if (res.code === 'COPLANAR_SAME_TYPE_OVERLAP') {
+        const clamp = resolveCoplanarClamp(res.candidate, res.neighbors)
+        if (clamp.corrected) {
+          store.actualizarElemento(el.id, clamp.corrected)
+          el.x = clamp.corrected.x
+          el.y = clamp.corrected.y
+        }
+      } else if (res.reason === 'Z_STACK_CONFLICT' && res.corrected) {
+        store.actualizarElemento(el.id, res.corrected)
+        el.x = res.corrected.x
+        el.y = res.corrected.y
+      }
+    }
+    el.invalidPlacement = !res.valid
+    return res
+  }
+
+  const handleEnd = (el) => {
+    const id = el.id
+    let candidate = { ...el }
+    const neighbors = store.useDragBoundsClamp ? neighborsCache.get(id) : undefined
+    if (store.useDragBoundsClamp && neighbors) {
+      const base = store.elementos.find((e) => e.id === id) || candidate
+      const { boundsPx } = getActiveBounds(store)
+      const areaBounds = { minX: 0, minY: 0, maxX: boundsPx.width, maxY: boundsPx.height }
+      const grid = store.gridSize || 50
+
+      let x = candidate.x
+      let y = candidate.y
+      const clamped = finalizeRectClampSnapReclamp(
+        x,
+        y,
+        base.width,
+        base.height,
+        areaBounds,
+        1,
+      )
+      x = clamped.x
+      y = clamped.y
+      const cop = resolveCoplanarClamp({ ...base, x, y }, neighbors)
+      if (cop.corrected) {
+        x = cop.corrected.x
+        y = cop.corrected.y
+      }
+      const stackRes = resolveZStackClamp({ ...base, x, y }, neighbors, areaBounds)
+      if (stackRes.collided) {
+        const last = lastGoodPos.get(id)
+        if (last) {
+          store.actualizarElemento(id, { x: last.x, y: last.y })
+          candidate.x = last.x
+          candidate.y = last.y
+        }
+      } else {
+        const snap = finalizeRectClampSnapReclamp(x, y, base.width, base.height, areaBounds, grid)
+        let sx = snap.x
+        let sy = snap.y
+        const cop2 = resolveCoplanarClamp({ ...base, x: sx, y: sy }, neighbors)
+        if (cop2.corrected) {
+          sx = cop2.corrected.x
+          sy = cop2.corrected.y
+        }
+        const stackRes2 = resolveZStackClamp({ ...base, x: sx, y: sy }, neighbors, areaBounds)
+        if (stackRes2.collided) {
+          const last = lastGoodPos.get(id)
+          if (last) {
+            store.actualizarElemento(id, { x: last.x, y: last.y })
+            candidate.x = last.x
+            candidate.y = last.y
+          }
+        } else if (sx !== candidate.x || sy !== candidate.y) {
+          store.actualizarElemento(id, { x: sx, y: sy })
+          candidate.x = sx
+          candidate.y = sy
+        }
+      }
+    }
+    const res = runPipeline(candidate, candidate.start, neighbors)
+    candidate.invalidPlacement = !res.valid
+    if (!res.valid) {
+      toast.showError(errorsPlacement[res.code] || errorsPlacement[res.reason] || res.code || res.reason)
+      if (candidate.start) return { ...res, corrected: candidate.start }
+    }
+    return res
+  }
+
+  const onDragEndGuard = (el) => handleEnd(el)
+  const onTransformEndGuard = (el) => handleEnd(el)
+
+  const installDragBounds = (node, elementId) => {
+    if (!store.useDragBoundsClamp) return
+    const rawBase = store.elementos.find((e) => e.id === elementId)
+    if (!rawBase) return
+    const base = hydrateCandidate(rawBase, {})
+    const parent = node.getParent()
+    const parentAbsToLocal = parent.getAbsoluteTransform().copy().invert()
+    const parentLocalToAbs = parent.getAbsoluteTransform().copy()
+    const { boundsPx } = getActiveBounds(store)
+    const areaBounds = { minX: 0, minY: 0, maxX: boundsPx.width, maxY: boundsPx.height }
+    const areaFast = { type: 'rect', W: areaBounds.maxX - areaBounds.minX, H: areaBounds.maxY - areaBounds.minY }
+    const neighbors = store.elementosVisibles
+      .filter((n) => {
+        if (n.id === base.id) return false
+        if (n.plantaId && base.plantaId && n.plantaId !== base.plantaId) return false
+        return true
+      })
+      .map((n) => hydrateCandidate(n, {}))
+    neighborsCache.set(elementId, neighbors)
+    lastGoodPos.set(elementId, node.getAbsolutePosition())
+    const bound = (posLocal) => {
+      const abs = parentLocalToAbs.point(posLocal)
+      const cArea = clampToAreaFast(abs.x, abs.y, base.width, base.height, areaFast)
+      let x = cArea.x
+      let y = cArea.y
+      const cop = resolveCoplanarClamp({ ...base, x, y }, neighbors)
+      if (cop.corrected) {
+        x = cop.corrected.x
+        y = cop.corrected.y
+      }
+      const res = resolveZStackClamp({ ...base, x, y }, neighbors, areaBounds)
+      if (res.collided && res.corrected) {
+        x = res.corrected.x
+        y = res.corrected.y
+      }
+      const local = parentAbsToLocal.point({ x, y })
+      return local
+    }
+    node.dragBoundFunc(bound)
+    const cleanup = () => {
+      node.dragBoundFunc(null)
+      node.off('dragend', cleanup)
+      neighborsCache.delete(elementId)
+      lastGoodPos.delete(elementId)
+    }
+    node.on('dragend', cleanup)
+  }
+
+  return { onDragMoveGuard, onDragEndGuard, onTransformEndGuard, installDragBounds }
+}
+
+export default usePlacementGuards

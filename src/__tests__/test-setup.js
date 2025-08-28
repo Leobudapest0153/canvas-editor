@@ -1,3 +1,4 @@
+/* eslint-env vitest, jsdom */
 import { vi } from 'vitest'
 
 // Stub vue-konva components globally
@@ -19,6 +20,11 @@ config.global.stubs = {
   'rulers-overlay': true
 }
 
+import { beforeEach } from 'vitest'
+beforeEach(() => {
+  localStorage.clear()
+})
+
 // Polyfill ResizeObserver for jsdom
 class ResizeObserver {
   observe() {}
@@ -26,7 +32,7 @@ class ResizeObserver {
   disconnect() {}
 }
 // @ts-ignore
-if (typeof global !== 'undefined') {
+if (typeof globalThis !== 'undefined') {
   // @ts-ignore
-  global.ResizeObserver = ResizeObserver
+  globalThis.ResizeObserver = ResizeObserver
 }

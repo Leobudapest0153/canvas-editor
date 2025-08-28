@@ -191,7 +191,6 @@
               shadowColor: getElementShadow(elemento).color,
               shadowBlur: getElementShadow(elemento).blur / canvasStore.zoom,
               shadowOpacity: getElementShadow(elemento).opacity,
-              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
@@ -261,7 +260,6 @@
               shadowColor: getElementShadow(elemento).color,
               shadowBlur: getElementShadow(elemento).blur / canvasStore.zoom,
               shadowOpacity: getElementShadow(elemento).opacity,
-              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'circle'),
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
@@ -294,7 +292,6 @@
               shadowColor: 'black',
               shadowBlur: 4,
               shadowOpacity: 0.3,
-              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
             }"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
@@ -568,6 +565,7 @@ import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
 import { makeInnerSession } from '@/composables/useInnerNoOverlap'
 import FloatingToolbar from './FloatingToolbar.vue'
+import usePlacementGuards from '@/composables/usePlacementGuards'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -609,6 +607,12 @@ const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId:
 const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
+
+const { onDragMoveGuard, onDragEndGuard, onTransformEndGuard, installDragBounds } = usePlacementGuards({
+  store: canvasStore,
+  alturaBodega: canvasStore.plantaActivaData.value?.dimensiones?.alto || Infinity,
+  CM_TO_PX,
+})
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -949,53 +953,6 @@ const lastVelocityMap = ref(new Map())
 const getStrokeColor = (elementId) => {
   if (atEdgeMap.value.get(elementId)) return '#f59e0b' // advertencia en borde
   return canvasStore.elementoSeleccionado === elementId ? '#000' : '#666'
-}
-
-// Convierte posición stage->layer considerando zoom/pan
-
-const toLayerCoords = (pos) => {
-  const stage = stageRef.value.getNode()
-  const scale = stage.scaleX() || 1
-  const x = (pos.x - stage.x()) / scale
-  const y = (pos.y - stage.y()) / scale
-  return { x, y }
-}
-
-// Convierte posición layer->stage considerando zoom/pan
-
-const toStageCoords = (pos) => {
-  const stage = stageRef.value.getNode()
-  const scale = stage.scaleX() || 1
-  return { x: pos.x * scale + stage.x(), y: pos.y * scale + stage.y() }
-}
-
-// Drag bound para cada elemento y forma (clamp mínimo al contorno)
-const dragBoundForElement = (pos, elemento, forma = 'rect') => {
-  try {
-    const layerW = layerConfig.value.width
-    const layerH = layerConfig.value.height
-    const lp = toLayerCoords(pos)
-    const boundary = computeBoundary()
-    if (forma === 'circular' || forma === 'circle') {
-      const r = Math.min(elemento.width, elemento.height) / 2
-      const cx = Math.max(r, Math.min(lp.x, layerW - r))
-      const cy = Math.max(r, Math.min(lp.y, layerH - r))
-      return toStageCoords({ x: cx, y: cy })
-    } else {
-      if (boundary.type === 'polygon') {
-        const c = clampRectToPolygon(
-          { x: lp.x, y: lp.y, width: elemento.width, height: elemento.height },
-          boundary.inset,
-        )
-        return toStageCoords(c)
-      } else {
-        const c = clampRectToRect(lp.x, lp.y, elemento.width, elemento.height, layerW, layerH)
-        return toStageCoords(c)
-      }
-    }
-  } catch {
-    return pos
-  }
 }
 
 // RAF + Perf mode state per element
@@ -1825,6 +1782,7 @@ const onShapeDragStart = (e, el) => {
     isElementDragging.value = true
     stageDragEnabled.value = false
   } else {
+    installDragBounds(e.target, el.id)
     startElementDrag(el.id)
   }
 }
@@ -1846,8 +1804,10 @@ const onShapeDragMove = (e, el) => {
     shape.position(session.toWorld(nextLocal, parent))
     needsDraw = true
     scheduleDraw()
+    onDragMoveGuard(el)
   } else {
     updateElementPosition(e, el.id, el.forma === 'circular' ? 'circular' : 'rectangular')
+    onDragMoveGuard(canvasStore.elementoPorId(el.id))
   }
 }
 
@@ -1861,23 +1821,34 @@ const onShapeDragEnd = (e, el) => {
     const shape = e.target
     let candLocal = session.toLocal(shape.position(), parent)
     let finalLocal = session.finalizeLocal(candLocal)
-    const finalWorld = session.toWorld(finalLocal, parent)
-    shape.position(finalWorld)
-    needsDraw = true
-    scheduleDraw()
-    const changed =
-      Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
-    if (changed) {
-      canvasStore.actualizarElementoConHistorial(
-        el.id,
-        { posicion: { x: finalWorld.x, y: finalWorld.y }, x: finalWorld.x, y: finalWorld.y },
-        `Elemento movido: ${el.id}`,
-      )
+      const finalWorld = session.toWorld(finalLocal, parent)
+      shape.position(finalWorld)
+      needsDraw = true
+      scheduleDraw()
+      const guardRes = onDragEndGuard({ ...el, x: finalWorld.x, y: finalWorld.y, start: initial })
+      if (!guardRes.valid && guardRes.corrected) {
+        shape.position(guardRes.corrected)
+        needsDraw = true
+        scheduleDraw()
+      }
+      if (guardRes.valid) {
+        const changed =
+          Math.round(finalWorld.x) !== Math.round(initial.x) || Math.round(finalWorld.y) !== Math.round(initial.y)
+        if (changed) {
+          canvasStore.actualizarElementoConHistorial(
+            el.id,
+            { posicion: { x: finalWorld.x, y: finalWorld.y }, x: finalWorld.x, y: finalWorld.y },
+            `Elemento movido: ${el.id}`,
+          )
+        }
+      }
+    } else {
+      const guardRes = onDragEndGuard(el)
+      if (guardRes.valid) {
+        endElementDrag(el.id)
+      }
     }
-  } else {
-    endElementDrag(el.id)
   }
-}
 
 const getElementShadow = (elemento) => {
   if (canvasStore.elementoDestacadoId === elemento.id) {
@@ -2253,14 +2224,16 @@ const handleTransformEnd = (e, elementId, forma) => {
     if (!elemento) return
 
     // Validar con isPlacementValid contra vecinos y área
-    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
-    const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    const isValidNow = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+      const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
+      const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+      const isValidNow = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation }
+      const guardRes = onTransformEndGuard({ ...elemento, x, y, width, height, start: prev })
 
   console.debug('[transform-debug] end', elementId, { prev: transformInitialState.get(elementId), new: { x, y, width, height, rotation }, isValidNow })
-  if (!isValidNow) {
+    if (!isValidNow || !guardRes.valid) {
       // Revertir al estado inicial guardado
-      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height }
+      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation }
       try {
         if (forma === 'circular') {
           const r = Math.min(prev.width, prev.height) / 2
