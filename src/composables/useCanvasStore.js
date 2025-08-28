@@ -9,7 +9,7 @@
  * - Configuración de canvas (zoom, pan, grid)
  * - CRUD de elementos en el canvas
  * - Gestión de plantas y navegación entre ellas
- * - Estado de las vistas XY/ZX/ZY
+ * - Estado de las vistas XY/XZ
  * - Integración con otros stores y composables
  * - Persistencia y sincronización del estado
  */
@@ -968,7 +968,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       meta: {
         version: '1.0.0',
         timestamp: new Date().toISOString(),
-        app: 'dv-canva-editor',
+        app: 'inventory-smart',
       },
 
       // Estado de plantas con todas sus propiedades
@@ -995,22 +995,22 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
       }),
 
-      // Estado de elementos con propiedades estáticas y personalizadas
+      // Estado de elementos con estructura aplanada
       elementos: elementos.value.map((elemento) => ({
-        // Elevación y tolerancias
-        elevacion: elemento.elevacion || {
-          zBase: 0,
-          altura: elemento.dimensiones?.alto || elemento.alto || 0,
-          espesor: elemento.elevacion?.espesor || 0,
-        },
-        tolerancias: elemento.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
+        // Identificación básica
         id: elemento.id,
         nombre: elemento.nombre,
         tipo: elemento.tipo,
         categoria: elemento.categoria,
         plantaId: elemento.plantaId,
 
-        // Propiedades físicas (maneja formato nuevo y legacy)
+        // Posición única (sin duplicidad)
+        x: elemento.posicion?.x || elemento.x || 0,
+        y: elemento.posicion?.y || elemento.y || 0,
+        z: elemento.posicion?.z || elemento.z || 0,
+        rotation: elemento.posicion?.rotation || elemento.rotation || 0,
+
+        // Dimensiones (mantener como está)
         dimensiones: elemento.dimensiones
           ? {
               ancho: elemento.dimensiones.ancho,
@@ -1019,80 +1019,44 @@ export const useCanvasStore = defineStore('canvas', () => {
             }
           : elemento.width || elemento.height
             ? {
-                // Fallback para formato legacy (width, height directos)
                 ancho: elemento.width || 100,
                 largo: elemento.height || 60,
                 alto: elemento.alto || 20,
               }
             : null,
 
-        // Posición y transformación (maneja formato nuevo y legacy)
-        posicion: elemento.posicion
-          ? {
-              x: elemento.posicion.x,
-              y: elemento.posicion.y,
-              z: elemento.posicion.z || 0,
-              rotation: elemento.posicion.rotation || 0,
-            }
-          : {
-              // Fallback para formato legacy (x, y directos)
-              x: elemento.x || 0,
-              y: elemento.y || 0,
-              z: elemento.z || 0,
-              rotation: elemento.rotation || 0,
-            },
-
-        // Propiedades visuales
-        visual: {
-          colorBase: elemento.colorBase || '#3b82f6',
-          forma: elemento.forma || 'rectangular',
-          visible: elemento.visible !== false, // Por defecto visible
-        },
-
-        // Propiedades funcionales
-        propiedades: {
-          pesoMaximo: elemento.pesoMaximo || 0,
-          ubicacion: elemento.ubicacion || 'suelo',
-          descripcion: elemento.descripcion || '',
-        },
+        // Propiedades aplanadas
+        colorBase: elemento.colorBase || '#3b82f6',
+        forma: elemento.forma || 'rectangular',
+        visible: elemento.visible !== false,
+        pesoMaximo: elemento.pesoMaximo || 0,
+        ubicacion: elemento.ubicacion || 'suelo',
+        descripcion: elemento.descripcion || '',
 
         // Jerarquía
-        jerarquia: {
-          padre: elemento.padre || null,
-          hijos: elemento.hijos || [],
-          nivel: elemento.nivel || 0,
-        },
+        padre: elemento.padre || null,
+        hijos: elemento.hijos || [],
+        nivel: elemento.nivel || 0,
 
-        // Propiedades personalizadas del usuario
+        // Elevación y tolerancias (mantener por funcionalidad)
+        elevacion: elemento.elevacion || {
+          zBase: 0,
+          altura: elemento.dimensiones?.alto || elemento.alto || 0,
+          espesor: elemento.elevacion?.espesor || 0,
+        },
+        tolerancias: elemento.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
+
+        // Propiedades personalizadas
         propiedadesPersonalizadas: elemento.propiedadesPersonalizadas || {},
-
-        // Metadatos adicionales
-        metadatos: {
-          fechaCreacion: elemento.fechaCreacion || new Date().toISOString(),
-          fechaModificacion: elemento.fechaModificacion || new Date().toISOString(),
-          creador: elemento.creador || 'usuario',
-        },
       })),
 
-      // Estado de navegación y configuración
+      // Estado de navegación y configuración mínima
       configuracion: {
         plantaActiva: plantaActiva.value,
-        elementoSeleccionado: elementoSeleccionado.value,
-        vistaActiva: vistaActiva.value,
-        zoom: zoom.value,
-        panX: panX.value,
-        panY: panY.value,
         contextoNavegacion: {
           tipo: contextoNavegacion.value.tipo,
           id: contextoNavegacion.value.id,
-          path: contextoNavegacion.value.path || [],
         },
-        canvasAdaptativo: {
-          width: canvasAdaptativo.value.width,
-          height: canvasAdaptativo.value.height,
-          escala: canvasAdaptativo.value.escala,
-        },
-        // Nueva configuración de grilla/snap
         grid: {
           size: gridSize.value,
           snapEps: snapGridEps.value,
@@ -1140,16 +1104,10 @@ export const useCanvasStore = defineStore('canvas', () => {
         })
       })
 
-      // Restaurar elementos directamente (primera versión, sin migración)
+      // Restaurar elementos con estructura aplanada
       const elementosData = state.elementos || []
 
       elementosData.forEach((elementoData) => {
-        // Extraer posición y dimensiones
-        const posX = elementoData.posicion?.x || 0
-        const posY = elementoData.posicion?.y || 0
-        const width = elementoData.dimensiones?.ancho || 100
-        const height = elementoData.dimensiones?.largo || 60
-
         elementos.value.push({
           id: elementoData.id,
           nombre: elementoData.nombre,
@@ -1157,90 +1115,93 @@ export const useCanvasStore = defineStore('canvas', () => {
           categoria: elementoData.categoria,
           plantaId: elementoData.plantaId,
 
+          // Posición única (sin duplicidad)
+          x: elementoData.x || 0,
+          y: elementoData.y || 0,
+          z: elementoData.z || 0,
+          rotation: elementoData.rotation || 0,
+
+          // Mantener también la estructura posicion para compatibilidad interna
+          posicion: {
+            x: elementoData.x || 0,
+            y: elementoData.y || 0,
+            z: elementoData.z || 0,
+            rotation: elementoData.rotation || 0,
+          },
+
+          // Dimensiones (mantener como está)
+          dimensiones: {
+            ancho: elementoData.dimensiones?.ancho || 100,
+            largo: elementoData.dimensiones?.largo || 60,
+            alto: elementoData.dimensiones?.alto || 20,
+          },
+
+          // Propiedades legacy para compatibilidad con Konva
+          width: elementoData.dimensiones?.ancho || 100,
+          height: elementoData.dimensiones?.largo || 60,
+
+          // Propiedades aplanadas
+          colorBase: elementoData.colorBase || '#3b82f6',
+          color: elementoData.colorBase || '#3b82f6', // Para compatibilidad
+          forma: elementoData.forma || 'rectangular',
+          visible: elementoData.visible !== false,
+          pesoMaximo: elementoData.pesoMaximo || 0,
+          ubicacion: elementoData.ubicacion || 'suelo',
+          descripcion: elementoData.descripcion || '',
+
+          // Jerarquía
+          padre: elementoData.padre || null,
+          hijos: elementoData.hijos || [],
+          nivel: elementoData.nivel || 0,
+
+          // Elevación y tolerancias
           elevacion: elementoData.elevacion || {
-            zBase: elementoData.posicion?.z || 0,
+            zBase: elementoData.z || 0,
             altura: elementoData.dimensiones?.alto || 0,
             espesor: 0,
           },
           tolerancias: elementoData.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
 
-          // Propiedades físicas (estructura nueva)
-          dimensiones: {
-            ancho: width,
-            largo: height,
-            alto: elementoData.dimensiones?.alto || 20,
-          },
-
-          // Posición (estructura nueva)
-          posicion: {
-            x: posX,
-            y: posY,
-            z: elementoData.posicion?.z || 0,
-            rotation: elementoData.posicion?.rotation || 0,
-          },
-
-          // Propiedades legacy para compatibilidad con Konva
-          x: posX,
-          y: posY,
-          width: width,
-          height: height,
-
-          // Propiedades visuales
-          color: elementoData.visual?.colorBase || '#3b82f6',
-          colorBase: elementoData.visual?.colorBase || '#3b82f6',
-          forma: elementoData.visual?.forma || 'rectangular',
-          visible: elementoData.visual?.visible !== false,
-
-          // Propiedades funcionales
-          pesoMaximo: elementoData.propiedades?.pesoMaximo || 0,
-          ubicacion: elementoData.propiedades?.ubicacion || 'suelo',
-          descripcion: elementoData.propiedades?.descripcion || '',
-
-          // Jerarquía
-          padre: elementoData.jerarquia?.padre || null,
-          hijos: elementoData.jerarquia?.hijos || [],
-          nivel: elementoData.jerarquia?.nivel || 0,
-
           // Propiedades personalizadas
           propiedadesPersonalizadas: elementoData.propiedadesPersonalizadas || {},
-
-          // Metadatos
-          metadata: {
-            fechaCreacion: elementoData.metadatos?.fechaCreacion || new Date().toISOString(),
-            fechaModificacion:
-              elementoData.metadatos?.fechaModificacion || new Date().toISOString(),
-            creador: elementoData.metadatos?.creador || 'usuario',
-            descripcion: elementoData.propiedades?.descripcion || '',
-            material: 'Estándar',
-            capacidad: 'Variable',
-          },
         })
       })
 
-      // Restaurar configuración
+      // Restaurar configuración mínima
       const config = state.configuracion
       plantaActiva.value = config.plantaActiva || plantas.value[0]?.id || null
-      elementoSeleccionado.value = config.elementoSeleccionado || null
-      // vistaActiva ahora es computed y se calcula automáticamente
-      zoom.value = config.zoom || 1
-      panX.value = config.panX || 0
-      panY.value = config.panY || 0
 
-      // Restaurar contexto de navegación directamente (primera versión, sin migración)
+      // Restaurar contexto de navegación simplificado
       if (config.contextoNavegacion) {
+        // Reconstruir path básico basado en tipo e id
+        const path = []
+
+        // Agregar planta al path
+        const planta = plantas.value.find(p => p.id === (config.contextoNavegacion.id.includes('planta') ? config.contextoNavegacion.id : plantaActiva.value))
+        if (planta) {
+          path.push({
+            tipo: 'plantas',
+            id: planta.id,
+            nombre: planta.nombre,
+          })
+        }
+
+        // Si no estamos en una planta, agregar el elemento/contenedor actual
+        if (config.contextoNavegacion.tipo !== 'plantas') {
+          const elemento = elementos.value.find(el => el.id === config.contextoNavegacion.id)
+          if (elemento) {
+            path.push({
+              tipo: config.contextoNavegacion.tipo,
+              id: elemento.id,
+              nombre: elemento.nombre,
+            })
+          }
+        }
+
         contextoNavegacion.value = {
           tipo: config.contextoNavegacion.tipo || 'plantas',
           id: config.contextoNavegacion.id || plantaActiva.value,
-          path: config.contextoNavegacion.path || [],
-        }
-      }
-
-      // Restaurar canvas adaptativo
-      if (config.canvasAdaptativo) {
-        canvasAdaptativo.value = {
-          width: config.canvasAdaptativo.width || 800,
-          height: config.canvasAdaptativo.height || 600,
-          escala: config.canvasAdaptativo.escala || 1,
+          path: path,
         }
       }
 
@@ -1249,6 +1210,14 @@ export const useCanvasStore = defineStore('canvas', () => {
         if (Number.isFinite(config.grid.size)) gridSize.value = config.grid.size
         if (Number.isFinite(config.grid.snapEps)) snapGridEps.value = config.grid.snapEps
       }
+
+      // Resetear valores temporales a sus defaults
+      elementoSeleccionado.value = null
+      zoom.value = 1
+      panX.value = 0
+      panY.value = 0
+
+      // Canvas adaptativo se recalculará automáticamente por el watcher
 
       console.log('Estado deserializado exitosamente:', {
         plantas: plantas.value.length,
