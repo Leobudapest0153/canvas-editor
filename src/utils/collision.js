@@ -173,6 +173,30 @@ export function computeMTD(ax, ay, aw, ah, bx, by, bw, bh) {
   return { dx: 0, dy: mtdY }
 }
 
+export function mtdAgainstSet(candidateRect, neighborsRects, XY_EPS = 0.01) {
+  let best = { dx: 0, dy: 0 }
+  let bestDepth = 0
+  for (const r of neighborsRects) {
+    const { dx, dy } = computeMTD(
+      candidateRect.x,
+      candidateRect.y,
+      candidateRect.width,
+      candidateRect.height,
+      r.x,
+      r.y,
+      r.width,
+      r.height,
+    )
+    if (Math.abs(dx) <= XY_EPS && Math.abs(dy) <= XY_EPS) continue
+    const depth = Math.abs(dx) + Math.abs(dy)
+    if (depth > bestDepth) {
+      bestDepth = depth
+      best = { dx, dy }
+    }
+  }
+  return best
+}
+
 // Proyección del MTD contra el contorno rectangular (prioridad de contorno)
 // Si el candidato está en minX y el MTD empuja hacia afuera (dx<0), anula dx, etc.
 export function projectMTDAgainstBoundary(candidateX, candidateY, mtdDx, mtdDy, w, h, W, H) {
