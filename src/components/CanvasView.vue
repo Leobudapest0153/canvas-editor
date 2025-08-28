@@ -2639,6 +2639,9 @@ onMounted(async () => {
   }
   await nextTick()
   centrarPlantaEnCanvas()
+  // Aplicar fitToPlanta automáticamente al cargar la vista
+  await nextTick()
+  fitToPlanta()
   window.addEventListener('click', handleGlobalClick)
   window.addEventListener('keydown', handleKeyDown)
 })
@@ -2815,6 +2818,18 @@ const fitToPlanta = () => {
     console.error('fitToPlanta error', e)
   }
 }
+
+// Auto-ajustar siempre que cambia el contexto (planta / elemento / contenedor)
+watch(
+  () => [canvasStore.contextoActual.tipo, canvasStore.contextoActual.id],
+  async () => {
+    // Esperar a que el store recalcule canvasAdaptativo y layerConfig
+    await nextTick()
+    await nextTick()
+    fitToPlanta()
+  },
+  { immediate: false },
+)
 
 // === CONTEXT MENU HANDLERS ===
 // Stubs de stage drag para evitar warnings
