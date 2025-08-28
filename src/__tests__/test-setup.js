@@ -26,7 +26,7 @@ class ResizeObserver {
   disconnect() {}
 }
 // @ts-ignore
-if (typeof global !== 'undefined') {
+if (typeof globalThis !== 'undefined') {
   // @ts-ignore
-  global.ResizeObserver = ResizeObserver
+  globalThis.ResizeObserver = ResizeObserver
 }
