@@ -278,6 +278,7 @@ const toggleFiltros = () => {
 const limpiarFiltros = () => {
   filtroCategoria.value = ''
   filtroUbicacion.value = ''
+  filtroNombre.value = '';
   canvasStore.limpiarSeleccion()
 }
 
