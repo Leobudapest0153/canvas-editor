@@ -1788,7 +1788,6 @@ const onShapeDragStart = (e, el) => {
 }
 
 const onShapeDragMove = (e, el) => {
-  onDragMoveGuard(el)
   const data = innerSessions.get(el.id)
   if (data) {
     const { session, parent } = data
@@ -1805,8 +1804,10 @@ const onShapeDragMove = (e, el) => {
     shape.position(session.toWorld(nextLocal, parent))
     needsDraw = true
     scheduleDraw()
+    onDragMoveGuard(el)
   } else {
     updateElementPosition(e, el.id, el.forma === 'circular' ? 'circular' : 'rectangular')
+    onDragMoveGuard(canvasStore.elementoPorId(el.id))
   }
 }
 

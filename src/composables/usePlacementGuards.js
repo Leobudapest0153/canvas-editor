@@ -99,6 +99,11 @@ export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
   const onDragMoveGuard = (el) => {
     const neighbors = store.useDragBoundsClamp ? neighborsCache.get(el.id) : undefined
     const res = runPipeline(el, undefined, neighbors)
+    if (!res.valid && res.reason === 'Z_STACK_CONFLICT' && res.corrected) {
+      store.actualizarElemento(el.id, res.corrected)
+      el.x = res.corrected.x
+      el.y = res.corrected.y
+    }
     el.invalidPlacement = !res.valid
     return res
   }

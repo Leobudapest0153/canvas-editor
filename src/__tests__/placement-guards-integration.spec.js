@@ -423,9 +423,8 @@ describe('placement guards integration', () => {
 
     const moveRes = guards.onDragMoveGuard({ ...store.elementos[1], x: 8, y: 0 })
     expect(moveRes.reason).toBe('Z_STACK_CONFLICT')
-    expect(moveRes.corrected.x).toBe(10)
+    expect(store.elementos[1].x).toBe(10)
 
-    store.elementos[1].x = moveRes.corrected.x
     const endRes = guards.onDragEndGuard({ ...store.elementos[1], start: { x: 20, y: 0 } })
     if (endRes.valid) store.saveToHistory('drag b')
     expect(endRes.valid).toBe(true)
@@ -476,9 +475,8 @@ describe('placement guards integration', () => {
 
     const moveRes = guards.onDragMoveGuard({ ...store.elementos[1], x: 10, y: 5 })
     expect(moveRes.reason).toBe('Z_STACK_CONFLICT')
-    expect(moveRes.corrected.x).toBe(20)
+    expect(store.elementos[1].x).toBe(20)
 
-    store.elementos[1].x = moveRes.corrected.x
     const endRes = guards.onDragEndGuard({ ...store.elementos[1], start: { x: 40, y: 0 } })
     if (endRes.valid) store.saveToHistory('drag wall')
     expect(endRes.valid).toBe(true)
