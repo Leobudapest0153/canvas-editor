@@ -1,7 +1,12 @@
 import { validateWallPlacement } from '@/utils/placementValidity'
-import { narrowPhase2D, zOverlapCheck, computeMTD, projectMTDAgainstBoundary } from '@/utils/collision'
+import {
+  narrowPhase2D,
+  zOverlapCheck,
+  computeMTD,
+  projectMTDAgainstBoundary,
+} from '@/utils/collision'
 import { finalizeRectClampSnapReclamp } from '@/utils/edgeConstraint'
-import { resolveVerticalProps } from './fieldResolvers'
+import { resolveVerticalProps, resolveTypeId } from './fieldResolvers'
 
 const Z_EPS = 0.001
 
@@ -36,6 +41,58 @@ export function validateHeightWithinWarehouse(element, candidate, alturaBodega) 
     return { valid: false, code: 'HEIGHT_EXCEEDS_WAREHOUSE' }
   }
   return { valid: true }
+}
+
+export function validateCoplanarSameTypeNoOverlap(
+  neighbors,
+  element,
+  candidate,
+  Z_LAYER_EPS = 0.5,
+  Z_EPS = 0.001,
+) {
+  const typeId = resolveTypeId(element, candidate)
+  if (!typeId) return { valid: true }
+  const { zBaseCm: candZ } = resolveVerticalProps(element, candidate)
+  for (const other of neighbors) {
+    if (other.id === candidate.id) continue
+    if (other.plantaId && candidate.plantaId && other.plantaId !== candidate.plantaId) continue
+    if (other.padre && candidate.padre && other.padre !== candidate.padre) continue
+    const otherType = resolveTypeId(other, {})
+    if (otherType !== typeId) continue
+    const { zBaseCm: otherZ } = resolveVerticalProps(other, {})
+    if (candZ == null || otherZ == null || Math.abs(candZ - otherZ) > Z_LAYER_EPS) continue
+    // Broad-phase AABB check
+    if (
+      candidate.x + candidate.width <= other.x ||
+      other.x + other.width <= candidate.x ||
+      candidate.y + candidate.height <= other.y ||
+      other.y + other.height <= candidate.y
+    )
+      continue
+    const { intersectXY } = narrowPhase2D(candidate, other)
+    if (intersectXY) {
+      return { valid: false, code: 'COPLANAR_SAME_TYPE_OVERLAP', offenderId: other.id }
+    }
+  }
+  return { valid: true }
+}
+
+export function resolveCoplanarClamp(candidate, neighbors) {
+  let best = null
+  for (const other of neighbors) {
+    if (other.id === candidate.id) continue
+    if (other.plantaId && candidate.plantaId && other.plantaId !== candidate.plantaId) continue
+    if (other.padre && candidate.padre && other.padre !== candidate.padre) continue
+    const { intersectXY, ra, rb } = narrowPhase2D(candidate, other)
+    if (!intersectXY) continue
+    const { dx, dy } = computeMTD(ra.x, ra.y, ra.w, ra.h, rb.x, rb.y, rb.w, rb.h)
+    const mag = Math.abs(dx) + Math.abs(dy)
+    if (!best || mag < best.mag) best = { dx, dy, mag }
+  }
+  if (best) {
+    return { collided: true, corrected: { x: candidate.x + best.dx, y: candidate.y + best.dy } }
+  }
+  return { collided: false }
 }
 
 /**
@@ -131,6 +188,8 @@ export function validateZStacking(elements, candidate, areaBounds, Z_EPS = 0.001
 export default {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
+  validateCoplanarSameTypeNoOverlap,
   validateZStacking,
   resolveZStackClamp,
+  resolveCoplanarClamp,
 }

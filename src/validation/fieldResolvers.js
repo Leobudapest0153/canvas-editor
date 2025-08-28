@@ -14,6 +14,8 @@ export function resolveVerticalProps(element = {}, candidate = {}) {
     element.location,
   )
   const rawZ = pick(
+    candidate.elevacion?.zBase,
+    element.elevacion?.zBase,
     candidate.zBase,
     element.zBase,
     candidate.alturaRespectoAlSuelo,
@@ -24,6 +26,8 @@ export function resolveVerticalProps(element = {}, candidate = {}) {
     element.baseZ,
   )
   const rawAlto = pick(
+    candidate.elevacion?.altura,
+    element.elevacion?.altura,
     candidate.alto,
     element.alto,
     candidate.altura,
@@ -42,4 +46,23 @@ export function resolveVerticalProps(element = {}, candidate = {}) {
   }
 }
 
-export default { resolveVerticalProps }
+export function resolveTypeId(element = {}, candidate = {}) {
+  const pick = (...vals) => {
+    for (const v of vals) {
+      if (v !== undefined && v !== null) return String(v)
+    }
+    return null
+  }
+  return pick(
+    candidate.typeId,
+    element.typeId,
+    candidate.tipo,
+    element.tipo,
+    candidate.class,
+    element.class,
+    candidate.kind,
+    element.kind,
+  )
+}
+
+export default { resolveVerticalProps, resolveTypeId }

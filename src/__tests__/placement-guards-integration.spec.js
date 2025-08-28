@@ -204,6 +204,7 @@ describe('placement guards integration', () => {
       {
         id: 'a',
         plantaId: 'planta_1',
+        typeId: 'rackA',
         tipo: 'elementos',
         ubicacion: 'Pared',
         x: 0,
@@ -216,6 +217,7 @@ describe('placement guards integration', () => {
       {
         id: 'b',
         plantaId: 'planta_1',
+        typeId: 'rackB',
         tipo: 'elementos',
         ubicacion: 'Pared',
         x: 20,
@@ -395,6 +397,7 @@ describe('placement guards integration', () => {
       {
         id: 'a',
         plantaId: 'planta_1',
+        typeId: 'rackA',
         tipo: 'elementos',
         ubicacion: 'Pared',
         x: 0,
@@ -407,6 +410,7 @@ describe('placement guards integration', () => {
       {
         id: 'b',
         plantaId: 'planta_1',
+        typeId: 'rackB',
         tipo: 'elementos',
         ubicacion: 'Pared',
         x: 20,
@@ -479,6 +483,53 @@ describe('placement guards integration', () => {
 
     const endRes = guards.onDragEndGuard({ ...store.elementos[1], start: { x: 40, y: 0 } })
     if (endRes.valid) store.saveToHistory('drag wall')
+    expect(endRes.valid).toBe(true)
+    expect(showError).not.toHaveBeenCalled()
+    expect(spySave).toHaveBeenCalledTimes(1)
+  })
+
+  it('tope entre elementos coplanares del mismo tipo', () => {
+    setActivePinia(createPinia())
+    const store = useCanvasStore()
+    store.elementos.push(
+      {
+        id: 'a',
+        plantaId: 'planta_1',
+        typeId: 'rack',
+        ubicacion: 'Pared',
+        x: 0,
+        y: 0,
+        width: 10,
+        height: 10,
+        alto: 100,
+        elevacion: { zBase: 0, altura: 100 },
+      },
+      {
+        id: 'b',
+        plantaId: 'planta_1',
+        typeId: 'rack',
+        ubicacion: 'Pared',
+        x: 20,
+        y: 0,
+        width: 10,
+        height: 10,
+        alto: 100,
+        elevacion: { zBase: 0, altura: 100 },
+      },
+    )
+    Object.defineProperty(store, 'elementosVisibles', { value: store.elementos })
+    store.useDragBoundsClamp = true
+    const guards = usePlacementGuards({ store, alturaBodega: 500, CM_TO_PX })
+    const node = new DummyNode({ x: 20, y: 0, width: 10, height: 10 })
+    guards.installDragBounds(node, 'b')
+    const next = node.dragBoundFunc()({ x: 8, y: 0 })
+    expect(next.x).toBe(10)
+    node.absolutePosition(next)
+    const spySave = vi.spyOn(store, 'saveToHistory')
+    showError.mockClear()
+    const endRes = guards.onDragEndGuard({ ...store.elementos[1], x: node.getAbsolutePosition().x, y: 0, start: { x: 20, y: 0 } })
+    node.fire('dragend')
+    if (endRes.valid) store.saveToHistory('drag b')
     expect(endRes.valid).toBe(true)
     expect(showError).not.toHaveBeenCalled()
     expect(spySave).toHaveBeenCalledTimes(1)
@@ -615,6 +666,7 @@ describe('placement guards integration', () => {
       {
         id: 'neighbor',
         plantaId: 'planta_1',
+        typeId: 'neighbor',
         tipo: 'elementos',
         ubicacion: 'Suelo',
         x: 100,
@@ -625,6 +677,7 @@ describe('placement guards integration', () => {
         elevacion: { zBase: 0, altura: 100 },
       },
     )
+    Object.defineProperty(store2, 'elementosVisibles', { value: store2.elementos })
     const guards2 = usePlacementGuards({ store: store2, alturaBodega: 500, CM_TO_PX })
     const node2 = new DummyNode({ x: 0, y: 0, width: 10, height: 10 })
     guards2.installDragBounds(node2, 'wall')

@@ -1,8 +1,10 @@
 import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
+  validateCoplanarSameTypeNoOverlap,
   validateZStacking,
   resolveZStackClamp,
+  resolveCoplanarClamp,
 } from '@/validation/placementOrchestrator'
 import { useToast } from '@/composables/useToast'
 import { errorsPlacement } from '@/utils/errorsPlacement'
@@ -79,6 +81,20 @@ export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
     const { boundsPx } = getActiveBounds(store)
     const areaBounds = { minX: 0, minY: 0, maxX: boundsPx.width, maxY: boundsPx.height }
     const neighbors = neighborsOverride || store.elementosVisibles
+    const resCop = validateCoplanarSameTypeNoOverlap(neighbors, base, cand)
+    if (!resCop.valid) {
+      if (start) {
+        const { x, y, width, height } = start
+        const payload = {}
+        if (x !== undefined) payload.x = x
+        if (y !== undefined) payload.y = y
+        if (width !== undefined) payload.width = width
+        if (height !== undefined) payload.height = height
+        store.actualizarElemento(candidate.id, payload)
+      }
+      const clamp = resolveCoplanarClamp(cand, neighbors)
+      return { ...resCop, reason: 'COPLANAR_SAME_TYPE_OVERLAP', corrected: clamp.corrected, candidate: cand }
+    }
     const resStack = validateZStacking(neighbors, cand, areaBounds)
     if (!resStack.valid) {
       if (start) {
@@ -99,10 +115,12 @@ export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
   const onDragMoveGuard = (el) => {
     const neighbors = store.useDragBoundsClamp ? neighborsCache.get(el.id) : undefined
     const res = runPipeline(el, undefined, neighbors)
-    if (!res.valid && res.reason === 'Z_STACK_CONFLICT' && res.corrected) {
-      store.actualizarElemento(el.id, res.corrected)
-      el.x = res.corrected.x
-      el.y = res.corrected.y
+    if (!res.valid && res.corrected) {
+      if (res.reason === 'COPLANAR_SAME_TYPE_OVERLAP' || res.reason === 'Z_STACK_CONFLICT') {
+        store.actualizarElemento(el.id, res.corrected)
+        el.x = res.corrected.x
+        el.y = res.corrected.y
+      }
     }
     el.invalidPlacement = !res.valid
     return res
@@ -125,12 +143,19 @@ export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
         areaBounds,
         grid,
       )
-      const snapRes = resolveZStackClamp({ ...base, x: snapped.x, y: snapped.y }, neighbors, areaBounds)
+      let x = snapped.x
+      let y = snapped.y
+      const copRes = resolveCoplanarClamp({ ...base, x, y }, neighbors)
+      if (copRes.collided) {
+        x = copRes.corrected.x
+        y = copRes.corrected.y
+      }
+      const snapRes = resolveZStackClamp({ ...base, x, y }, neighbors, areaBounds)
       if (!snapRes.collided) {
-        if (snapped.x !== candidate.x || snapped.y !== candidate.y) {
-          store.actualizarElemento(id, { x: snapped.x, y: snapped.y })
-          candidate.x = snapped.x
-          candidate.y = snapped.y
+        if (x !== candidate.x || y !== candidate.y) {
+          store.actualizarElemento(id, { x, y })
+          candidate.x = x
+          candidate.y = y
         }
       } else {
         const last = lastGoodPos.get(id)
@@ -175,6 +200,11 @@ export function usePlacementGuards({ store, alturaBodega, CM_TO_PX }) {
       const cArea = clampToAreaFast(abs.x, abs.y, base.width, base.height, areaFast)
       let x = cArea.x
       let y = cArea.y
+      const copRes = resolveCoplanarClamp({ ...base, x, y }, neighbors)
+      if (copRes.collided && copRes.corrected) {
+        x = copRes.corrected.x
+        y = copRes.corrected.y
+      }
       const res = resolveZStackClamp({ ...base, x, y }, neighbors, areaBounds)
       if (res.collided && res.corrected) {
         x = res.corrected.x

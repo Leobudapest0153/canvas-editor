@@ -4,6 +4,7 @@ import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
   validateZStacking,
+  validateCoplanarSameTypeNoOverlap,
 } from '@/validation/placementOrchestrator'
 import { resolveVerticalProps } from '@/validation/fieldResolvers'
 
@@ -16,6 +17,46 @@ describe('validateWallZBaseRequired', () => {
 
   it('acepta zBase mayor a 0', () => {
     const res = validateWallZBaseRequired({ ubicacion: 'Pared', zBase: 10 }, {})
+    expect(res.valid).toBe(true)
+  })
+})
+
+describe('validateCoplanarSameTypeNoOverlap', () => {
+  const base = {
+    id: 'a',
+    typeId: 'rack',
+    ubicacion: 'Pared',
+    x: 0,
+    y: 0,
+    width: 10,
+    height: 10,
+    elevacion: { zBase: 0, altura: 100 },
+  }
+  const neighbor = {
+    id: 'b',
+    typeId: 'rack',
+    ubicacion: 'Pared',
+    x: 20,
+    y: 0,
+    width: 10,
+    height: 10,
+    elevacion: { zBase: 0, altura: 100 },
+  }
+  it('detecta solape entre coplanares del mismo tipo', () => {
+    const cand = { ...base, id: 'c', x: 5 }
+    const res = validateCoplanarSameTypeNoOverlap([base], base, cand)
+    expect(res.valid).toBe(false)
+    expect(res.code).toBe('COPLANAR_SAME_TYPE_OVERLAP')
+  })
+  it('permite tocar sin solape', () => {
+    const cand = { ...base, id: 'c', x: 10 }
+    const res = validateCoplanarSameTypeNoOverlap([base], base, cand)
+    expect(res.valid).toBe(true)
+  })
+  it('ignora tipos distintos', () => {
+    const other = { ...base, id: 'd', typeId: 'other' }
+    const cand = { ...base, id: 'c', x: 5 }
+    const res = validateCoplanarSameTypeNoOverlap([other], base, cand)
     expect(res.valid).toBe(true)
   })
 })

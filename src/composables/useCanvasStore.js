@@ -18,7 +18,10 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { CM_TO_PX } from '@/utils/constants'
 import { validateWallPlacement } from '@/utils/placementValidity'
-import { validateZStacking } from '@/validation/placementOrchestrator'
+import {
+  validateZStacking,
+  validateCoplanarSameTypeNoOverlap,
+} from '@/validation/placementOrchestrator'
 import { errorsPlacement } from '@/utils/errorsPlacement'
 
 // Variable para evitar circular import - será inicializada por el composable de historial
@@ -643,6 +646,11 @@ export const useCanvasStore = defineStore('canvas', () => {
           altura: altoFinal,
         },
       }
+      const copRes = validateCoplanarSameTypeNoOverlap(elementos.value, elemento, candidate)
+      if (!copRes.valid) {
+        console.error(errorsPlacement[copRes.code] || copRes.code)
+        return false
+      }
       const stackRes = validateZStacking(elementos.value, candidate)
       if (!stackRes.valid) {
         console.error(errorsPlacement[stackRes.code || stackRes.reason] || stackRes.code || stackRes.reason)
@@ -793,6 +801,11 @@ export const useCanvasStore = defineStore('canvas', () => {
         console.error(mensaje)
         return null
       }
+    }
+    const copRes = validateCoplanarSameTypeNoOverlap(elementos.value, nuevoElemento, nuevoElemento)
+    if (!copRes.valid) {
+      console.error(errorsPlacement[copRes.code] || copRes.code)
+      return null
     }
     const stackRes = validateZStacking(elementos.value, nuevoElemento)
     if (!stackRes.valid) {
