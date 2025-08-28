@@ -8,6 +8,20 @@ export const errorsPlacement = {
   Z_STACK_CONFLICT: 'Colisión vertical: las alturas se solapan',
 }
 
+export function resolveCoplanarNeighbors(element = {}, all = [], Z_LAYER_EPS = 0.5) {
+  const { zBaseCm: zA, ubic: ubicA } = resolveVerticalProps(element, {})
+  const out = []
+  for (const n of all) {
+    if (!n || n.id === element.id) continue
+    if (n.plantaId !== element.plantaId) continue
+    const { zBaseCm: zB, ubic: ubicB } = resolveVerticalProps(n, {})
+    if (ubicA == null || ubicB == null || ubicA !== ubicB) continue
+    if (!Number.isFinite(zA) || !Number.isFinite(zB)) continue
+    if (Math.abs(zA - zB) <= Z_LAYER_EPS) out.push(n)
+  }
+  return out
+}
+
 export function validateWallZBaseRequired(element = {}, candidate = {}, ctx = {}) {
   const { ubic, zBaseCm } = resolveVerticalProps(element, candidate)
   if (ubic !== 'Pared') return { valid: true }

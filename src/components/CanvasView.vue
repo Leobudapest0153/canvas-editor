@@ -620,7 +620,12 @@ function scheduleDraw() {
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
-const { onDragMoveGuard, onDragEndGuard, onTransformEndGuard } = usePlacementGuards()
+const {
+  onDragStartGuard,
+  onDragMoveGuard,
+  onDragEndGuard,
+  onTransformEndGuard,
+} = usePlacementGuards()
 const buffer = useCanvasBuffer()
 const ctx = useContextMenu()
 const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId: ctxElementId } = ctx
@@ -1884,6 +1889,7 @@ const onShapeDragStart = (e, el) => {
   } else {
     startElementDrag(el.id)
   }
+  onDragStartGuard(e.target, el)
 }
 
 const onShapeDragMove = (e, el) => {
