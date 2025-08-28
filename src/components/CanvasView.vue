@@ -1965,7 +1965,17 @@ const onShapeDragEnd = (e, el) => {
     needsDraw = true
     scheduleDraw()
 
-    const guardRes = onDragEndGuard(el, { x: finalWorld.x, y: finalWorld.y })
+    const guardRes = onDragEndGuard(
+      el,
+      { x: finalWorld.x, y: finalWorld.y },
+      {
+        revert: () => {
+          shape.position(initial)
+          needsDraw = true
+          scheduleDraw()
+        },
+      },
+    )
     if (!guardRes.valid) return
 
     const changed =
@@ -2363,7 +2373,34 @@ const handleTransformEnd = (e, elementId, forma) => {
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
 
-    const guardRes = onTransformEndGuard(elemento, { x, y, width, height, rotation })
+    const guardRes = onTransformEndGuard(
+      elemento,
+      { x, y, width, height, rotation },
+      {
+        revert: () => {
+          const prev =
+            transformInitialState.get(elementId) ||
+            { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation || 0 }
+          try {
+            if (forma === 'circular') {
+              const r = Math.min(prev.width, prev.height) / 2
+              node.x(prev.x + r)
+              node.y(prev.y + r)
+            } else {
+              node.x(prev.x)
+              node.y(prev.y)
+            }
+            node.width && node.width(prev.width)
+            node.height && node.height(prev.height)
+            node.rotation && node.rotation(prev.rotation || 0)
+          } catch {
+            /* ignore */
+          }
+          needsDraw = true
+          scheduleDraw()
+        },
+      },
+    )
     if (!guardRes.valid) return
 
     // Validar con isPlacementValid contra vecinos y área

@@ -17,6 +17,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { CM_TO_PX } from '@/utils/constants'
+import {
+  validateWallZBaseRequired,
+  validateHeightWithinWarehouse,
+  errorsPlacement,
+} from '@/validation/placementOrchestrator'
 
 // Variable para evitar circular import - será inicializada por el composable de historial
 let historyComposable = null
@@ -587,6 +592,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const actualizarElemento = (elementoId, propiedades) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
+    if (!elemento) return false
+    if (!runPlacementValidators(elemento, propiedades)) return false
     if (elemento) {
       for (const key in propiedades) {
         if (typeof propiedades[key] === 'object' && propiedades[key] !== null && !Array.isArray(propiedades[key])) {
@@ -622,6 +629,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
       }
     }
+    return true
   }
 
   const configurarZoom = (nuevoZoom) => {
@@ -704,9 +712,26 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+  const runPlacementValidators = (element, candidate) => {
+    const planta = plantaPorId.value(plantaActiva.value)
+    const ctx = { alturaBodega: planta?.dimensiones?.alto }
+    const checks = [validateWallZBaseRequired, validateHeightWithinWarehouse]
+    for (const v of checks) {
+      const res = v(element, candidate, ctx)
+      if (res.valid === false) {
+        const msg = errorsPlacement[res.code] || 'Posición inválida'
+        window?.__toasts?.show?.(msg, { type: 'error' })
+        return false
+      }
+    }
+    return true
+  }
+
   // Actions para elementos
   const agregarElemento = (nuevoElemento) => {
     console.log('Agregando elemento al store:', nuevoElemento)
+
+    if (!runPlacementValidators(null, nuevoElemento)) return null
 
     // Validar tipo de elemento
     if (!nuevoElemento.tipo) {
@@ -884,7 +909,8 @@ export const useCanvasStore = defineStore('canvas', () => {
    * Versiones con historial de las acciones principales
    */
   const actualizarElementoConHistorial = (elementoId, propiedades, description) => {
-    actualizarElemento(elementoId, propiedades)
+    const ok = actualizarElemento(elementoId, propiedades)
+    if (!ok) return
 
     const descripcionAuto =
       description || `Propiedades actualizadas: ${Object.keys(propiedades).join(', ')}`

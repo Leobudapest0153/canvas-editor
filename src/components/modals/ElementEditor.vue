@@ -235,6 +235,12 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useWeightValidation } from '@/composables/useWeightValidation'
+import { useCanvasStore } from '@/composables/useCanvasStore'
+import {
+  validateWallZBaseRequired,
+  validateHeightWithinWarehouse,
+  errorsPlacement,
+} from '@/validation/placementOrchestrator'
 
 const props = defineProps({
   visible: Boolean,
@@ -246,6 +252,7 @@ const props = defineProps({
 const emit = defineEmits(['cancel', 'save'])
 
 const weightValidation = useWeightValidation()
+const canvasStore = useCanvasStore()
 
 const esFormaCircular = computed(() => localElemento.value.forma === 'circular')
 
@@ -395,6 +402,16 @@ const validarFormulario = () => {
   if (elemento.pesoMaximo <= 0) {
     alert('La capacidad de carga debe ser mayor a 0')
     return false
+  }
+  const ctx = {
+    alturaBodega: canvasStore.plantaPorId(canvasStore.plantaActiva)?.dimensiones?.alto,
+  }
+  for (const v of [validateWallZBaseRequired, validateHeightWithinWarehouse]) {
+    const res = v(null, elemento, ctx)
+    if (res.valid === false) {
+      alert(errorsPlacement[res.code])
+      return false
+    }
   }
   return true
 }

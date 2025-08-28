@@ -18,7 +18,7 @@ export function resolveVerticalProps(element = {}, candidate = {}) {
     return Number.isFinite(n) ? n : null
   }
 
-  const location = parseNumber(coalesce(candidate, element, locationKeys))
+  const location = coalesce(candidate, element, locationKeys)
   const zBase = parseNumber(coalesce(candidate, element, zBaseKeys))
   const height = parseNumber(coalesce(candidate, element, heightKeys))
 
