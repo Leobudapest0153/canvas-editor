@@ -29,6 +29,17 @@
           ref="filtrosPanelRef"
         >
           <div class="p-4 space-y-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide">
+                Nombre de elemento
+              </label>
+              <input
+                v-model="filtroNombre"
+                @keyup.enter="() => filtrosVisibles = false"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
+                placeholder="Nombre del elemento..."
+              />
+            </div>
             <!-- Filtro por categoría -->
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide"
@@ -205,6 +216,7 @@ const canvasStore = useCanvasStore()
 const filtroCategoria = ref('')
 const filtroUbicacion = ref('')
 const filtrosVisibles = ref(false)
+const filtroNombre = ref('');
 const modalVisible = ref(false)
 const textoNuevaEtiqueta = ref('')
 
@@ -219,6 +231,10 @@ const elementosFiltrados = computed(() => {
   // --- CAMBIO CLAVE AQUÍ ---
   // Usamos la nueva computed property segura del store
   let elementos = canvasStore.elementosVisiblesParaCapas
+
+  if (filtroNombre.value) {
+    elementos = elementos.filter((elemento) => elemento.nombre.toLowerCase().includes(filtroNombre.value.toLowerCase()));
+  }
 
   if (filtroCategoria.value) {
     elementos = elementos.filter((elemento) => elemento.categoria === filtroCategoria.value)
@@ -249,6 +265,7 @@ const hayFiltrosActivos = computed(() => {
   return !!(
     filtroCategoria.value ||
     filtroUbicacion.value ||
+    filtroNombre.value ||
     canvasStore.etiquetasSeleccionadas.length > 0
   )
 })
