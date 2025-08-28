@@ -108,7 +108,7 @@
               canvasStore.estaEnElemento || canvasStore.estaEnContenedor
                 ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${layerConfig.width}x${layerConfig.height}px (Adaptativo)`
                 : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
-            fontSize: 12,
+            fontSize: 12 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#3b82f6',
             listening: false,
@@ -118,9 +118,9 @@
           v-if="canvasStore.estaEnPlanta"
           :config="{
             x: 10,
-            y: 30,
+            y: 10 + (12 / canvasStore.zoom) + (8 / canvasStore.zoom),
             text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
-            fontSize: 11,
+            fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#6b7280',
             listening: false,
@@ -130,9 +130,9 @@
           v-if="canvasStore.estaEnElemento"
           :config="{
             x: 10,
-            y: 30,
+            y: 10 + (12 / canvasStore.zoom) + (8 / canvasStore.zoom),
             text: `Contenedores: ${elementosVisiblesEnCanvas.length}`,
-            fontSize: 11,
+            fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#dc2626',
             listening: false,
@@ -141,10 +141,10 @@
         <v-text
           v-if="canvasStore.estaEnContenedor"
           :config="{
-            x: 10,
-            y: 30,
+            x: 5,
+            y: 10 + (11 / canvasStore.zoom) + (8 / canvasStore.zoom),
             text: `Items: ${elementosVisiblesEnCanvas.length} (elementos + contenedores)`,
-            fontSize: 11,
+            fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#dc2626',
             listening: false,
@@ -212,11 +212,14 @@
             />
             <!-- Icono de candado para elemento bloqueado -->
               <v-text
+                v-if="canvasStore.zoom > 0.8"
                 :config="{
-                  x: elemento.width / 2 - 16,
-                  y: elemento.height / 2 - 16,
+                  width: elemento.width,
+                  height: elemento.height,
+                  verticalAlign: 'middle',
+                  align: 'center',
                   text: '🔒',
-                  fontSize: 32,
+                  fontSize: 32 / canvasStore.zoom,
                   fontFamily: 'Arial',
                   fill: '#f59e0b',
                   listening: false,
@@ -313,11 +316,14 @@
             />
             <!-- Icono de candado para elemento circular bloqueado -->
             <v-text
+              v-if="canvasStore.zoom > 0.8"
               :config="{
-                x: elemento.width / 2 - 16,
-                y: elemento.height / 2 - 16,
+                width: elemento.width,
+                height: elemento.height,
+                align: 'center',
+                verticalAlign: 'center',
                 text: '🔒',
-                fontSize: 32,
+                fontSize: 32 / canvasStore.zoom,
                 fontFamily: 'Arial',
                 fill: '#f59e0b',
                 listening: false,
@@ -351,11 +357,14 @@
               }"
             />
             <v-text
+              v-if="canvasStore.zoom > 0.8"
               :config="{
-                x: elemento.width / 2 - 16,
-                y: elemento.height / 2 - 16,
+                width: elemento.width,
+                height: elemento.height,
+                verticalAlign: 'middle',
+                align: 'center',
                 text: '🔒',
-                fontSize: 32,
+                fontSize: 32 / canvasStore.zoom,
                 fontFamily: 'Arial',
                 fill: '#f59e0b',
                 listening: false,
@@ -365,11 +374,12 @@
 
           <!-- Texto con el nombre del elemento -->
           <v-text
+            v-if="canvasStore.zoom > 0.8 "
             :config="{
               x: elemento.x + 5,
               y: elemento.y + 5,
               text: elemento.nombre || elemento.tipo || 'Elemento',
-              fontSize: 12,
+              fontSize: 14 / canvasStore.zoom,
               fontFamily: 'Arial',
               fill: '#fff',
               shadowColor: 'black',
