@@ -973,29 +973,24 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       // Estado de plantas con todas sus propiedades
       plantas: plantas.value.map((planta) => {
-        // Calcular elementos que pertenecen a esta planta dinámicamente
-        const elementosEnPlanta = elementos.value
-          .filter((el) => el.plantaId === planta.id)
-          .map((el) => el.id)
-
         return {
           id: planta.id,
           nombre: planta.nombre,
           descripcion: planta.descripcion || '',
           dimensiones: {
-            alto: planta.dimensiones?.alto || 280,
-            ancho: planta.dimensiones?.ancho || 800,
-            largo: planta.dimensiones?.largo || 1000,
+            alto: planta.dimensiones.alto,
+            ancho: planta.dimensiones.ancho,
+            largo: planta.dimensiones.largo
           },
-          pesoMaximoSoportado: planta.pesoMaximoSoportado || 3000,
-          elementos: elementosEnPlanta,
+          pesoMaximoSoportado: planta.pesoMaximoSoportado,
+          elementos: planta.elementos || [],
           activa: planta.activa || false,
           // Propiedades personalizadas adicionales
           propiedadesPersonalizadas: planta.propiedadesPersonalizadas || {},
         }
       }),
 
-      // Estado de elementos con estructura aplanada
+      // Estado de elementos
       elementos: elementos.value.map((elemento) => ({
         // Identificación básica
         id: elemento.id,
@@ -1010,22 +1005,14 @@ export const useCanvasStore = defineStore('canvas', () => {
         z: elemento.posicion?.z || elemento.z || 0,
         rotation: elemento.posicion?.rotation || elemento.rotation || 0,
 
-        // Dimensiones (mantener como está)
-        dimensiones: elemento.dimensiones
-          ? {
-              ancho: elemento.dimensiones.ancho,
-              largo: elemento.dimensiones.largo,
-              alto: elemento.dimensiones.alto,
-            }
-          : elemento.width || elemento.height
-            ? {
-                ancho: elemento.width || 100,
-                largo: elemento.height || 60,
-                alto: elemento.alto || 20,
-              }
-            : null,
-
+        // Dimensiones
+        dimensiones: {
+          ancho: elemento.dimensiones.ancho,
+          largo: elemento.dimensiones.largo,
+          alto: elemento.dimensiones.alto,
+        },
         // Propiedades aplanadas
+        color: elemento.color || elemento.colorBase || '#3b82f6',
         colorBase: elemento.colorBase || '#3b82f6',
         forma: elemento.forma || 'rectangular',
         visible: elemento.visible !== false,
@@ -1037,14 +1024,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         padre: elemento.padre || null,
         hijos: elemento.hijos || [],
         nivel: elemento.nivel || 0,
-
-        // Elevación y tolerancias (mantener por funcionalidad)
-        elevacion: elemento.elevacion || {
-          zBase: 0,
-          altura: elemento.dimensiones?.alto || elemento.alto || 0,
-          espesor: elemento.elevacion?.espesor || 0,
-        },
-        tolerancias: elemento.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
 
         // Propiedades personalizadas
         propiedadesPersonalizadas: elemento.propiedadesPersonalizadas || {},
@@ -1121,14 +1100,6 @@ export const useCanvasStore = defineStore('canvas', () => {
           z: elementoData.z || 0,
           rotation: elementoData.rotation || 0,
 
-          // Mantener también la estructura posicion para compatibilidad interna
-          posicion: {
-            x: elementoData.x || 0,
-            y: elementoData.y || 0,
-            z: elementoData.z || 0,
-            rotation: elementoData.rotation || 0,
-          },
-
           // Dimensiones (mantener como está)
           dimensiones: {
             ancho: elementoData.dimensiones?.ancho || 100,
@@ -1153,14 +1124,6 @@ export const useCanvasStore = defineStore('canvas', () => {
           padre: elementoData.padre || null,
           hijos: elementoData.hijos || [],
           nivel: elementoData.nivel || 0,
-
-          // Elevación y tolerancias
-          elevacion: elementoData.elevacion || {
-            zBase: elementoData.z || 0,
-            altura: elementoData.dimensiones?.alto || 0,
-            espesor: 0,
-          },
-          tolerancias: elementoData.tolerancias || { junta: 0, paralelismo: 0, zEpsilon: 0 },
 
           // Propiedades personalizadas
           propiedadesPersonalizadas: elementoData.propiedadesPersonalizadas || {},
