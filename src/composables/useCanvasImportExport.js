@@ -156,12 +156,12 @@ export const useCanvasImportExport = () => {
       const data = JSON.parse(jsonString)
 
       // Validar estructura básica requerida
-      const tieneEstructuraBasica = !!(data.plantas && data.elementos && data.configuracion)
+      const tieneEstructuraBasica = !!(data.plantas && data.elementos)
 
       if (!tieneEstructuraBasica) {
         return {
           valido: false,
-          error: 'El archivo debe contener plantas, elementos y configuración'
+          error: 'El archivo debe contener plantas y elementos'
         }
       }
 

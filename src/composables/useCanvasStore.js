@@ -93,11 +93,11 @@ export const useCanvasStore = defineStore('canvas', () => {
   const panX = ref(0)
   const panY = ref(0)
 
-  const elementoDestacadoId = ref(null);
-  const idsElementosFiltrados = ref(null);
-  const elementoAura = ref(null);
+  const elementoDestacadoId = ref(null)
+  const idsElementosFiltrados = ref(null)
+  const elementoAura = ref(null)
 
-  const isDraggable = ref(true);
+  const isDraggable = ref(true)
   // Configuración de grilla y snap
   const gridSize = ref(50) // px entre líneas de grilla
   const snapGridEps = ref(10) // px de proximidad para aplicar snap al soltar
@@ -287,9 +287,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Iconos por tipo
     if (tipo === 'contenedores') {
       const iconosContenedores = {
-        cajas: '�',
-        bins: '�️',
-        bandejas: '�',
+        cajas: '📦',
+        bins: '🗑️',
+        bandejas: '🪣',
       }
       return iconosContenedores[categoria] || '🗃️'
     }
@@ -298,8 +298,8 @@ export const useCanvasStore = defineStore('canvas', () => {
       const iconosElementos = {
         anaqueles: '📚',
         estantes: '📋',
-        mesas: '�️',
-        armarios: '�️',
+        mesas: '🪑',
+        armarios: '🗄️',
       }
       return iconosElementos[categoria] || '📦'
     }
@@ -359,7 +359,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       tipo: elemento.tipo,
       path: nuevoPath,
     })
-
   }
 
   const navegarAlPadre = () => {
@@ -418,7 +417,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       nuevoContexto: contextoNavegacion.value,
       path: nuevoPath,
     })
-
   }
 
   /**
@@ -455,7 +453,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     panX.value = 0
     panY.value = 0
     elementoSeleccionado.value = null
-
   }
 
   const navegarAPlanta = (plantaId) => {
@@ -503,7 +500,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       plantaId,
       nombre: planta.nombre,
     })
-
   }
 
   const calcularCanvasAdaptativo = (elemento) => {
@@ -624,13 +620,17 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!runPlacementValidators(elemento, propiedades)) return false
     if (elemento) {
       for (const key in propiedades) {
-        if (typeof propiedades[key] === 'object' && propiedades[key] !== null && !Array.isArray(propiedades[key])) {
+        if (
+          typeof propiedades[key] === 'object' &&
+          propiedades[key] !== null &&
+          !Array.isArray(propiedades[key])
+        ) {
           // Si la propiedad es un objeto (como 'dimensiones'), la fusionamos recursivamente.
           if (!elemento[key]) elemento[key] = {}
-          Object.assign(elemento[key], propiedades[key]);
+          Object.assign(elemento[key], propiedades[key])
         } else {
           // Si es un valor simple, lo asignamos directamente.
-          elemento[key] = propiedades[key];
+          elemento[key] = propiedades[key]
         }
       }
 
@@ -659,7 +659,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       // Guardar en historial si se especifica
       if (saveHistory) {
-        const descripcionAuto = description || `Propiedades actualizadas: ${Object.keys(propiedades).join(', ')}`
+        const descripcionAuto =
+          description || `Propiedades actualizadas: ${Object.keys(propiedades).join(', ')}`
         saveToHistory(descripcionAuto)
       }
     }
@@ -679,7 +680,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     zoomPanDebounceTimer = setTimeout(() => {
-      saveToHistory(`Vista ajustada: zoom ${zoom.value.toFixed(2)}x, pan (${Math.round(panX.value)}, ${Math.round(panY.value)})`)
+      saveToHistory(
+        `Vista ajustada: zoom ${zoom.value.toFixed(2)}x, pan (${Math.round(panX.value)}, ${Math.round(panY.value)})`,
+      )
       zoomPanDebounceTimer = null
     }, ZOOM_PAN_DEBOUNCE_DELAY)
   }
@@ -807,7 +810,12 @@ export const useCanvasStore = defineStore('canvas', () => {
   const agregarElemento = (nuevoElemento) => {
     console.log('Agregando elemento al store:', nuevoElemento)
 
-    const ubic = (nuevoElemento.ubicacion || nuevoElemento.ubic || nuevoElemento.location || '').toLowerCase()
+    const ubic = (
+      nuevoElemento.ubicacion ||
+      nuevoElemento.ubic ||
+      nuevoElemento.location ||
+      ''
+    ).toLowerCase()
     const hasZBase =
       nuevoElemento.zBase != null ||
       nuevoElemento.alturaRespectoAlSuelo != null ||
@@ -879,8 +887,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     } else {
       // Si estamos en una planta, agregar normalmente
       nuevoElemento.plantaId = contextoNavegacion.value.id
-      nuevoElemento.padre = null;
-      nuevoElemento.etiquetas = []; // Sin etiquetas inicialmente
+      nuevoElemento.padre = null
+      nuevoElemento.etiquetas = [] // Sin etiquetas inicialmente
 
       // Actualizar el array de elementos en la planta
       const planta = plantas.value.find((p) => p.id === contextoNavegacion.value.id)
@@ -1021,12 +1029,12 @@ export const useCanvasStore = defineStore('canvas', () => {
           dimensiones: {
             alto: planta.dimensiones.alto,
             ancho: planta.dimensiones.ancho,
-            largo: planta.dimensiones.largo
+            largo: planta.dimensiones.largo,
           },
+          poligono: planta.poligono || [],
           pesoMaximoSoportado: planta.pesoMaximoSoportado,
           elementos: planta.elementos || [],
           activa: planta.activa || false,
-          // Propiedades personalizadas adicionales
           propiedadesPersonalizadas: planta.propiedadesPersonalizadas || {},
         }
       }),
@@ -1036,52 +1044,55 @@ export const useCanvasStore = defineStore('canvas', () => {
         // Identificación básica
         id: elemento.id,
         nombre: elemento.nombre,
+        descripcion: elemento.descripcion || '',
         tipo: elemento.tipo,
         categoria: elemento.categoria,
         plantaId: elemento.plantaId,
+        etiquetas: elemento.etiquetas || [],
 
-        // Posición única (sin duplicidad)
-        x: elemento.posicion?.x || elemento.x || 0,
-        y: elemento.posicion?.y || elemento.y || 0,
-        z: elemento.posicion?.z || elemento.z || 0,
-        rotation: elemento.posicion?.rotation || elemento.rotation || 0,
+        alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
 
-        // Dimensiones
+        posicion: {
+          x: elemento.x || 0,
+          y: elemento.y || 0,
+          // Unused
+          z: elemento.z || 0,
+          rotation: elemento.rotation || 0,
+        },
+
         dimensiones: {
           ancho: elemento.dimensiones.ancho,
           largo: elemento.dimensiones.largo,
           alto: elemento.dimensiones.alto,
         },
-        // Propiedades aplanadas
+
         color: elemento.color || elemento.colorBase || '#3b82f6',
         colorBase: elemento.colorBase || '#3b82f6',
         forma: elemento.forma || 'rectangular',
-        visible: elemento.visible !== false,
+        visible: elemento.visible,
         pesoMaximo: elemento.pesoMaximo || 0,
+        volumenMaximo: elemento.volumenMaximo || 0,
         ubicacion: elemento.ubicacion || 'suelo',
-        descripcion: elemento.descripcion || '',
+
+        // Canvas representacion
+        canvas: {
+          width: elemento.width,
+          height: elemento.height
+        },
+
+        // Uso real
+        uso: {
+          peso: elemento.uso.peso || 0,
+          volumen: elemento.uso.volumen || 0
+        },
 
         // Jerarquía
         padre: elemento.padre || null,
         hijos: elemento.hijos || [],
-        nivel: elemento.nivel || 0,
 
         // Propiedades personalizadas
         propiedadesPersonalizadas: elemento.propiedadesPersonalizadas || {},
       })),
-
-      // Estado de navegación y configuración mínima
-      configuracion: {
-        plantaActiva: plantaActiva.value,
-        contextoNavegacion: {
-          tipo: contextoNavegacion.value.tipo,
-          id: contextoNavegacion.value.id,
-        },
-        grid: {
-          size: gridSize.value,
-          snapEps: snapGridEps.value,
-        },
-      },
     }
 
     return JSON.stringify(state, null, 2)
@@ -1097,7 +1108,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const state = JSON.parse(jsonString)
 
       // Validar estructura básica
-      if (!state || !state.plantas || !state.elementos || !state.configuracion) {
+      if (!state || !state.plantas || !state.elementos) {
         console.error('Estructura JSON inválida')
         return false
       }
@@ -1113,106 +1124,81 @@ export const useCanvasStore = defineStore('canvas', () => {
           nombre: plantaData.nombre,
           descripcion: plantaData.descripcion || '',
           dimensiones: {
-            alto: plantaData.dimensiones?.alto || 280,
-            ancho: plantaData.dimensiones?.ancho || 800,
-            largo: plantaData.dimensiones?.largo || 1000,
+            alto: plantaData.dimensiones.alto,
+            ancho: plantaData.dimensiones.ancho,
+            largo: plantaData.dimensiones.largo,
           },
-          pesoMaximoSoportado: plantaData.pesoMaximoSoportado || 3000,
+          poligono: plantaData.poligono || [],
+          pesoMaximoSoportado: plantaData.pesoMaximoSoportado,
           elementos: plantaData.elementos || [],
           activa: plantaData.activa || false,
           propiedadesPersonalizadas: plantaData.propiedadesPersonalizadas || {},
         })
       })
 
-      // Restaurar elementos con estructura aplanada
+      // Restaurar elementos
       const elementosData = state.elementos || []
 
       elementosData.forEach((elementoData) => {
         elementos.value.push({
           id: elementoData.id,
           nombre: elementoData.nombre,
+                    descripcion: elementoData.descripcion || '',
           tipo: elementoData.tipo,
           categoria: elementoData.categoria,
           plantaId: elementoData.plantaId,
+          etiquetas: elementoData.etiquetas || [],
 
-          // Posición única (sin duplicidad)
-          x: elementoData.x || 0,
-          y: elementoData.y || 0,
-          z: elementoData.z || 0,
-          rotation: elementoData.rotation || 0,
+          x: elementoData.posicion.x,
+          y: elementoData.posicion.y,
+          z: elementoData.posicion.z,
+          rotation: elementoData.posicion.rotation,
 
-          // Dimensiones (mantener como está)
           dimensiones: {
-            ancho: elementoData.dimensiones?.ancho || 100,
-            largo: elementoData.dimensiones?.largo || 60,
-            alto: elementoData.dimensiones?.alto || 20,
+            ancho: elementoData.dimensiones.ancho,
+            largo: elementoData.dimensiones.largo,
+            alto: elementoData.dimensiones.alto,
           },
 
-          // Propiedades legacy para compatibilidad con Konva
-          width: elementoData.dimensiones?.ancho || 100,
-          height: elementoData.dimensiones?.largo || 60,
-
-          // Propiedades aplanadas
           colorBase: elementoData.colorBase || '#3b82f6',
-          color: elementoData.colorBase || '#3b82f6', // Para compatibilidad
+          color: elementoData.color || '#3b82f6',
           forma: elementoData.forma || 'rectangular',
           visible: elementoData.visible !== false,
           pesoMaximo: elementoData.pesoMaximo || 0,
+          volumenMaximo: elementoData.volumenMaximo || 0,
           ubicacion: elementoData.ubicacion || 'suelo',
-          descripcion: elementoData.descripcion || '',
 
-          // Jerarquía
+          width: elementoData.canvas.width,
+          height: elementoData.canvas.height || 60,
+
           padre: elementoData.padre || null,
           hijos: elementoData.hijos || [],
-          nivel: elementoData.nivel || 0,
 
-          // Propiedades personalizadas
           propiedadesPersonalizadas: elementoData.propiedadesPersonalizadas || {},
         })
       })
 
-      // Restaurar configuración mínima
-      const config = state.configuracion
-      plantaActiva.value = config.plantaActiva || plantas.value[0]?.id || null
-
-      // Restaurar contexto de navegación simplificado
-      if (config.contextoNavegacion) {
-        // Reconstruir path básico basado en tipo e id
-        const path = []
-
-        // Agregar planta al path
-        const planta = plantas.value.find(p => p.id === (config.contextoNavegacion.id.includes('planta') ? config.contextoNavegacion.id : plantaActiva.value))
-        if (planta) {
-          path.push({
-            tipo: 'plantas',
-            id: planta.id,
-            nombre: planta.nombre,
-          })
-        }
-
-        // Si no estamos en una planta, agregar el elemento/contenedor actual
-        if (config.contextoNavegacion.tipo !== 'plantas') {
-          const elemento = elementos.value.find(el => el.id === config.contextoNavegacion.id)
-          if (elemento) {
-            path.push({
-              tipo: config.contextoNavegacion.tipo,
-              id: elemento.id,
-              nombre: elemento.nombre,
-            })
-          }
-        }
-
-        contextoNavegacion.value = {
-          tipo: config.contextoNavegacion.tipo || 'plantas',
-          id: config.contextoNavegacion.id || plantaActiva.value,
-          path: path,
-        }
+      // Validar que hay al menos una planta antes de continuar
+      if (plantas.value.length === 0) {
+        console.error('No se puede deserializar: no hay plantas en el archivo JSON')
+        return false
       }
 
-      // Restaurar grid/snapping si existe
-      if (config.grid) {
-        if (Number.isFinite(config.grid.size)) gridSize.value = config.grid.size
-        if (Number.isFinite(config.grid.snapEps)) snapGridEps.value = config.grid.snapEps
+      // Establecer la primera planta como activa siempre
+      const primeraPlanta = plantas.value[0]
+      plantaActiva.value = primeraPlanta.id
+
+      // Establecer contexto de navegación siempre en la primera planta
+      contextoNavegacion.value = {
+        tipo: 'plantas',
+        id: primeraPlanta.id,
+        path: [
+          {
+            tipo: 'plantas',
+            id: primeraPlanta.id,
+            nombre: primeraPlanta.nombre,
+          },
+        ],
       }
 
       // Resetear valores temporales a sus defaults
@@ -1228,9 +1214,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         elementos: elementos.value.length,
         plantaActiva: plantaActiva.value,
       })
-
-      // No guardar en historial - la importación es para restauración/copias de seguridad
-      // El historial se manejará por separado para las operaciones del usuario
 
       return true
     } catch (error) {
@@ -1332,7 +1315,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
-
   // Funciones para agregar etiquetas a los filtros
   const agregarEtiquetaAElemento = (elementoId, etiquetaId) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
@@ -1340,7 +1322,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (!elemento.etiquetas) {
         elemento.etiquetas = []
       }
-    if (!elemento.etiquetas.includes(etiquetaId)) {
+      if (!elemento.etiquetas.includes(etiquetaId)) {
         elemento.etiquetas.push(etiquetaId)
         saveToHistory(`Etiqueta añadida a ${elemento.nombre}`)
       }
@@ -1358,9 +1340,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
-
   const crearYAsignarEtiquetaAElemento = (elementoId, nuevaEtiqueta) => {
-     // 1. Crear la etiqueta globalmente
+    // 1. Crear la etiqueta globalmente
     const newId = Math.max(0, ...etiquetas.value.map((e) => e.id)) + 1
     const etiquetaCompleta = { id: newId, ...nuevaEtiqueta }
     etiquetas.value.push(etiquetaCompleta)
@@ -1375,7 +1356,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     elementoDestacadoId.value = elementoId
 
     // Creamos la configuración del aura basada en el elemento
-    const paddingAura = 30 / zoom.value; // Píxeles extra de tamaño para el aura
+    const paddingAura = 30 / zoom.value // Píxeles extra de tamaño para el aura
     elementoAura.value = {
       // Usamos un ID único para el aura para evitar conflictos de key
       id: `aura_${elemento.id}`,
@@ -1394,16 +1375,15 @@ export const useCanvasStore = defineStore('canvas', () => {
         elementoAura.value = null // <-- Limpiar el aura
       }
     }, 2500) // Aumentamos un poco el tiempo a 2.5 segundos
-  };
-
+  }
 
   const actualizarIdsFiltrados = (ids) => {
     idsElementosFiltrados.value = ids
   }
 
   const setDraggableMode = (mode) => {
-    this.isDraggable = mode;
-  };
+    this.isDraggable = mode
+  }
 
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
   watch(
