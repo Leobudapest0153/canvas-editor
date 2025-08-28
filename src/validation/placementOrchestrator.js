@@ -7,19 +7,20 @@ export const errorsPlacement = {
 }
 
 export function validateWallZBaseRequired(element = {}, candidate = {}, ctx = {}) {
-  const { location: ubic, zBase } = resolveVerticalProps(element, candidate)
-  if ((ubic || '').toLowerCase() !== 'pared') return { valid: true }
-  if (zBase == null || zBase <= 0) {
+  const { ubic, zBaseCm } = resolveVerticalProps(element, candidate)
+  if (ubic !== 'Pared') return { valid: true }
+  if (zBaseCm == null || zBaseCm <= 0) {
     return { valid: false, code: 'ZBASE_REQUIRED' }
   }
   return { valid: true }
 }
 
 export function validateHeightWithinWarehouse(element = {}, candidate = {}, ctx = {}) {
-  const { zBase, height } = resolveVerticalProps(element, candidate)
-  if (zBase == null || height == null) return { valid: true }
+  const { zBaseCm, altoCm } = resolveVerticalProps(element, candidate)
   const limit = Number(ctx.alturaBodega)
-  if (Number.isFinite(limit) && zBase + height > limit + 1e-6) {
+  if (!Number.isFinite(limit) || limit <= 0) return { valid: true }
+  if (!Number.isFinite(zBaseCm) || !Number.isFinite(altoCm)) return { valid: true }
+  if (zBaseCm + altoCm > limit + 1e-6) {
     return { valid: false, code: 'HEIGHT_EXCEEDS_WAREHOUSE' }
   }
   return { valid: true }

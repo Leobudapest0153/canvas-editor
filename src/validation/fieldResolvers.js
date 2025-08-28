@@ -18,11 +18,24 @@ export function resolveVerticalProps(element = {}, candidate = {}) {
     return Number.isFinite(n) ? n : null
   }
 
-  const location = coalesce(candidate, element, locationKeys)
-  const zBase = parseNumber(coalesce(candidate, element, zBaseKeys))
-  const height = parseNumber(coalesce(candidate, element, heightKeys))
+  let ubic = coalesce(candidate, element, locationKeys)
+  if (typeof ubic === 'string') {
+    const lower = ubic.toLowerCase()
+    if (lower === 'suelo' || lower === 'floor') ubic = 'Suelo'
+    else if (lower === 'pared' || lower === 'wall') ubic = 'Pared'
+  }
 
-  return { location, zBase, height }
+  let zBaseCm = parseNumber(coalesce(candidate, element, zBaseKeys))
+
+  let altoCm = parseNumber(
+    candidate?.dimensiones?.alto ??
+      element?.dimensiones?.alto ??
+      coalesce(candidate, element, heightKeys),
+  )
+
+  if (ubic === 'Suelo' && zBaseCm == null) zBaseCm = 0
+
+  return { ubic, zBaseCm, altoCm }
 }
 
 export function resolveTypeId(element = {}, candidate = {}) {

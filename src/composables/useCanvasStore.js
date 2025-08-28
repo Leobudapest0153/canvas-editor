@@ -731,6 +731,16 @@ export const useCanvasStore = defineStore('canvas', () => {
   const agregarElemento = (nuevoElemento) => {
     console.log('Agregando elemento al store:', nuevoElemento)
 
+    const ubic = (nuevoElemento.ubicacion || nuevoElemento.ubic || nuevoElemento.location || '').toLowerCase()
+    const hasZBase =
+      nuevoElemento.zBase != null ||
+      nuevoElemento.alturaRespectoAlSuelo != null ||
+      nuevoElemento.z_base != null ||
+      nuevoElemento.baseZ != null
+    if (ubic === 'suelo' && !hasZBase) {
+      nuevoElemento.zBase = 0
+    }
+
     if (!runPlacementValidators(null, nuevoElemento)) return null
 
     // Validar tipo de elemento

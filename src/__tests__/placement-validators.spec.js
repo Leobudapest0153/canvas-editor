@@ -27,22 +27,47 @@ describe('validateWallZBaseRequired', () => {
 })
 
 describe('validateHeightWithinWarehouse', () => {
-  const ctx = { alturaBodega: 300 }
-
-  it('allows when sum equals warehouse height', () => {
+  it('allows floor element with nested height when below roof', () => {
     const res = validateHeightWithinWarehouse(
-      { alturaRespectoAlSuelo: 100, height: 200 },
       {},
-      ctx,
+      { ubicacion: 'Suelo', dimensiones: { alto: 180 } },
+      { alturaBodega: 500 },
     )
     expect(res.valid).toBe(true)
   })
 
-  it('fails when sum exceeds warehouse height', () => {
+  it('allows lowercase ubicacion for floor element', () => {
     const res = validateHeightWithinWarehouse(
-      { alturaRespectoAlSuelo: 100, height: 201 },
       {},
-      ctx,
+      { ubicacion: 'suelo', dimensiones: { alto: 180 } },
+      { alturaBodega: 500 },
+    )
+    expect(res.valid).toBe(true)
+  })
+
+  it('skips check when warehouse height missing', () => {
+    const res = validateHeightWithinWarehouse(
+      {},
+      { ubicacion: 'Suelo', dimensiones: { alto: 180 } },
+      {},
+    )
+    expect(res.valid).toBe(true)
+  })
+
+  it('allows wall element exactly at warehouse height', () => {
+    const res = validateHeightWithinWarehouse(
+      {},
+      { ubicacion: 'Pared', zBase: 400, alto: 100 },
+      { alturaBodega: 500 },
+    )
+    expect(res.valid).toBe(true)
+  })
+
+  it('rejects wall element exceeding warehouse height', () => {
+    const res = validateHeightWithinWarehouse(
+      {},
+      { ubicacion: 'Pared', zBase: 401, alto: 100 },
+      { alturaBodega: 500 },
     )
     expect(res).toEqual({ valid: false, code: 'HEIGHT_EXCEEDS_WAREHOUSE' })
   })

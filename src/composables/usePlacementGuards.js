@@ -17,8 +17,16 @@ export function usePlacementGuards() {
   ]
 
   const getCtx = () => {
-    const planta = store.plantaPorId(store.plantaActiva)
-    return { alturaBodega: planta?.dimensiones?.alto }
+    const planta =
+      typeof store.plantaPorId === 'function'
+        ? store.plantaPorId(store.plantaActiva)
+        : null
+    const alturaBodega =
+      planta?.alturaBodega ??
+      planta?.dimensiones?.alto ??
+      planta?.altura ??
+      null
+    return { alturaBodega }
   }
 
   const run = (el, cand) => {
