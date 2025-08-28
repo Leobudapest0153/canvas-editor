@@ -59,7 +59,7 @@
             points: plantPolygonFlat,
             closed: true,
             stroke: '#0ea5e9',
-            fill: 'rgba(14,165,233,0.08)',
+            fill: 'rgba(255,265,255,1)',
             strokeWidth: 2,
             listening: false,
           }"
