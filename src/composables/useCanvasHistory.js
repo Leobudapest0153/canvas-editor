@@ -19,7 +19,7 @@ import { useCanvasStore } from './useCanvasStore'
 // Estado global del historial (singleton)
 const historyStack = ref([])
 const currentIndex = ref(-1)
-const maxHistorySize = ref(50) // Máximo 50 estados en el historial
+const maxHistorySize = ref(10) // Máximo 10 estados en el historial
 const isUndoRedoOperation = ref(false)
 
 // Sistema de logging para debugging
@@ -490,25 +490,6 @@ export const useCanvasHistory = () => {
   }
 
   /**
-   * Habilitar/deshabilitar modo debug
-   */
-  const toggleDebugMode = (enabled = !historyEvents.debugMode) => {
-    historyEvents.debugMode = enabled
-    console.log(`🔧 Modo debug del historial: ${enabled ? 'ACTIVADO' : 'DESACTIVADO'}`)
-    return enabled
-  }
-
-  /**
-   * Limpiar errores del historial
-   */
-  const clearErrors = () => {
-    const errorCount = historyEvents.errors.length
-    historyEvents.errors = []
-    console.log(`🧹 ${errorCount} errores del historial eliminados`)
-    return errorCount
-  }
-
-  /**
    * Obtener el historial como lista para UI
    */
   const getHistoryList = () => {
@@ -570,18 +551,5 @@ export const useCanvasHistory = () => {
     createSnapshot,
     restoreSnapshot,
     applyIncrementalChanges,
-
-    // Debugging y eventos (Punto 7)
-    historyEvents: computed(() => ({ ...historyEvents })),
-    toggleDebugMode,
-    clearErrors,
-    calculateMemoryUsage,
-
-    // Configuración
-    setMaxHistorySize: (newSize) => {
-      maxHistorySize.value = Math.max(10, Math.min(100, newSize)) // Entre 10 y 100
-      console.log(`⚙️ Tamaño máximo del historial actualizado a: ${maxHistorySize.value}`)
-    },
-    getMaxHistorySize: () => maxHistorySize.value
   }
 }
