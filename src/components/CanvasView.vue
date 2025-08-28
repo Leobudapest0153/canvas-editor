@@ -502,6 +502,7 @@
           :guide-shadow-blur="4"
           :guide-shadow-opacity="0.8"
           :show-intersections="true"
+          :zoom="canvasStore.zoom"
         />
 
         <v-transformer
