@@ -1,3 +1,4 @@
+/* eslint-env vitest, jsdom */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -67,7 +68,7 @@ vi.mock('@/composables/useConflicts', () => ({
 }))
 
 // Mock del sistema de toast
-global.window = {
+globalThis.window = {
   __toasts: {
     show: vi.fn()
   }
