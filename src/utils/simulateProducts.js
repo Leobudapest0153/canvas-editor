@@ -67,7 +67,7 @@ export function useProductSimulation({ canvasStore, showToast, forceRedraw }) {
     };
 
     // Actualizar el store con el nuevo objeto 'uso'
-    canvasStore.actualizarElementoConHistorial(
+    canvasStore.actualizarElemento(
       elementoId,
       { uso: nuevoUso },
       `Simulación de uso para: ${contenedor.nombre}`

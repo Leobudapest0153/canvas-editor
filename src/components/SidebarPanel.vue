@@ -71,7 +71,7 @@
 
         <span
           v-if="tab.id === 'capas' && activeFilters"
-          class="absolute top-2 right-1 w-2 h-2 bg-blue-500 rounded-full"
+          class="absolute top-0 right-0  w-2 h-2 bg-red-500 rounded-full"
         ></span>
         <span class="tab-label">{{ tab.label }}</span>
       </button>
@@ -129,7 +129,8 @@ const tabs = [
 ]
 
 const activeFilters = computed(() => {
-  return canvasStore.elementoDestacadoId || canvasStore.idsElementosFiltrados;
+  const elementsNotVisible = canvasStore.elementosVisibles.find((element) => element?.visible == false);
+  return canvasStore.elementoDestacadoId || canvasStore.idsElementosFiltrados || elementsNotVisible;
 });
 </script>
 
