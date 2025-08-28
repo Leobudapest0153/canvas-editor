@@ -13,7 +13,7 @@
       :config="{
         points: [guide.x, guide.y1, guide.x, guide.y2],
         stroke: '#000000',
-        strokeWidth: guideStrokeWidth + 2,
+        strokeWidth: guideStrokeWidth / zoom,
         opacity: 0.6,
         listening: false,
       }"
@@ -26,7 +26,7 @@
       :config="{
         points: [guide.x, guide.y1, guide.x, guide.y2],
         stroke: guideColor,
-        strokeWidth: guideStrokeWidth,
+        strokeWidth: guideStrokeWidth / zoom,
         opacity: guideOpacity,
         listening: false,
         dash: guideDashPattern,
@@ -40,7 +40,7 @@
       :config="{
         points: [guide.x1, guide.y, guide.x2, guide.y],
         stroke: '#000000',
-        strokeWidth: guideStrokeWidth + 2,
+        strokeWidth: guideStrokeWidth / zoom,
         opacity: 0.6,
         listening: false,
       }"
@@ -53,7 +53,7 @@
       :config="{
         points: [guide.x1, guide.y, guide.x2, guide.y],
         stroke: guideColor,
-        strokeWidth: guideStrokeWidth,
+        strokeWidth: guideStrokeWidth / zoom,
         opacity: guideOpacity,
         listening: false,
         dash: guideDashPattern,
@@ -68,10 +68,10 @@
         :config="{
           x: intersection.x,
           y: intersection.y,
-          radius: intersectionRadius,
+          radius: intersectionRadius / zoom,
           fill: intersectionColor,
           stroke: intersectionStrokeColor,
-          strokeWidth: intersectionStrokeWidth,
+          strokeWidth: intersectionStrokeWidth / zoom,
           opacity: intersectionOpacity,
           listening: false,
         }"
@@ -145,6 +145,10 @@ const props = defineProps({
   intersectionOpacity: {
     type: Number,
     default: 1.0 // Opacidad completa
+  },
+  zoom: {
+    type: Number,
+    default: 1.0 // Zoom por defecto
   }
 })
 
