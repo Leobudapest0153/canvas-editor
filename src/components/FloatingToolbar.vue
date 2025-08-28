@@ -1,117 +1,84 @@
 <!-- components/FloatingToolbar.vue -->
 <template>
   <div
-    class="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-xl bg-white p-2 shadow-lg backdrop-blur-sm"
+    class="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-[var(--gap)] px-2 py-2 ui-surface"
+    role="toolbar"
+    aria-label="Toolbar de lienzo"
   >
-
-    <!-- Switch de Modo Edición / Arrastre -->
-    <div class="relative flex items-center rounded-xl bg-gray-200/50 p-1">
+    <!-- Grupo conmutador Mano / Edición -->
+    <div
+      class="relative flex items-center bg-[var(--ui-bg)]/0 border border-[var(--ui-border)] rounded-[12px] p-1"
+      role="group"
+      aria-label="Cambiar modo"
+    >
       <div
-        class="absolute left-1 top-1 h-8 w-8 rounded-lg bg-blue-600 shadow-md transition-transform duration-300 ease-in-out"
-        :style="{ transform: activeMode === 'edit' ? 'translateX(100%)' : 'translateX(0)' }"
+        class="absolute left-1 top-1 h-[calc(var(--btn-size)-8px)] w-[calc(var(--btn-size)-8px)] rounded-[10px] bg-[var(--primary)] transition-transform will-change-transform"
+        :style="{ transform: activeMode === 'edit' ? 'translateX(100%)' : 'translateX(0%)' }"
+        aria-hidden="true"
       ></div>
       <button
         @click.stop="$emit('set-mode', 'drag')"
-        class="relative z-10 flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-200 cursor-pointer"
-        title="Modo Arrastre (Mover el lienzo)"
+        class="h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 hover:bg-black/5 dark:hover:bg-white/5 transition text-slate-600 dark:text-slate-200"
+        :class="{ 'text-white': activeMode === 'drag' }"
+        aria-label="Modo mano (mover lienzo)"
       >
-        <!-- Icono de Mano (Arrastre) -->
-        <svg
-          class="w-6"
-          :class="activeMode === 'drag' ? 'fill-white' : 'fill-gray-700'"
-          viewBox="0 0 24 24"
-        >
-        <path
-          fill-rule="evenodd"
-          d="M12.997 8.62H13V10a.5.5 0 0 0 1 0V5.923A1 1 0 0 1 15.997 6v2.62H16V10a.5.5 0 0 0 1 0V8a1 1 0 1 1 2 0v.62h.01v4.743q0 .074-.01.143l-.007.07a6.773 6.773 0 0 1-6.756 6.287q-.243 0-.47-.01c-1.535-.07-2.885-.786-4.107-1.92-1.23-1.141-2.28-2.66-3.188-4.219-.289-.495-.486-.88-.555-1.193a.6.6 0 0 1-.016-.263c.007-.029.022-.071.087-.135a.57.57 0 0 1 .517-.173c.224.03.518.165.807.434l.001.002 1 .945A1 1 0 0 0 8 12.604V6a1 1 0 0 1 2 0v4a.5.5 0 0 0 1 0V5a1 1 0 1 1 2 0v.89l-.003.11zM7 8.5V6a2 2 0 0 1 3.112-1.662 2 2 0 0 1 3.775-.002A2 2 0 0 1 16.997 6v.27A2 2 0 0 1 20 8v.5h.01v4.863q0 .144-.02.284a7.773 7.773 0 0 1-7.753 7.216q-.266 0-.516-.012c-3.682-.167-6.256-3.449-8.113-6.633-.565-.969-1.11-2.043-.316-2.812.793-.77 1.898-.505 2.705.25l.003.003 1 .945z" />
+        <!-- Icono Mano -->
+        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor" aria-hidden="true">
+          <path d="M8 11V6a1 1 0 1 1 2 0v4h1V5a1 1 0 1 1 2 0v5h1V6a1 1 0 1 1 2 0v4h1V8a1 1 0 1 1 2 0v5c0 3.5-2.8 6.5-6.3 6.5-2 0-3.8-1-5.3-2.6C4.7 15.3 4 14 4 13.3c0-.5.3-.9.8-1 .3 0 .6.1.9.4l1 .9A1 1 0 0 0 8 12v-1z" />
         </svg>
       </button>
       <button
         @click.stop="$emit('set-mode', 'edit')"
-        class="relative cursor-pointer z-10 flex h-8 w-8 items-center justify-center rounded-lg transition-colors duration-200"
-        title="Modo Edición (Seleccionar y mover elementos)"
+        class="h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 hover:bg-black/5 dark:hover:bg-white/5 transition text-slate-600 dark:text-slate-200"
+        :class="{ 'text-white': activeMode === 'edit' }"
+        aria-label="Modo edición"
       >
-        <!-- Icono de Puntero (Edición) -->
-        <svg
-          class="w-6 ml-px"
-          viewBox="0 0 24 24"
-        >
-        <path 
-          fill="none" 
-          stroke="currentColor" 
-          stroke-width="1.2" 
-          :class="activeMode === 'edit' ? '!stroke-white' : 'stroke-gray-700'"
-          d="M8.084 20.276c-1.06 1.38-3.264.66-3.306-1.079L4.443 5.392C4.407 3.932 6 3.012 7.247 3.773l11.788 7.192c1.485.906 1.006 3.176-.719 3.403l-5.581.738a1.84 1.84 0 0 0-1.221.705z"/>
+        <!-- Icono Cursor -->
+        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor" aria-hidden="true">
+          <path d="M6 3l12 7-7 1-2 6-3-14z" />
         </svg>
       </button>
     </div>
 
-    <!-- Separador y Snapping -->
-    <div class="h-6 w-px bg-gray-300/70"></div>
-
-    <button @click.stop="$emit('toggle-snapping')"
-      class="flex cursor-pointer h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 relative group"
-      :class="`${isSnappingEnabled ? 'bg-red-600 hover:bg-red-500' : 'hover:bg-gray-700/80'}`"
-      :title="isSnappingEnabled ? 'Desactivar Object Snapping' : 'Activar Object Snapping'">
-      <!-- Indicador de actividad -->
-      <div 
-        v-if="isSnappingEnabled"
-        class="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-xl border-2 border-gray-900 animate-pulse"
-      ></div>
-      <svg
-        class="h-6 w-6 transition-transform duration-200"
-        :class="[
-          isSnappingEnabled ? 'text-white scale-110' : 'text-gray-400 group-hover:text-gray-100 scale-100'
-        ]"
-        fill="currentColor"
-        viewBox="0 0 24 24">
-        <path
-          d="M12,2A2,2 0 0,1 14,4C14,5.11 13.1,6 12,6C10.89,6 10,5.1 10,4A2,2 0 0,1 12,2M21,9V7L17,3H15V5H16.59L19,7.41V9H21M15,19V21H17L21,17V15H19V16.59L16.59,19H15M9,21V19H7.41L5,16.59V15H3V17L7,21H9M3,9H5V7.41L7.41,5H9V3H7L3,7V9M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12A2,2 0 0,0 12,10Z"
-        />
+    <!-- Snapping -->
+    <button
+      @click.stop="$emit('toggle-snapping')"
+      class="h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 hover:bg-black/5 dark:hover:bg-white/5 transition text-slate-600 dark:text-slate-200"
+      :aria-pressed="isSnappingEnabled ? 'true' : 'false'"
+      aria-label="Alternar snapping"
+    >
+      <!-- Icono Snap (imán) -->
+      <svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor" aria-hidden="true">
+        <path d="M7 3h3v4H7a3 3 0 0 0-3 3v6a4 4 0 0 0 4 4h1v-3H8a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h2V7h4v2h2a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-1v3h1a4 4 0 0 0 4-4v-6a3 3 0 0 0-3-3h-3V3H7z" />
       </svg>
     </button>
+
+    <!-- Lock / Unlock -->
     <button
       v-if="isElementSelected"
-      @click.stop="$emit('toggle-lock')" 
-      class="flex h-8 w-8 cursor-pointer items-center group justify-center rounded-xl transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40" 
-      :class="`${isElementLocked ? 'bg-amber-500 hover:bg-amber-600' : 'hover:bg-gray-700/80'}`"
-      :title="isElementLocked ? 'Desbloquear' : 'Bloquear'"
+      @click.stop="$emit('toggle-lock')"
+      class="h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 hover:bg-black/5 dark:hover:bg-white/5 transition text-slate-600 dark:text-slate-200 disabled:opacity-40 disabled:pointer-events-none"
+      :aria-label="isElementLocked ? 'Desbloquear elemento' : 'Bloquear elemento'"
     >
-      <svg
-        v-if="isElementLocked"
-        class="h-6 w-6 text-white"
-        fill="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"
-        />
+      <!-- Icono candado -->
+      <svg v-if="isElementLocked" viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor" aria-hidden="true">
+        <path d="M17 9V7a5 5 0 0 0-10 0v2H5v12h14V9h-2zm-8 0V7a3 3 0 0 1 6 0v2H9z" />
       </svg>
-      <svg 
-        v-else 
-        class="h-6 w-6 text-gray-400 group-hover:text-gray-100" 
-        fill="currentColor" 
-        viewBox="0 0 24 24"
-      >
-        <path
-            d="M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10A2,2 0 0,1 6,8H15V6A3,3 0 0,0 12,3A3,3 0 0,0 9,6H7A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,17A2,2 0 0,0 14,15A2,2 0 0,0 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17Z"
-        />
+      <svg v-else viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor" aria-hidden="true">
+        <path d="M7 9V7a5 5 0 0 1 9.6-2H14a3 3 0 0 0-6 2v2H5v12h14V9H7z" />
       </svg>
     </button>
-    <button 
+
+    <!-- Fill container -->
+    <button
       v-if="isContainer && isElementSelected"
       @click.stop="$emit('fill-container')"
-      class="flex h-8 w-8 items-center justify-center rounded-xl transition-colors duration-200 group disabled:cursor-not-allowed disabled:opacity-40 hover:bg-gray-700/80 cursor-pointer"
-      title="Llenar contenedor"
+      class="h-[var(--btn-size)] w-[var(--btn-size)] rounded-[10px] grid place-items-center outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]/40 hover:bg-black/5 dark:hover:bg-white/5 transition text-slate-600 dark:text-slate-200 disabled:opacity-40"
+      aria-label="Llenar contenedor"
     >
-      <svg 
-        xmlns="http://www.w3.org/2000/svg" 
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        class="h-6 w-6 text-gray-400 group-hover:text-gray-100"
-      >
-        <path d="M3,2H6V5H3V2M6,7H9V10H6V7M8,2H11V5H8V2M17,11L12,6H15V2H19V6H22L17,11M7.5,22C6.72,22 6.04,21.55 5.71,20.9V20.9L3.1,13.44L3,13A1,1 0 0,1 4,12H20A1,1 0 0,1 21,13L20.96,13.29L18.29,20.9C17.96,21.55 17.28,22 16.5,22H7.5M7.61,20H16.39L18.57,14H5.42L7.61,20Z" />
-
+      <!-- Icono fill -->
+      <svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor" aria-hidden="true">
+        <path d="M4 4l8 8 3-3 5 5-3 3-5-5 3-3-8-8-3 3zM4 18h10v2H4v-2z" />
       </svg>
     </button>
   </div>
@@ -128,4 +95,3 @@ defineProps({
 
 defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'fill-container'])
 </script>
-
