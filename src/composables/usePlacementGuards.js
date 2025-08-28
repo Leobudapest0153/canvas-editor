@@ -31,8 +31,11 @@ export function usePlacementGuards() {
 
   const run = (el, cand) => {
     const ctx = getCtx()
+    const neighbors = store.elementosVisibles.filter((n) => n.id !== el?.id)
     for (const v of validators) {
-      const res = v(el, cand, ctx)
+      let res
+      if (v === validateZStacking) res = v(el, cand, neighbors)
+      else res = v(el, cand, ctx)
       if (res && res.valid === false) return res
     }
     return { valid: true }

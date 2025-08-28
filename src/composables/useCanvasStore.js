@@ -20,6 +20,7 @@ import { CM_TO_PX } from '@/utils/constants'
 import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
+  validateZStacking,
   errorsPlacement,
 } from '@/validation/placementOrchestrator'
 
@@ -715,9 +716,14 @@ export const useCanvasStore = defineStore('canvas', () => {
   const runPlacementValidators = (element, candidate) => {
     const planta = plantaPorId.value(plantaActiva.value)
     const ctx = { alturaBodega: planta?.dimensiones?.alto }
-    const checks = [validateWallZBaseRequired, validateHeightWithinWarehouse]
+    const neighbors = elementosVisibles.value.filter((n) => n.id !== element?.id)
+    const checks = [
+      (el, cand) => validateWallZBaseRequired(el, cand, ctx),
+      (el, cand) => validateHeightWithinWarehouse(el, cand, ctx),
+      (el, cand) => validateZStacking(el, cand, neighbors),
+    ]
     for (const v of checks) {
-      const res = v(element, candidate, ctx)
+      const res = v(element, candidate)
       if (res.valid === false) {
         const msg = errorsPlacement[res.code] || 'Posición inválida'
         window?.__toasts?.show?.(msg, { type: 'error' })
