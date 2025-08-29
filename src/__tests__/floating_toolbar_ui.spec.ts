@@ -89,19 +89,13 @@ describe('FloatingToolbar UI (segmented control)', () => {
     })
   })
 
-  it('active mode SVG has -ml-px micro-offset for perfect centering', async () => {
-    const wrapper = mountToolbar({ activeMode: 'drag' })
-    const svgsDrag = wrapper.get('[role="group"]').findAll('svg')
-    const dragSvg = svgsDrag[0]
-    const editSvg = svgsDrag[1]
-    expect(dragSvg.classes()).toContain('-ml-px')
-    expect(editSvg.classes()).not.toContain('-ml-px')
-
-    await wrapper.setProps({ activeMode: 'edit' })
-    const svgsEdit = wrapper.get('[role="group"]').findAll('svg')
-    const dragSvg2 = svgsEdit[0]
-    const editSvg2 = svgsEdit[1]
-    expect(dragSvg2.classes()).not.toContain('-ml-px')
-    expect(editSvg2.classes()).toContain('-ml-px')
+  it('edit icon renders 18x18 and turns white when active', async () => {
+    const wrapper = mountToolbar({ activeMode: 'edit' })
+    const editBtn = wrapper.get('button[aria-label="Modo edición"]')
+    const editSvg = editBtn.get('svg')
+    expect(editSvg.classes()).toContain('h-[18px]')
+    expect(editSvg.classes()).toContain('w-[18px]')
+    // button becomes white on active, SVG uses fill-current
+    expect(editBtn.classes()).toContain('!text-white')
   })
 })

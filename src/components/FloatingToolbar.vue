@@ -43,10 +43,10 @@
         :aria-pressed="activeMode === 'edit' ? 'true' : 'false'"
       >
         <!-- Icono Cursor -->
-        <svg
+         <svg
           viewBox="0 0 24 24"
           class="block h-[18px] w-[18px] pointer-events-none fill-current align-middle data-[state=on]:text-white"
-          :class="activeMode==='edit' ? '-ml-px' : ''"
+          :class="activeMode==='edit' ? '' : ''"
           aria-hidden="true"
         >
           <path d="M6 3l12 7-7 1-2 6-3-14z" />
