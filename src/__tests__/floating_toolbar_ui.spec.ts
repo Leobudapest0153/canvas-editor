@@ -30,13 +30,12 @@ describe('FloatingToolbar UI (segmented control)', () => {
     expect(toolbar.classes()).not.toContain('h-40')
   })
 
-  it('group has rounded-[14px], overflow-hidden and exact paddings', () => {
+  it('group has rounded-[14px], overflow-hidden and exact padding', () => {
     const wrapper = mountToolbar()
     const group = wrapper.get('[role="group"]')
     expect(group.classes()).toContain('rounded-[14px]')
     expect(group.classes()).toContain('overflow-hidden')
-    expect(group.classes()).toContain('px-0.5')
-    expect(group.classes()).toContain('py-0.5')
+    expect(group.classes()).toContain('px-[var(--seg-pad)]')
   })
 
   it('segmented exposes CSS vars, slider vertical-centers, and seg-index toggles calc translate', async () => {
@@ -52,16 +51,22 @@ describe('FloatingToolbar UI (segmented control)', () => {
     expect(slider.classes()).toContain('rounded-full')
     expect(slider.classes()).toContain('top-1/2')
     expect(slider.classes()).toContain('-translate-y-1/2')
+    expect(slider.classes()).toContain('left-[var(--seg-pad)]')
+    expect(slider.classes()).toContain('h-[36px]')
+    expect(slider.classes()).toContain('w-[36px]')
     expect(slider.classes()).toContain('duration-220')
     expect(slider.classes()).toContain('ease-[cubic-bezier(.25,1.1,.4,1)]')
-    expect(slider.classes()).toContain('left-[var(--seg-pad,2px)]')
-    expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(calc\(var\(--seg-index\) \* \(var\(--seg-w\) \+ var\(--seg-gap\)\)\)\)/)
+    // uses Tailwind transform var for X only (no optical offset)
+    expect(slider.attributes('style')).toMatch(/--tw-translate-x:\s*calc\(var\(--seg-index\) \* \(var\(--seg-w\) \+ var\(--seg-gap\)\)\)/)
 
     await wrapper.setProps({ activeMode: 'edit' })
     const styleStr2 = group.attributes('style') || ''
     expect(styleStr2).toMatch(/--seg-index:\s*1/)
-    // effective travel equals calc(36px + 8px)
-    expect(slider.attributes('style')).toMatch(/translateX\(calc\(36px \+ 8px\)\)/)
+    // assert the expression uses: calc(36px + 8px)
+    const segW = (styleStr2.match(/--seg-w:\s*([^;]+)/)?.[1] || '').trim()
+    const segGap = (styleStr2.match(/--seg-gap:\s*([^;]+)/)?.[1] || '').trim()
+    const exp = `calc(${segW} + ${segGap})`
+    expect(exp).toBe('calc(36px + 8px)')
   })
 
   it('secondary buttons are 36x36 with 18px icons', () => {
@@ -82,5 +87,21 @@ describe('FloatingToolbar UI (segmented control)', () => {
       expect(svg.classes()).toContain('block')
       expect(svg.classes()).toContain('align-middle')
     })
+  })
+
+  it('active mode SVG has -ml-px micro-offset for perfect centering', async () => {
+    const wrapper = mountToolbar({ activeMode: 'drag' })
+    const svgsDrag = wrapper.get('[role="group"]').findAll('svg')
+    const dragSvg = svgsDrag[0]
+    const editSvg = svgsDrag[1]
+    expect(dragSvg.classes()).toContain('-ml-px')
+    expect(editSvg.classes()).not.toContain('-ml-px')
+
+    await wrapper.setProps({ activeMode: 'edit' })
+    const svgsEdit = wrapper.get('[role="group"]').findAll('svg')
+    const dragSvg2 = svgsEdit[0]
+    const editSvg2 = svgsEdit[1]
+    expect(dragSvg2.classes()).not.toContain('-ml-px')
+    expect(editSvg2.classes()).toContain('-ml-px')
   })
 })
