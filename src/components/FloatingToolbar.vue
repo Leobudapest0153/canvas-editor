@@ -1,7 +1,7 @@
 ﻿<!-- components/FloatingToolbar.vue -->
 <template>
   <div
-    class="fixed inset-x-0 bottom-6 z-[60] mx-auto w-fit rounded-[20px] border border-white/20 dark:border-white/10 bg-white/65 dark:bg-slate-900/60 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,.10)] px-2 py-2"
+    class="fixed inset-x-0 bottom-6 z-[60] mx-auto w-auto inline-flex items-center gap-2 whitespace-nowrap rounded-[20px] border border-white/20 dark:border-white/10 bg-white/65 dark:bg-slate-900/60 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,.10)] px-2 py-2"
     :class="{ 'translate-y-20': avoidOverlap }"
     role="toolbar"
     aria-label="Toolbar de lienzo"
@@ -19,7 +19,7 @@
         aria-hidden="true"
       ></div>
       <UiIconButton
-        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 [data-state=on]:hover:opacity-95 hover:!bg-transparent dark:hover:!bg-transparent"
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 [data-state=on]:hover:opacity-95"
         @click.stop="$emit('set-mode', 'drag')"
         :state="activeMode === 'drag' ? 'on' : 'off'"
         aria-label="Modo mano (mover lienzo)"
@@ -31,7 +31,7 @@
         </svg>
       </UiIconButton>
       <UiIconButton
-        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 [data-state=on]:hover:opacity-95 hover:!bg-transparent dark:hover:!bg-transparent"
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 [data-state=on]:hover:opacity-95"
         @click.stop="$emit('set-mode', 'edit')"
         :state="activeMode === 'edit' ? 'on' : 'off'"
         aria-label="Modo edición"
@@ -46,7 +46,7 @@
 
     <!-- Snapping -->
     <UiIconButton
-      class="relative z-10 grid h-10 w-10 place-items-center rounded-xl text-slate-700 dark:text-slate-200 hover:!bg-black/[.04] dark:hover:!bg-white/[.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+      class="relative z-10 grid h-10 w-10 place-items-center rounded-xl bg-transparent hover:bg-black/[.04] dark:hover:bg-white/[.06] text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
       @click.stop="$emit('toggle-snapping')"
       :state="isSnappingEnabled ? 'on' : 'off'"
       :aria-label="'Alternar snapping'"
@@ -65,7 +65,7 @@
     <!-- Lock / Unlock -->
     <UiIconButton
       v-if="isElementSelected"
-      class="relative z-10 grid h-10 w-10 place-items-center rounded-xl text-slate-700 dark:text-slate-200 hover:!bg-black/[.04] dark:hover:!bg-white/[.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+      class="relative z-10 grid h-10 w-10 place-items-center rounded-xl bg-transparent hover:bg-black/[.04] dark:hover:bg-white/[.06] text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
       @click.stop="$emit('toggle-lock')"
       :state="isElementLocked ? 'on' : 'off'"
       :aria-label="isElementLocked ? 'Desbloquear elemento' : 'Bloquear elemento'"
@@ -84,7 +84,7 @@
     <!-- Fill container -->
     <UiIconButton
       v-if="isContainer && isElementSelected"
-      class="relative z-10 grid h-10 w-10 place-items-center rounded-xl text-slate-700 dark:text-slate-200 hover:!bg-black/[.04] dark:hover:!bg-white/[.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+      class="relative z-10 grid h-10 w-10 place-items-center rounded-xl bg-transparent hover:bg-black/[.04] dark:hover:bg-white/[.06] text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
       @click.stop="$emit('fill-container')"
       state="off"
       aria-label="Llenar contenedor"

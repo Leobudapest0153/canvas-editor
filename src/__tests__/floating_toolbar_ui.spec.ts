@@ -17,11 +17,16 @@ describe('FloatingToolbar UI (segmented control)', () => {
       },
     })
 
-  it('container has rounded-[20px] and backdrop-blur-xl', () => {
+  it('container has inline-flex, whitespace-nowrap and rounded-[20px]', () => {
     const wrapper = mountToolbar()
     const toolbar = wrapper.get('[role="toolbar"]')
+    expect(toolbar.classes()).toContain('inline-flex')
+    expect(toolbar.classes()).toContain('whitespace-nowrap')
     expect(toolbar.classes()).toContain('rounded-[20px]')
-    expect(toolbar.classes()).toContain('backdrop-blur-xl')
+    // sanity: not column or fixed boxy dims
+    expect(toolbar.classes()).not.toContain('flex-col')
+    expect(toolbar.classes()).not.toContain('w-40')
+    expect(toolbar.classes()).not.toContain('h-40')
   })
 
   it('group has rounded-[14px]', () => {
@@ -51,4 +56,3 @@ describe('FloatingToolbar UI (segmented control)', () => {
     expect(editBtn2.get('svg').classes()).toContain('text-white')
   })
 })
-
