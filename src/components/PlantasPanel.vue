@@ -104,7 +104,7 @@
       <div class="flex items-center gap-3">
         <!-- -- -- -->
         <!-- ACCIONES PARA PRUEBAS -- NO BORRAR -- -->
-        <button
+        <!-- <button
           type="button"
           class="inline-flex items-center gap-2 p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
           title="Ver historial completo"
@@ -119,7 +119,6 @@
             />
           </svg>
         </button>
-
         <button
           type="button"
           class="inline-flex items-center gap-2 p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
@@ -134,7 +133,7 @@
               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
             />
           </svg>
-        </button>
+        </button> -->
         <!-- -- -- -->
 
         <!-- Icono de Backups (gris) -->
