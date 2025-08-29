@@ -37,14 +37,22 @@ describe('FloatingToolbar UI (segmented control)', () => {
     expect(group.classes()).toContain('overflow-hidden')
   })
 
-  it('slider rounded-full, duration-200 and moves 0 -> 48px', async () => {
+  it('slider centered with top-0.5 left-0.5, has ease cubic-bezier and moves 0 -> 44px', async () => {
     const wrapper = mountToolbar({ activeMode: 'drag' })
     const slider = wrapper.get('.seg-slider')
     expect(slider.classes()).toContain('rounded-full')
-    expect(slider.classes()).toContain('duration-200')
+    expect(slider.classes()).toContain('top-0.5')
+    expect(slider.classes()).toContain('left-0.5')
+    expect(slider.classes()).toContain('duration-250')
+    expect(slider.classes()).toContain('ease-[cubic-bezier(.25,1.25,.5,1)]')
     expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(0\)/)
     await wrapper.setProps({ activeMode: 'edit' })
-    expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(48px\)/)
+    expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(44px\)/)
+    // glow ring when active
+    expect(slider.classes()).toContain('ring-4')
+    // accept either CSS variable based primary ring or alias
+    const ringClass = slider.classes().find(c => c.startsWith('ring-[') && c.includes('colors.blue.600'))
+    expect(ringClass).toBeTruthy()
   })
 
   it('secondary buttons are 36x36 with 18px icons', () => {

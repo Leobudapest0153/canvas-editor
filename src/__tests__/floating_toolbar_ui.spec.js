@@ -32,16 +32,18 @@ describe('FloatingToolbar UI (refactor visuals)', () => {
     expect(group.classes()).toContain('overflow-hidden')
   })
 
-  it('slider rounded-full, duration-200 ease-out and translates 0px -> 48px', async () => {
+  it('slider centered, cubic-bezier ease and translates 0px -> 44px', async () => {
     const wrapper = mountToolbar({ activeMode: 'drag' })
     const group = wrapper.get('[role="group"]')
     const slider = group.get('div[aria-hidden="true"]')
     expect(slider.classes()).toContain('rounded-full')
-    expect(slider.classes()).toContain('duration-200')
-    expect(slider.classes()).toContain('ease-out')
+    expect(slider.classes()).toContain('top-0.5')
+    expect(slider.classes()).toContain('left-0.5')
+    expect(slider.classes()).toContain('duration-250')
+    expect(slider.classes()).toContain('ease-[cubic-bezier(.25,1.25,.5,1)]')
     expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(0\)/)
     await wrapper.setProps({ activeMode: 'edit' })
-    expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(48px\)/)
+    expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(44px\)/)
   })
 
   it('active icon uses text-white on its SVG', async () => {

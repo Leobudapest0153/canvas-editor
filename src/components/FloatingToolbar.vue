@@ -14,8 +14,8 @@
       style="--seg-w:40px; --seg-gap:8px;"
     >
       <div
-        class="seg-slider absolute left-1 top-1 z-0 h-[36px] w-[36px] rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_8px_20px_rgba(37,99,235,.35)] transition-transform duration-200 ease-out will-change-transform"
-        :style="{ transform: activeMode === 'edit' ? 'translateX(48px)' : 'translateX(0)' }"
+        class="seg-slider absolute top-0.5 left-0.5 z-0 h-[36px] w-[36px] rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_8px_20px_rgba(37,99,235,.35)] transition-transform duration-250 ease-[cubic-bezier(.25,1.25,.5,1)] will-change-transform ring-4 ring-[var(--primary,theme(colors.blue.600))]/10"
+        :style="{ transform: activeMode === 'edit' ? 'translateX(44px)' : 'translateX(0)' }"
         aria-hidden="true"
       ></div>
       <UiIconButton
