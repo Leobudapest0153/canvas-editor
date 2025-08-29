@@ -79,29 +79,65 @@
     >
       <svg
         v-if="isElementLocked"
-        class="h-6 w-6 text-white"
+        class="w-[26px] text-white"
         fill="currentColor"
-        viewBox="0 0 24 24"
+        viewBox="0 0 48 48"
       >
-        <path
-          d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"
-        />
+      <path 
+        fill="none" 
+        stroke="currentColor" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        d="M11.51 20.609h24.98c.947 0 1.715.768 1.715 1.715v18.46c0 .948-.768 1.716-1.715 1.716H11.51a1.715 1.715 0 0 1-1.715-1.715V22.324c0-.947.768-1.715 1.715-1.715m3.088-5.744a9.394 9.394 0 0 1 18.788 0v5.744" 
+        stroke-width="2.5"
+      />
+
+      <circle cx="23.992" cy="31.554" r="3.643" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"/>
       </svg>
       <svg 
         v-else 
-        class="h-6 w-6 text-gray-400 group-hover:text-gray-100" 
+        class="w-6 text-gray-400 group-hover:text-gray-100" 
         fill="currentColor" 
-        viewBox="0 0 24 24"
+        viewBox="0 0 48 48"
       >
-        <path
-            d="M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6C4.89,22 4,21.1 4,20V10A2,2 0 0,1 6,8H15V6A3,3 0 0,0 12,3A3,3 0 0,0 9,6H7A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,17A2,2 0 0,0 14,15A2,2 0 0,0 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17Z"
+        <path 
+          fill="none" 
+          stroke="currentColor" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" 
+          d="M10.17 19.26h27.66a1.9 1.9 0 0 1 1.898 1.9V41.6a1.9 1.9 0 0 1-1.899 1.9H10.171a1.9 1.9 0 0 1-1.9-1.9V21.16a1.9 1.9 0 0 1 1.9-1.9m3.419 0V14.9a10.401 10.401 0 0 1 20.803 0v4.36" 
+          stroke-width="2.5"
         />
+
+        <circle cx="23.991" cy="31.38" r="4.034" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"/>
+      </svg>
+    </button>
+    <button
+      v-if="isElementSelected"
+      @click.stop="$emit('delete')"
+      class="flex h-8 w-8 items-center justify-center rounded-xl transition-colors duration-200 group disabled:cursor-not-allowed disabled:opacity-40 hover:bg-red-700/80 cursor-pointer text-gray-400"
+      title="Eliminar"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        class="h-6 w-6 text-gray-400 group-hover:text-gray-100"
+      >
+      <path 
+        fill="none" 
+        stroke="currentColor" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        stroke-width="1.2" 
+        d="m20 9l-1.995 11.346A2 2 0 0 1 16.035 22h-8.07a2 2 0 0 1-1.97-1.654L4 9m17-3h-5.625M3 6h5.625m0 0V4a2 2 0 0 1 2-2h2.75a2 2 0 0 1 2 2v2m-6.75 0h6.75"
+      />
       </svg>
     </button>
     <button 
       v-if="isContainer && isElementSelected"
       @click.stop="$emit('fill-container')"
-      class="flex h-8 w-8 items-center justify-center rounded-xl transition-colors duration-200 group disabled:cursor-not-allowed disabled:opacity-40 hover:bg-gray-700/80 cursor-pointer"
+      class="flex h-8 w-8 items-center justify-center rounded-xl transition-colors duration-200 group disabled:cursor-not-allowed disabled:opacity-40 hover:bg-green-700/80 cursor-pointer"
       title="Llenar contenedor"
     >
       <svg 
@@ -110,8 +146,7 @@
         fill="currentColor"
         class="h-6 w-6 text-gray-400 group-hover:text-gray-100"
       >
-        <path d="M3,2H6V5H3V2M6,7H9V10H6V7M8,2H11V5H8V2M17,11L12,6H15V2H19V6H22L17,11M7.5,22C6.72,22 6.04,21.55 5.71,20.9V20.9L3.1,13.44L3,13A1,1 0 0,1 4,12H20A1,1 0 0,1 21,13L20.96,13.29L18.29,20.9C17.96,21.55 17.28,22 16.5,22H7.5M7.61,20H16.39L18.57,14H5.42L7.61,20Z" />
-
+      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"><path d="M10 14a2 2 0 1 0 4 0a2 2 0 0 0-4 0"/><path d="M5.001 8H19a2 2 0 0 1 1.977 2.304l-1.255 7.152A3 3 0 0 1 16.756 20H7.244a3 3 0 0 1-2.965-2.544l-1.255-7.152A2 2 0 0 1 5.001 8M17 10l-2-6m-8 6l2-6"/></g>
       </svg>
     </button>
   </div>
@@ -126,6 +161,6 @@ defineProps({
   isSnappingEnabled: { type: Boolean, default: true },
 })
 
-defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'fill-container'])
+defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'fill-container', 'delete'])
 </script>
 
