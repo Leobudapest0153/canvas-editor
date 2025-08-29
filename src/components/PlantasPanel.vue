@@ -14,12 +14,12 @@
 -->
 
 <template>
-  <div class="bg-white border-b border-gray-200 p-4 shadow-sm">
+  <div class="bg-white border-b border-gray-200 px-4 py-2 shadow-sm">
     <div class="flex items-center gap-4">
       <!-- Lista de plantas con scroll horizontal -->
       <div class="flex items-center gap-3 min-w-0 flex-1">
         <!-- Contenedor de plantas scrolleable -->
-        <div class="flex overflow-x-auto space-x-3 pb-2 plantas-scroll-container flex-1 min-w-0">
+        <div class="flex overflow-x-auto space-x-3 plantas-scroll-container flex-1 min-w-0">
           <!-- Tarjetas de plantas -->
           <div
             v-for="planta in canvasStore.plantas"
@@ -414,7 +414,6 @@ import ImportExportModal from './ImportExportModal.vue'
 import BackupModal from './BackupModal.vue'
 import { usePlantResizeGuard, pack as packShelf } from '@/composables/usePlantResizeGuard'
 import { CM_TO_PX, MARGIN_CM, FACTOR_UTILIZACION } from '@/utils/constants'
-import { useToast } from '@/composables/useToast'
 
 // Store
 const canvasStore = useCanvasStore()
@@ -528,7 +527,7 @@ const guardarCambios = () => {
   // Por ahora solo será de visualización
   console.log('Función guardarCambios activada - por implementar')
   // Alerta temporal
-  useToast().showSuccess('✅ Cambios guardados')
+  showToast('Cambios guardados correctamente', 'success')
 }
 
 const seleccionarPlanta = (plantaId) => {
