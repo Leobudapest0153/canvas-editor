@@ -1,52 +1,55 @@
 ﻿<!-- components/FloatingToolbar.vue -->
 <template>
   <div
-    class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] inline-flex items-center gap-2 whitespace-nowrap max-w-max rounded-[20px] border border-white/10 dark:border-white/5 bg-white/55 dark:bg-slate-900/50 backdrop-blur-xl shadow-[0_4px_12px_rgba(0,0,0,.08)] px-3 py-2"
+    class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] inline-flex items-center gap-3 whitespace-nowrap max-w-max rounded-[20px] border border-white/12 dark:border-white/6 bg-white/50 dark:bg-slate-900/45 backdrop-blur-xl backdrop-saturate-150 px-3.5 py-2 shadow-[0_6px_18px_rgba(0,0,0,.08),inset_0_0_0_1px_rgba(255,255,255,.06)]"
     :class="{ 'translate-y-20': avoidOverlap }"
     role="toolbar"
     aria-label="Toolbar de lienzo"
   >
     <!-- Grupo conmutador Mano / EdiciÃ³n -->
     <div
-      class="relative isolate flex h-[40px] w-[88px] items-center rounded-[14px] border border-black/5 dark:border-white/10 bg-white/40 dark:bg-white/5 px-1 gap-2"
+      class="relative isolate flex h-[40px] w-[88px] items-center overflow-hidden rounded-[14px] border border-white/10 dark:border-white/8 bg-white/35 dark:bg-white/5 px-1 gap-2 shadow-[inset_0_-1px_0_rgba(0,0,0,.05),inset_0_1px_0_rgba(255,255,255,.06)]"
       role="group"
       aria-label="Cambiar modo"
       style="--seg-w:40px; --seg-gap:8px;"
     >
       <div
-        class="seg-slider absolute left-1 top-1 z-0 h-[36px] w-[36px] rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_6px_16px_rgba(37,99,235,.35)] transition-transform duration-250 ease-out will-change-transform"
-        :style="{ transform: activeMode === 'edit' ? 'translateX(calc(40px + 8px))' : 'translateX(0)' }"
+        class="seg-slider absolute left-1 top-1 z-0 h-[36px] w-[36px] rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_8px_20px_rgba(37,99,235,.35)] transition-transform duration-200 ease-out will-change-transform"
+        :style="{ transform: activeMode === 'edit' ? 'translateX(48px)' : 'translateX(0)' }"
         aria-hidden="true"
       ></div>
       <UiIconButton
-        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 [data-state=on]:hover:opacity-95"
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
         @click.stop="$emit('set-mode', 'drag')"
         :state="activeMode === 'drag' ? 'on' : 'off'"
         aria-label="Modo mano (mover lienzo)"
         :aria-pressed="activeMode === 'drag' ? 'true' : 'false'"
       >
         <!-- Icono Mano -->
-        <svg viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current" :class="{ 'text-white': activeMode === 'drag' }" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current text-slate-500/80 dark:text-slate-300/80" :class="{ 'text-white': activeMode === 'drag' }" aria-hidden="true">
           <path d="M8 11V6a1 1 0 1 1 2 0v4h1V5a1 1 0 1 1 2 0v5h1V6a1 1 0 1 1 2 0v4h1V8a1 1 0 1 1 2 0v5c0 3.5-2.8 6.5-6.3 6.5-2 0-3.8-1-5.3-2.6C4.7 15.3 4 14 4 13.3c0-.5.3-.9.8-1 .3 0 .6.1.9.4l1 .9A1 1 0 0 0 8 12v-1z" />
         </svg>
       </UiIconButton>
       <UiIconButton
-        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 [data-state=on]:hover:opacity-95"
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
         @click.stop="$emit('set-mode', 'edit')"
         :state="activeMode === 'edit' ? 'on' : 'off'"
         aria-label="Modo edición"
         :aria-pressed="activeMode === 'edit' ? 'true' : 'false'"
       >
         <!-- Icono Cursor -->
-        <svg viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current" :class="{ 'text-white': activeMode === 'edit' }" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current text-slate-500/80 dark:text-slate-300/80" :class="{ 'text-white': activeMode === 'edit' }" aria-hidden="true">
           <path d="M6 3l12 7-7 1-2 6-3-14z" />
         </svg>
       </UiIconButton>
     </div>
 
+    <!-- Divider between group and secondary actions -->
+    <div class="h-6 w-px bg-white/10 dark:bg-white/10 mx-1.5" aria-hidden="true" />
+
     <!-- Snapping -->
     <UiIconButton
-      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
       @click.stop="$emit('toggle-snapping')"
       :state="isSnappingEnabled ? 'on' : 'off'"
       :aria-label="'Alternar snapping'"
@@ -65,7 +68,7 @@
     <!-- Lock / Unlock -->
     <UiIconButton
       v-if="isElementSelected"
-      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
       @click.stop="$emit('toggle-lock')"
       :state="isElementLocked ? 'on' : 'off'"
       :aria-label="isElementLocked ? 'Desbloquear elemento' : 'Bloquear elemento'"
@@ -84,7 +87,7 @@
     <!-- Fill container -->
     <UiIconButton
       v-if="isContainer && isElementSelected"
-      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-700 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
       @click.stop="$emit('fill-container')"
       state="off"
       aria-label="Llenar contenedor"

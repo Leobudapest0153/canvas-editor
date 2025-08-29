@@ -17,39 +17,48 @@ describe('FloatingToolbar UI (refactor visuals)', () => {
       },
     })
 
-  it('container has rounded-[20px] and backdrop-blur-xl', () => {
+  it('container has rounded-[20px], backdrop-blur-xl and backdrop-saturate-150', () => {
     const wrapper = mountToolbar()
     const toolbar = wrapper.get('[role="toolbar"]')
     expect(toolbar.classes()).toContain('rounded-[20px]')
     expect(toolbar.classes()).toContain('backdrop-blur-xl')
+    expect(toolbar.classes()).toContain('backdrop-saturate-150')
   })
 
-  it('switch group is rounded-[14px]', () => {
+  it('switch group is rounded-[14px] and overflow-hidden', () => {
     const wrapper = mountToolbar()
     const group = wrapper.get('[role="group"]')
     expect(group.classes()).toContain('rounded-[14px]')
+    expect(group.classes()).toContain('overflow-hidden')
   })
 
-  it('slider rounded-[12px], duration-250 ease-out and translates 0px -> 40px', async () => {
+  it('slider rounded-full, duration-200 ease-out and translates 0px -> 48px', async () => {
     const wrapper = mountToolbar({ activeMode: 'drag' })
     const group = wrapper.get('[role="group"]')
     const slider = group.get('div[aria-hidden="true"]')
-    expect(slider.classes()).toContain('rounded-[12px]')
-    expect(slider.classes()).toContain('duration-250')
+    expect(slider.classes()).toContain('rounded-full')
+    expect(slider.classes()).toContain('duration-200')
     expect(slider.classes()).toContain('ease-out')
     expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(0\)/)
     await wrapper.setProps({ activeMode: 'edit' })
-    expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(40px\)/)
+    expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(48px\)/)
   })
 
-  it('active icon uses text-white via button state', async () => {
+  it('active icon uses text-white on its SVG', async () => {
     const wrapper = mountToolbar({ activeMode: 'drag' })
     const group = wrapper.get('[role="group"]')
     const [dragBtn, editBtn] = group.findAll('button')
-    expect(dragBtn.classes()).toContain('!text-white')
-    expect(editBtn.classes()).not.toContain('!text-white')
+    expect(dragBtn.get('svg').classes()).toContain('text-white')
+    expect(editBtn.get('svg').classes()).not.toContain('text-white')
     await wrapper.setProps({ activeMode: 'edit' })
-    expect(group.findAll('button')[1].classes()).toContain('!text-white')
+    expect(group.findAll('button')[1].get('svg').classes()).toContain('text-white')
+  })
+
+  it('has a slim divider between group and secondary buttons', () => {
+    const wrapper = mountToolbar()
+    // find a divider with width-px and aria-hidden that is not the slider
+    const dividers = wrapper.findAll('div[aria-hidden="true"]')
+    const hasSlimDivider = dividers.some((d) => d.classes().includes('w-px') && d.classes().includes('h-6'))
+    expect(hasSlimDivider).toBe(true)
   })
 })
-
