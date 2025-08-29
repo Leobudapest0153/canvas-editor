@@ -271,7 +271,7 @@
         </div>
 
         <div class="p-6">
-          <p class="text-gray-700 mb-4">
+          <p class="text-gray-700 mb-4" v-if="elementosEnPlantaAEliminar <= 0">
             ¿Estás seguro que deseas eliminar la planta
             <strong>"{{ plantaAEliminar?.nombre }}"</strong>?
           </p>
@@ -365,8 +365,10 @@ import HistorialModal from './HistorialModal.vue'
 import ImportExportModal from './ImportExportModal.vue'
 import { usePlantResizeGuard, pack as packShelf } from '@/composables/usePlantResizeGuard'
 import { CM_TO_PX, MARGIN_CM, FACTOR_UTILIZACION } from '@/utils/constants'
+import { useToast } from '@/composables/useToast'
 // Store
 const canvasStore = useCanvasStore()
+const { showToast } = useToast()
 
 // Estado local para modales
 const showHistorialModal = ref(false)
@@ -549,7 +551,7 @@ const eliminarPlantaConfirmada = () => {
       plantaAEliminar.value = null
     } catch (error) {
       console.error('Error al eliminar planta:', error)
-      alert(error.message)
+      showToast(error.message)
     }
   }
 }
@@ -603,7 +605,7 @@ const runCanvasSyncSequence = async () => {
 
 const guardarPlanta = async () => {
   if (!formularioPlanta.value.nombre.trim()) {
-    alert('El nombre de la planta es requerido')
+    showToast('El nombre de la planta es requerido', { type: 'error' })
     return
   }
 
@@ -612,7 +614,7 @@ const guardarPlanta = async () => {
     const res = guard.simulateResize(dims.ancho, dims.largo)
 
     if (res.status === 'block') {
-      window.__toasts?.show?.('No es posible reducir: elementos no caben con las nuevas dimensiones', { type: 'error' })
+      showToast('No es posible reducir: elementos no caben con las nuevas dimensiones', { type: 'error' })
       return
     }
 
@@ -654,7 +656,7 @@ const guardarPlanta = async () => {
           canvasStore.editarPlanta(canvasStore.plantaActiva, {
             dimensiones: { ...prevDims },
           })
-          window.__toasts?.show?.('No fue posible reacomodar elementos; se revierte la redimensión', { type: 'error' })
+          showToast('No fue posible reacomodar elementos; se revierte la redimensión', { type: 'error' })
           // Secuencia de sync para reflejar reversión inmediatamente
           await runCanvasSyncSequence()
           return
@@ -696,8 +698,7 @@ const guardarPlanta = async () => {
           }
           el.rotation = p.rotation
         }
-
-        window.__toasts?.show?.(`Se reacomodaron ${moved} elementos`, { type: 'warn' })
+        showToast(`Se reacomodaron ${moved} elementos`, { type: 'warn' })
         canvasStore.saveToHistory('Auto-adjust after resize (post-apply)')
       } else {
         // No ajustes requeridos
@@ -722,7 +723,7 @@ const guardarPlanta = async () => {
     cerrarModales()
   } catch (error) {
     console.error('Error al guardar planta:', error)
-    alert('Error al guardar la planta')
+    showToast('Error al guardar la planta', { type: 'error' })
   }
 }
 

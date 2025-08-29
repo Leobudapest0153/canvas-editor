@@ -15,6 +15,7 @@ import { ref, computed } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
 import { useWeightValidation } from './useWeightValidation'
 import { CM_TO_PX } from '@/utils/constants'
+import { useToast } from './useToast'
 
 
 // Estado global del buffer (singleton)
@@ -23,6 +24,7 @@ const bufferItems = ref([])
 export const useCanvasBuffer = () => {
   const canvasStore = useCanvasStore()
   const weightValidation = useWeightValidation()
+  const { showToast } = useToast()
 
   // Computed properties
   const hasItems = computed(() => bufferItems.value.length > 0)
@@ -215,7 +217,7 @@ export const useCanvasBuffer = () => {
         const mensaje = totalElements > 1
           ? `Estructura "${nombreElemento}" copiada (${totalElements} elementos)`
           : `Elemento "${nombreElemento}" copiado`
-        window.__toasts.show(mensaje, { type: 'info' })
+        showToast(mensaje, { type: 'info' })
       }
     } else {
       console.error('⚠️ Error al copiar la estructura al buffer')
@@ -449,7 +451,7 @@ export const useCanvasBuffer = () => {
       console.warn('⚠️ No se puede pegar: excedería el peso máximo soportado', resultadoValidacionPeso)
 
       if (typeof window !== 'undefined' && window.__toasts?.show) {
-        window.__toasts.show(
+        showToast(
           `No se puede pegar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
           { type: 'error', timeout: 3000 }
         )
@@ -492,7 +494,7 @@ export const useCanvasBuffer = () => {
           const mensaje = totalElements > 1
             ? `Estructura "${nombreElemento}" pegada (${totalElements} elementos)`
             : `Elemento "${nombreElemento}" pegado`
-          window.__toasts.show(mensaje, { type: 'info' })
+          showToast(mensaje, { type: 'info' })
         }
 
         return rootElementId
@@ -526,7 +528,7 @@ export const useCanvasBuffer = () => {
         // Mostrar mensaje de éxito para elemento simple
         if (typeof window !== 'undefined' && window.__toasts?.show) {
           const nombreElemento = elemento.nombre || elemento.tipo
-          window.__toasts.show(`Elemento "${nombreElemento}" pegado`, { type: 'info' })
+          showToast(`Elemento "${nombreElemento}" pegado`, { type: 'info' })
         }
 
         return finalElementId
