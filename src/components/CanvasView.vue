@@ -673,7 +673,6 @@ import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { useWeightValidation } from '@/composables/useWeightValidation'
 import { applyEdgeConstraint } from '@/utils/edgeConstraint'
 import { resetEdgeState } from '@/composables/useEdgeState'
-import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
 import { makeInnerSession } from '@/composables/useInnerNoOverlap'
@@ -681,8 +680,8 @@ import { useObjectSnapping } from '@/composables/useObjectSnapping'
 import { usePlacementGuards } from '@/composables/usePlacementGuards'
 import FloatingToolbar from './FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/utils/simulateProducts'
-import {config} from '@vue/test-utils'
 import SnapGuides from './SnapGuides.vue'
+import { useToast } from '@/composables/useToast'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -1659,15 +1658,7 @@ const handleDrop = (e) => {
   }
 }
 
-// Función auxiliar para mostrar toast de error
-const showToast = (message, type = 'error') => {
-  if (typeof window !== 'undefined' && window.__toasts) {
-    window.__toasts.show(message, { type, timeout: 4000 })
-  } else {
-    console.warn('Toast:', message)
-  }
-}
-
+const { showToast } = useToast()
 
 const { simularLlenadoContenedor} = useProductSimulation({
   canvasStore,

@@ -417,61 +417,12 @@ const cambiosPendientes = ref({
   pesoMaximo: null
 })
 
-// Estado para almacenar errores - Ya no necesario, usamos toasts
-// const errorValidacion = ref('')
 
 const modalCrearEtiquetaVisible = ref(false)
 const textoNuevaEtiqueta = ref('')
 
 // Computed
 const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoCompleto)
-// const isLockedSelected = computed(() => {
-//   const el = elementoSeleccionado.value
-//   return !!(el && (el.bloqueado === true || el.locked === true))
-// })
-
-// Información sobre la capacidad del contenedor padre o planta
-// const infoPesoContenedor = computed(() => {
-//   const elemento = elementoSeleccionado.value
-//   if (!elemento) return { mostrar: false, mensaje: '' }
-
-//   // Verificar si el elemento tiene un padre
-//   if (elemento.padre) {
-//     const padreId = elemento.padre
-//     const padre = canvasStore.elementoPorId(padreId)
-
-//     if (padre && padre.pesoMaximo > 0) {
-//       const nombrePadre = padre.nombre || obtenerNombreElementoPorId(padreId)
-//       const tipoElementoPadre = padre.tipo || 'elementos'
-//       const resultado = weightValidation.calcularPesoDisponible(padreId, tipoElementoPadre)
-
-//       if (resultado.limiteDePeso) {
-//         return {
-//           mostrar: true,
-//           mensaje: `Contenedor: "${nombrePadre}" - Capacidad disponible: ${Math.round(resultado.disponible * 10) / 10} kg de ${resultado.maximo} kg (${Math.round(resultado.porcentajeUsado)}% en uso)`
-//         }
-//       }
-//     }
-//   }
-//   // Verificar si el elemento está en una planta sin padre (elemento de primer nivel)
-//   else if (elemento.plantaId) {
-//     const plantaId = elemento.plantaId
-//     const planta = canvasStore.plantaPorId(plantaId)
-
-//     if (planta && planta.pesoMaximoSoportado > 0) {
-//       const resultado = weightValidation.calcularPesoDisponible(plantaId, 'plantas')
-
-//       if (resultado.limiteDePeso) {
-//         return {
-//           mostrar: true,
-//           mensaje: `Planta: "${planta.nombre}" - Capacidad disponible: ${Math.round(resultado.disponible * 10) / 10} kg de ${resultado.maximo} kg (${Math.round(resultado.porcentajeUsado)}% en uso)`
-//         }
-//       }
-//     }
-//   }
-
-//   return { mostrar: false, mensaje: '' }
-// })
 
 
 const volumen = computed(() => {
