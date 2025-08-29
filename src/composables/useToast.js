@@ -5,7 +5,7 @@
  */
 
 export function useToast() {
-  const showToast = (message, type = 'info', options = {}) => {
+  const showToast = (message, type = 'error', options = {}) => {
     if (typeof window !== 'undefined' && window.__toasts) {
       window.__toasts.show(message, { 
         type, 
@@ -29,10 +29,15 @@ export function useToast() {
     showToast(message, 'error', options)
   }
 
+  const showInfo = (message, options = {}) => {
+    showToast(message, 'info', options)
+  }
+
   return {
     showToast,
     showSuccess,
     showWarning,
-    showError
+    showError,
+    showInfo
   }
 }

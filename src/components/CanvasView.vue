@@ -52,6 +52,7 @@
       @dragmove="handleStageDragMove"
       @dragend="handleStageDragEnd"
     >
+    
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
         <v-line
           v-if="plantPolygon.length"
@@ -120,57 +121,6 @@
 
         <!-- Aquí podrías añadir v-circle, etc., si tienes otras formas -->
       </template>
-        <!-- Debug: mostrar información según el contexto -->
-        <v-text
-          :config="{
-            x: 10,
-            y: 10,
-            text:
-              canvasStore.estaEnElemento || canvasStore.estaEnContenedor
-                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${layerConfig.width}x${layerConfig.height}px (Adaptativo)`
-                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
-            fontSize: 12 / canvasStore.zoom,
-            fontFamily: 'Arial',
-            fill: '#3b82f6',
-            listening: false,
-          }"
-        />
-        <v-text
-          v-if="canvasStore.estaEnPlanta"
-          :config="{
-            x: 10,
-            y: 10 + (12 / canvasStore.zoom) + (8 / canvasStore.zoom),
-            text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
-            fontSize: 11 / canvasStore.zoom,
-            fontFamily: 'Arial',
-            fill: '#6b7280',
-            listening: false,
-          }"
-        />
-        <v-text
-          v-if="canvasStore.estaEnElemento"
-          :config="{
-            x: 10,
-            y: 10 + (12 / canvasStore.zoom) + (8 / canvasStore.zoom),
-            text: `Contenedores: ${elementosVisiblesEnCanvas.length}`,
-            fontSize: 11 / canvasStore.zoom,
-            fontFamily: 'Arial',
-            fill: '#dc2626',
-            listening: false,
-          }"
-        />
-        <v-text
-          v-if="canvasStore.estaEnContenedor"
-          :config="{
-            x: 5,
-            y: 10 + (11 / canvasStore.zoom) + (8 / canvasStore.zoom),
-            text: `Items: ${elementosVisiblesEnCanvas.length} (elementos + contenedores)`,
-            fontSize: 11 / canvasStore.zoom,
-            fontFamily: 'Arial',
-            fill: '#dc2626',
-            listening: false,
-          }"
-        />
 
         <!-- Renderizado de elementos del store -->
         <template v-for="elemento in elementosVisiblesEnCanvas" :key="elemento.id">
@@ -492,6 +442,61 @@
         <!-- Los contenedores se renderizan junto con los elementos en la sección principal -->
 
       </v-layer>
+
+      <v-layer ref="uiLayerRef" :config="{ listening: false }">
+
+        <!-- Debug: mostrar información según el contexto -->
+        <v-text
+          :config="{
+            x: 10,
+            y: -(39 / canvasStore.zoom),
+            text:
+              canvasStore.estaEnElemento || canvasStore.estaEnContenedor
+                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${layerConfig.width}x${layerConfig.height}px (Adaptativo)`
+                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
+            fontSize: 12 / canvasStore.zoom,
+            fontFamily: 'Arial',
+            fill: '#3b82f6',
+            listening: false,
+          }"
+        />
+        <v-text
+          v-if="canvasStore.estaEnPlanta"
+          :config="{
+            x: 10,
+            y: -(11 / canvasStore.zoom) - (8 / canvasStore.zoom),
+            text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
+            fontSize: 11 / canvasStore.zoom,
+            fontFamily: 'Arial',
+            fill: '#6b7280',
+            listening: false,
+          }"
+        />
+        <v-text
+          v-if="canvasStore.estaEnElemento"
+          :config="{
+            x: 10,
+            y: -(11 / canvasStore.zoom) - (8 / canvasStore.zoom),
+            text: `Contenedores: ${elementosVisiblesEnCanvas.length}`,
+            fontSize: 11 / canvasStore.zoom,
+            fontFamily: 'Arial',
+            fill: '#dc2626',
+            listening: false,
+          }"
+        />
+        <v-text
+          v-if="canvasStore.estaEnContenedor"
+          :config="{
+            x: 10,
+            y: -(11 / canvasStore.zoom) - (8 / canvasStore.zoom),
+            text: `Items: ${elementosVisiblesEnCanvas.length} (elementos + contenedores)`,
+            fontSize: 11 / canvasStore.zoom,
+            fontFamily: 'Arial',
+            fill: '#dc2626',
+            listening: false,
+          }"
+        />
+      </v-layer> 
       <v-layer ref="overlaysLayerRef">
         <!-- Líneas guía de object snapping -->
         <SnapGuides
@@ -668,7 +673,6 @@ import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { useWeightValidation } from '@/composables/useWeightValidation'
 import { applyEdgeConstraint } from '@/utils/edgeConstraint'
 import { resetEdgeState } from '@/composables/useEdgeState'
-import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
 import { makeInnerSession } from '@/composables/useInnerNoOverlap'
@@ -676,8 +680,8 @@ import { useObjectSnapping } from '@/composables/useObjectSnapping'
 import { usePlacementGuards } from '@/composables/usePlacementGuards'
 import FloatingToolbar from './FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/utils/simulateProducts'
-import {config} from '@vue/test-utils'
 import SnapGuides from './SnapGuides.vue'
+import { useToast } from '@/composables/useToast'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -1654,15 +1658,7 @@ const handleDrop = (e) => {
   }
 }
 
-// Función auxiliar para mostrar toast de error
-const showToast = (message, type = 'error') => {
-  if (typeof window !== 'undefined' && window.__toasts) {
-    window.__toasts.show(message, { type, timeout: 4000 })
-  } else {
-    console.warn('Toast:', message)
-  }
-}
-
+const { showToast } = useToast()
 
 const { simularLlenadoContenedor} = useProductSimulation({
   canvasStore,

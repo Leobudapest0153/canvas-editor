@@ -151,9 +151,11 @@
 import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore'
 import { useWeightValidation } from '@/composables/useWeightValidation'
+import { useToast } from '@/composables/useToast';
 import DrawEditor from './DrawEditor.vue';
 
 const canvasStore = useCanvasStore();
+const { showToast } = useToast();
 const weightValidation = useWeightValidation();
 const canvasEditorRef = ref(null);
 
@@ -418,7 +420,7 @@ function onSave(){
     const pesoTotalHijos = weightValidation.calcularPesoTotal(local.id, 'plantas');
 
     if (local.maxWeight > 0 && pesoTotalHijos > local.maxWeight) {
-      window.__toasts?.show?.(`La capacidad de carga de la planta (${local.maxWeight} kg) es menor a la capacidad de carga total requerida por los elementos contenidos (${Math.round(pesoTotalHijos * 100) / 100} kg).`, { type: 'error' })
+      showToast(`La capacidad de carga de la planta (${local.maxWeight} kg) es menor a la capacidad de carga total requerida por los elementos contenidos (${Math.round(pesoTotalHijos * 100) / 100} kg).`, { type: 'error' });
       return;
     }
   }
@@ -438,6 +440,7 @@ function onSave(){
 
   if (plantaData.id) {
     canvasStore.editarPlanta(plantaData.id, plantaData);
+    canvasStore.calcularCanvasAdaptativo(plantaData);
   } else {
     delete plantaData.id;
     canvasStore.agregarPlanta(plantaData);

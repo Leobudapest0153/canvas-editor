@@ -241,6 +241,8 @@ import {
   validateHeightWithinWarehouse,
   errorsPlacement,
 } from '@/validation/placementOrchestrator'
+import { useToast } from '@/composables/useToast'
+const { showToast } = useToast()
 
 const props = defineProps({
   visible: Boolean,
@@ -376,19 +378,19 @@ const onCancel = () => {
 const validarFormulario = () => {
   const elemento = localElemento.value
   if (!elemento.nombre.trim()) {
-    alert('El nombre es requerido')
+    showToast('El nombre es requerido', { type: 'error' })
     return false
   }
   if (!elemento.categoria) {
-    alert('La categoría es requerida')
+    showToast('La categoría es requerida', { type: 'error' })
     return false
   }
   if (!elemento.forma) {
-    alert('La forma es requerida')
+    showToast('La forma es requerida', { type: 'error' })
     return false
   }
   if (!elemento.ubicacion) {
-    alert('La ubicación es requerida')
+    showToast('La ubicación es requerida', { type: 'error' })
     return false
   }
   if (
@@ -396,11 +398,11 @@ const validarFormulario = () => {
     elemento.dimensiones.largo <= 0 ||
     elemento.dimensiones.alto <= 0
   ) {
-    alert('Las dimensiones deben ser mayores a 0')
+    showToast('Las dimensiones deben ser mayores a 0', { type: 'error' })
     return false
   }
   if (elemento.pesoMaximo <= 0) {
-    alert('La capacidad de carga debe ser mayor a 0')
+    showToast('La capacidad de carga debe ser mayor a 0', { type: 'error' })
     return false
   }
   const ctx = {
@@ -409,7 +411,7 @@ const validarFormulario = () => {
   for (const v of [validateWallZBaseRequired, validateHeightWithinWarehouse]) {
     const res = v(null, elemento, ctx)
     if (res.valid === false) {
-      alert(errorsPlacement[res.code])
+      showToast(errorsPlacement[res.code], { type: 'error' })
       return false
     }
   }
@@ -431,7 +433,7 @@ const handleSubmit = () => {
 
     // Si el nuevo peso máximo es menor que el peso actual de los hijos, mostrar error
     if (resultado.limiteDePeso && nuevoPesoMaximo < pesoActualHijos) {
-      alert(`La capacidad de carga debe ser al menos ${pesoActualHijos} kg para soportar los elementos actuales contenidos.`);
+      showToast(`La capacidad de carga debe ser al menos ${pesoActualHijos} kg para soportar los elementos actuales contenidos.`, { type: 'error' });
       return;
     }
   }
