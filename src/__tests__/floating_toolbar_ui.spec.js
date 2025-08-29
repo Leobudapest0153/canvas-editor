@@ -32,18 +32,19 @@ describe('FloatingToolbar UI (refactor visuals)', () => {
     expect(group.classes()).toContain('overflow-hidden')
   })
 
-  it('slider centered, cubic-bezier ease and translates 0px -> 44px', async () => {
+  it('slider vertical-centers with calc-based travel', async () => {
     const wrapper = mountToolbar({ activeMode: 'drag' })
     const group = wrapper.get('[role="group"]')
     const slider = group.get('div[aria-hidden="true"]')
     expect(slider.classes()).toContain('rounded-full')
-    expect(slider.classes()).toContain('top-0.5')
-    expect(slider.classes()).toContain('left-0.5')
-    expect(slider.classes()).toContain('duration-250')
+    expect(slider.classes()).toContain('top-1/2')
+    expect(slider.classes()).toContain('-translate-y-1/2')
+    expect(slider.classes()).toContain('duration-220')
     expect(slider.classes()).toContain('ease-[cubic-bezier(.25,1.25,.5,1)]')
-    expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(0\)/)
+    // uses CSS vars with calc
+    expect(slider.attributes('style')).toMatch(/translateX\(calc\(var\(--seg-index\) \* \(var\(--seg-w\) \+ var\(--seg-gap\)\)\)\)/)
     await wrapper.setProps({ activeMode: 'edit' })
-    expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(44px\)/)
+    expect(group.attributes('style') || '').toMatch(/--seg-index:\s*1/)
   })
 
   it('active icon uses text-white on its SVG', async () => {

@@ -11,34 +11,34 @@
       class="relative isolate flex h-[40px] w-[88px] items-center overflow-hidden rounded-[14px] border border-white/10 dark:border-white/8 bg-white/35 dark:bg-white/5 px-1 gap-2 shadow-[inset_0_-1px_0_rgba(0,0,0,.05),inset_0_1px_0_rgba(255,255,255,.06)]"
       role="group"
       aria-label="Cambiar modo"
-      style="--seg-w:40px; --seg-gap:8px;"
+      :style="{ '--seg-w': '36px', '--seg-gap': '8px', '--seg-index': activeMode === 'edit' ? 1 : 0 }"
     >
       <div
-        class="seg-slider absolute top-0.5 left-0.5 z-0 h-[36px] w-[36px] rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_8px_20px_rgba(37,99,235,.35)] transition-transform duration-250 ease-[cubic-bezier(.25,1.25,.5,1)] will-change-transform ring-4 ring-[var(--primary,theme(colors.blue.600))]/10"
-        :style="{ transform: activeMode === 'edit' ? 'translateX(44px)' : 'translateX(0)' }"
+        class="seg-slider absolute left-[2px] top-1/2 -translate-y-1/2 z-0 h-[36px] w-[36px] rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_8px_20px_rgba(37,99,235,.35)] transition-transform duration-220 ease-[cubic-bezier(.25,1.25,.5,1)] will-change-transform"
+        :style="{ transform: 'translateX(calc(var(--seg-index) * (var(--seg-w) + var(--seg-gap))))' }"
         aria-hidden="true"
       ></div>
       <UiIconButton
-        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+        class="relative z-10 p-0 leading-none grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
         @click.stop="$emit('set-mode', 'drag')"
         :state="activeMode === 'drag' ? 'on' : 'off'"
         aria-label="Modo mano (mover lienzo)"
         :aria-pressed="activeMode === 'drag' ? 'true' : 'false'"
       >
         <!-- Icono Mano -->
-        <svg viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current text-slate-500/80 dark:text-slate-300/80" :class="{ 'text-white': activeMode === 'drag' }" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="block h-[18px] w-[18px] pointer-events-none fill-current text-slate-500/80 dark:text-slate-300/80" :class="{ 'text-white': activeMode === 'drag' }" aria-hidden="true">
           <path d="M8 11V6a1 1 0 1 1 2 0v4h1V5a1 1 0 1 1 2 0v5h1V6a1 1 0 1 1 2 0v4h1V8a1 1 0 1 1 2 0v5c0 3.5-2.8 6.5-6.3 6.5-2 0-3.8-1-5.3-2.6C4.7 15.3 4 14 4 13.3c0-.5.3-.9.8-1 .3 0 .6.1.9.4l1 .9A1 1 0 0 0 8 12v-1z" />
         </svg>
       </UiIconButton>
       <UiIconButton
-        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+        class="relative z-10 p-0 leading-none grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
         @click.stop="$emit('set-mode', 'edit')"
         :state="activeMode === 'edit' ? 'on' : 'off'"
         aria-label="Modo edición"
         :aria-pressed="activeMode === 'edit' ? 'true' : 'false'"
       >
         <!-- Icono Cursor -->
-        <svg viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current text-slate-500/80 dark:text-slate-300/80" :class="{ 'text-white': activeMode === 'edit' }" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="block h-[18px] w-[18px] pointer-events-none fill-current text-slate-500/80 dark:text-slate-300/80" :class="{ 'text-white': activeMode === 'edit' }" aria-hidden="true">
           <path d="M6 3l12 7-7 1-2 6-3-14z" />
         </svg>
       </UiIconButton>
