@@ -17,6 +17,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { CM_TO_PX } from '@/utils/constants'
+import { useAutoSave } from '@/composables/useAutoSave'
 import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
@@ -1082,8 +1083,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
         // Uso real
         uso: {
-          peso: elemento.uso.peso || 0,
-          volumen: elemento.uso.volumen || 0
+          peso: elemento?.uso?.peso || 0,
+          volumen: elemento?.uso?.volumen || 0
         },
 
         // Jerarquía
@@ -1385,6 +1386,18 @@ export const useCanvasStore = defineStore('canvas', () => {
     this.isDraggable = mode
   }
 
+  // === INTEGRACIÓN CON AUTOSAVE ===
+  // Instancia del autosave - se establece desde App.vue o el componente principal
+  const autoSaveInstance = ref(null)
+
+  /**
+   * Establecer la instancia del autosave (resuelve dependencia circular)
+   */
+  const setAutoSaveInstance = (autoSaveComposableInstance) => {
+    autoSaveInstance.value = autoSaveComposableInstance
+    console.log('💾 Instancia de autosave establecida en el store')
+  }
+
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
   watch(
     () => [contextoNavegacion.value.tipo, contextoNavegacion.value.id],
@@ -1485,6 +1498,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     setHistoryInstance,
     saveToHistory,
     clearZoomPanDebounce,
+
+    // === INTEGRACIÓN CON AUTOSAVE ===
+    setAutoSaveInstance,
+    autoSaveInstance,
 
     // === FUNCIONES DE SERIALIZACIÓN ===
     serialize,

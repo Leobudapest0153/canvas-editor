@@ -88,9 +88,12 @@
           </div>
       </div>
 
-      <!-- Acciones (Historial e Import/Export) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 col-span-1 lg:col-span-4 lg:justify-self-end">
-        <button
+      <!-- Acciones (Historial, Import/Export y Copias de Seguridad) -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 col-span-1 lg:col-span-4 lg:justify-self-end">
+
+        <!-- DESCOMENTAR EN DEV PARA TEST -->
+
+        <!-- <button
           type="button"
           class="inline-flex items-center gap-2 w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
           title="Ver historial completo"
@@ -104,10 +107,11 @@
               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <span>Historial</span>
-        </button>
+          <span class="hidden sm:inline">Historial</span>
+          <span class="sm:hidden">📜</span>
+        </button> -->
 
-        <button
+        <!-- <button
           type="button"
           class="inline-flex items-center gap-2 w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
           title="Importar / Exportar Canvas"
@@ -121,7 +125,22 @@
               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
             />
           </svg>
-          <span>Import/Export</span>
+          <span class="hidden sm:inline">Import/Export</span>
+          <span class="sm:hidden">💾</span>
+        </button> -->
+
+        <button
+          type="button"
+          class="inline-flex items-center gap-2 w-full px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
+          title="Gestionar copias de seguridad automáticas"
+          @click="openBackupModal"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 7v10c0 2.21 1.79 4 4 4h8c2.21 0 4-1.79 4-4V7M4 7l2-2h12l2 2M4 7h16m-9 4v4m2-4v4" />
+          </svg>
+          <span class="hidden sm:inline">Backups</span>
+          <span class="sm:hidden">🔒</span>
         </button>
       </div>
     </div>
@@ -356,21 +375,31 @@
 
   <!-- Modal de importar/exportar -->
   <ImportExportModal :mostrar="showImportExportModal" @cerrar="closeImportExportModal" />
+
+  <!-- Modal de copias de seguridad -->
+  <BackupModal :mostrar="showBackupModal" :auto-save="autoSave" @cerrar="closeBackupModal" />
 </template>
 
 <script setup>
 import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore'
+import { useAutoSave } from '@/composables/useAutoSave'
 import HistorialModal from './HistorialModal.vue'
 import ImportExportModal from './ImportExportModal.vue'
+import BackupModal from './BackupModal.vue'
 import { usePlantResizeGuard, pack as packShelf } from '@/composables/usePlantResizeGuard'
 import { CM_TO_PX, MARGIN_CM, FACTOR_UTILIZACION } from '@/utils/constants'
+
 // Store
 const canvasStore = useCanvasStore()
+
+// Autosave
+const autoSave = useAutoSave(canvasStore)
 
 // Estado local para modales
 const showHistorialModal = ref(false)
 const showImportExportModal = ref(false)
+const showBackupModal = ref(false)
 const mostrarModalAgregar = ref(false)
 const mostrarModalEditar = ref(false)
 const mostrarConfirmacionEliminar = ref(false)
@@ -450,6 +479,14 @@ const openImportExportModal = () => {
 
 const closeImportExportModal = () => {
   showImportExportModal.value = false
+}
+
+const openBackupModal = () => {
+  showBackupModal.value = true
+}
+
+const closeBackupModal = () => {
+  showBackupModal.value = false
 }
 
 const seleccionarPlanta = (plantaId) => {

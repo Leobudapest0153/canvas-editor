@@ -169,7 +169,7 @@ export const useCanvasImportExport = () => {
         valido: true,
         plantas: data.plantas?.length || 0,
         elementos: data.elementos?.length || 0,
-        version: data.meta?.version || 'desconocida',
+        version: data.meta?.version || 'desconociddasda',
         fecha: data.meta?.timestamp || null,
       }
     } catch (error) {
