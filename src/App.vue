@@ -15,8 +15,6 @@
       <!-- Canvas principal -->
       <div class="app-canvas">
         <CanvasView
-          @select="handleElementSelect"
-          @drill-down="handleDrillDown"
           :safeRight="showPropiedadesPanel ? 320 : 20"
         />
       </div>
@@ -59,19 +57,6 @@ const buffer = useCanvasBuffer()
 const { deleteSelected } = useDeleteElement()
 
 const showPropiedadesPanel = computed(() => canvasStore.elementoSeleccionadoCompleto)
-
-const selectedElement = ref(null)
-
-const handleElementSelect = (elemento) => {
-  selectedElement.value = elemento
-  console.log('Elemento seleccionado:', elemento)
-}
-
-const handleDrillDown = (elemento) => {
-  console.log('Drill down a elemento:', elemento)
-  // TODO: Implementar navegación a vista hija
-  alert(`Navegando a vista hija de: ${elemento.tipo} (${elemento.id})`)
-}
 
 // Atajos de teclado globales
 const handleKeydown = (e) => {
