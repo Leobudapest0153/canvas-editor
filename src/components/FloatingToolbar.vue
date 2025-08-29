@@ -14,12 +14,12 @@
       :style="{ '--seg-w':'36px','--seg-gap':'8px','--seg-pad':'2px','--seg-index': activeMode==='edit' ? 1 : 0 }"
     >
       <div
-        class="seg-slider absolute top-1/2 left-[var(--seg-pad)] z-0 h-[36px] w-[36px] rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_8px_20px_rgba(37,99,235,.35)] ring-2 ring-[var(--primary,theme(colors.blue.600))]/20 -translate-y-1/2 transform transition-transform duration-220 ease-[cubic-bezier(.25,1.1,.4,1)] will-change-transform"
+        class="seg-slider absolute top-1/2 left-[var(--seg-pad)] z-0 h-[36px] w-[36px] rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_8px_24px_rgba(37,99,235,.35)] ring-2 ring-white/15 ring-[var(--primary,theme(colors.blue.600))]/20 -translate-y-1/2 transform transition-transform duration-220 ease-[cubic-bezier(.25,1.1,.4,1)] will-change-transform"
         :style="{ '--tw-translate-x': 'calc(var(--seg-index) * (var(--seg-w) + var(--seg-gap)))' }"
         aria-hidden="true"
       ></div>
       <UiIconButton
-        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none"
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none transform transition data-[state=on]:scale-100 data-[state=off]:scale-95"
         @click.stop="$emit('set-mode', 'drag')"
         :state="activeMode === 'drag' ? 'on' : 'off'"
         aria-label="Modo mano (mover lienzo)"
@@ -28,7 +28,7 @@
         <!-- Icono Mano -->
         <svg
           viewBox="0 0 24 24"
-          class="block h-[18px] w-[18px] pointer-events-none fill-current align-middle data-[state=on]:text-white"
+          class="block h-[18px] w-[18px] pointer-events-none fill-current align-middle transition data-[state=on]:text-white data-[state=off]:text-slate-400/70 data-[state=off]:opacity-70 drop-shadow-[0_1px_1px_rgba(0,0,0,.25)]"
           :class="activeMode==='drag' ? '-ml-px' : ''"
           aria-hidden="true"
         >
@@ -36,20 +36,17 @@
         </svg>
       </UiIconButton>
       <UiIconButton
-        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none"
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none transform transition data-[state=on]:scale-100 data-[state=off]:scale-95"
         @click.stop="$emit('set-mode', 'edit')"
         :state="activeMode === 'edit' ? 'on' : 'off'"
         aria-label="Modo edición"
         :aria-pressed="activeMode === 'edit' ? 'true' : 'false'"
       >
         <!-- Icono Cursor -->
-         <svg
-          viewBox="0 0 24 24"
-          class="block h-[18px] w-[18px] pointer-events-none fill-current align-middle data-[state=on]:text-white"
-          :class="activeMode==='edit' ? '' : ''"
-          aria-hidden="true"
-        >
-          <path d="M6 3l12 7-7 1-2 6-3-14z" />
+        <svg viewBox="0 0 24 24" class="block h-[18px] w-[18px] pointer-events-none fill-current align-middle transition data-[state=on]:text-white data-[state=off]:text-slate-400/70 data-[state=off]:opacity-70 drop-shadow-[0_1px_1px_rgba(0,0,0,.25)]" aria-hidden="true">
+          <g transform="translate(-0.5,0)">
+            <path d="M6 3.75 17.25 11.2a.9.9 0 0 1-.23 1.63l-4.72 1.42-1.42 4.72a.9.9 0 0 1-1.63.23L3.75 7.5a.9.9 0 0 1 1.25-1.17Z" />
+          </g>
         </svg>
       </UiIconButton>
     </div>
@@ -58,27 +55,26 @@
     <div class="h-6 w-px bg-white/10 dark:bg-white/10 mx-1.5" aria-hidden="true" />
 
     <!-- Snapping -->
+    <div class="relative group">
     <UiIconButton
-      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
       @click.stop="$emit('toggle-snapping')"
       :state="isSnappingEnabled ? 'on' : 'off'"
       :aria-label="'Alternar snapping'"
       :aria-pressed="isSnappingEnabled ? 'true' : 'false'"
     >
       <!-- Icono Snap (imÃ¡n) -->
-      <svg viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current" aria-hidden="true">
+      <svg viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
         <path d="M7 3h3v4H7a3 3 0 0 0-3 3v6a4 4 0 0 0 4 4h1v-3H8a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h2V7h4v2h2a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-1v3h1a4 4 0 0 0 4-4v-6a3 3 0 0 0-3-3h-3V3H7z" />
       </svg>
-      <span
-        v-if="isSnappingEnabled && isSnapping"
-        class="absolute top-1 right-1 h-2 w-2 rounded-full bg-[var(--primary)] animate-pulse"
-      ></span>
     </UiIconButton>
+    <span v-if="isSnappingEnabled" class="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--primary,theme(colors.blue.600))] ring-2 ring-slate-900/60"></span>
+    </div>
 
     <!-- Lock / Unlock -->
     <UiIconButton
       v-if="isElementSelected"
-      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
       @click.stop="$emit('toggle-lock')"
       :state="isElementLocked ? 'on' : 'off'"
       :aria-label="isElementLocked ? 'Desbloquear elemento' : 'Bloquear elemento'"
@@ -86,10 +82,10 @@
       :class="{ 'text-amber-600 dark:text-amber-400': isElementLocked }"
     >
       <!-- Icono candado -->
-      <svg v-if="isElementLocked" viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current" aria-hidden="true">
+      <svg v-if="isElementLocked" viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
         <path d="M17 9V7a5 5 0 0 0-10 0v2H5v12h14V9h-2zm-8 0V7a3 3 0 0 1 6 0v2H9z" />
       </svg>
-      <svg v-else viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current" aria-hidden="true">
+      <svg v-else viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
         <path d="M7 9V7a5 5 0 0 1 9.6-2H14a3 3 0 0 0-6 2v2H5v12h14V9H7z" />
       </svg>
     </UiIconButton>
@@ -97,13 +93,13 @@
     <!-- Fill container -->
     <UiIconButton
       v-if="isContainer && isElementSelected"
-      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
       @click.stop="$emit('fill-container')"
       state="off"
       aria-label="Llenar contenedor"
     >
       <!-- Icono fill -->
-      <svg viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current" aria-hidden="true">
+      <svg viewBox="0 0 24 24" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
         <path d="M4 4l8 8 3-3 5 5-3 3-5-5 3-3-8-8-3 3zM4 18h10v2H4v-2z" />
       </svg>
     </UiIconButton>

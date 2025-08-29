@@ -51,6 +51,9 @@ describe('FloatingToolbar UI (refactor visuals)', () => {
     expect(slider.classes()).toContain('ease-[cubic-bezier(.25,1.1,.4,1)]')
     // uses Tailwind transform var for X only (no optical offset)
     expect(slider.attributes('style')).toMatch(/--tw-translate-x:\s*calc\(var\(--seg-index\) \* \(var\(--seg-w\) \+ var\(--seg-gap\)\)\)/)
+    // ring and contrast boost present
+    expect(slider.classes()).toContain('ring-2')
+    expect(slider.classes()).toContain('ring-white/15')
     await wrapper.setProps({ activeMode: 'edit' })
     const style2 = group.attributes('style') || ''
     expect(style2).toMatch(/--seg-index:\s*1/)
@@ -69,6 +72,40 @@ describe('FloatingToolbar UI (refactor visuals)', () => {
       expect(svg.classes()).toContain('block')
       expect(svg.classes()).toContain('align-middle')
     })
+  })
+
+  it('mode SVGs have off-state opacity class for affordance', () => {
+    const wrapper = mountToolbar({ activeMode: 'drag' })
+    const group = wrapper.get('[role="group"]')
+    const svgs = group.findAll('svg')
+    expect(svgs[0].classes()).toContain('data-[state=off]:opacity-70')
+    expect(svgs[1].classes()).toContain('data-[state=off]:opacity-70')
+  })
+
+  it('Move/Edit labels toggle opacity with active mode', async () => {
+    const wrapper = mountToolbar({ activeMode: 'drag' })
+    const allDivs = wrapper.findAll('div')
+    const move = allDivs.find((n) => n.text() === 'Move')
+    const edit = allDivs.find((n) => n.text() === 'Edit')
+    expect(move.classes()).toContain('opacity-100')
+    expect(edit.classes()).toContain('opacity-0')
+    await wrapper.setProps({ activeMode: 'edit' })
+    const allDivs2 = wrapper.findAll('div')
+    const move2 = allDivs2.find((n) => n.text() === 'Move')
+    const edit2 = allDivs2.find((n) => n.text() === 'Edit')
+    expect(move2.classes()).toContain('opacity-0')
+    expect(edit2.classes()).toContain('opacity-100')
+  })
+
+  it('secondary buttons declare strong on-state styles', () => {
+    const wrapper = mountToolbar({ activeMode: 'drag', isSnappingEnabled: true })
+    const snapBtn = wrapper.get('button[aria-label="Alternar snapping"]')
+    expect(snapBtn.classes()).toContain('data-[state=on]:bg-white/10')
+    expect(snapBtn.classes()).toContain('data-[state=on]:ring-1')
+    expect(snapBtn.classes()).toContain('data-[state=on]:ring-white/15')
+    const snapSvg = snapBtn.get('svg')
+    expect(snapSvg.classes()).toContain('data-[state=on]:text-white')
+    expect(snapSvg.classes()).toContain('data-[state=off]:text-slate-300')
   })
 
   it('edit icon renders 18x18 and turns white when active', async () => {
