@@ -13,7 +13,7 @@
     <!-- Contenido (scroll) -->
     <div class="flex-1 overflow-y-auto p-4">
       <!-- Sin elemento seleccionado -->
-      <div v-if="!elementoSeleccionado" class="text-center py-12">
+   <!--  <div v-if="!elementoSeleccionado" class="text-center py-12">
         <svg
           class="w-12 h-12 text-gray-300 mx-auto mb-4"
           fill="none"
@@ -31,10 +31,10 @@
           Selecciona un elemento en el canvas<br />
           para ver sus propiedades
         </p>
-      </div>
+   </div> -->
 
       <!-- Panel de propiedades -->
-      <div v-else class="space-y-6">
+      <div class="space-y-6">
         <!-- Información básica -->
         <div class="bg-gray-50 rounded-lg p-4">
           <h3 class="text-sm font-medium text-gray-700 mb-3">Información Básica</h3>
@@ -613,7 +613,9 @@ const handleAgregarEtiqueta = (etiquetaId) => {
 
 const handleQuitarEtiqueta = (etiquetaId) => {
   if (!elementoSeleccionado.value) return
+  console.log("Quitando propiedades")
   canvasStore.quitarEtiquetaDeElemento(elementoSeleccionado.value.id, etiquetaId)
+  canvasStore.toggleMostrarPropiedades();
 }
 
 const abrirModalCrearEtiqueta = (texto) => {
