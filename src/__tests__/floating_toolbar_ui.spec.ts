@@ -23,6 +23,8 @@ describe('FloatingToolbar UI (segmented control)', () => {
     expect(toolbar.classes()).toContain('inline-flex')
     expect(toolbar.classes()).toContain('whitespace-nowrap')
     expect(toolbar.classes()).toContain('rounded-[20px]')
+    expect(toolbar.classes()).toContain('bg-white/55')
+    expect(toolbar.classes()).toContain('shadow-[0_4px_12px_rgba(0,0,0,.08)]')
     // sanity: not column or fixed boxy dims
     expect(toolbar.classes()).not.toContain('flex-col')
     expect(toolbar.classes()).not.toContain('w-40')
@@ -35,14 +37,24 @@ describe('FloatingToolbar UI (segmented control)', () => {
     expect(group.classes()).toContain('rounded-[14px]')
   })
 
-  it('slider rounded/duration and moves 0 -> calc(40px + 8px)', async () => {
+  it('slider rounded-full/duration and moves 0 -> calc(40px + 8px)', async () => {
     const wrapper = mountToolbar({ activeMode: 'drag' })
     const slider = wrapper.get('.seg-slider')
-    expect(slider.classes()).toContain('rounded-[12px]')
+    expect(slider.classes()).toContain('rounded-full')
     expect(slider.classes()).toContain('duration-250')
     expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(0\)/)
     await wrapper.setProps({ activeMode: 'edit' })
     expect(slider.attributes('style')).toMatch(/transform:\s*translateX\(calc\(40px \+ 8px\)\)/)
+  })
+
+  it('secondary buttons are 36x36 with 18px icons', () => {
+    const wrapper = mountToolbar()
+    const snapBtn = wrapper.get('button[aria-label="Alternar snapping"]')
+    expect(snapBtn.classes()).toContain('h-[36px]')
+    expect(snapBtn.classes()).toContain('w-[36px]')
+    const svg = snapBtn.get('svg')
+    expect(svg.classes()).toContain('h-[18px]')
+    expect(svg.classes()).toContain('w-[18px]')
   })
 
   it('active button icon has text-white', async () => {
