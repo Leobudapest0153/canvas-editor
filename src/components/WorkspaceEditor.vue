@@ -440,6 +440,7 @@ function onSave(){
 
   if (plantaData.id) {
     canvasStore.editarPlanta(plantaData.id, plantaData);
+    canvasStore.calcularCanvasAdaptativo(plantaData);
   } else {
     delete plantaData.id;
     canvasStore.agregarPlanta(plantaData);
