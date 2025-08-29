@@ -1,7 +1,7 @@
 ﻿<!-- components/FloatingToolbar.vue -->
 <template>
   <div
-    class="fixed inset-x-0 bottom-6 z-[60] mx-auto w-auto inline-flex items-center gap-2 whitespace-nowrap rounded-[20px] border border-white/20 dark:border-white/10 bg-white/65 dark:bg-slate-900/60 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,.10)] px-2 py-2"
+    class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] inline-flex items-center gap-2 whitespace-nowrap max-w-max rounded-[20px] border border-white/20 dark:border-white/10 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,.12)] px-3 py-2"
     :class="{ 'translate-y-20': avoidOverlap }"
     role="toolbar"
     aria-label="Toolbar de lienzo"
