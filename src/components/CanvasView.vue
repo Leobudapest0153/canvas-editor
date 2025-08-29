@@ -540,6 +540,7 @@
       :is-element-selected="canvasStore.elementoSeleccionado ? true : false"
       :is-element-locked="selectedElementLocked"
       :is-snapping-enabled="isSnappingEnabled"
+      :is-snapping="isSnapping"
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
 
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
@@ -663,6 +664,7 @@ import {
   nudgePlace,
 } from '@/utils/geometry'
 import { clampRectToPolygon, pointInPolygon, clampPointToPolygon } from '@/utils/polygonBounds'
+import { handleCanvasHotkeys } from '@/utils/canvasHotkeys'
 import { polygonInset } from '@/utils/polygonInset'
 import { GRID_SIZE, CM_TO_PX } from '@/utils/constants'
 import { getActiveBounds } from '@/utils/activeBounds'
@@ -2672,10 +2674,17 @@ const handleKeyDown = (e) => {
   if (e.key === 'Escape' || e.key === 'Esc') {
     canvasStore.seleccionarElemento(null)
     // Asegurar que el transformer/edición se cierre
-  editingElementId.value = null
-  speedDialOpen.value = false
-  // Limpiar guías de snapping
-  clearGuides()
+    editingElementId.value = null
+    speedDialOpen.value = false
+    // Limpiar guías de snapping
+    clearGuides()
+  } else {
+    handleCanvasHotkeys(e, {
+      dragMode: dragModeGlobal,
+      toggleDragMode,
+      toggleSnapping,
+      toggleLock: () => toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado),
+    })
   }
 }
 let resizeObserver = null
