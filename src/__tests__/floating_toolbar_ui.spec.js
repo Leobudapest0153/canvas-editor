@@ -25,11 +25,17 @@ describe('FloatingToolbar UI (refactor visuals)', () => {
     expect(toolbar.classes()).toContain('backdrop-saturate-150')
   })
 
-  it('switch group is rounded-[14px] and overflow-hidden', () => {
+  it('switch group is rounded-[14px], overflow-hidden, and exact paddings/vars', () => {
     const wrapper = mountToolbar()
     const group = wrapper.get('[role="group"]')
     expect(group.classes()).toContain('rounded-[14px]')
     expect(group.classes()).toContain('overflow-hidden')
+    expect(group.classes()).toContain('px-0.5')
+    expect(group.classes()).toContain('py-0.5')
+    const styleStr = group.attributes('style') || ''
+    expect(styleStr).toMatch(/--seg-w:\s*36px/)
+    expect(styleStr).toMatch(/--seg-gap:\s*8px/)
+    expect(styleStr).toMatch(/--seg-pad:\s*2px/)
   })
 
   it('slider vertical-centers with calc-based travel', async () => {
@@ -40,21 +46,24 @@ describe('FloatingToolbar UI (refactor visuals)', () => {
     expect(slider.classes()).toContain('top-1/2')
     expect(slider.classes()).toContain('-translate-y-1/2')
     expect(slider.classes()).toContain('duration-220')
-    expect(slider.classes()).toContain('ease-[cubic-bezier(.25,1.25,.5,1)]')
+    expect(slider.classes()).toContain('ease-[cubic-bezier(.25,1.1,.4,1)]')
+    expect(slider.classes()).toContain('left-[var(--seg-pad,2px)]')
     // uses CSS vars with calc
     expect(slider.attributes('style')).toMatch(/translateX\(calc\(var\(--seg-index\) \* \(var\(--seg-w\) \+ var\(--seg-gap\)\)\)\)/)
     await wrapper.setProps({ activeMode: 'edit' })
-    expect(group.attributes('style') || '').toMatch(/--seg-index:\s*1/)
+    const style2 = group.attributes('style') || ''
+    expect(style2).toMatch(/--seg-index:\s*1/)
+    expect(slider.attributes('style')).toMatch(/translateX\(calc\(36px \+ 8px\)\)/)
   })
 
-  it('active icon uses text-white on its SVG', async () => {
+  it('SVGs are block and align-middle (no baseline drift)', async () => {
     const wrapper = mountToolbar({ activeMode: 'drag' })
     const group = wrapper.get('[role="group"]')
-    const [dragBtn, editBtn] = group.findAll('button')
-    expect(dragBtn.get('svg').classes()).toContain('text-white')
-    expect(editBtn.get('svg').classes()).not.toContain('text-white')
-    await wrapper.setProps({ activeMode: 'edit' })
-    expect(group.findAll('button')[1].get('svg').classes()).toContain('text-white')
+    const svgs = group.findAll('svg')
+    svgs.forEach((svg) => {
+      expect(svg.classes()).toContain('block')
+      expect(svg.classes()).toContain('align-middle')
+    })
   })
 
   it('has a slim divider between group and secondary buttons', () => {

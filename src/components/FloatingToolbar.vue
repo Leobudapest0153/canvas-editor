@@ -8,37 +8,37 @@
   >
     <!-- Grupo conmutador Mano / EdiciÃ³n -->
     <div
-      class="relative isolate flex h-[40px] w-[88px] items-center overflow-hidden rounded-[14px] border border-white/10 dark:border-white/8 bg-white/35 dark:bg-white/5 px-1 gap-2 shadow-[inset_0_-1px_0_rgba(0,0,0,.05),inset_0_1px_0_rgba(255,255,255,.06)]"
+      class="relative isolate flex h-[40px] items-center rounded-[14px] border border-white/10 dark:border-white/8 bg-white/35 dark:bg-white/5 gap-2 px-0.5 py-0.5 overflow-hidden"
       role="group"
       aria-label="Cambiar modo"
-      :style="{ '--seg-w': '36px', '--seg-gap': '8px', '--seg-index': activeMode === 'edit' ? 1 : 0 }"
+      :style="{ '--seg-w': '36px', '--seg-gap': '8px', '--seg-index': activeMode === 'edit' ? 1 : 0, '--seg-pad': '2px' }"
     >
       <div
-        class="seg-slider absolute left-[2px] top-1/2 -translate-y-1/2 z-0 h-[36px] w-[36px] rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_8px_20px_rgba(37,99,235,.35)] transition-transform duration-220 ease-[cubic-bezier(.25,1.25,.5,1)] will-change-transform"
-        :style="{ transform: 'translateX(calc(var(--seg-index) * (var(--seg-w) + var(--seg-gap))))' }"
+        class="seg-slider absolute left-[var(--seg-pad,2px)] top-1/2 -translate-y-1/2 z-0 h-[36px] w-[36px] rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_8px_20px_rgba(37,99,235,.35)] transition-transform duration-220 ease-[cubic-bezier(.25,1.1,.4,1)] will-change-transform transform-gpu"
+        :style="{ transform: activeMode === 'edit' ? 'translateX(calc(36px + 8px))' : 'translateX(calc(var(--seg-index) * (var(--seg-w) + var(--seg-gap))))' }"
         aria-hidden="true"
       ></div>
       <UiIconButton
-        class="relative z-10 p-0 leading-none grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none data-[state=on]:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
         @click.stop="$emit('set-mode', 'drag')"
         :state="activeMode === 'drag' ? 'on' : 'off'"
         aria-label="Modo mano (mover lienzo)"
         :aria-pressed="activeMode === 'drag' ? 'true' : 'false'"
       >
         <!-- Icono Mano -->
-        <svg viewBox="0 0 24 24" class="block h-[18px] w-[18px] pointer-events-none fill-current text-slate-500/80 dark:text-slate-300/80" :class="{ 'text-white': activeMode === 'drag' }" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="block h-[18px] w-[18px] pointer-events-none fill-current align-middle text-slate-500/80 dark:text-slate-300/80" aria-hidden="true">
           <path d="M8 11V6a1 1 0 1 1 2 0v4h1V5a1 1 0 1 1 2 0v5h1V6a1 1 0 1 1 2 0v4h1V8a1 1 0 1 1 2 0v5c0 3.5-2.8 6.5-6.3 6.5-2 0-3.8-1-5.3-2.6C4.7 15.3 4 14 4 13.3c0-.5.3-.9.8-1 .3 0 .6.1.9.4l1 .9A1 1 0 0 0 8 12v-1z" />
         </svg>
       </UiIconButton>
       <UiIconButton
-        class="relative z-10 p-0 leading-none grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none data-[state=on]:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40"
         @click.stop="$emit('set-mode', 'edit')"
         :state="activeMode === 'edit' ? 'on' : 'off'"
         aria-label="Modo edición"
         :aria-pressed="activeMode === 'edit' ? 'true' : 'false'"
       >
         <!-- Icono Cursor -->
-        <svg viewBox="0 0 24 24" class="block h-[18px] w-[18px] pointer-events-none fill-current text-slate-500/80 dark:text-slate-300/80" :class="{ 'text-white': activeMode === 'edit' }" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="block h-[18px] w-[18px] pointer-events-none fill-current align-middle text-slate-500/80 dark:text-slate-300/80" aria-hidden="true">
           <path d="M6 3l12 7-7 1-2 6-3-14z" />
         </svg>
       </UiIconButton>
