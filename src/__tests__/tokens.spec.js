@@ -24,4 +24,11 @@ describe('tokens.css import and utility classes', () => {
     expect(tokensCss).toMatch(/backdrop-filter:\s*saturate\(140%\)\s*blur\(10px\)/)
     expect(tokensCss).toMatch(/border:\s*1px\s+solid\s+var\(--ui-border\)/)
   })
+
+  it('defines tuned dark mode surface tokens', () => {
+    const tokensPath = path.resolve(process.cwd(), 'src/styles/tokens.css')
+    const tokensCss = fs.readFileSync(tokensPath, 'utf-8')
+    expect(tokensCss).toMatch(/--ui-bg-dark:\s*rgba\(15,\s*17,\s*20,\s*0\.92\)/)
+    expect(tokensCss).toMatch(/--ui-border-dark:\s*rgba\(255,\s*255,\s*255,\s*0\.06\)/)
+  })
 })

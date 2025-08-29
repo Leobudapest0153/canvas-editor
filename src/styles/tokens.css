@@ -2,9 +2,9 @@
 
 :root {
   --ui-bg: rgba(255, 255, 255, 0.92);
-  --ui-bg-dark: rgba(20, 20, 22, 0.92);
+  --ui-bg-dark: rgba(15, 17, 20, 0.92);
   --ui-border: rgba(0, 0, 0, 0.08);
-  --ui-border-dark: rgba(255, 255, 255, 0.08);
+  --ui-border-dark: rgba(255, 255, 255, 0.06);
   --ui-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   --ui-radius: 16px;
   --btn-size: 40px;
@@ -13,6 +13,12 @@
   --danger: #ef4444;
   --warning: #f59e0b;
   --muted: #64748b;
+}
+
+@media (max-width: 480px) {
+  :root {
+    --btn-size: 36px;
+  }
 }
 
 /* Dark mode overrides */

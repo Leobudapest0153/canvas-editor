@@ -1,7 +1,8 @@
 <!-- components/FloatingToolbar.vue -->
 <template>
   <div
-    class="fixed bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-[var(--gap)] px-2 py-2 ui-surface"
+    class="fixed left-1/2 -translate-x-1/2 z-30 flex items-center gap-[var(--gap)] px-2 py-2 ui-surface text-slate-200 bottom-[max(1.25rem,env(safe-area-inset-bottom))] sm:bottom-[max(1.5rem,env(safe-area-inset-bottom))]"
+    :class="{ 'translate-y-20': avoidOverlap }"
     role="toolbar"
     aria-label="Toolbar de lienzo"
   >
@@ -17,9 +18,11 @@
         aria-hidden="true"
       ></div>
       <UiIconButton
+        class="text-slate-200 hover:bg-black/5 dark:hover:bg-white/5"
         @click.stop="$emit('set-mode', 'drag')"
         :state="activeMode === 'drag' ? 'on' : 'off'"
         aria-label="Modo mano (mover lienzo)"
+        :aria-pressed="activeMode === 'drag' ? 'true' : 'false'"
       >
         <!-- Icono Mano -->
         <svg viewBox="0 0 24 24" class="h-5 w-5 pointer-events-none" :class="{ '!text-white': activeMode === 'drag' }" fill="currentColor" aria-hidden="true">
@@ -27,9 +30,11 @@
         </svg>
       </UiIconButton>
       <UiIconButton
+        class="text-slate-200 hover:bg-black/5 dark:hover:bg-white/5"
         @click.stop="$emit('set-mode', 'edit')"
         :state="activeMode === 'edit' ? 'on' : 'off'"
         aria-label="Modo edición"
+        :aria-pressed="activeMode === 'edit' ? 'true' : 'false'"
       >
         <!-- Icono Cursor -->
         <svg viewBox="0 0 24 24" class="h-5 w-5 pointer-events-none" :class="{ '!text-white': activeMode === 'edit' }" fill="currentColor" aria-hidden="true">
@@ -40,6 +45,7 @@
 
     <!-- Snapping -->
     <UiIconButton
+      class="text-slate-200 hover:bg-black/5 dark:hover:bg-white/5"
       @click.stop="$emit('toggle-snapping')"
       :state="isSnappingEnabled ? 'on' : 'off'"
       :aria-label="'Alternar snapping'"
@@ -49,14 +55,21 @@
       <svg viewBox="0 0 24 24" class="h-5 w-5 pointer-events-none" fill="currentColor" aria-hidden="true">
         <path d="M7 3h3v4H7a3 3 0 0 0-3 3v6a4 4 0 0 0 4 4h1v-3H8a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h2V7h4v2h2a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-1v3h1a4 4 0 0 0 4-4v-6a3 3 0 0 0-3-3h-3V3H7z" />
       </svg>
+      <span
+        v-if="isSnappingEnabled && isSnapping"
+        class="absolute top-1 right-1 h-2 w-2 rounded-full bg-[var(--primary)] animate-pulse"
+      ></span>
     </UiIconButton>
 
     <!-- Lock / Unlock -->
     <UiIconButton
       v-if="isElementSelected"
+      class="text-slate-200 hover:bg-black/5 dark:hover:bg-white/5"
       @click.stop="$emit('toggle-lock')"
       :state="isElementLocked ? 'on' : 'off'"
       :aria-label="isElementLocked ? 'Desbloquear elemento' : 'Bloquear elemento'"
+      :aria-pressed="isElementLocked ? 'true' : 'false'"
+      :class="{ 'text-amber-600 dark:text-amber-400': isElementLocked }"
     >
       <!-- Icono candado -->
       <svg v-if="isElementLocked" viewBox="0 0 24 24" class="h-5 w-5 pointer-events-none" fill="currentColor" aria-hidden="true">
@@ -70,6 +83,7 @@
     <!-- Fill container -->
     <UiIconButton
       v-if="isContainer && isElementSelected"
+      class="text-slate-200 hover:bg-black/5 dark:hover:bg-white/5"
       @click.stop="$emit('fill-container')"
       state="off"
       aria-label="Llenar contenedor"
@@ -90,6 +104,8 @@ defineProps({
   isElementLocked: { type: Boolean, default: false },
   isContainer: { type: Boolean, default: false },
   isSnappingEnabled: { type: Boolean, default: true },
+  isSnapping: { type: Boolean, default: false },
+  avoidOverlap: { type: Boolean, default: false },
 })
 
 defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'fill-container'])
