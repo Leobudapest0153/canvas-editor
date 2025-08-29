@@ -1915,14 +1915,6 @@ const createElementFromDrop = (data, dropEvent) => {
     categoria: elemento.categoria, // Mantener también la categoría
     nombre: elemento.nombre || 'Nuevo elemento',
 
-    // Estructura correcta para posición
-    posicion: {
-      x: finalPosition.x,
-      y: finalPosition.y,
-      z: 0,
-      rotation: 0,
-    },
-
     // Estructura correcta para dimensiones (preservar todas las dimensiones independientemente de la vista)
     dimensiones: {
       ancho: anchoCm,
@@ -1952,15 +1944,7 @@ const createElementFromDrop = (data, dropEvent) => {
     // Copiar contenedores del elemento original si los tiene
     contenedores: elemento.contenedores ? [...elemento.contenedores] : [],
 
-    hijos: [],
-    metadata: {
-      pesoMaximo: elemento.pesoMaximo || 'N/A',
-      ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
-      descripcion: elemento.descripcion || '',
-      material: elemento.material || 'Estándar',
-      capacidad: elemento.capacidad || 'Variable',
-      personalizado: elemento.personalizado || false,
-    },
+    hijos: []
   }
 
   console.log('✅ Creando elemento desde drop en posición válida:', nuevoElemento)
