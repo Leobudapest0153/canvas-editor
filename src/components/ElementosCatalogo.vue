@@ -63,7 +63,7 @@
         </div>
 
         <!-- Filtro por categoría (select) -->
-        <div>
+        <div v-if="!esModoRoot">
           <label for="filtroCategoria" class="sr-only">Categoría</label>
           <select
             id="filtroCategoria"
@@ -214,10 +214,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useCanvasStore } from '@/composables/useCanvasStore'
+import { ref, computed, watch } from 'vue'
+import { useCatalogStore } from '@/stores/catalog'
 import {
-  ELEMENTOS_PREDEFINIDOS,
   TODAS_LAS_CATEGORIAS,
   TIPOS_ENTIDAD,
   getColorPorTipo,
@@ -227,14 +226,22 @@ import {
 
 import ElementEditor from './modals/ElementEditor.vue'
 
-// Store
-const canvasStore = useCanvasStore()
+// Stores
+const catalogStore = useCatalogStore()
 
 // Estado local
-const filtroTexto = ref('')
-const categoriaSeleccionada = ref(null)
+const filtroTexto = computed({
+  get: () => catalogStore.searchText,
+  set: (val) => (catalogStore.searchText = val),
+})
+const categoriaSeleccionada = computed({
+  get: () => catalogStore.selectedCategory,
+  set: (val) => (catalogStore.selectedCategory = val),
+})
 const mostrarModalCrear = ref(false)
-const elementosPersonalizados = ref([])
+const esModoRoot = computed(
+  () => catalogStore.catalogContext.mode === 'root',
+)
 
 // Formulario para nuevo elemento
 const nuevoElemento = ref({
@@ -255,81 +262,31 @@ const nuevoElemento = ref({
 
 // Computed: título dinámico según el contexto
 const tituloContextual = computed(() => {
-  const contexto = canvasStore.contextoActual.tipo
-
-  if (contexto === 'plantas') {
-    return 'Catálogo de Elementos'
-  } else if (contexto === 'elementos') {
-    return 'Catálogo de Contenedores'
-  } else if (contexto === 'contenedores') {
+  const mode = catalogStore.catalogContext.mode
+  if (mode === 'root') return 'Catálogo de Elementos'
+  if (mode === 'detail-element') return 'Catálogo de Contenedores'
+  if (mode === 'detail-container')
     return 'Catálogo (Elementos + Contenedores)'
-  }
-
   return 'Catálogo de Elementos'
 })
 
 // Computed: determina si se pueden crear elementos personalizados
 const puedeCrearElementosPersonalizados = computed(() => {
-  return true
-  // const contexto = canvasStore.contextoActual.tipo
-  // Solo permitir creación personalizada en plantas (elementos)
-  // Los contenedores son solo predefinidos
-  // return contexto === 'plantas'
+  return catalogStore.catalogContext.mode !== 'root'
 })
 
 // Computed: categorías disponibles según el contexto
 const categoriasDisponibles = computed(() => {
-  return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'elementos')
-  // const contexto = canvasStore.contextoActual.tipo
-  // if (contexto === 'plantas') {
-  //   // En plantas solo se pueden crear elementos
-  //   return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'elementos')
-  // } else if (contexto === 'elementos') {
-  //   // En elementos solo se pueden crear contenedores
-  //   return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'contenedores')
-  // } else if (contexto === 'contenedores') {
-  //   // En contenedores se pueden crear elementos Y contenedores
-  //   return TODAS_LAS_CATEGORIAS.filter(
-  //     (cat) => cat.tipo === 'elementos' || cat.tipo === 'contenedores',
-  //   )
-  // }
-
-  // return TODAS_LAS_CATEGORIAS
+  const allowed = catalogStore.allowedTypesForContext(
+    catalogStore.catalogContext,
+  )
+  return TODAS_LAS_CATEGORIAS.filter((cat) => allowed.includes(cat.tipo))
 })
 
 // Computed: elementos filtrados según contexto y filtros
-const elementosFiltrados = computed(() => {
-  let elementos = [...ELEMENTOS_PREDEFINIDOS, ...elementosPersonalizados.value]
-
-  // Filtrar por contexto (solo mostrar elementos apropiados)
-  const contexto = canvasStore.contextoActual.tipo
-  if (contexto === 'plantas') {
-    elementos = elementos.filter((el) => el.tipo === 'elementos')
-  } else if (contexto === 'elementos') {
-    elementos = elementos.filter((el) => el.tipo === 'contenedores')
-  } else if (contexto === 'contenedores') {
-    // Los contenedores pueden contener elementos Y otros contenedores
-    elementos = elementos.filter((el) => el.tipo === 'elementos' || el.tipo === 'contenedores')
-  }
-
-  // Filtrar por texto
-  if (filtroTexto.value) {
-    const texto = filtroTexto.value.toLowerCase()
-    elementos = elementos.filter(
-      (elemento) =>
-        elemento.nombre.toLowerCase().includes(texto) ||
-        elemento.descripcion.toLowerCase().includes(texto) ||
-        elemento.categoria.includes(texto),
-    )
-  }
-
-  // Filtrar por categoría
-  if (categoriaSeleccionada.value) {
-    elementos = elementos.filter((elemento) => elemento.categoria === categoriaSeleccionada.value)
-  }
-
-  return elementos
-})
+const elementosFiltrados = computed(
+  () => catalogStore.filteredCatalogItems,
+)
 
 const onGuardarElemento = (elemento) => {
   const elementoNuevo = {
@@ -340,7 +297,7 @@ const onGuardarElemento = (elemento) => {
     // Asegurar que tenga la propiedad tipo basada en la categoría
     tipo: elemento.categoria === 'contenedores' ? 'contenedores' : 'elementos',
   }
-  elementosPersonalizados.value.push(elementoNuevo)
+  catalogStore.addCustomItem(elementoNuevo)
   cerrarModal()
   categoriaSeleccionada.value = elementoNuevo.categoria
   filtroTexto.value = ''
@@ -417,37 +374,10 @@ const cerrarModal = () => {
   mostrarModalCrear.value = false
   // El formulario se resetea automáticamente al abrir el modal
 }
-
-// Cargar elementos personalizados del localStorage
-onMounted(() => {
-  const elementosGuardados = localStorage.getItem('elementos-personalizados')
-  if (elementosGuardados) {
-    try {
-      elementosPersonalizados.value = JSON.parse(elementosGuardados)
-    } catch (error) {
-      console.error('Error cargando elementos personalizados:', error)
-    }
-  }
-})
-
-// Guardar elementos personalizados en localStorage
-const guardarElementosPersonalizados = () => {
-  localStorage.setItem('elementos-personalizados', JSON.stringify(elementosPersonalizados.value))
-}
-
-// Observar cambios en elementos personalizados para guardar
-watch(
-  () => elementosPersonalizados.value,
-  () => {
-    guardarElementosPersonalizados()
-  },
-  { deep: true },
-)
-
 // Observar cambios en el contexto para verificar validez del filtro de categoría
 watch(
-  () => canvasStore.contextoActual.tipo,
-  (_nuevoContexto) => {
+  () => catalogStore.catalogContext.mode,
+  () => {
     categoriaSeleccionada.value = null
   }
 )

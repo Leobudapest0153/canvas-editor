@@ -17,6 +17,14 @@ export const JERARQUIA_PERMITIDA = {
   contenedores: ['elementos', 'contenedores'], // Los contenedores pueden contener elementos Y otros contenedores
 }
 
+export const CATALOGO = {
+  SISTEMA_BASE_KEYS: [
+    'anaquel_metalico_grande',
+    'estante_pared_pequeno',
+    'armario_pared_alto',
+  ],
+}
+
 export const ELEMENTOS_PREDEFINIDOS = [
   // === ELEMENTOS (solo pueden ir en plantas) ===
 
@@ -37,6 +45,10 @@ export const ELEMENTOS_PREDEFINIDOS = [
     ubicacion: 'suelo',
     descripcion: 'Anaquel metálico de alta capacidad para almacenamiento pesado',
     icono: 'rack',
+    props: {
+      system: true,
+      catalogVisible: true,
+    },
   },
 
   // Estante de pared
@@ -57,6 +69,10 @@ export const ELEMENTOS_PREDEFINIDOS = [
     alturaRespectoAlSuelo: 150, // cm - altura típica para estantes de pared
     descripcion: 'Estante montado en pared para almacenamiento ligero',
     icono: 'shelf',
+    props: {
+      system: true,
+      catalogVisible: true,
+    },
   },
 
   // Armario de pared
@@ -77,6 +93,10 @@ export const ELEMENTOS_PREDEFINIDOS = [
     alturaRespectoAlSuelo: 50, // cm - altura moderada para armarios
     descripcion: 'Armario montado en pared para almacenamiento vertical',
     icono: 'cabinet',
+    props: {
+      system: true,
+      catalogVisible: true,
+    },
   },
 
   // === CONTENEDORES (solo pueden ir en elementos) ===
@@ -98,6 +118,10 @@ export const ELEMENTOS_PREDEFINIDOS = [
     ubicacion: 'interior',
     descripcion: 'Contenedor básico para almacenamiento organizado (redimensionable)',
     icono: 'box',
+    props: {
+      system: true,
+      catalogVisible: true,
+    },
   },
 ]
 
