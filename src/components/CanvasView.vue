@@ -1307,7 +1307,7 @@ const updateElementPosition = (e, elementId, forma = 'rectangular') => {
   // Aplicar object snapping solo si está habilitado y hay movimiento activo
   if (isSnappingEnabled.value && isElementDragging.value) {
     const otherElements = canvasStore.elementosVisibles.filter(el => el.id !== elementId)
-    const snapResult = performSnap(elemento, x, y, otherElements)
+  const snapResult = performSnap(elemento, x, y, otherElements, { width: layerConfig.value.width, height: layerConfig.value.height })
 
     // Usar la posición ajustada por snapping
     x = snapResult.x
@@ -2022,7 +2022,7 @@ const onShapeDragMove = (e, el) => {
         }
 
         // Aplicar snapping
-        const snapResult = performSnap(el, elementX, elementY, otherElements)
+  const snapResult = performSnap(el, elementX, elementY, otherElements, { width: layerConfig.value.width, height: layerConfig.value.height })
 
         // Convertir de vuelta a coordenadas del shape
         if (el.forma === 'circular') {

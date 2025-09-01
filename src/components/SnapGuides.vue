@@ -25,7 +25,7 @@
       :key="`v-main-${guide.x}-${guide.y1}-${guide.y2}`"
       :config="{
         points: [guide.x, guide.y1, guide.x, guide.y2],
-        stroke: guideColor,
+        stroke: guide.otherElementId === '__page__' ? '#ef4444' : guideColor,
         strokeWidth: guideStrokeWidth / zoom,
         opacity: guideOpacity,
         listening: false,
@@ -52,7 +52,7 @@
       :key="`h-main-${guide.y}-${guide.x1}-${guide.x2}`"
       :config="{
         points: [guide.x1, guide.y, guide.x2, guide.y],
-        stroke: guideColor,
+        stroke: guide.otherElementId === '__page__' ? '#ef4444' : guideColor,
         strokeWidth: guideStrokeWidth / zoom,
         opacity: guideOpacity,
         listening: false,
@@ -65,16 +65,19 @@
       <v-circle
         v-for="intersection in intersections"
         :key="`intersection-${intersection.x}-${intersection.y}`"
-        :config="{
-          x: intersection.x,
-          y: intersection.y,
-          radius: intersectionRadius / zoom,
-          fill: intersectionColor,
-          stroke: intersectionStrokeColor,
-          strokeWidth: intersectionStrokeWidth / zoom,
-          opacity: intersectionOpacity,
-          listening: false,
-        }"
+        :config="(() => {
+          const isPageIntersection = intersection.vGuide.otherElementId === '__page__' && intersection.hGuide.otherElementId === '__page__'
+          return {
+            x: intersection.x,
+            y: intersection.y,
+            radius: intersectionRadius / zoom,
+            fill: isPageIntersection ? '#ef4444' : intersectionColor,
+            stroke: isPageIntersection ? '#7f1d1d' : intersectionStrokeColor,
+            strokeWidth: intersectionStrokeWidth / zoom,
+            opacity: intersectionOpacity,
+            listening: false,
+          }
+        })()"
       />
     </template>
   </v-group>
