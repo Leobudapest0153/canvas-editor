@@ -16,7 +16,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX, DIMENSIONS, CATALOGO } from '@/utils/constants'
+import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/utils/dimensionPolicy'
 import { useAutoSave } from '@/composables/useAutoSave'
 import {
@@ -790,6 +790,12 @@ export const useCanvasStore = defineStore('canvas', () => {
             if (!dims) continue
             // Persistir nuevas dimensiones; width/height se recalculan según vista en actualizarElemento
             actualizarElemento(el.id, { dimensiones: dims }, true, `Auto-resize por cambio de planta: ${el.nombre || el.id}`)
+            // Offset vertical configurable (por tipo) — solo si aplica
+            const off = OFFSETS?.offsetByType?.[typeKey]?.zOffsetShare
+            if (typeof off === 'number' && isFinite(off)) {
+              const zBase = Math.round((planta.dimensiones.alto || 0) * off)
+              actualizarElemento(el.id, { alturaRespectoAlSuelo: zBase })
+            }
           }
         }
       } catch (e) {
@@ -960,6 +966,11 @@ export const useCanvasStore = defineStore('canvas', () => {
               const { width, height } = toCanvasSizePx(dims, 'XY')
               if (Number.isFinite(width)) nuevoElemento.width = width
               if (Number.isFinite(height)) nuevoElemento.height = height
+            }
+            // Offset vertical configurable (por tipo)
+            const off = OFFSETS?.offsetByType?.[typeKey]?.zOffsetShare
+            if (typeof off === 'number' && isFinite(off)) {
+              nuevoElemento.alturaRespectoAlSuelo = Math.round((planta.dimensiones.alto || 0) * off)
             }
           }
         }

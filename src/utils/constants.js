@@ -245,7 +245,8 @@ export const DIMENSIONS = {
   axisScaleByType: {
     // Elementos de sistema por defecto
     anaquel_metalico_grande: { x: 0.2, y: 0.2, z: 0.2 },
-    estante_pared_pequeno: { x: 0.2, y: 0.2, z: 0.2 },
+    // Estante de pared: w=20% ancho, d=10% largo (profundidad), h=20% alto
+    estante_pared_pequeno: { x: 0.2, y: 0.1, z: 0.2 },
     barril_basico: { x: 0.2, y: 0.2, z: 0.2 },
   },
   // Límites por tipo
@@ -257,6 +258,14 @@ export const DIMENSIONS = {
   autoResizeOnParentChange: true,
   // Reusar conversión de cm→px existente
   gridPxPerCm: CM_TO_PX,
+}
+
+// Offset configurable por tipo (porcentaje de altura de planta desde el suelo)
+export const OFFSETS = {
+  offsetByType: {
+    // Estante de pared al 50% de la altura de la planta
+    estante_pared_pequeno: { zOffsetShare: 0.5 },
+  },
 }
 
 // (Opcional) Política de peso — OFF por defecto

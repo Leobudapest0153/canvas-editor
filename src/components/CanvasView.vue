@@ -666,7 +666,7 @@ import {
 import { clampRectToPolygon, pointInPolygon, clampPointToPolygon } from '@/utils/polygonBounds'
 import { handleCanvasHotkeys } from '@/utils/canvasHotkeys'
 import { polygonInset } from '@/utils/polygonInset'
-import { GRID_SIZE, CM_TO_PX, DIMENSIONS, CATALOGO } from '@/utils/constants'
+import { GRID_SIZE, CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/utils/dimensionPolicy'
 import { getActiveBounds } from '@/utils/activeBounds'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
@@ -1759,6 +1759,14 @@ const createElementFromDrop = (data, dropEvent) => {
         const sizePx = toCanvasSizePx(dims, 'XY')
         width = sizePx.width
         height = sizePx.height
+      }
+      // Offset vertical para estante de pared (altura desde el suelo)
+      const off = OFFSETS?.offsetByType?.[elemento.id]?.zOffsetShare
+      if (typeof off === 'number' && isFinite(off)) {
+        // Redondear a cm enteros
+        const zBase = Math.round((planta.dimensiones.alto || 0) * off)
+        // Usar en la instancia recién creada
+        elemento.alturaRespectoAlSuelo = zBase
       }
     }
   }
