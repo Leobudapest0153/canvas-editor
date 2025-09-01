@@ -12,50 +12,30 @@
           <div class="mt-3 space-y-3">
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
-              <input
-                v-model="edited.nombre"
-                type="text"
+              <input v-model="edited.nombre" type="text"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Nombre del elemento"
-                :disabled="isSaving"
-              />
+                placeholder="Nombre del elemento" :disabled="isSaving" />
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-                <input
-                  :value="getTipoNombre(elementoSeleccionado.tipo)"
-                  type="text"
-                  disabled
-                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed"
-                />
+                <input :value="getTipoNombre(elementoSeleccionado.tipo)" type="text" disabled
+                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed" />
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Categoría</label>
-                <input
-                  :value="getCategoriaDisplay(elementoSeleccionado.categoria)"
-                  type="text"
-                  disabled
-                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed capitalize"
-                />
+                <input :value="getCategoriaDisplay(elementoSeleccionado.categoria)" type="text" disabled
+                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed capitalize" />
               </div>
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Color</label>
               <div class="flex items-center gap-3">
-                <input
-                  v-model="edited.color"
-                  type="color"
-                  class="!w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
-                  :disabled="isSaving"
-                />
-                <input
-                  v-model="edited.color"
-                  type="text"
+                <input v-model="edited.color" type="color"
+                  class="!w-12 h-10 border border-gray-300 rounded-lg cursor-pointer" :disabled="isSaving" />
+                <input v-model="edited.color" type="text"
                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="#3B82F6"
-                  :disabled="isSaving"
-                />
+                  placeholder="#3B82F6" :disabled="isSaving" />
               </div>
             </div>
           </div>
@@ -65,32 +45,25 @@
         <details v-if="mostrarDimensiones" open class="bg-gray-50 rounded-lg p-4">
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">Dimensiones (cm)</summary>
           <div class="mt-3 space-y-3">
+            <!-- Para formas no circulares, mostrar ancho/largo -->
             <div v-if="!ocultarAnchoLargo" class="grid grid-cols-2 gap-3">
               <div>
                 <label class="text-sm text-gray-500">Ancho</label>
                 <div class="flex items-center">
-                  <input
-                    type="number"
-                    min="0"
-                    v-model.number="edited.dimensiones.ancho"
+                  <input type="number" min="0" v-model.number="edited.dimensiones.ancho"
                     @change="validarDimension('ancho')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    :disabled="isSaving"
-                  />
+                    :disabled="isSaving" />
                   <span class="ml-1 text-sm text-gray-500">cm</span>
                 </div>
               </div>
               <div>
                 <label class="text-sm text-gray-500">Largo</label>
                 <div class="flex items-center">
-                  <input
-                    type="number"
-                    min="0"
-                    v-model.number="edited.dimensiones.largo"
+                  <input type="number" min="0" v-model.number="edited.dimensiones.largo"
                     @change="validarDimension('largo')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    :disabled="isSaving"
-                  />
+                    :disabled="isSaving" />
                   <span class="ml-1 text-sm text-gray-500">cm</span>
                 </div>
               </div>
@@ -98,16 +71,25 @@
             <div>
               <label class="text-sm text-gray-500">Alto</label>
               <div class="flex items-center">
-                <input
-                  type="number"
-                  min="0"
-                    v-model.number="edited.dimensiones.alto"
-                    @change="validarDimension('alto')"
-                    class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    :disabled="isSaving"
-                  />
+                <input type="number" min="0" v-model.number="edited.dimensiones.alto" @change="validarDimension('alto')"
+                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  :disabled="isSaving" />
                 <span class="ml-1 text-sm text-gray-500">cm</span>
               </div>
+            </div>
+            <!-- Diámetro para circulares -->
+            <div v-if="esCircular">
+              <label class="text-sm text-gray-500">Diámetro</label>
+              <div class="flex items-center">
+                <input type="number" min="1" step="1" :max="maxDiametroPlanta" v-model.number="edited.diametroCm"
+                  @change="validarDiametro"
+                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  :disabled="isSaving" />
+                <span class="ml-1 text-sm text-gray-500">cm</span>
+              </div>
+              <p v-if="advertenciaDiametroLimite" class="text-xs text-amber-600">{{ advertenciaDiametroLimite }}</p>
+              <p v-if="advertenciaDiametroContencion" class="text-xs text-amber-600">{{ advertenciaDiametroContencion }}
+              </p>
             </div>
             <p v-if="advertenciaAltura" class="text-xs text-amber-600">{{ advertenciaAltura }}</p>
           </div>
@@ -120,15 +102,10 @@
             <div>
               <label class="text-sm text-gray-500">Altura sobre el suelo</label>
               <div class="flex items-center">
-                <input
-                  type="number"
-                  :min="0"
-                  :max="maxAlturaSobreSuelo"
-                  v-model.number="edited.alturaSobreSueloCm"
+                <input type="number" :min="0" :max="maxAlturaSobreSuelo" v-model.number="edited.alturaSobreSueloCm"
                   @change="validarAlturaSobreSuelo"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  :disabled="isSaving || !esPared"
-                />
+                  :disabled="isSaving || !esPared" />
                 <span class="ml-1 text-sm text-gray-500">cm</span>
               </div>
               <p v-if="advertenciaZBase" class="text-xs text-amber-600">{{ advertenciaZBase }}</p>
@@ -143,25 +120,17 @@
             <div>
               <label class="text-sm text-gray-500">Capacidad de carga</label>
               <div class="flex items-center">
-                <input
-                  type="number"
-                  min="0"
-                  v-model.number="edited.pesoMaximo"
-                  @change="validarPeso"
+                <input type="number" min="0" v-model.number="edited.pesoMaximo" @change="validarPeso"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  :disabled="isSaving"
-                />
+                  :disabled="isSaving" />
                 <span class="ml-1 text-sm text-gray-500">kg</span>
               </div>
             </div>
             <div v-if="volumen !== null">
               <label class="text-sm text-gray-500">Volumen</label>
               <div class="flex items-center">
-                <input
-                  :value="volumen"
-                  disabled
-                  class="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-500"
-                />
+                <input :value="volumen" disabled
+                  class="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-500" />
                 <span class="ml-1 text-sm text-gray-500">m³</span>
               </div>
             </div>
@@ -174,23 +143,16 @@
       <div v-if="isDirty" class="space-x-2 mb-3 flex justify-end">
         <button
           class="px-3 py-1 border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-          @click="revertir"
-          :disabled="isSaving"
-        >
+          @click="revertir" :disabled="isSaving">
           Revertir
         </button>
-        <button
-          class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:opacity-50"
-          @click="guardar"
-          :disabled="guardarDeshabilitado"
-        >
+        <button class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:opacity-50"
+          @click="guardar" :disabled="guardarDeshabilitado">
           Guardar
         </button>
       </div>
-      <button
-        @click="deseleccionarElemento"
-        class="w-full cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
-      >
+      <button @click="deseleccionarElemento"
+        class="w-full cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm">
         Deseleccionar
       </button>
     </div>
@@ -228,6 +190,9 @@ const cargarDesdeStore = (el) => deepClone({
   alturaSobreSueloCm: el.alturaSobreSueloCm != null
     ? Number(el.alturaSobreSueloCm)
     : (el.alturaRespectoAlSuelo != null ? Number(el.alturaRespectoAlSuelo) : 0),
+  diametroCm: (el.forma === 'circular')
+    ? Number(el.dimensiones?.ancho ?? el.dimensiones?.largo ?? 0)
+    : 0,
 })
 
 watch(() => elementoSeleccionado.value?.id, (id) => {
@@ -245,7 +210,13 @@ const isDirty = computed(() => {
   return !deepEqual(edited.value, snapshotOriginal.value)
 })
 
-const guardarDeshabilitado = computed(() => isSaving.value || !!advertenciaAltura.value || !!advertenciaZBase.value)
+const guardarDeshabilitado = computed(() =>
+  isSaving.value ||
+  !!advertenciaAltura.value ||
+  !!advertenciaZBase.value ||
+  !!advertenciaDiametroLimite.value ||
+  !!advertenciaDiametroContencion.value,
+)
 
 const revertir = () => {
   edited.value = deepClone(snapshotOriginal.value)
@@ -274,18 +245,34 @@ const guardar = async () => {
       patch.posicion = { ...(elementoSeleccionado.value?.posicion || {}), y: yTopPx }
     }
   }
+
+  // Si es circular, normalizar dimensiones con el diámetro y sincronizar px
+  if (esCircular.value) {
+    const d = Number(edited.value?.diametroCm) || 0
+    if (!patch.dimensiones) patch.dimensiones = {}
+    patch.dimensiones.ancho = d
+    patch.dimensiones.largo = d
+    // No contaminar el store con la propiedad auxiliar
+    delete patch.diametroCm
+  }
+  const diamChanged = esCircular.value && (snapshotOriginal.value?.diametroCm !== edited.value?.diametroCm)
   const ok = await canvasStore.updateElementById(elementoSeleccionado.value.id, patch)
   if (ok) {
     snapshotOriginal.value = deepClone(edited.value)
-    showSuccess('Cambios guardados')
+    showSuccess(diamChanged ? 'Diámetro actualizado' : 'Cambios guardados')
   }
   isSaving.value = false
 }
 
 const validarDimension = (prop) => {
   const val = Number(edited.value.dimensiones[prop])
+  const max = alturaPlanta.value
+
   if (isNaN(val) || val < 0) {
     showWarning('El valor debe ser mayor o igual a 0')
+    edited.value.dimensiones[prop] = snapshotOriginal.value.dimensiones[prop]
+  } else if (val > max) {
+    showWarning(`La altura no debe superar ${max} cm`)
     edited.value.dimensiones[prop] = snapshotOriginal.value.dimensiones[prop]
   }
 }
@@ -331,7 +318,8 @@ const esCajaOPallet = computed(() => {
 
 const mostrarCapacidad = computed(() => esAnaquelOEstante.value || esContenedorBarril.value || esCajaOPallet.value)
 const mostrarDimensiones = computed(() => true)
-const ocultarAnchoLargo = computed(() => esContenedorBarril.value && elementoSeleccionado.value?.forma === 'circular')
+const esCircular = computed(() => (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circular' || (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circle')
+const ocultarAnchoLargo = computed(() => esCircular.value)
 
 const volumen = computed(() => {
   if (!esContenedorBarril.value) return null
@@ -351,6 +339,48 @@ const advertenciaAltura = computed(() => {
   const actual = edited.value?.dimensiones?.alto || 0
   return actual > max ? `La altura no debe superar ${max} cm` : null
 })
+
+// ===== Validaciones para círculo (diametro y contención) =====
+const plantaDims = computed(() => {
+  const p = canvasStore.plantaPorId(canvasStore.plantaActiva)
+  return {
+    ancho: Number(p?.dimensiones?.ancho || 0),
+    largo: Number(p?.dimensiones?.largo || 0),
+  }
+})
+
+const maxDiametroPlanta = computed(() => Math.min(plantaDims.value.ancho, plantaDims.value.largo))
+
+const advertenciaDiametroLimite = computed(() => {
+  if (!esCircular.value) return null
+  const d = Number(edited.value?.diametroCm)
+  if (!Number.isFinite(d) || d <= 0) return 'El diámetro debe ser mayor a 0.'
+  if (d > maxDiametroPlanta.value) return 'El diámetro excede las dimensiones de la planta.'
+  return null
+})
+
+const advertenciaDiametroContencion = computed(() => {
+  if (!esCircular.value) return null
+  const d = Number(edited.value?.diametroCm)
+  if (!Number.isFinite(d) || d <= 0) return null
+  // Top-left como ancla según el modelo
+  const xPx = Number(elementoSeleccionado.value?.x || 0)
+  const yPx = Number(elementoSeleccionado.value?.y || 0)
+  const xCm = xPx / (CM_TO_PX || 10)
+  const yCm = yPx / (CM_TO_PX || 10)
+  if (xCm < 0 || yCm < 0) return 'El círculo se sale del área de trabajo con el diámetro actual.'
+  if (xCm + d > plantaDims.value.ancho || yCm + d > plantaDims.value.largo) return 'El círculo se sale del área de trabajo con el diámetro actual.'
+  return null
+})
+
+const validarDiametro = () => {
+  if (!esCircular.value) return
+  const d = Number(edited.value?.diametroCm)
+  if (!Number.isFinite(d) || d < 1) {
+    showWarning('El diámetro debe ser mayor o igual a 1 cm')
+    edited.value.diametroCm = snapshotOriginal.value.diametroCm
+  }
+}
 
 const maxAlturaSobreSuelo = computed(() => {
   const techo = Number(alturaPlanta.value) || 0
