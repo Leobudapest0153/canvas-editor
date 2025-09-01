@@ -102,6 +102,7 @@
     <UiIconButton
       v-if="isElementSelected"
       class="hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
+      aria-label="Eliminar elemento"
       @click.stop="$emit('delete')"
     >
       <svg 
