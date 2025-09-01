@@ -1,10 +1,13 @@
 // filepath: c:\xampp\htdocs\proyectos-inventario\dv-canvas-editor\src\composables\useConfirmDialog.js
-import { ref, computed } from 'vue'
+import { ref, computed, reactive } from 'vue'
 
 // Estado único (singleton)
 const isOpen = ref(false)
 const isMounted = ref(false)
 const title = ref('Confirmación')
+const background = ref(null);
+const color = ref(null);
+const border = ref(null);
 const message = ref('')
 const confirmLabel = ref('Confirmar')
 const cancelLabel = ref('Cancelar')
@@ -16,7 +19,10 @@ export const useConfirmDialog = () => {
     message.value = opts.message || ''
     confirmLabel.value = opts.confirmLabel || 'Confirmar'
     cancelLabel.value = opts.cancelLabel || 'Cancelar'
-    isOpen.value = true
+    isOpen.value = true;
+    background.value = opts.background || '#EF4444';
+    color.value = opts.color || '#FFF';
+    border.value = opts.border || '#FECACA';
   }
 
   const close = () => {
@@ -60,6 +66,9 @@ export const useConfirmDialog = () => {
     message,
     confirmLabel,
     cancelLabel,
+    background,
+    color,
+    border,
 
     // acciones
     open,

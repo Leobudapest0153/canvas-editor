@@ -511,7 +511,7 @@ const onDimChange = () => {
     if (res.status === 'block') {
       preview.value = {
         status: 'block',
-        message: 'elementos no caben con las nuevas dimensiones',
+        message: 'No hay suficiente espacio con las nuevas dimensiones. Ajusta el tamaño o mueve elementos.',
         placements: [],
       }
     } else if (res.status === 'auto_adjust') {
