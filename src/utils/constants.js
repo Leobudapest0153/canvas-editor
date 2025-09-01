@@ -10,6 +10,14 @@ export const TIPOS_ENTIDAD = [
   { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', icono: '🗃️' },
 ]
 
+export const CATALOGO = {
+  SISTEMA_BASE_KEYS: [
+    'anaquel_metalico_grande',
+    'estante_pared_pequeno',
+    'barril_plastico_200l',
+  ],
+}
+
 // === REGLAS DE JERARQUÍA ===
 export const JERARQUIA_PERMITIDA = {
   plantas: ['elementos'], // Las plantas pueden contener elementos
@@ -37,6 +45,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     ubicacion: 'suelo',
     descripcion: 'Anaquel metálico de alta capacidad para almacenamiento pesado',
     icono: 'rack',
+    props: { system: true },
   },
 
   // Estante de pared
@@ -57,6 +66,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     alturaRespectoAlSuelo: 150, // cm - altura típica para estantes de pared
     descripcion: 'Estante montado en pared para almacenamiento ligero',
     icono: 'shelf',
+    props: { system: true },
   },
 
   // Armario de pared
@@ -77,6 +87,27 @@ export const ELEMENTOS_PREDEFINIDOS = [
     alturaRespectoAlSuelo: 50, // cm - altura moderada para armarios
     descripcion: 'Armario montado en pared para almacenamiento vertical',
     icono: 'cabinet',
+    props: { system: true },
+  },
+
+  // Barril
+  {
+    id: 'barril_plastico_200l',
+    nombre: 'Barril 200L',
+    tipo: 'elementos',
+    categoria: 'barriles',
+    forma: 'circular',
+    colorBase: '#f97316',
+    dimensiones: {
+      ancho: 60,
+      largo: 60,
+      alto: 90,
+    },
+    pesoMaximo: 200,
+    ubicacion: 'suelo',
+    descripcion: 'Barril plástico de 200 litros',
+    icono: 'box',
+    props: { system: true },
   },
 
   // === CONTENEDORES (solo pueden ir en elementos) ===
@@ -98,6 +129,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     ubicacion: 'interior',
     descripcion: 'Contenedor básico para almacenamiento organizado (redimensionable)',
     icono: 'box',
+    props: { system: true },
   },
 ]
 
@@ -107,6 +139,7 @@ export const CATEGORIAS_ELEMENTOS = [
   { id: 'estantes', nombre: 'Estantes', color: '#10b981', tipo: 'elementos' },
   { id: 'mesas', nombre: 'Mesas', color: '#f59e0b', tipo: 'elementos' },
   { id: 'armarios', nombre: 'Armarios', color: '#7c3aed', tipo: 'elementos' },
+  { id: 'barriles', nombre: 'Barriles', color: '#f97316', tipo: 'elementos' },
 ]
 
 export const CATEGORIAS_CONTENEDORES = [
@@ -119,6 +152,7 @@ export const CATEGORIAS = [
   { id: 'estantes', nombre: 'Estantes', color: '#10b981' },
   { id: 'mesas', nombre: 'Mesas', color: '#f59e0b' },
   { id: 'armarios', nombre: 'Armarios', color: '#7c3aed' },
+  { id: 'barriles', nombre: 'Barriles', color: '#f97316' },
   { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626' },
 ]
 

@@ -17,6 +17,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { CM_TO_PX } from '@/utils/constants'
+import { useCatalogStore } from '@/stores/catalog'
 import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
@@ -120,6 +121,22 @@ export const useCanvasStore = defineStore('canvas', () => {
     id: 'planta_1', // ID de la planta, elemento o contenedor actual
     path: [], // Array de objetos: [{ tipo: 'plantas', id: 'planta_1', nombre: 'Planta Baja' }]
   })
+
+  const catalogStore = useCatalogStore()
+
+  watch(
+    contextoNavegacion,
+    (ctx) => {
+      if (ctx.tipo === 'plantas') {
+        catalogStore.setContext({ mode: 'root', currentId: ctx.id, currentType: undefined })
+      } else if (ctx.tipo === 'elementos') {
+        catalogStore.setContext({ mode: 'detail-element', currentId: ctx.id, currentType: 'element' })
+      } else if (ctx.tipo === 'contenedores') {
+        catalogStore.setContext({ mode: 'detail-container', currentId: ctx.id, currentType: 'container' })
+      }
+    },
+    { immediate: true, deep: true },
+  )
 
   // Tamaño del canvas adaptativo según el contexto
   const canvasAdaptativo = ref({

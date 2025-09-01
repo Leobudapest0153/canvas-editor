@@ -20,7 +20,7 @@
       <div class="flex items-center justify-between mb-3">
         <h2 class="text-base font-semibold text-gray-800 m-0">{{ tituloContextual }}</h2>
         <button
-          v-if="puedeCrearElementosPersonalizados"
+          v-if="!esModoRaiz && puedeCrearElementosPersonalizados"
           @click="mostrarModalCrear = true"
           type="button"
           class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
@@ -42,7 +42,7 @@
         <!-- Barra de búsqueda -->
         <div class="relative">
           <input
-            v-model="filtroTexto"
+            v-model="catalogStore.searchText"
             type="text"
             placeholder="Buscar elementos..."
             class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100"
@@ -63,11 +63,11 @@
         </div>
 
         <!-- Filtro por categoría (select) -->
-        <div>
+        <div v-if="!esModoRaiz">
           <label for="filtroCategoria" class="sr-only">Categoría</label>
           <select
             id="filtroCategoria"
-            v-model="categoriaSeleccionada"
+            v-model="catalogStore.selectedCategory"
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100"
           >
             <option :value="null">Todas las categorías</option>
@@ -87,7 +87,7 @@
     <div class="elementos-lista flex-1 overflow-y-auto p-4">
       <div class="grid grid-cols-1 gap-3">
         <div
-          v-for="elemento in elementosFiltrados"
+          v-for="elemento in catalogStore.filteredCatalogItems"
           :key="elemento.id"
           :draggable="true"
           @dragstart="iniciarArrastre(elemento, $event)"
@@ -180,7 +180,7 @@
       </div>
 
       <!-- Mensaje cuando no hay elementos -->
-      <div v-if="elementosFiltrados.length === 0" class="text-center py-12">
+      <div v-if="catalogStore.filteredCatalogItems.length === 0" class="text-center py-12">
         <svg
           class="w-12 h-12 text-gray-300 mx-auto mb-4"
           fill="none"
@@ -215,9 +215,8 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useCanvasStore } from '@/composables/useCanvasStore'
+import { useCatalogStore } from '@/stores/catalog'
 import {
-  ELEMENTOS_PREDEFINIDOS,
   TODAS_LAS_CATEGORIAS,
   TIPOS_ENTIDAD,
   getColorPorTipo,
@@ -228,13 +227,10 @@ import {
 import ElementEditor from './modals/ElementEditor.vue'
 
 // Store
-const canvasStore = useCanvasStore()
+const catalogStore = useCatalogStore()
 
 // Estado local
-const filtroTexto = ref('')
-const categoriaSeleccionada = ref(null)
 const mostrarModalCrear = ref(false)
-const elementosPersonalizados = ref([])
 
 // Formulario para nuevo elemento
 const nuevoElemento = ref({
@@ -255,18 +251,20 @@ const nuevoElemento = ref({
 
 // Computed: título dinámico según el contexto
 const tituloContextual = computed(() => {
-  const contexto = canvasStore.contextoActual.tipo
-
-  if (contexto === 'plantas') {
+  const mode = catalogStore.catalogContext.mode
+  if (mode === 'root') {
     return 'Catálogo de Elementos'
-  } else if (contexto === 'elementos') {
+  }
+  if (mode === 'detail-element') {
     return 'Catálogo de Contenedores'
-  } else if (contexto === 'contenedores') {
+  }
+  if (mode === 'detail-container') {
     return 'Catálogo (Elementos + Contenedores)'
   }
-
   return 'Catálogo de Elementos'
 })
+
+const esModoRaiz = computed(() => catalogStore.catalogContext.mode === 'root')
 
 // Computed: determina si se pueden crear elementos personalizados
 const puedeCrearElementosPersonalizados = computed(() => {
@@ -298,38 +296,6 @@ const categoriasDisponibles = computed(() => {
 })
 
 // Computed: elementos filtrados según contexto y filtros
-const elementosFiltrados = computed(() => {
-  let elementos = [...ELEMENTOS_PREDEFINIDOS, ...elementosPersonalizados.value]
-
-  // Filtrar por contexto (solo mostrar elementos apropiados)
-  const contexto = canvasStore.contextoActual.tipo
-  if (contexto === 'plantas') {
-    elementos = elementos.filter((el) => el.tipo === 'elementos')
-  } else if (contexto === 'elementos') {
-    elementos = elementos.filter((el) => el.tipo === 'contenedores')
-  } else if (contexto === 'contenedores') {
-    // Los contenedores pueden contener elementos Y otros contenedores
-    elementos = elementos.filter((el) => el.tipo === 'elementos' || el.tipo === 'contenedores')
-  }
-
-  // Filtrar por texto
-  if (filtroTexto.value) {
-    const texto = filtroTexto.value.toLowerCase()
-    elementos = elementos.filter(
-      (elemento) =>
-        elemento.nombre.toLowerCase().includes(texto) ||
-        elemento.descripcion.toLowerCase().includes(texto) ||
-        elemento.categoria.includes(texto),
-    )
-  }
-
-  // Filtrar por categoría
-  if (categoriaSeleccionada.value) {
-    elementos = elementos.filter((elemento) => elemento.categoria === categoriaSeleccionada.value)
-  }
-
-  return elementos
-})
 
 const onGuardarElemento = (elemento) => {
   const elementoNuevo = {
@@ -340,10 +306,13 @@ const onGuardarElemento = (elemento) => {
     // Asegurar que tenga la propiedad tipo basada en la categoría
     tipo: elemento.categoria === 'contenedores' ? 'contenedores' : 'elementos',
   }
-  elementosPersonalizados.value.push(elementoNuevo)
+  catalogStore.addCustomItem({
+    ...elementoNuevo,
+    props: { system: true },
+  })
   cerrarModal()
-  categoriaSeleccionada.value = elementoNuevo.categoria
-  filtroTexto.value = ''
+  catalogStore.selectedCategory = elementoNuevo.categoria
+  catalogStore.searchText = ''
 }
 
 // Métodos
@@ -355,6 +324,11 @@ const getTipoNombre = (tipo) => {
 const getCategoriaName = (categoriaId) => {
   const categoria = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
   return categoria ? categoria.nombre : 'Sin categoría'
+}
+
+const getColorCategoria = (categoriaId) => {
+  const categoria = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
+  return categoria?.color || '#6b7280'
 }
 
 const getIconComponent = (iconType) => {
@@ -423,32 +397,24 @@ onMounted(() => {
   const elementosGuardados = localStorage.getItem('elementos-personalizados')
   if (elementosGuardados) {
     try {
-      elementosPersonalizados.value = JSON.parse(elementosGuardados)
+      const cargados = JSON.parse(elementosGuardados)
+      cargados.forEach((el) => catalogStore.addCustomItem(el))
     } catch (error) {
       console.error('Error cargando elementos personalizados:', error)
     }
   }
 })
 
-// Guardar elementos personalizados en localStorage
 const guardarElementosPersonalizados = () => {
-  localStorage.setItem('elementos-personalizados', JSON.stringify(elementosPersonalizados.value))
+  const personalizados = catalogStore.items.filter((el) => el.personalizado)
+  localStorage.setItem('elementos-personalizados', JSON.stringify(personalizados))
 }
 
-// Observar cambios en elementos personalizados para guardar
 watch(
-  () => elementosPersonalizados.value,
+  () => catalogStore.items,
   () => {
     guardarElementosPersonalizados()
   },
   { deep: true },
-)
-
-// Observar cambios en el contexto para verificar validez del filtro de categoría
-watch(
-  () => canvasStore.contextoActual.tipo,
-  (_nuevoContexto) => {
-    categoriaSeleccionada.value = null
-  }
 )
 </script>
