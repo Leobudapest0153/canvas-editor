@@ -746,7 +746,7 @@ const {
 } = useObjectSnapping()
 
 // Estado para controlar si el snapping está habilitado (por defecto desactivado — evita alineado automático)
-const isSnappingEnabled = ref(false)
+const isSnappingEnabled = ref(true)
 
 // === HELPERS DE CONVERSIÓN ===
 /**
