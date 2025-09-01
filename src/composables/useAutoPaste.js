@@ -6,10 +6,13 @@
  *
  * Funcionalidades:
  * - Buscar espacios disponibles automáticamente
- * - Validar dimensiones del área
+ * - Validar dimensiones del área según vista activa (XY/XZ)
  * - Validar capacidad de peso
  * - Validar compatibilidad de ubicaciones (pared/suelo/etc)
  * - Evitar colisiones con otros elementos
+ * - Búsqueda adaptativa: Tamaño de grid adaptado al tamaño del elemento
+ * - Caching de validaciones: Matriz de ocupación para filtros rápidos
+ * - Dimensiones correctas según vista XY (arriba) o XZ (frontal)
  */
 
 import { useCanvasStore } from './useCanvasStore'
@@ -32,24 +35,138 @@ export function useAutoPaste() {
   const { startLoading, stopLoading, isOperationInProgress } = useLoader()
 
   /**
+   * 4.1.2 Caching de validaciones - Crear matriz de ocupación
+   * Crea una matriz optimizada que indica qué áreas están ocupadas
+   * considerando las dimensiones apropiadas según la vista activa
+   */
+  const createOccupancyGrid = (areaBounds, neighbors, gridResolution = 10) => {
+    const gridWidth = Math.ceil((areaBounds.maxX - areaBounds.minX) / gridResolution)
+    const gridHeight = Math.ceil((areaBounds.maxY - areaBounds.minY) / gridResolution)
+
+    // Inicializar matriz con false (libre)
+    const grid = Array(gridHeight).fill(null).map(() => Array(gridWidth).fill(false))
+
+    // Marcar áreas ocupadas por elementos vecinos
+    neighbors.forEach(elemento => {
+      // Obtener dimensiones apropiadas según la vista activa
+      const elementDimensions = getElementDimensions(elemento)
+
+      const startX = Math.floor((elemento.x - areaBounds.minX) / gridResolution)
+      const startY = Math.floor((elemento.y - areaBounds.minY) / gridResolution)
+      const endX = Math.ceil((elemento.x + elementDimensions.width - areaBounds.minX) / gridResolution)
+      const endY = Math.ceil((elemento.y + elementDimensions.height - areaBounds.minY) / gridResolution)
+
+      // Marcar área ocupada con márgenes de seguridad
+      for (let y = Math.max(0, startY - 1); y < Math.min(gridHeight, endY + 1); y++) {
+        for (let x = Math.max(0, startX - 1); x < Math.min(gridWidth, endX + 1); x++) {
+          grid[y][x] = true
+        }
+      }
+    })
+
+    return { grid, gridWidth, gridHeight, gridResolution, areaBounds }
+  }
+
+  /**
+   * Verifica si una posición está libre en la matriz de ocupación
+   */
+  const isOccupiedInGrid = (occupancyGrid, x, y, elementWidth, elementHeight) => {
+    const { grid, gridResolution, areaBounds } = occupancyGrid
+
+    const startGridX = Math.floor((x - areaBounds.minX) / gridResolution)
+    const startGridY = Math.floor((y - areaBounds.minY) / gridResolution)
+    const endGridX = Math.ceil((x + elementWidth - areaBounds.minX) / gridResolution)
+    const endGridY = Math.ceil((y + elementHeight - areaBounds.minY) / gridResolution)
+
+    // Verificar si alguna celda en el área está ocupada
+    for (let gridY = Math.max(0, startGridY); gridY < Math.min(grid.length, endGridY); gridY++) {
+      for (let gridX = Math.max(0, startGridX); gridX < Math.min(grid[0].length, endGridX); gridX++) {
+        if (grid[gridY][gridX]) {
+          return true // Ocupado
+        }
+      }
+    }
+
+    return false // Libre
+  }
+
+  /**
+   * Obtiene las dimensiones apropiadas de un elemento según la vista activa
+   */
+  const getElementDimensions = (elemento) => {
+    const vistaActiva = canvasStore.vistaActiva
+
+    if (elemento.dimensiones) {
+      if (vistaActiva === 'XY') {
+        // Vista desde arriba: ancho=X, largo=Y
+        return {
+          width: (elemento.dimensiones.ancho || 0) * CM_TO_PX,
+          height: (elemento.dimensiones.largo || 0) * CM_TO_PX
+        }
+      } else if (vistaActiva === 'XZ') {
+        // Vista frontal: ancho=X, alto=Y
+        return {
+          width: (elemento.dimensiones.ancho || 0) * CM_TO_PX,
+          height: (elemento.dimensiones.alto || 0) * CM_TO_PX
+        }
+      }
+    }
+
+    // Fallback a width/height si no hay dimensiones
+    return {
+      width: elemento.width || 0,
+      height: elemento.height || 0
+    }
+  }
+
+  /**
    * Obtiene las dimensiones del área disponible en el contexto actual
+   * considerando la vista activa (XY o XZ) y las dimensiones apropiadas
    */
   const getAreaBounds = () => {
     const contexto = canvasStore.contextoActual
+    const vistaActiva = canvasStore.vistaActiva
+    const canvasAdaptativo = canvasStore.canvasAdaptativo
     let bounds = { minX: 0, minY: 0, maxX: 0, maxY: 0 }
 
     if (contexto.tipo === 'plantas') {
       const planta = canvasStore.plantaPorId(contexto.id)
       if (planta?.dimensiones) {
-        bounds.maxX = (planta.dimensiones.ancho || 0) * CM_TO_PX
-        bounds.maxY = (planta.dimensiones.largo || 0) * CM_TO_PX
+        // En plantas, usar las dimensiones reales según la vista
+        if (vistaActiva === 'XY') {
+          // Vista desde arriba: X=ancho, Y=largo
+          bounds.maxX = (planta.dimensiones.ancho || 0) * CM_TO_PX
+          bounds.maxY = (planta.dimensiones.largo || 0) * CM_TO_PX
+        } else if (vistaActiva === 'XZ') {
+          // Vista frontal: X=ancho, Y=alto
+          bounds.maxX = (planta.dimensiones.ancho || 0) * CM_TO_PX
+          bounds.maxY = (planta.dimensiones.alto || 0) * CM_TO_PX
+        }
       }
     } else if (contexto.tipo === 'elementos' || contexto.tipo === 'contenedores') {
       const elemento = canvasStore.elementoPorId(contexto.id)
-      if (elemento) {
+      if (elemento?.dimensiones) {
+        // Usar las dimensiones reales del elemento según la vista
+        if (vistaActiva === 'XY') {
+          // Vista desde arriba: X=ancho, Y=largo
+          bounds.maxX = (elemento.dimensiones.ancho || 0) * CM_TO_PX
+          bounds.maxY = (elemento.dimensiones.largo || 0) * CM_TO_PX
+        } else if (vistaActiva === 'XZ') {
+          // Vista frontal: X=ancho, Y=alto
+          bounds.maxX = (elemento.dimensiones.ancho || 0) * CM_TO_PX
+          bounds.maxY = (elemento.dimensiones.alto || 0) * CM_TO_PX
+        }
+      } else if (elemento) {
+        // Fallback a width/height si no hay dimensiones
         bounds.maxX = elemento.width || 0
         bounds.maxY = elemento.height || 0
       }
+    }
+
+    // Si no se pudieron determinar las dimensiones, usar el canvas adaptativo como límite
+    if (bounds.maxX === 0 && bounds.maxY === 0 && canvasAdaptativo) {
+      bounds.maxX = canvasAdaptativo.width || 0
+      bounds.maxY = canvasAdaptativo.height || 0
     }
 
     return bounds
@@ -157,10 +274,14 @@ export function useAutoPaste() {
 
   /**
    * Busca automáticamente un espacio disponible para un elemento
+   * considerando la vista activa y las dimensiones apropiadas
    */
   const findAvailableSpace = (elemento, areaBounds, startPosition = null) => {
-    const elementWidth = elemento.width || 0
-    const elementHeight = elemento.height || 0
+    // Obtener dimensiones del elemento según la vista activa
+    const elementDimensions = getElementDimensions(elemento)
+    const elementWidth = elementDimensions.width
+    const elementHeight = elementDimensions.height
+
     const areaWidth = areaBounds.maxX - areaBounds.minX
     const areaHeight = areaBounds.maxY - areaBounds.minY
 
@@ -170,8 +291,20 @@ export function useAutoPaste() {
     }
 
     // Obtener elementos vecinos excluyendo el elemento actual
-    const neighbors = canvasStore.elementosVisibles.filter(el => el.id !== elemento.id)    // Función para verificar si una posición es válida
+    const neighbors = canvasStore.elementosVisibles.filter(el => el.id !== elemento.id)
+
+    // 4.1.1 Búsqueda adaptativa - Adaptar el tamaño de la cuadrícula al tamaño del elemento
+    const adaptiveGridSize = Math.max(15, Math.min(elementWidth, elementHeight) / 3)
+    const gridSize = Math.max(adaptiveGridSize, 20) // Mínimo de 20px para evitar grids muy pequeños
+
+    // 4.1.2 Crear matriz de ocupación para optimizar validaciones
+    const occupancyGrid = createOccupancyGrid(areaBounds, neighbors, Math.min(gridSize, 20))    // Función optimizada para verificar si una posición es válida
     const isPositionValid = (x, y) => {
+      // 4.1.2 Verificación rápida usando matriz de ocupación
+      if (isOccupiedInGrid(occupancyGrid, x, y, elementWidth, elementHeight)) {
+        return false // Filtro rápido: área ocupada según la matriz
+      }
+
       const position = { x, y }
 
       // Crear elemento temporal con la nueva posición
@@ -239,8 +372,6 @@ export function useAutoPaste() {
       }
     }
 
-    // Búsqueda sistemática en grid
-    const gridSize = 25 // Tamaño de la grilla
     const maxRadius = Math.max(areaWidth, areaHeight) / gridSize
 
     // Búsqueda en espiral desde el centro
@@ -302,8 +433,8 @@ export function useAutoPaste() {
       }
     }
 
-    // Si no encuentra espacio en espiral, intentar búsqueda exhaustiva en grid más pequeño
-    const smallGridSize = 15
+    // Si no encuentra espacio en espiral, intentar búsqueda exhaustiva con grid adaptativo
+    const smallGridSize = Math.max(10, adaptiveGridSize / 2) // Grid más fino pero aún adaptativo
     for (let y = areaBounds.minY; y <= areaBounds.maxY - elementHeight; y += smallGridSize) {
       for (let x = areaBounds.minX; x <= areaBounds.maxX - elementWidth; x += smallGridSize) {
         if (isPositionValid(x, y)) {
@@ -408,6 +539,7 @@ export function useAutoPaste() {
 
         // Seleccionar el elemento recién pegado
         canvasStore.seleccionarElemento(elementoId)
+        // canvasStore.destacarElemento(elementoId)
 
         return true
       } else {
@@ -555,6 +687,10 @@ export function useAutoPaste() {
     findAvailableSpace,
     validatePlacement,
     isLocationCompatible,
-    getAreaBounds
+    getAreaBounds,
+    getElementDimensions,
+    // Nuevas funciones de optimización
+    createOccupancyGrid,
+    isOccupiedInGrid
   }
 }

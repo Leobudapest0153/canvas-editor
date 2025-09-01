@@ -19,6 +19,7 @@ import { ref, computed, watch } from 'vue'
 import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/utils/dimensionPolicy'
 import { useAutoSave } from '@/composables/useAutoSave'
+import { useToast } from '@/composables/useToast'
 import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
@@ -27,6 +28,8 @@ import {
 } from '@/validation/placementOrchestrator'
 
 export const useCanvasStore = defineStore('canvas', () => {
+  const { showToast } = useToast()
+
   // === INTEGRACIÓN CON HISTORIAL ===
   // Instancia del historial - se establece desde useCanvasWithHistory
   const historyInstance = ref(null)
@@ -316,12 +319,14 @@ export const useCanvasStore = defineStore('canvas', () => {
   const navegarAElemento = (elementoId) => {
     const elemento = elementoPorId.value(elementoId)
     if (!elemento) {
+      showToast('Elemento no encontrado')
       console.error('Elemento no encontrado:', elementoId)
       return
     }
 
     // Verificar que el elemento sea navegable (elementos o contenedores)
     if (elemento.tipo !== 'elementos' && elemento.tipo !== 'contenedores') {
+      showToast('Solo se puede navegar a elementos o contenedores')
       console.error('Solo se puede navegar a elementos o contenedores:', elemento.tipo)
       return
     }
@@ -463,6 +468,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const navegarAPlanta = (plantaId) => {
     const planta = plantaPorId.value(plantaId)
     if (!planta) {
+      showToast('Planta no encontrada')
       console.error('Planta no encontrada:', plantaId)
       return
     }
@@ -881,11 +887,13 @@ export const useCanvasStore = defineStore('canvas', () => {
     // - contenedores solo pueden ir en elementos
     // - elementos pueden ir en contenedores
     if (contextoActual === 'plantas' && tipoElemento !== 'elementos') {
+      showToast('En plantas solo se pueden agregar elementos')
       console.error('En plantas solo se pueden agregar elementos')
       return null
     }
 
     if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
+      showToast('En elementos solo se pueden agregar contenedores')
       console.error('En elementos solo se pueden agregar contenedores')
       return null
     }
