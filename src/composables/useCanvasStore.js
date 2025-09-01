@@ -678,6 +678,29 @@ export const useCanvasStore = defineStore('canvas', () => {
     return true
   }
 
+  const persist = () => {
+    try {
+      const data = serialize()
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('canvas-data', data)
+      }
+    } catch (e) {
+      console.warn('Error persisting state', e)
+    }
+  }
+
+  const updateElementById = (id, patch) => {
+    const ok = actualizarElemento(id, patch, true, 'Editar propiedades')
+    if (ok) {
+      const el = elementos.value.find(e => e.id === id)
+      if (el) {
+        el.updatedAt = new Date().toISOString()
+      }
+      persist()
+    }
+    return ok
+  }
+
   // Variables para debounce de historial de vista
   let zoomPanDebounceTimer = null
   const ZOOM_PAN_DEBOUNCE_DELAY = 1000 // 1 segundo
@@ -1565,6 +1588,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     seleccionarElemento,
     actualizarPosicion,
     actualizarElemento,
+    updateElementById,
+    persist,
     configurarZoom,
     configurarPan,
     setGridSize,

@@ -236,11 +236,13 @@ import { CATEGORIAS } from '@/utils/constants'
 import TagFilter from '@/components/TagFilter.vue'
 import CreateTagModal from '@/components/CreateTagModal.vue'
 import {useDeleteElement} from '@/composables/useDeleteElement'
+import { useConfirmDialog } from '@/composables/useConfirmDialog'
 
 // Composables
 const canvasStore = useCanvasStore()
 
 const deleteElement = useDeleteElement();
+const confirmDialog = useConfirmDialog();
 
 // Estado local
 const filtroCategoria = ref('')

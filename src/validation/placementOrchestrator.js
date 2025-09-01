@@ -4,8 +4,8 @@ import { narrowPhase2D } from '@/utils/collision'
 export const errorsPlacement = {
   ZBASE_REQUIRED: 'La altura respecto al suelo es obligatoria y debe ser mayor a 0.',
   HEIGHT_EXCEEDS_WAREHOUSE:
-    'Supera la altura de la bodega (zBase + alto > altura de bodega).',
-  Z_STACK_CONFLICT: 'Colisión vertical: las alturas se solapan',
+    'Su altura total excede la altura máxima de la bodega.',
+  Z_STACK_CONFLICT: 'Conflicto de altura detectado con otro elemento.',
 }
 
 export function resolveCoplanarNeighbors(element = {}, all = [], Z_LAYER_EPS = 0.5) {
