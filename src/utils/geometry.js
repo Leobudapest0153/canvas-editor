@@ -11,6 +11,9 @@ export const approxEqual = (a, b, eps = EPSILON) => Math.abs(a - b) <= eps
 
 // Grid snapping
 export const snapToGrid = (x, y, gridSize = 50) => {
+  // If gridSize is falsy (0, null, undefined) or <= 0, treat as disabled: return original coords
+  if (typeof gridSize !== 'number') gridSize = 50
+  if (gridSize <= 0) return { x, y }
   const sx = Math.round(x / gridSize) * gridSize
   const sy = Math.round(y / gridSize) * gridSize
   return { x: sx, y: sy }

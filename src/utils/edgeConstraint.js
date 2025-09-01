@@ -95,9 +95,13 @@ export function finalizeRectClampSnapReclamp(x, y, w, h, areaBounds, gridSize = 
   let cx = Math.max(minX, Math.min(x, maxX - w))
   let cy = Math.max(minY, Math.min(y, maxY - h))
 
-  // snap
-  const sx = Math.round(cx / gridSize) * gridSize
-  const sy = Math.round(cy / gridSize) * gridSize
+  // snap (solo si gridSize > 0)
+  let sx = cx
+  let sy = cy
+  if (typeof gridSize === 'number' && gridSize > 0) {
+    sx = Math.round(cx / gridSize) * gridSize
+    sy = Math.round(cy / gridSize) * gridSize
+  }
 
   // re-clamp
   cx = Math.max(minX, Math.min(sx, maxX - w))
