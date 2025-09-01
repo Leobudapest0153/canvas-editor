@@ -334,7 +334,6 @@ const guardar = async () => {
     showSuccess(diamChanged ? 'Diámetro actualizado' : 'Cambios guardados')
   }
   isSaving.value = false
-}
 
 const validarDimension = (prop) => {
   const val = Number(edited.value.dimensiones[prop])
