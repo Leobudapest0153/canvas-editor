@@ -63,7 +63,7 @@
         </div>
 
         <!-- Filtro por categoría (select) -->
-        <div>
+        <div v-if="catalogContext.mode !== 'root'">
           <label for="filtroCategoria" class="sr-only">Categoría</label>
           <select
             id="filtroCategoria"
@@ -87,7 +87,7 @@
     <div class="elementos-lista flex-1 overflow-y-auto p-4">
       <div class="grid grid-cols-1 gap-3">
         <div
-          v-for="elemento in elementosFiltrados"
+          v-for="elemento in filteredCatalogItems"
           :key="elemento.id"
           :draggable="true"
           @dragstart="iniciarArrastre(elemento, $event)"
@@ -129,9 +129,7 @@
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Dim:</span>
                 <span class="spec-value text-gray-700">
-                    {{ elemento.dimensiones.ancho }}x{{ elemento.dimensiones.largo }}x{{
-                      elemento.dimensiones.alto
-                    }}
+                  {{ getCardDims(elemento).ancho }}x{{ getCardDims(elemento).largo }}x{{ getCardDims(elemento).alto }}
                 </span>
               </div>
               <div class="spec-item flex justify-between text-xs">
@@ -180,7 +178,7 @@
       </div>
 
       <!-- Mensaje cuando no hay elementos -->
-      <div v-if="elementosFiltrados.length === 0" class="text-center py-12">
+      <div v-if="filteredCatalogItems.length === 0" class="text-center py-12">
         <svg
           class="w-12 h-12 text-gray-300 mx-auto mb-4"
           fill="none"
@@ -215,26 +213,31 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useCanvasStore } from '@/composables/useCanvasStore'
+import { useCatalogStore } from '@/stores/catalog'
 import {
-  ELEMENTOS_PREDEFINIDOS,
   TODAS_LAS_CATEGORIAS,
   TIPOS_ENTIDAD,
   getColorPorTipo,
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
 } from '@/utils/constants'
+import { CATALOGO } from '@/utils/constants'
+import { computeDimsByAxisScale } from '@/utils/dimensionPolicy'
 
 import ElementEditor from './modals/ElementEditor.vue'
 
-// Store
+// Stores
 const canvasStore = useCanvasStore()
+const catalogStore = useCatalogStore()
+const { filteredCatalogItems, catalogContext, searchText, selectedCategory, items } =
+  storeToRefs(catalogStore)
 
 // Estado local
-const filtroTexto = ref('')
-const categoriaSeleccionada = ref(null)
+const filtroTexto = searchText
+const categoriaSeleccionada = selectedCategory
 const mostrarModalCrear = ref(false)
-const elementosPersonalizados = ref([])
 
 // Formulario para nuevo elemento
 const nuevoElemento = ref({
@@ -255,80 +258,25 @@ const nuevoElemento = ref({
 
 // Computed: título dinámico según el contexto
 const tituloContextual = computed(() => {
-  const contexto = canvasStore.contextoActual.tipo
-
-  if (contexto === 'plantas') {
+  if (catalogContext.value.mode === 'root') {
     return 'Catálogo de Elementos'
-  } else if (contexto === 'elementos') {
+  } else if (catalogContext.value.mode === 'detail-element') {
     return 'Catálogo de Contenedores'
-  } else if (contexto === 'contenedores') {
+  } else if (catalogContext.value.mode === 'detail-container') {
     return 'Catálogo (Elementos + Contenedores)'
   }
-
   return 'Catálogo de Elementos'
 })
 
 // Computed: determina si se pueden crear elementos personalizados
-const puedeCrearElementosPersonalizados = computed(() => {
-  return true
-  // const contexto = canvasStore.contextoActual.tipo
-  // Solo permitir creación personalizada en plantas (elementos)
-  // Los contenedores son solo predefinidos
-  // return contexto === 'plantas'
-})
+const puedeCrearElementosPersonalizados = computed(
+  () => catalogContext.value.mode !== 'root',
+)
 
 // Computed: categorías disponibles según el contexto
 const categoriasDisponibles = computed(() => {
-  return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'elementos')
-  // const contexto = canvasStore.contextoActual.tipo
-  // if (contexto === 'plantas') {
-  //   // En plantas solo se pueden crear elementos
-  //   return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'elementos')
-  // } else if (contexto === 'elementos') {
-  //   // En elementos solo se pueden crear contenedores
-  //   return TODAS_LAS_CATEGORIAS.filter((cat) => cat.tipo === 'contenedores')
-  // } else if (contexto === 'contenedores') {
-  //   // En contenedores se pueden crear elementos Y contenedores
-  //   return TODAS_LAS_CATEGORIAS.filter(
-  //     (cat) => cat.tipo === 'elementos' || cat.tipo === 'contenedores',
-  //   )
-  // }
-
-  // return TODAS_LAS_CATEGORIAS
-})
-
-// Computed: elementos filtrados según contexto y filtros
-const elementosFiltrados = computed(() => {
-  let elementos = [...ELEMENTOS_PREDEFINIDOS, ...elementosPersonalizados.value]
-
-  // Filtrar por contexto (solo mostrar elementos apropiados)
-  const contexto = canvasStore.contextoActual.tipo
-  if (contexto === 'plantas') {
-    elementos = elementos.filter((el) => el.tipo === 'elementos')
-  } else if (contexto === 'elementos') {
-    elementos = elementos.filter((el) => el.tipo === 'contenedores')
-  } else if (contexto === 'contenedores') {
-    // Los contenedores pueden contener elementos Y otros contenedores
-    elementos = elementos.filter((el) => el.tipo === 'elementos' || el.tipo === 'contenedores')
-  }
-
-  // Filtrar por texto
-  if (filtroTexto.value) {
-    const texto = filtroTexto.value.toLowerCase()
-    elementos = elementos.filter(
-      (elemento) =>
-        elemento.nombre.toLowerCase().includes(texto) ||
-        elemento.descripcion.toLowerCase().includes(texto) ||
-        elemento.categoria.includes(texto),
-    )
-  }
-
-  // Filtrar por categoría
-  if (categoriaSeleccionada.value) {
-    elementos = elementos.filter((elemento) => elemento.categoria === categoriaSeleccionada.value)
-  }
-
-  return elementos
+  const tipos = catalogStore.allowedTypesForContext(catalogContext.value)
+  return TODAS_LAS_CATEGORIAS.filter((cat) => tipos.includes(cat.tipo))
 })
 
 const onGuardarElemento = (elemento) => {
@@ -340,7 +288,7 @@ const onGuardarElemento = (elemento) => {
     // Asegurar que tenga la propiedad tipo basada en la categoría
     tipo: elemento.categoria === 'contenedores' ? 'contenedores' : 'elementos',
   }
-  elementosPersonalizados.value.push(elementoNuevo)
+  items.value.push(elementoNuevo)
   cerrarModal()
   categoriaSeleccionada.value = elementoNuevo.categoria
   filtroTexto.value = ''
@@ -377,6 +325,24 @@ const getShapeClass = (forma) => {
       return 'rounded-full aspect-square' // Añadimos aspect-square para mantener la relación de aspecto 1:1
     default:
       return 'rounded-sm'
+  }
+}
+
+// Dims preview para elementos de sistema por defecto
+const isSystemDefaultItem = (item) => !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
+
+const getCardDims = (item) => {
+  try {
+    if (!item?.dimensiones) return { ancho: 0, largo: 0, alto: 0 }
+    if (!isSystemDefaultItem(item)) return item.dimensiones
+    const planta = canvasStore.plantaActivaData
+    const dimsPlanta = planta?.dimensiones
+    if (!dimsPlanta) return item.dimensiones
+    const parentDims = { w: dimsPlanta.ancho, h: dimsPlanta.largo, d: dimsPlanta.alto }
+    const dims = computeDimsByAxisScale(item.id, parentDims, { snap: true })
+    return dims || item.dimensiones
+  } catch {
+    return item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
   }
 }
 
@@ -423,7 +389,7 @@ onMounted(() => {
   const elementosGuardados = localStorage.getItem('elementos-personalizados')
   if (elementosGuardados) {
     try {
-      elementosPersonalizados.value = JSON.parse(elementosGuardados)
+      JSON.parse(elementosGuardados).forEach((el) => items.value.push(el))
     } catch (error) {
       console.error('Error cargando elementos personalizados:', error)
     }
@@ -432,12 +398,13 @@ onMounted(() => {
 
 // Guardar elementos personalizados en localStorage
 const guardarElementosPersonalizados = () => {
-  localStorage.setItem('elementos-personalizados', JSON.stringify(elementosPersonalizados.value))
+  const personalizados = items.value.filter((el) => el.personalizado)
+  localStorage.setItem('elementos-personalizados', JSON.stringify(personalizados))
 }
 
 // Observar cambios en elementos personalizados para guardar
 watch(
-  () => elementosPersonalizados.value,
+  () => items.value,
   () => {
     guardarElementosPersonalizados()
   },
@@ -446,9 +413,24 @@ watch(
 
 // Observar cambios en el contexto para verificar validez del filtro de categoría
 watch(
-  () => canvasStore.contextoActual.tipo,
-  (_nuevoContexto) => {
-    categoriaSeleccionada.value = null
-  }
+  () => canvasStore.contextoActual,
+  (ctx) => {
+    if (ctx.tipo === 'plantas') {
+      catalogStore.setCatalogContext({ mode: 'root' })
+    } else if (ctx.tipo === 'elementos') {
+      catalogStore.setCatalogContext({
+        mode: 'detail-element',
+        currentId: ctx.id,
+        currentType: 'element',
+      })
+    } else if (ctx.tipo === 'contenedores') {
+      catalogStore.setCatalogContext({
+        mode: 'detail-container',
+        currentId: ctx.id,
+        currentType: 'container',
+      })
+    }
+  },
+  { immediate: true },
 )
 </script>

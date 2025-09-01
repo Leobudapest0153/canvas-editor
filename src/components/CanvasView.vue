@@ -666,7 +666,8 @@ import {
 import { clampRectToPolygon, pointInPolygon, clampPointToPolygon } from '@/utils/polygonBounds'
 import { handleCanvasHotkeys } from '@/utils/canvasHotkeys'
 import { polygonInset } from '@/utils/polygonInset'
-import { GRID_SIZE, CM_TO_PX } from '@/utils/constants'
+import { GRID_SIZE, CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/utils/constants'
+import { computeDimsByAxisScale, toCanvasSizePx } from '@/utils/dimensionPolicy'
 import { getActiveBounds } from '@/utils/activeBounds'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -1724,18 +1725,48 @@ const createElementFromDrop = (data, dropEvent) => {
   // ===== CONTINUAR CON LA LÓGICA EXISTENTE =====
 
   // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
-  const { width, height } = getElementPixelDimensions(elemento)
+  let { width, height } = getElementPixelDimensions(elemento)
 
   // Obtener dimensiones originales en cm para guardar (preservar todas las dimensiones)
-  const anchoCm = elemento.dimensiones?.ancho || 100
-  const largoCm = elemento.dimensiones?.largo || 60
-  const altoCm = elemento.dimensiones?.alto || 20
+  let anchoCm = elemento.dimensiones?.ancho || 100
+  let largoCm = elemento.dimensiones?.largo || 60
+  let altoCm = elemento.dimensiones?.alto || 20
+
+  // Política de dimensiones para elementos de sistema por defecto
+  const isSystemDefault = !!(elemento?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(elemento.id))
+  if (isSystemDefault && elemento?.dimensionLock !== true) {
+    const planta = canvasStore.plantaActivaData
+    if (planta && planta.dimensiones) {
+      const parentDims = {
+        w: planta.dimensiones.ancho,
+        h: planta.dimensiones.largo,
+        d: planta.dimensiones.alto,
+      }
+      const dims = computeDimsByAxisScale(elemento.id, parentDims, { snap: true, gridPx: GRID_SIZE })
+      if (dims) {
+        anchoCm = dims.ancho
+        largoCm = dims.largo
+        altoCm = dims.alto
+        const sizePx = toCanvasSizePx(dims, 'XY')
+        width = sizePx.width
+        height = sizePx.height
+      }
+      // Offset vertical para estante de pared (altura desde el suelo)
+      const off = OFFSETS?.offsetByType?.[elemento.id]?.zOffsetShare
+      if (typeof off === 'number' && isFinite(off)) {
+        // Redondear a cm enteros
+        const zBase = Math.round((planta.dimensiones.alto || 0) * off)
+        // Usar en la instancia recién creada
+        elemento.alturaRespectoAlSuelo = zBase
+      }
+    }
+  }
 
   // Aplicar dimensiones mínimas para mejorar la interacción
   const MIN_WIDTH = 40
   const MIN_HEIGHT = 30
-  const finalWidth = Math.max(width, MIN_WIDTH)
-  const finalHeight = Math.max(height, MIN_HEIGHT)
+  let finalWidth = Math.max(width, MIN_WIDTH)
+  let finalHeight = Math.max(height, MIN_HEIGHT)
 
   // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
   const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
@@ -1928,6 +1959,9 @@ const createElementFromDrop = (data, dropEvent) => {
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
     volumenMaximo: anchoCm * largoCmFinal * altoCm,
+    // Política de dimensiones
+    dimensionLock: false,
+    systemTypeKey: elemento.id,
     uso: {
       volumen: 0,
       peso: 0
@@ -2557,7 +2591,12 @@ const handleTransformEnd = (e, elementId, forma) => {
       node.x(x)
       node.y(y)
     }
-    canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones }, true, `Elemento redimensionado: ${elemento?.nombre || elemento?.tipo || elementId}`)
+    canvasStore.actualizarElemento(
+      elementId,
+      { x, y, width, height, rotation, dimensiones: newDimensiones, dimensionLock: true },
+      true,
+      `Elemento redimensionado: ${elemento?.nombre || elemento?.tipo || elementId}`
+    )
     lastValidPositions.value.set(elementId, { x, y })
     nextTick(() => setupTransformer())
   } catch (err) {
