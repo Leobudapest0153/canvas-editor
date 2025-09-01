@@ -65,28 +65,31 @@
             listening: false,
           }"
         />
-        <v-line
-          v-for="i in gridLines.vertical"
-          :key="`v-${i}`"
-          :config="{
-            points: [i, 0, i, floorBoundary.height],
-            stroke: '#e5e7eb',
-            strokeWidth: 1,
-            opacity: 0.5,
-            listening: false,
-          }"
-        />
-        <v-line
-          v-for="i in gridLines.horizontal"
-          :key="`h-${i}`"
-          :config="{
-            points: [0, i, floorBoundary.width, i],
-            stroke: '#e5e7eb',
-            strokeWidth: 1,
-            opacity: 0.5,
-            listening: false,
-          }"
-        />
+        <!-- Dibujar grid solo si gridSize > 0 -->
+        <template v-if="(canvasStore.gridSize || 0) > 0">
+          <v-line
+            v-for="i in gridLines.vertical"
+            :key="`v-${i}`"
+            :config="{
+              points: [i, 0, i, floorBoundary.height],
+              stroke: '#e5e7eb',
+              strokeWidth: 1,
+              opacity: 0.5,
+              listening: false,
+            }"
+          />
+          <v-line
+            v-for="i in gridLines.horizontal"
+            :key="`h-${i}`"
+            :config="{
+              points: [0, i, floorBoundary.width, i],
+              stroke: '#e5e7eb',
+              strokeWidth: 1,
+              opacity: 0.5,
+              listening: false,
+            }"
+          />
+        </template>
       </v-layer>
       <v-layer ref="layerRef">
         <template v-if="canvasStore.elementoAura">
@@ -135,7 +138,7 @@
               height: elemento.height,
               fill: elemento.color,
               stroke: getStrokeColor(elemento.id),
-              strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
+              strokeWidth: 1,
               opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
               draggable: canDragElement(elemento.id),
               shadowColor: getElementShadow(elemento).color,
@@ -208,7 +211,7 @@
               radius: Math.min(elemento.width, elemento.height) / 2,
               fill: elemento.color,
               stroke: getStrokeColor(elemento.id),
-              strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
+              strokeWidth: 1,
               opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
               draggable: canDragElement(elemento.id),
               shadowColor: getElementShadow(elemento).color,
@@ -241,7 +244,7 @@
               height: elemento.height,
               fill: elemento.color,
               stroke: getStrokeColor(elemento.id),
-              strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
+              strokeWidth: 1,
               opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
               draggable: canDragElement(elemento.id),
               shadowColor: 'black',
@@ -742,8 +745,8 @@ const {
   clearGuides
 } = useObjectSnapping()
 
-// Estado para controlar si el snapping está habilitado
-const isSnappingEnabled = ref(true)
+// Estado para controlar si el snapping está habilitado (por defecto desactivado — evita alineado automático)
+const isSnappingEnabled = ref(false)
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -946,9 +949,14 @@ const elementosVisiblesEnCanvas = computed(() => {
 
 // Grid de referencia - BASADO EN LAS DIMENSIONES DEL LAYER
 const gridLines = computed(() => {
-  const gridSizePx = canvasStore.gridSize || 50
+  const gridSizePx = Number(canvasStore.gridSize || 0)
   const vertical = []
   const horizontal = []
+
+  // Si gridSize <= 0, no generar líneas
+  if (!gridSizePx || gridSizePx <= 0) {
+    return { vertical, horizontal }
+  }
 
   // Usar las dimensiones del layer (planta) para el grid
   const layerWidth = floorBoundary.value.width
@@ -1083,9 +1091,10 @@ const lastDesiredPosMap = ref(new Map())
 const lastVelocityMap = ref(new Map())
 
 // Helper: color de borde con feedback
+// No usamos un color oscuro para el elemento seleccionado — mantenemos un borde sutil.
 const getStrokeColor = (elementId) => {
   if (atEdgeMap.value.get(elementId)) return '#f59e0b' // advertencia en borde
-  return canvasStore.elementoSeleccionado === elementId ? '#000' : '#666'
+  return '#666'
 }
 
 // Convierte posición stage->layer considerando zoom/pan
@@ -1393,7 +1402,7 @@ const endElementDrag = async (elementId) => {
           movingEl: asRect,
           neighbors,
           areaBounds,
-          grid: canvasStore.gridSize || 50,
+          grid: canvasStore.gridSize ?? GRID_SIZE,
           lastValidPos: lastPos,
           CM_TO_PX,
           strokePx,
@@ -1434,7 +1443,7 @@ const endElementDrag = async (elementId) => {
             movingEl: asRect,
             neighbors,
             areaBounds,
-            grid: canvasStore.gridSize || 50,
+            grid: canvasStore.gridSize ?? GRID_SIZE,
             lastValidPos: lastPos,
             CM_TO_PX,
             strokePx,
@@ -1753,8 +1762,8 @@ const createElementFromDrop = (data, dropEvent) => {
   let candX = worldCoords.x - finalWidth / 2
   let candY = worldCoords.y - finalHeight / 2
 
-  // 3. Aplicar snap a grilla ANTES de validar
-  const snapped = snapToGrid(candX, candY, GRID_SIZE)
+  // 3. Aplicar snap a grilla ANTES de validar (usar valor runtime de canvasStore.gridSize: 0 desactiva)
+  const snapped = snapToGrid(candX, candY, canvasStore.gridSize ?? GRID_SIZE)
   candX = snapped.x
   candY = snapped.y
 
@@ -1851,7 +1860,7 @@ const createElementFromDrop = (data, dropEvent) => {
       boundary,
       allElements,
       tempElement,
-      GRID_SIZE,
+      canvasStore.gridSize ?? GRID_SIZE,
       16, // máximo 16 intentos
       detectConflictsFor, // Pasar la función como parámetro
     )
@@ -2221,8 +2230,8 @@ const createElementFromBuffer = (data, dropEvent) => {
   let candX = worldCoords.x - width / 2
   let candY = worldCoords.y - height / 2
 
-  // 3. Aplicar snap a grilla ANTES de validar
-  const snapped = snapToGrid(candX, candY, GRID_SIZE)
+  // 3. Aplicar snap a grilla ANTES de validar (usar valor runtime de canvasStore.gridSize: 0 desactiva)
+  const snapped = snapToGrid(candX, candY, canvasStore.gridSize ?? GRID_SIZE)
   candX = snapped.x
   candY = snapped.y
 
@@ -2280,7 +2289,7 @@ const createElementFromBuffer = (data, dropEvent) => {
       boundary,
       allElements,
       tempElement,
-      GRID_SIZE,
+      canvasStore.gridSize ?? GRID_SIZE,
       16,
       detectConflictsFor, // Pasar la función como parámetro
     )

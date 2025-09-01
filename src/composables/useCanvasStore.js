@@ -100,13 +100,15 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const isDraggable = ref(true)
   // Configuración de grilla y snap
-  const gridSize = ref(50) // px entre líneas de grilla
+  // Por defecto desactivamos la cuadrícula (0 = sin cuadricula visual ni snap a grilla)
+  const gridSize = ref(0) // px entre líneas de grilla (0 desactiva)
   const snapGridEps = ref(10) // px de proximidad para aplicar snap al soltar
 
   const setGridSize = (sizePx) => {
     const s = Number(sizePx)
     if (!Number.isFinite(s)) return
-    gridSize.value = Math.max(5, Math.min(500, s))
+    // Permitimos 0 para desactivar la grilla; rango [0,500]
+    gridSize.value = Math.max(0, Math.min(500, s))
   }
   const setSnapGridEps = (epsPx) => {
     const e = Number(epsPx)
