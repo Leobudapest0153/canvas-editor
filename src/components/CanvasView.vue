@@ -52,7 +52,7 @@
       @dragmove="handleStageDragMove"
       @dragend="handleStageDragEnd"
     >
-    
+
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
         <v-line
           v-if="plantPolygon.length"
@@ -499,7 +499,7 @@
             listening: false,
           }"
         />
-      </v-layer> 
+      </v-layer>
       <v-layer ref="overlaysLayerRef">
         <!-- Líneas guía de object snapping -->
         <SnapGuides
@@ -699,9 +699,6 @@ const props = defineProps({
 
 // Referencia segura a Konva (cuando está disponible globalmente via vue-konva)
 const Konva = typeof globalThis !== 'undefined' ? globalThis.Konva || (typeof window !== 'undefined' ? window.Konva : null) : null
-
-// Definir emits
-const emit = defineEmits(['select', 'drill-down'])
 
 // Referencias
 const containerRef = ref(null)
@@ -1055,12 +1052,6 @@ const handleStageClick = (e) => {
 const selectElement = (elementId) => {
   console.log('Seleccionando elemento:', elementId)
   canvasStore.seleccionarElemento(elementId)
-
-  const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
-  if (elemento) {
-    emit('select', elemento)
-  }
-
   // Si el modo arrastre global está activado y el elemento NO está bloqueado, activar edición (transformer)
   if (dragModeGlobal.value && elementId && !isElementLocked(elementId)) {
     editingElementId.value = elementId

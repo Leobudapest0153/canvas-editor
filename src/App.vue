@@ -34,6 +34,8 @@
     <ToastContainer />
     <!-- Modal de confirmación global -->
     <ConfirmModal />
+    <!-- Loader global -->
+    <LoaderOverlay />
     <WorkspaceEditor/>
   </div>
 </template>
@@ -49,14 +51,17 @@ import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
 import { useDeleteElement } from './composables/useDeleteElement'
+import { useAutoPaste } from './composables/useAutoPaste'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
+import LoaderOverlay from './components/LoaderOverlay.vue'
 
 
 // Composable para undo/redo global
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
 const { deleteSelected } = useDeleteElement()
+const { handlePaste } = useAutoPaste()
 
 const selectedElement = ref(null)
 
@@ -93,6 +98,9 @@ const handleKeydown = (e) => {
     } else if (e.key === 'c') {
       e.preventDefault()
       handleCopyToBuffer()
+    } else if (e.key === 'v') {
+      e.preventDefault()
+      handlePaste()
     }
   } else if (e.key === 'Delete' || e.key === 'Backspace') {
     // Supr o Retroceso -> eliminar seleccionado
