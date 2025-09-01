@@ -7,12 +7,15 @@
  * Funcionalidades:
  * - Buscar espacios disponibles automáticamente
  * - Validar dimensiones del área según vista activa (XY/XZ)
+ * - Soporte completo para polígonos de plantas con validación de límites
  * - Validar capacidad de peso
  * - Validar compatibilidad de ubicaciones (pared/suelo/etc)
  * - Evitar colisiones con otros elementos
+ * - Considerar dimensiones apropiadas (ancho/largo/alto) según contexto
  * - Búsqueda adaptativa: Tamaño de grid adaptado al tamaño del elemento
  * - Caching de validaciones: Matriz de ocupación para filtros rápidos
- * - Dimensiones correctas según vista XY (arriba) o XZ (frontal)
+ * - Respeta límites poligonales de plantas, marcando áreas externas como ocupadas
+ * - Inicia búsqueda desde el centroide del polígono para mejor distribución
  */
 
 import { useCanvasStore } from './useCanvasStore'
@@ -21,10 +24,11 @@ import { useWeightValidation } from './useWeightValidation'
 import { usePlacementGuards } from './usePlacementGuards'
 import { useToast } from './useToast'
 import { useLoader } from './useLoader'
-import { nudgePlace } from '@/utils/geometry'
-import { detectConflictsFor } from '@/utils/collision'
 import { isPlacementValid } from '@/utils/isPlacementValid'
 import { CM_TO_PX } from '@/utils/constants'
+import { pointInPolygon } from '@/utils/polygonBounds'
+import { polygonInset } from '@/utils/polygonInset'
+
 
 export function useAutoPaste() {
   const canvasStore = useCanvasStore()
@@ -35,9 +39,29 @@ export function useAutoPaste() {
   const { startLoading, stopLoading, isOperationInProgress } = useLoader()
 
   /**
+   * Calcula el centroide de un polígono
+   */
+  const calculatePolygonCentroid = (polygon) => {
+    if (!polygon || polygon.length === 0) return { x: 0, y: 0 }
+
+    let sumX = 0
+    let sumY = 0
+
+    polygon.forEach(point => {
+      sumX += point.x
+      sumY += point.y
+    })
+
+    return {
+      x: sumX / polygon.length,
+      y: sumY / polygon.length
+    }
+  }
+
+  /**
    * 4.1.2 Caching de validaciones - Crear matriz de ocupación
    * Crea una matriz optimizada que indica qué áreas están ocupadas
-   * considerando las dimensiones apropiadas según la vista activa
+   * considerando las dimensiones apropiadas según la vista activa y polígonos
    */
   const createOccupancyGrid = (areaBounds, neighbors, gridResolution = 10) => {
     const gridWidth = Math.ceil((areaBounds.maxX - areaBounds.minX) / gridResolution)
@@ -45,6 +69,21 @@ export function useAutoPaste() {
 
     // Inicializar matriz con false (libre)
     const grid = Array(gridHeight).fill(null).map(() => Array(gridWidth).fill(false))
+
+    // Marcar áreas fuera del polígono como ocupadas (si hay polígono)
+    if (areaBounds.hasPolygon && areaBounds.insetPolygon) {
+      for (let y = 0; y < gridHeight; y++) {
+        for (let x = 0; x < gridWidth; x++) {
+          const worldX = areaBounds.minX + x * gridResolution + gridResolution / 2
+          const worldY = areaBounds.minY + y * gridResolution + gridResolution / 2
+
+          // Si este punto de la grid está fuera del polígono, marcarlo como ocupado
+          if (!pointInPolygon({ x: worldX, y: worldY }, areaBounds.insetPolygon)) {
+            grid[y][x] = true
+          }
+        }
+      }
+    }
 
     // Marcar áreas ocupadas por elementos vecinos
     neighbors.forEach(elemento => {
@@ -121,18 +160,41 @@ export function useAutoPaste() {
 
   /**
    * Obtiene las dimensiones del área disponible en el contexto actual
-   * considerando la vista activa (XY o XZ) y las dimensiones apropiadas
+   * considerando la vista activa (XY o XZ), las dimensiones apropiadas y el polígono de la planta
    */
   const getAreaBounds = () => {
     const contexto = canvasStore.contextoActual
     const vistaActiva = canvasStore.vistaActiva
     const canvasAdaptativo = canvasStore.canvasAdaptativo
     let bounds = { minX: 0, minY: 0, maxX: 0, maxY: 0 }
+    let polygonPoints = null
+    let insetPolygon = null
 
     if (contexto.tipo === 'plantas') {
       const planta = canvasStore.plantaPorId(contexto.id)
-      if (planta?.dimensiones) {
-        // En plantas, usar las dimensiones reales según la vista
+      // Intentar obtener el polígono de la planta primero
+      if (planta?.poligono && Array.isArray(planta.poligono) && planta.poligono.length > 0) {
+        // Los puntos ya están en pixeles, y solo se usa en vista XY
+        polygonPoints = planta.poligono.map(p => ({
+          x: (p.x || 0),
+          y: (p.y || 0)
+        }))
+
+        if (polygonPoints && polygonPoints.length > 0) {
+          // Crear polígono con margen de seguridad (inset)
+          insetPolygon = polygonInset(polygonPoints, 5) // 5px de margen
+
+          // Calcular los límites rectangulares del polígono
+          const xs = polygonPoints.map(p => p.x)
+          const ys = polygonPoints.map(p => p.y)
+          bounds.minX = Math.min(...xs)
+          bounds.maxX = Math.max(...xs)
+          bounds.minY = Math.min(...ys)
+          bounds.maxY = Math.max(...ys)
+        }
+      }
+      // Si no hay polígono, usar dimensiones rectangulares
+      if (!polygonPoints && planta?.dimensiones) {
         if (vistaActiva === 'XY') {
           // Vista desde arriba: X=ancho, Y=largo
           bounds.maxX = (planta.dimensiones.ancho || 0) * CM_TO_PX
@@ -169,7 +231,12 @@ export function useAutoPaste() {
       bounds.maxY = canvasAdaptativo.height || 0
     }
 
-    return bounds
+    return {
+      ...bounds,
+      polygon: polygonPoints,
+      insetPolygon: insetPolygon,
+      hasPolygon: !!polygonPoints && polygonPoints.length > 0
+    }
   }
 
   /**
@@ -300,7 +367,25 @@ export function useAutoPaste() {
     // 4.1.2 Crear matriz de ocupación para optimizar validaciones
     const occupancyGrid = createOccupancyGrid(areaBounds, neighbors, Math.min(gridSize, 20))    // Función optimizada para verificar si una posición es válida
     const isPositionValid = (x, y) => {
-      // 4.1.2 Verificación rápida usando matriz de ocupación
+      // 1. Verificar primero si estamos dentro del polígono (si existe)
+      if (areaBounds.hasPolygon && areaBounds.insetPolygon) {
+        // Verificar si las 4 esquinas del rectángulo están dentro del polígono
+        const corners = [
+          { x, y }, // Esquina superior izquierda
+          { x: x + elementWidth, y }, // Esquina superior derecha
+          { x, y: y + elementHeight }, // Esquina inferior izquierda
+          { x: x + elementWidth, y: y + elementHeight } // Esquina inferior derecha
+        ]
+
+        // Si alguna esquina está fuera del polígono, rechazar posición
+        const allCornersInside = corners.every(corner =>
+          pointInPolygon(corner, areaBounds.insetPolygon)
+        )
+
+        if (!allCornersInside) return false
+      }
+
+      // 2. Verificación rápida usando matriz de ocupación
       if (isOccupiedInGrid(occupancyGrid, x, y, elementWidth, elementHeight)) {
         return false // Filtro rápido: área ocupada según la matriz
       }
@@ -310,12 +395,12 @@ export function useAutoPaste() {
       // Crear elemento temporal con la nueva posición
       const elementoTemporal = { ...elemento, x, y }
 
-      // 1. Verificar compatibilidad de ubicación
+      // 3. Verificar compatibilidad de ubicación
       if (!isLocationCompatible(elemento, canvasStore.contextoActual)) {
         return false
       }
 
-      // 2. Verificar que esté dentro del área y sin colisiones básicas
+      // 4. Verificar que esté dentro del área y sin colisiones básicas
       if (!isPlacementValid({
         pos: position,
         movingEl: elemento,
@@ -327,7 +412,7 @@ export function useAutoPaste() {
         return false
       }
 
-      // 3. Validar peso máximo
+      // 5. Validar peso máximo
       try {
         const resultadoValidacionPeso = weightValidation.validarPesoElemento(
           elemento,
@@ -343,7 +428,7 @@ export function useAutoPaste() {
         return false
       }
 
-      // 4. Validar placement guards (crítico para elementos de pared)
+      // 6. Validar placement guards (crítico para elementos de pared)
       try {
         const guardResult = placementGuards.onDragMoveGuard(elementoTemporal, position)
 
@@ -355,13 +440,28 @@ export function useAutoPaste() {
       } catch (error) {
         return false
       }
-    }    // Configurar posición inicial (centro del área si no se especifica)
-    let initialX = Math.floor(areaWidth / 2) + areaBounds.minX
-    let initialY = Math.floor(areaHeight / 2) + areaBounds.minY
+    }
+
+    // Configurar posición inicial considerando polígono si existe
+    let initialX, initialY
 
     if (startPosition) {
+      // Si se especifica una posición, usarla (con límites)
       initialX = Math.max(areaBounds.minX, Math.min(startPosition.x, areaBounds.maxX - elementWidth))
       initialY = Math.max(areaBounds.minY, Math.min(startPosition.y, areaBounds.maxY - elementHeight))
+    } else if (areaBounds.hasPolygon && areaBounds.polygon) {
+      // Si hay polígono, intentar usar su centroide como punto inicial
+      const centroid = calculatePolygonCentroid(areaBounds.polygon)
+      initialX = centroid.x - elementWidth / 2
+      initialY = centroid.y - elementHeight / 2
+
+      // Asegurar que la posición inicial esté dentro de los límites
+      initialX = Math.max(areaBounds.minX, Math.min(initialX, areaBounds.maxX - elementWidth))
+      initialY = Math.max(areaBounds.minY, Math.min(initialY, areaBounds.maxY - elementHeight))
+    } else {
+      // Fallback: centro del área rectangular
+      initialX = Math.floor(areaWidth / 2) + areaBounds.minX
+      initialY = Math.floor(areaHeight / 2) + areaBounds.minY
     }
 
     // Intentar posición inicial
@@ -689,6 +789,7 @@ export function useAutoPaste() {
     isLocationCompatible,
     getAreaBounds,
     getElementDimensions,
+    calculatePolygonCentroid,
     // Nuevas funciones de optimización
     createOccupancyGrid,
     isOccupiedInGrid
