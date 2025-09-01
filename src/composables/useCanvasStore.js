@@ -1306,6 +1306,35 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   // === FIN FUNCIONES DE SERIALIZACIÓN ===
+  const persist = () => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('canvasState', serialize())
+      }
+    } catch (err) {
+      console.warn('Error persisting canvas state', err)
+    }
+  }
+
+  const updateElementById = (id, patch) => {
+    const ok = actualizarElemento(id, patch, true)
+    if (!ok) return false
+    const el = elementos.value.find(e => e.id === id)
+    if (el) {
+      el.updatedAt = new Date().toISOString()
+      if ((el.tipo === 'contenedores' || el.categoria === 'contenedores') && patch.dimensiones) {
+        const d = el.dimensiones || {}
+        if (el.forma === 'circular') {
+          el.volumenMaximo = (Math.PI * Math.pow((d.ancho || 0) / 2, 2) * (d.alto || 0)) / 1_000_000
+        } else {
+          el.volumenMaximo = ((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000
+        }
+      }
+    }
+    persist()
+    return true
+  }
+
 
   const abrirEditor = (plantaId = null) => {
     if (plantaId) {
@@ -1557,6 +1586,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     seleccionarElemento,
     actualizarPosicion,
     actualizarElemento,
+    updateElementById,
     configurarZoom,
     configurarPan,
     setGridSize,
