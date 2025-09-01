@@ -92,6 +92,11 @@
               </p>
             </div>
             <p v-if="advertenciaAltura" class="text-xs text-amber-600">{{ advertenciaAltura }}</p>
+            <p v-if="dimensionError" class="text-xs text-red-600">{{ dimensionError }}</p>
+            <ul v-if="dimensionSugerencias && dimensionSugerencias.length" class="list-disc ml-5 text-xs text-gray-600">
+              <li v-for="(s,i) in dimensionSugerencias" :key="i">{{ s }}</li>
+            </ul>
+            <p v-if="posicionAjustadaBadge" class="text-xs text-emerald-700">Se ajustó posición para evitar desbordamiento/colisión.</p>
           </div>
         </details>
 
@@ -172,19 +177,22 @@ import { deepClone, deepEqual, makePatch } from '@/utils/object'
 import { useToast } from '@/composables/useToast.js'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { useWeightValidation } from '@/composables/useWeightValidation.js'
-
-const EPSILON = 1e-6
+import { useDimensionValidation } from '@/composables/useDimensionValidation.js'
 
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
 const confirmDialog = useConfirmDialog()
 const { validarPesoElemento, calcularPesoDisponible, contextoActualTieneLimiteDePeso, infoPesoContextoActual } = useWeightValidation()
+const { validarDimensiones, aplicarResultadoValidacion } = useDimensionValidation()
 
 const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoCompleto)
 
 const snapshotOriginal = ref(null)
 const edited = ref(null)
 const isSaving = ref(false)
+const dimensionError = ref(null)
+const dimensionSugerencias = ref([])
+const posicionAjustadaBadge = ref(false)
 
 const cargarDesdeStore = (el) => deepClone({
   nombre: el.nombre || '',
@@ -229,17 +237,57 @@ const guardarDeshabilitado = computed(() =>
 
 const revertir = () => {
   edited.value = deepClone(snapshotOriginal.value)
+  dimensionError.value = null
+  dimensionSugerencias.value = []
+  posicionAjustadaBadge.value = false
 }
 
 const guardar = async () => {
   if (!elementoSeleccionado.value) return
   if (guardarDeshabilitado.value) return
   isSaving.value = true
-  // Validación de peso antes de persistir
-  if (advertenciaPeso.value) {
-    showWarning(advertenciaPeso.value)
+  // Reset UI de validación
+  dimensionError.value = null
+  dimensionSugerencias.value = []
+  posicionAjustadaBadge.value = false
+
+  // 1) Validación de dimensiones (cm)
+  let anchoCm, largoCm, altoCm
+  if (esCircular.value) {
+    const diam = Number(edited.value?.diametroCm)
+    if (!Number.isFinite(diam) || diam <= 0) {
+      dimensionError.value = 'El diámetro debe ser mayor a 0.'
+      isSaving.value = false
+      return
+    }
+    anchoCm = diam
+    largoCm = diam
+  } else {
+    anchoCm = Number(edited.value?.dimensiones?.ancho)
+    largoCm = Number(edited.value?.dimensiones?.largo)
+  }
+  altoCm = Number(edited.value?.dimensiones?.alto)
+  if (!Number.isFinite(anchoCm) || anchoCm <= 0 || !Number.isFinite(largoCm) || largoCm <= 0 || !Number.isFinite(altoCm) || altoCm <= 0) {
+    dimensionError.value = 'Las dimensiones deben ser números válidos y mayores a 0.'
     isSaving.value = false
     return
+  }
+  }
+
+  const resultadoDims = validarDimensiones(
+    elementoSeleccionado.value.id,
+    { ancho: anchoCm, largo: largoCm, alto: altoCm },
+    { silencioso: false },
+  )
+  if (!resultadoDims?.valida) {
+    dimensionError.value = resultadoDims?.razon || 'Dimensiones inválidas'
+    dimensionSugerencias.value = resultadoDims?.sugerencias || []
+    isSaving.value = false
+    return
+  }
+  if (resultadoDims?.accion === 'aplicar') {
+    const res = aplicarResultadoValidacion(elementoSeleccionado.value.id, resultadoDims)
+    posicionAjustadaBadge.value = !!res?.posicionAjustada
   }
   const patch = makePatch(snapshotOriginal.value, edited.value)
 
@@ -271,6 +319,15 @@ const guardar = async () => {
     delete patch.diametroCm
   }
   const diamChanged = esCircular.value && (snapshotOriginal.value?.diametroCm !== edited.value?.diametroCm)
+
+  // 3) Validación de peso después de dimensiones
+  if (advertenciaPeso.value) {
+    showWarning(advertenciaPeso.value)
+    isSaving.value = false
+    return
+  }
+
+  // 4) Persistencia final
   const ok = await canvasStore.updateElementById(elementoSeleccionado.value.id, patch)
   if (ok) {
     snapshotOriginal.value = deepClone(edited.value)
@@ -281,13 +338,8 @@ const guardar = async () => {
 
 const validarDimension = (prop) => {
   const val = Number(edited.value.dimensiones[prop])
-  const max = alturaPlanta.value
-
   if (isNaN(val) || val < 0) {
     showWarning('El valor debe ser mayor o igual a 0')
-    edited.value.dimensiones[prop] = snapshotOriginal.value.dimensiones[prop]
-  } else if (val > max) {
-    showWarning(`La altura no debe superar ${max} cm`)
     edited.value.dimensiones[prop] = snapshotOriginal.value.dimensiones[prop]
   }
 }
