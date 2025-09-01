@@ -295,9 +295,9 @@ const volumen = computed(() => {
 const alturaPlanta = computed(() => canvasStore.plantaPorId(canvasStore.plantaActiva)?.dimensiones?.alto || 0)
 const advertenciaAltura = computed(() => {
   if (!esAnaquelOEstante.value) return null
-  const min = alturaPlanta.value * 0.5
+  const max = alturaPlanta.value;
   const actual = edited.value?.dimensiones?.alto || 0
-  return actual < min ? `La altura debe ser al menos ${min} cm` : null
+  return actual > max ? `La altura no debe superar ${max} cm` : null
 })
 
 const deseleccionarElemento = () => {
