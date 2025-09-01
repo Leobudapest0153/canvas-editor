@@ -71,7 +71,7 @@ function getSnapPoints(element) {
  * @param {Array} otherElements - Otros elementos para comparar
  * @returns {Object} - Resultado del snap con posición ajustada y guías
  */
-function detectSnap(movingElement, candidateX, candidateY, otherElements) {
+function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBounds) {
   // Validar entrada
   if (!movingElement || !Array.isArray(otherElements) || 
       typeof candidateX !== 'number' || typeof candidateY !== 'number') {
@@ -185,6 +185,82 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements) {
       break
     }
   }
+
+  // Además, detectar snap contra los bordes de la página (si se proporcionan)
+  if (pageBounds && (typeof pageBounds.width === 'number') && (typeof pageBounds.height === 'number')) {
+    const W = pageBounds.width
+    const H = pageBounds.height
+
+    // Crear puntos de borde como objetos comparables
+    const pageVLines = [
+      { x: 0, label: 'page-left' },
+      { x: W, label: 'page-right' },
+      { x: W / 2, label: 'page-center' },
+    ]
+
+    const pageHLines = [
+      { y: 0, label: 'page-top' },
+      { y: H, label: 'page-bottom' },
+      { y: H / 2, label: 'page-center' },
+    ]
+
+    // Vertical page lines
+    for (const movingVLine of movingPoints.verticalLines) {
+      for (const pV of pageVLines) {
+        const distance = Math.abs(movingVLine.x - pV.x)
+        if (distance <= SNAP_DISTANCE) {
+          const priority = (movingVLine.label === 'center' || pV.label.includes('center')) ? 2 : 1
+          if (!snapResult.snappedX || priority > snapResult.snapPriorityX) {
+            const adjustment = pV.x - movingVLine.x
+            snapResult.x = candidateX + adjustment
+            snapResult.snappedX = true
+            snapResult.snapPriorityX = priority
+            if (priority > 1) snapResult.guides = snapResult.guides.filter(g => g.type !== 'vertical')
+
+            // Crear guía hacia el borde de la página
+            const guide = {
+              type: 'vertical',
+              x: pV.x,
+              y1: Math.min(movingElement.y - GUIDE_EXTEND, 0),
+              y2: Math.max(movingElement.y + movingElement.height + GUIDE_EXTEND, H),
+              movingLabel: movingVLine.label,
+              otherLabel: pV.label,
+              otherElementId: '__page__'
+            }
+            snapResult.guides.push(guide)
+          }
+        }
+      }
+    }
+
+    // Horizontal page lines
+    for (const movingHLine of movingPoints.horizontalLines) {
+      for (const pH of pageHLines) {
+        const distance = Math.abs(movingHLine.y - pH.y)
+        if (distance <= SNAP_DISTANCE) {
+          const priority = (movingHLine.label === 'center' || pH.label.includes('center')) ? 2 : 1
+          if (!snapResult.snappedY || priority > snapResult.snapPriorityY) {
+            const adjustment = pH.y - movingHLine.y
+            snapResult.y = candidateY + adjustment
+            snapResult.snappedY = true
+            snapResult.snapPriorityY = priority
+            if (priority > 1) snapResult.guides = snapResult.guides.filter(g => g.type !== 'horizontal')
+
+            const guide = {
+              type: 'horizontal',
+              y: pH.y,
+              x1: Math.min(movingElement.x - GUIDE_EXTEND, 0),
+              x2: Math.max(movingElement.x + movingElement.width + GUIDE_EXTEND, W),
+              movingLabel: movingHLine.label,
+              otherLabel: pH.label,
+              otherElementId: '__page__'
+            }
+            snapResult.guides.push(guide)
+          }
+        }
+      }
+    }
+  }
   
   return snapResult
 }
@@ -256,13 +332,14 @@ export function useObjectSnapping() {
    * @param {Array} otherElements - Otros elementos en el canvas
    * @returns {Object} - Posición final ajustada
    */
-  function performSnap(movingElement, candidateX, candidateY, otherElements) {
-    if (!movingElement || !otherElements?.length) {
+  function performSnap(movingElement, candidateX, candidateY, otherElements, pageBounds) {
+    if (!movingElement) {
       clearGuides()
       return { x: candidateX, y: candidateY }
     }
-    
-    const snapResult = detectSnap(movingElement, candidateX, candidateY, otherElements)
+
+    // Pasar pageBounds a detectSnap; permitir que pageBounds genere guías aun si no hay otros elementos
+    const snapResult = detectSnap(movingElement, candidateX, candidateY, otherElements || [], pageBounds)
     
     // Actualizar guías activas
     activeGuides.value = snapResult.guides
