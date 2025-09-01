@@ -16,7 +16,8 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX } from '@/utils/constants'
+import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/utils/constants'
+import { computeDimsByAxisScale, toCanvasSizePx } from '@/utils/dimensionPolicy'
 import { useAutoSave } from '@/composables/useAutoSave'
 import {
   validateWallZBaseRequired,
@@ -101,13 +102,15 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const isDraggable = ref(true)
   // Configuración de grilla y snap
-  const gridSize = ref(50) // px entre líneas de grilla
+  // Por defecto desactivamos la cuadrícula (0 = sin cuadricula visual ni snap a grilla)
+  const gridSize = ref(0) // px entre líneas de grilla (0 desactiva)
   const snapGridEps = ref(10) // px de proximidad para aplicar snap al soltar
 
   const setGridSize = (sizePx) => {
     const s = Number(sizePx)
     if (!Number.isFinite(s)) return
-    gridSize.value = Math.max(5, Math.min(500, s))
+    // Permitimos 0 para desactivar la grilla; rango [0,500]
+    gridSize.value = Math.max(0, Math.min(500, s))
   }
   const setSnapGridEps = (epsPx) => {
     const e = Number(epsPx)
@@ -767,6 +770,40 @@ export const useCanvasStore = defineStore('canvas', () => {
     const planta = plantas.value.find((p) => p.id === plantaId)
     if (planta) {
       Object.assign(planta, datosActualizados)
+      try {
+        // Recalcular dimensiones de hijos (solo elementos de sistema) si aplica
+        const shouldAuto = DIMENSIONS?.autoResizeOnParentChange !== false
+        if (shouldAuto && planta?.dimensiones) {
+          const parentDims = {
+            w: planta.dimensiones.ancho,
+            h: planta.dimensiones.largo,
+            d: planta.dimensiones.alto,
+          }
+          const elems = elementos.value.filter(
+            (el) => el.plantaId === plantaId && !el.padre && el.tipo === 'elementos'
+          )
+          for (const el of elems) {
+            const typeKey = el.systemTypeKey || el.id
+            const isSystemDefault = !!(
+              typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey)
+            )
+            if (!isSystemDefault) continue
+            if (el.dimensionLock === true) continue
+            const dims = computeDimsByAxisScale(typeKey, parentDims, { snap: true, gridPx: gridSize.value })
+            if (!dims) continue
+            // Persistir nuevas dimensiones; width/height se recalculan según vista en actualizarElemento
+            actualizarElemento(el.id, { dimensiones: dims }, true, `Auto-resize por cambio de planta: ${el.nombre || el.id}`)
+            // Offset vertical configurable (por tipo) — solo si aplica
+            const off = OFFSETS?.offsetByType?.[typeKey]?.zOffsetShare
+            if (typeof off === 'number' && isFinite(off)) {
+              const zBase = Math.round((planta.dimensiones.alto || 0) * off)
+              actualizarElemento(el.id, { alturaRespectoAlSuelo: zBase })
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Recalculo de dimensiones al editar planta falló:', e)
+      }
     }
   }
 
@@ -905,6 +942,44 @@ export const useCanvasStore = defineStore('canvas', () => {
           totalElementosEnPlanta: planta.elementos.length,
         })
       }
+    }
+
+    // Política de dimensiones al crear en planta para elementos de sistema
+    try {
+      const shouldAuto = true
+      if (shouldAuto && nuevoElemento.tipo === 'elementos') {
+        const typeKey = nuevoElemento.systemTypeKey || nuevoElemento.id
+        const isSystemDefault = !!(
+          typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey)
+        )
+        const isLocked = nuevoElemento.dimensionLock === true
+        if (isSystemDefault && !isLocked) {
+          const planta = plantas.value.find((p) => p.id === nuevoElemento.plantaId)
+          if (planta && planta.dimensiones) {
+            const parentDims = {
+              w: planta.dimensiones.ancho,
+              h: planta.dimensiones.largo,
+              d: planta.dimensiones.alto,
+            }
+            const dims = computeDimsByAxisScale(typeKey, parentDims, { snap: true, gridPx: gridSize.value })
+            if (dims) {
+              // Ajustar dimensiones de modelo
+              nuevoElemento.dimensiones = { ...nuevoElemento.dimensiones, ...dims }
+              // Ajustar canvas en px según vista actual
+              const { width, height } = toCanvasSizePx(dims, 'XY')
+              if (Number.isFinite(width)) nuevoElemento.width = width
+              if (Number.isFinite(height)) nuevoElemento.height = height
+            }
+            // Offset vertical configurable (por tipo)
+            const off = OFFSETS?.offsetByType?.[typeKey]?.zOffsetShare
+            if (typeof off === 'number' && isFinite(off)) {
+              nuevoElemento.alturaRespectoAlSuelo = Math.round((planta.dimensiones.alto || 0) * off)
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Auto-scale on create failed:', e)
     }
 
     elementos.value.push(nuevoElemento)
@@ -1075,6 +1150,9 @@ export const useCanvasStore = defineStore('canvas', () => {
         pesoMaximo: elemento.pesoMaximo || 0,
         volumenMaximo: elemento.volumenMaximo || 0,
         ubicacion: elemento.ubicacion || 'suelo',
+        // Política de dimensiones
+        dimensionLock: elemento.dimensionLock === true,
+        systemTypeKey: elemento.systemTypeKey || null,
 
         // Canvas representacion
         canvas: {
@@ -1169,6 +1247,9 @@ export const useCanvasStore = defineStore('canvas', () => {
           pesoMaximo: elementoData.pesoMaximo || 0,
           volumenMaximo: elementoData.volumenMaximo || 0,
           ubicacion: elementoData.ubicacion || 'suelo',
+          // Política de dimensiones
+          dimensionLock: elementoData.dimensionLock === true,
+          systemTypeKey: elementoData.systemTypeKey || null,
 
           width: elementoData.canvas.width,
           height: elementoData.canvas.height || 60,

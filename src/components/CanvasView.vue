@@ -65,28 +65,31 @@
             listening: false,
           }"
         />
-        <v-line
-          v-for="i in gridLines.vertical"
-          :key="`v-${i}`"
-          :config="{
-            points: [i, 0, i, floorBoundary.height],
-            stroke: '#e5e7eb',
-            strokeWidth: 1,
-            opacity: 0.5,
-            listening: false,
-          }"
-        />
-        <v-line
-          v-for="i in gridLines.horizontal"
-          :key="`h-${i}`"
-          :config="{
-            points: [0, i, floorBoundary.width, i],
-            stroke: '#e5e7eb',
-            strokeWidth: 1,
-            opacity: 0.5,
-            listening: false,
-          }"
-        />
+        <!-- Dibujar grid solo si gridSize > 0 -->
+        <template v-if="(canvasStore.gridSize || 0) > 0">
+          <v-line
+            v-for="i in gridLines.vertical"
+            :key="`v-${i}`"
+            :config="{
+              points: [i, 0, i, floorBoundary.height],
+              stroke: '#e5e7eb',
+              strokeWidth: 1,
+              opacity: 0.5,
+              listening: false,
+            }"
+          />
+          <v-line
+            v-for="i in gridLines.horizontal"
+            :key="`h-${i}`"
+            :config="{
+              points: [0, i, floorBoundary.width, i],
+              stroke: '#e5e7eb',
+              strokeWidth: 1,
+              opacity: 0.5,
+              listening: false,
+            }"
+          />
+        </template>
       </v-layer>
       <v-layer ref="layerRef">
         <template v-if="canvasStore.elementoAura">
@@ -135,7 +138,7 @@
               height: elemento.height,
               fill: elemento.color,
               stroke: getStrokeColor(elemento.id),
-              strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
+              strokeWidth: 1,
               opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
               draggable: canDragElement(elemento.id),
               shadowColor: getElementShadow(elemento).color,
@@ -208,7 +211,7 @@
               radius: Math.min(elemento.width, elemento.height) / 2,
               fill: elemento.color,
               stroke: getStrokeColor(elemento.id),
-              strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
+              strokeWidth: 1,
               opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
               draggable: canDragElement(elemento.id),
               shadowColor: getElementShadow(elemento).color,
@@ -241,7 +244,7 @@
               height: elemento.height,
               fill: elemento.color,
               stroke: getStrokeColor(elemento.id),
-              strokeWidth: canvasStore.elementoSeleccionado === elemento.id ? 3 : 1,
+              strokeWidth: 1,
               opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
               draggable: canDragElement(elemento.id),
               shadowColor: 'black',
@@ -668,7 +671,8 @@ import {
 import { clampRectToPolygon, pointInPolygon, clampPointToPolygon } from '@/utils/polygonBounds'
 import { handleCanvasHotkeys } from '@/utils/canvasHotkeys'
 import { polygonInset } from '@/utils/polygonInset'
-import { GRID_SIZE, CM_TO_PX } from '@/utils/constants'
+import { GRID_SIZE, CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/utils/constants'
+import { computeDimsByAxisScale, toCanvasSizePx } from '@/utils/dimensionPolicy'
 import { getActiveBounds } from '@/utils/activeBounds'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -744,8 +748,8 @@ const {
   clearGuides
 } = useObjectSnapping()
 
-// Estado para controlar si el snapping está habilitado
-const isSnappingEnabled = ref(true)
+// Estado para controlar si el snapping está habilitado (por defecto desactivado — evita alineado automático)
+const isSnappingEnabled = ref(false)
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -948,9 +952,14 @@ const elementosVisiblesEnCanvas = computed(() => {
 
 // Grid de referencia - BASADO EN LAS DIMENSIONES DEL LAYER
 const gridLines = computed(() => {
-  const gridSizePx = canvasStore.gridSize || 50
+  const gridSizePx = Number(canvasStore.gridSize || 0)
   const vertical = []
   const horizontal = []
+
+  // Si gridSize <= 0, no generar líneas
+  if (!gridSizePx || gridSizePx <= 0) {
+    return { vertical, horizontal }
+  }
 
   // Usar las dimensiones del layer (planta) para el grid
   const layerWidth = floorBoundary.value.width
@@ -1086,9 +1095,10 @@ const lastDesiredPosMap = ref(new Map())
 const lastVelocityMap = ref(new Map())
 
 // Helper: color de borde con feedback
+// No usamos un color oscuro para el elemento seleccionado — mantenemos un borde sutil.
 const getStrokeColor = (elementId) => {
   if (atEdgeMap.value.get(elementId)) return '#f59e0b' // advertencia en borde
-  return canvasStore.elementoSeleccionado === elementId ? '#000' : '#666'
+  return '#666'
 }
 
 // Convierte posición stage->layer considerando zoom/pan
@@ -1396,7 +1406,7 @@ const endElementDrag = async (elementId) => {
           movingEl: asRect,
           neighbors,
           areaBounds,
-          grid: canvasStore.gridSize || 50,
+          grid: canvasStore.gridSize ?? GRID_SIZE,
           lastValidPos: lastPos,
           CM_TO_PX,
           strokePx,
@@ -1437,7 +1447,7 @@ const endElementDrag = async (elementId) => {
             movingEl: asRect,
             neighbors,
             areaBounds,
-            grid: canvasStore.gridSize || 50,
+            grid: canvasStore.gridSize ?? GRID_SIZE,
             lastValidPos: lastPos,
             CM_TO_PX,
             strokePx,
@@ -1736,18 +1746,48 @@ const createElementFromDrop = (data, dropEvent) => {
   // ===== CONTINUAR CON LA LÓGICA EXISTENTE =====
 
   // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
-  const { width, height } = getElementPixelDimensions(elemento)
+  let { width, height } = getElementPixelDimensions(elemento)
 
   // Obtener dimensiones originales en cm para guardar (preservar todas las dimensiones)
-  const anchoCm = elemento.dimensiones?.ancho || 100
-  const largoCm = elemento.dimensiones?.largo || 60
-  const altoCm = elemento.dimensiones?.alto || 20
+  let anchoCm = elemento.dimensiones?.ancho || 100
+  let largoCm = elemento.dimensiones?.largo || 60
+  let altoCm = elemento.dimensiones?.alto || 20
+
+  // Política de dimensiones para elementos de sistema por defecto
+  const isSystemDefault = !!(elemento?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(elemento.id))
+  if (isSystemDefault && elemento?.dimensionLock !== true) {
+    const planta = canvasStore.plantaActivaData
+    if (planta && planta.dimensiones) {
+      const parentDims = {
+        w: planta.dimensiones.ancho,
+        h: planta.dimensiones.largo,
+        d: planta.dimensiones.alto,
+      }
+      const dims = computeDimsByAxisScale(elemento.id, parentDims, { snap: true, gridPx: GRID_SIZE })
+      if (dims) {
+        anchoCm = dims.ancho
+        largoCm = dims.largo
+        altoCm = dims.alto
+        const sizePx = toCanvasSizePx(dims, 'XY')
+        width = sizePx.width
+        height = sizePx.height
+      }
+      // Offset vertical para estante de pared (altura desde el suelo)
+      const off = OFFSETS?.offsetByType?.[elemento.id]?.zOffsetShare
+      if (typeof off === 'number' && isFinite(off)) {
+        // Redondear a cm enteros
+        const zBase = Math.round((planta.dimensiones.alto || 0) * off)
+        // Usar en la instancia recién creada
+        elemento.alturaRespectoAlSuelo = zBase
+      }
+    }
+  }
 
   // Aplicar dimensiones mínimas para mejorar la interacción
   const MIN_WIDTH = 40
   const MIN_HEIGHT = 30
-  const finalWidth = Math.max(width, MIN_WIDTH)
-  const finalHeight = Math.max(height, MIN_HEIGHT)
+  let finalWidth = Math.max(width, MIN_WIDTH)
+  let finalHeight = Math.max(height, MIN_HEIGHT)
 
   // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
   const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
@@ -1756,8 +1796,8 @@ const createElementFromDrop = (data, dropEvent) => {
   let candX = worldCoords.x - finalWidth / 2
   let candY = worldCoords.y - finalHeight / 2
 
-  // 3. Aplicar snap a grilla ANTES de validar
-  const snapped = snapToGrid(candX, candY, GRID_SIZE)
+  // 3. Aplicar snap a grilla ANTES de validar (usar valor runtime de canvasStore.gridSize: 0 desactiva)
+  const snapped = snapToGrid(candX, candY, canvasStore.gridSize ?? GRID_SIZE)
   candX = snapped.x
   candY = snapped.y
 
@@ -1854,7 +1894,7 @@ const createElementFromDrop = (data, dropEvent) => {
       boundary,
       allElements,
       tempElement,
-      GRID_SIZE,
+      canvasStore.gridSize ?? GRID_SIZE,
       16, // máximo 16 intentos
       detectConflictsFor, // Pasar la función como parámetro
     )
@@ -1940,6 +1980,9 @@ const createElementFromDrop = (data, dropEvent) => {
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
     volumenMaximo: anchoCm * largoCmFinal * altoCm,
+    // Política de dimensiones
+    dimensionLock: false,
+    systemTypeKey: elemento.id,
     uso: {
       volumen: 0,
       peso: 0
@@ -2224,8 +2267,8 @@ const createElementFromBuffer = (data, dropEvent) => {
   let candX = worldCoords.x - width / 2
   let candY = worldCoords.y - height / 2
 
-  // 3. Aplicar snap a grilla ANTES de validar
-  const snapped = snapToGrid(candX, candY, GRID_SIZE)
+  // 3. Aplicar snap a grilla ANTES de validar (usar valor runtime de canvasStore.gridSize: 0 desactiva)
+  const snapped = snapToGrid(candX, candY, canvasStore.gridSize ?? GRID_SIZE)
   candX = snapped.x
   candY = snapped.y
 
@@ -2283,7 +2326,7 @@ const createElementFromBuffer = (data, dropEvent) => {
       boundary,
       allElements,
       tempElement,
-      GRID_SIZE,
+      canvasStore.gridSize ?? GRID_SIZE,
       16,
       detectConflictsFor, // Pasar la función como parámetro
     )
@@ -2569,7 +2612,12 @@ const handleTransformEnd = (e, elementId, forma) => {
       node.x(x)
       node.y(y)
     }
-    canvasStore.actualizarElemento(elementId, { x, y, width, height, rotation, dimensiones: newDimensiones }, true, `Elemento redimensionado: ${elemento?.nombre || elemento?.tipo || elementId}`)
+    canvasStore.actualizarElemento(
+      elementId,
+      { x, y, width, height, rotation, dimensiones: newDimensiones, dimensionLock: true },
+      true,
+      `Elemento redimensionado: ${elemento?.nombre || elemento?.tipo || elementId}`
+    )
     lastValidPositions.value.set(elementId, { x, y })
     nextTick(() => setupTransformer())
   } catch (err) {
