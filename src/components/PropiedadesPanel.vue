@@ -113,6 +113,29 @@
           </div>
         </details>
 
+        <!-- Posicionamiento en pared -->
+        <details v-if="esPared" open class="bg-gray-50 rounded-lg p-4">
+          <summary class="text-sm font-medium text-gray-700 cursor-pointer">Posicionamiento en pared</summary>
+          <div class="mt-3 space-y-3">
+            <div>
+              <label class="text-sm text-gray-500">Altura sobre el suelo</label>
+              <div class="flex items-center">
+                <input
+                  type="number"
+                  :min="0"
+                  :max="maxAlturaSobreSuelo"
+                  v-model.number="edited.alturaSobreSueloCm"
+                  @change="validarAlturaSobreSuelo"
+                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  :disabled="isSaving || !esPared"
+                />
+                <span class="ml-1 text-sm text-gray-500">cm</span>
+              </div>
+              <p v-if="advertenciaZBase" class="text-xs text-amber-600">{{ advertenciaZBase }}</p>
+            </div>
+          </div>
+        </details>
+
         <!-- Capacidad -->
         <details v-if="mostrarCapacidad" open class="bg-gray-50 rounded-lg p-4">
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">Capacidad</summary>
@@ -178,7 +201,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useCanvasStore } from '@/composables/useCanvasStore.js'
-import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS } from '@/utils/constants'
+import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX } from '@/utils/constants'
 import { deepClone, deepEqual, makePatch } from '@/utils/object'
 import { useToast } from '@/composables/useToast.js'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
@@ -202,6 +225,9 @@ const cargarDesdeStore = (el) => deepClone({
     alto: el.dimensiones?.alto || 0,
   },
   pesoMaximo: el.pesoMaximo || 0,
+  alturaSobreSueloCm: el.alturaSobreSueloCm != null
+    ? Number(el.alturaSobreSueloCm)
+    : (el.alturaRespectoAlSuelo != null ? Number(el.alturaRespectoAlSuelo) : 0),
 })
 
 watch(() => elementoSeleccionado.value?.id, (id) => {
@@ -219,7 +245,7 @@ const isDirty = computed(() => {
   return !deepEqual(edited.value, snapshotOriginal.value)
 })
 
-const guardarDeshabilitado = computed(() => isSaving.value || !!advertenciaAltura.value)
+const guardarDeshabilitado = computed(() => isSaving.value || !!advertenciaAltura.value || !!advertenciaZBase.value)
 
 const revertir = () => {
   edited.value = deepClone(snapshotOriginal.value)
@@ -230,6 +256,24 @@ const guardar = async () => {
   if (guardarDeshabilitado.value) return
   isSaving.value = true
   const patch = makePatch(snapshotOriginal.value, edited.value)
+
+  // Si es un elemento de pared, reflejar valores verticales y posicionar Y en px
+  if (esPared.value) {
+    const zBase = Number(edited.value?.alturaSobreSueloCm) || 0
+    patch.alturaRespectoAlSuelo = zBase
+    patch.alturaSobreSueloCm = zBase
+
+    const alturaTechoCm = Number(canvasStore.plantaPorId(canvasStore.plantaActiva)?.dimensiones?.alto || 0)
+    const altoCm = Number(edited.value?.dimensiones?.alto || elementoSeleccionado.value?.dimensiones?.alto || 0)
+    const yTopPx = (alturaTechoCm - (zBase + altoCm)) * (CM_TO_PX || 10)
+    if (Number.isFinite(yTopPx)) {
+      if (canvasStore.vistaActiva === 'XZ') {
+        patch.y = yTopPx
+      }
+      // Guardar en estructura de posición para futuras vistas XZ
+      patch.posicion = { ...(elementoSeleccionado.value?.posicion || {}), y: yTopPx }
+    }
+  }
   const ok = await canvasStore.updateElementById(elementoSeleccionado.value.id, patch)
   if (ok) {
     snapshotOriginal.value = deepClone(edited.value)
@@ -273,6 +317,8 @@ const esAnaquelOEstante = computed(() => {
   return cat === 'anaqueles' || cat === 'estantes'
 })
 
+const esPared = computed(() => (elementoSeleccionado.value?.ubicacion || '').toLowerCase() === 'pared')
+
 const esContenedorBarril = computed(() => {
   const el = elementoSeleccionado.value
   return el?.tipo === 'contenedores' || el?.categoria === 'contenedores'
@@ -305,6 +351,35 @@ const advertenciaAltura = computed(() => {
   const actual = edited.value?.dimensiones?.alto || 0
   return actual > max ? `La altura no debe superar ${max} cm` : null
 })
+
+const maxAlturaSobreSuelo = computed(() => {
+  const techo = Number(alturaPlanta.value) || 0
+  const alto = Number(edited.value?.dimensiones?.alto || 0)
+  return Math.max(0, techo - alto)
+})
+
+const advertenciaZBase = computed(() => {
+  if (!esPared.value) return null
+  const z = Number(edited.value?.alturaSobreSueloCm)
+  if (!Number.isFinite(z) || z < 0) return 'La altura sobre suelo debe ser mayor o igual a 0 cm'
+  const max = maxAlturaSobreSuelo.value
+  return z > max ? `La altura sobre el suelo no debe superar ${max} cm` : null
+})
+
+const validarAlturaSobreSuelo = () => {
+  if (!esPared.value) return
+  const z = Number(edited.value?.alturaSobreSueloCm)
+  if (!Number.isFinite(z) || z < 0) {
+    showWarning('La altura sobre el suelo debe ser mayor o igual a 0 cm')
+    edited.value.alturaSobreSueloCm = snapshotOriginal.value.alturaSobreSueloCm
+    return
+  }
+  const max = maxAlturaSobreSuelo.value
+  if (z > max) {
+    showWarning(`La altura sobre el suelo no debe superar ${max} cm`)
+    edited.value.alturaSobreSueloCm = snapshotOriginal.value.alturaSobreSueloCm
+  }
+}
 
 const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
