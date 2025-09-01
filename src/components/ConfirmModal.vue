@@ -10,7 +10,15 @@
       </section>
       <footer class="modal-footer">
         <button class="btn" @click="onCancel">{{ cancelLabel }}</button>
-        <button class="btn btn-danger" @click="onConfirm">{{ confirmLabel }}</button>
+        <button 
+          class="btn" 
+          @click="onConfirm"
+          :style="{
+            backgroundColor: background,
+            color: color,
+            border: border,
+            }"
+        >{{ confirmLabel }}</button>
       </footer>
     </div>
   </div>
@@ -29,6 +37,9 @@ const {
   onConfirm,
   onCancel,
   markMounted,
+  background,
+  border,
+  color
 } = useConfirmDialog()
 
 onMounted(() => {

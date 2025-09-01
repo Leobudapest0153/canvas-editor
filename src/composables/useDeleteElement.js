@@ -249,6 +249,46 @@ export function useDeleteElement() {
       cleanReferences(idsToAffect)
     }
 
+    // Verificar que el uso esté en 0 antes de eliminar
+    const childElementsWithUsage = () => {
+      const parent = store.elementos.find(el => el.id== selectedId);
+
+
+      if (parent.categoria === 'contenedores' && parent.uso && (parent.uso.volumen > 0 || parent.uso.peso > 0)) {
+        return true;
+      }
+
+      if (!parent || !parent.hijos || parent.hijos.length === 0) {
+        return false;
+      }
+
+      return parent.hijos.some(hijoId => {
+        const hijo = store.elementos.find(el => el.id === hijoId);
+
+        if (!hijo) {
+          return false;
+        }
+
+        const isContainer = hijo.categoria === 'contenedores';
+        const hasUsage = hijo.uso && (hijo.uso.volumen > 0) || hijo.uso.peso > 0;
+
+        return isContainer && hasUsage;
+      });
+    };
+
+    if (childElementsWithUsage()) {
+      confirmDialog.open({
+        title: 'Acción no permitida',
+        message: 'El elemento ya tiene productos ingresados. No se puede eliminar.',
+        confirmLabel: 'Entendido',
+        background: '#568fec',
+        color: '#FFFFFF',
+        border: '#568fec'
+      });
+      return false
+    }
+
+
     // Confirmación siempre que se solicite
     if (withConfirm) {
       const msg = descendants.size > 0
