@@ -2,7 +2,7 @@ import { resolveVerticalProps } from './fieldResolvers'
 import { narrowPhase2D } from '@/utils/collision'
 
 export const errorsPlacement = {
-  ZBASE_REQUIRED: 'La altura respecto al suelo es obligatoria y debe ser mayor a 0.',
+  ZBASE_REQUIRED: 'Por favor, ingresa una altura válida desde el suelo (mayor a 0).',
   HEIGHT_EXCEEDS_WAREHOUSE:
     'Su altura total excede la altura máxima de la bodega.',
   Z_STACK_CONFLICT: 'Conflicto de altura detectado con otro elemento.',

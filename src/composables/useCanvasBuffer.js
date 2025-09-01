@@ -213,11 +213,11 @@ export const useCanvasBuffer = () => {
 
       // Mostrar mensaje de éxito
       if (typeof window !== 'undefined' && window.__toasts?.show) {
-        const nombreElemento = elemento.nombre || elemento.tipo
-        const mensaje = totalElements > 1
-          ? `Estructura "${nombreElemento}" copiada (${totalElements} elementos)`
-          : `Elemento "${nombreElemento}" copiado`
-        showToast(mensaje, { type: 'info' })
+          const nombreElemento = elemento.nombre || elemento.tipo
+          const mensaje = totalElements > 1
+            ? `Estructura "${nombreElemento}" copiada (${totalElements} elementos)`
+            : `Elemento "${nombreElemento}" copiado al portapapeles`
+          showToast(mensaje, { type: 'info' })
       }
     } else {
       console.error('⚠️ Error al copiar la estructura al buffer')
@@ -493,7 +493,7 @@ export const useCanvasBuffer = () => {
           const totalElements = newElementsMap.size
           const mensaje = totalElements > 1
             ? `Estructura "${nombreElemento}" pegada (${totalElements} elementos)`
-            : `Elemento "${nombreElemento}" pegado`
+            : `Elemento "${nombreElemento}" pegado correctamente`
           showToast(mensaje, { type: 'info' })
         }
 
@@ -528,7 +528,7 @@ export const useCanvasBuffer = () => {
         // Mostrar mensaje de éxito para elemento simple
         if (typeof window !== 'undefined' && window.__toasts?.show) {
           const nombreElemento = elemento.nombre || elemento.tipo
-          showToast(`Elemento "${nombreElemento}" pegado`, { type: 'info' })
+          showToast(`Elemento "${nombreElemento}" pegado correctamente`, { type: 'info' })
         }
 
         return finalElementId
