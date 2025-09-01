@@ -47,6 +47,7 @@ import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
 import { useDeleteElement } from './composables/useDeleteElement'
+import { useAutoPaste } from './composables/useAutoPaste'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 
@@ -55,7 +56,7 @@ import ConfirmModal from './components/ConfirmModal.vue'
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
 const { deleteSelected } = useDeleteElement()
-
+const { handlePaste } = useAutoPaste()
 const showPropiedadesPanel = computed(() => canvasStore.elementoSeleccionadoCompleto)
 
 // Atajos de teclado globales
@@ -80,6 +81,9 @@ const handleKeydown = (e) => {
     } else if (e.key === 'c') {
       e.preventDefault()
       handleCopyToBuffer()
+    } else if (e.key === 'v') {
+      e.preventDefault()
+      handlePaste()
     }
   } else if (e.key === 'Delete' || e.key === 'Backspace') {
     // Supr o Retroceso -> eliminar seleccionado
