@@ -548,6 +548,7 @@
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
       @fill-container="() => simularLlenadoContenedor(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
+      @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
     />
 
     <!-- Menú contextual -->
