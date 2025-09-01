@@ -246,10 +246,16 @@ const validarDimension = (prop) => {
   }
 }
 
+const plantaActiva = computed(() => canvasStore.plantaPorId(canvasStore.plantaActiva) || 0);
+const pesoMaximoSoportado = computed(() => plantaActiva.value?.pesoMaximoSoportado || 0);
+
 const validarPeso = () => {
   const val = Number(edited.value.pesoMaximo)
   if (isNaN(val) || val < 0) {
     showWarning('El valor debe ser mayor o igual a 0')
+    edited.value.pesoMaximo = snapshotOriginal.value.pesoMaximo
+  } else if (val > pesoMaximoSoportado.value) {
+    showWarning(`El valor no debe superar ${pesoMaximoSoportado.value} kg, que es el peso máximo soportado por la planta activa.`)
     edited.value.pesoMaximo = snapshotOriginal.value.pesoMaximo
   }
 }
