@@ -253,10 +253,14 @@ export function useDeleteElement() {
     const childElementsWithUsage = () => {
       const parent = store.elementos.find(el => el.id== selectedId);
 
+
+      if (parent.categoria === 'contenedores' && parent.uso && (parent.uso.volumen > 0 || parent.uso.peso > 0)) {
+        return true;
+      }
+
       if (!parent || !parent.hijos || parent.hijos.length === 0) {
         return false;
       }
-
 
       return parent.hijos.some(hijoId => {
         const hijo = store.elementos.find(el => el.id === hijoId);
