@@ -281,7 +281,7 @@ const elementoEditandoInfo = computed(() => {
 
   // Si el peso máximo que está configurando es menor al actual, mostrar advertencia
   if (localElemento.value.pesoMaximo < pesoActual) {
-    mensaje += ` (¡La capacidad de carga debe ser al menos ${pesoActual} kg!)`;
+  mensaje += ` (la capacidad debe ser al menos ${pesoActual} kg)`;
     claseColor = 'text-red-600';
   }
 
@@ -433,7 +433,7 @@ const handleSubmit = () => {
 
     // Si el nuevo peso máximo es menor que el peso actual de los hijos, mostrar error
     if (resultado.limiteDePeso && nuevoPesoMaximo < pesoActualHijos) {
-      showToast(`La capacidad de carga debe ser al menos ${pesoActualHijos} kg para soportar los elementos actuales contenidos.`, { type: 'error' });
+  showToast(`La capacidad debe ser al menos ${pesoActualHijos} kg para soportar los elementos que contiene.`, { type: 'error' });
       return;
     }
   }

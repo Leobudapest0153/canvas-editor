@@ -2,10 +2,10 @@ import { resolveVerticalProps } from './fieldResolvers'
 import { narrowPhase2D } from '@/utils/collision'
 
 export const errorsPlacement = {
-  ZBASE_REQUIRED: 'La altura respecto al suelo es obligatoria y debe ser mayor a 0.',
+  ZBASE_REQUIRED: 'Por favor, ingresa una altura válida desde el suelo (mayor a 0).',
   HEIGHT_EXCEEDS_WAREHOUSE:
-    'Supera la altura de la bodega (zBase + alto > altura de bodega).',
-  Z_STACK_CONFLICT: 'Colisión vertical: las alturas se solapan',
+    'La suma de la altura base y el alto del objeto supera la altura permitida en la bodega.',
+  Z_STACK_CONFLICT: 'No es posible apilar aquí: las alturas se superponen con otro objeto.',
 }
 
 export function resolveCoplanarNeighbors(element = {}, all = [], Z_LAYER_EPS = 0.5) {

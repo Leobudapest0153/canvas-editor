@@ -628,8 +628,8 @@ const aplicarCambios = () => {
     const pesoActualHijos = resultado.usado
 
     // Si el nuevo peso máximo es menor que el peso actual de los hijos, mostrar error
-    if (resultado.limiteDePeso && nuevoPesoMaximo < pesoActualHijos) {
-      showError(`La capacidad de carga debe ser al menos ${pesoActualHijos} kg para soportar los elementos actuales contenidos.`)
+  if (resultado.limiteDePeso && nuevoPesoMaximo < pesoActualHijos) {
+  showError(`La capacidad debe ser al menos ${pesoActualHijos} kg para soportar los elementos que contiene.`)
       return
     }
   }
