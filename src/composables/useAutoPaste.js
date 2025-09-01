@@ -324,7 +324,7 @@ export function useAutoPaste() {
   const handlePaste = async () => {
     // Verificar si ya hay una operación de pegado en progreso
     if (isOperationInProgress('paste')) {
-      showToast('Ya hay una operación de pegado en progreso', { type: 'warning' })
+      showToast('Ya hay una operación de pegado en curso. Espera a que termine.', { type: 'warning' })
       return false
     }
 
@@ -333,7 +333,7 @@ export function useAutoPaste() {
     try {
       // Verificar que hay elementos en el buffer
       if (!buffer.hasItems.value) {
-        showToast('No hay elementos en el buffer para pegar', { type: 'warning' })
+        showToast('No hay elementos en el portapapeles para pegar.', { type: 'warning' })
         return false
       }
 
@@ -342,7 +342,7 @@ export function useAutoPaste() {
       const firstItem = bufferItems[0]
 
       if (!firstItem) {
-        showToast('No se pudo obtener el elemento del buffer', { type: 'error' })
+        showToast('No fue posible leer el elemento del portapapeles.', { type: 'error' })
         return false
       }
 
@@ -356,7 +356,7 @@ export function useAutoPaste() {
       )
 
       if (!loadingId) {
-        showToast('No se puede iniciar operación de pegado', { type: 'error' })
+        showToast('No fue posible iniciar la operación de pegado.', { type: 'error' })
         return false
       }
 
@@ -367,7 +367,7 @@ export function useAutoPaste() {
       const areaBounds = getAreaBounds()
 
       if (areaBounds.maxX === 0 || areaBounds.maxY === 0) {
-        showToast('No se pueden determinar los límites del área actual', { type: 'error' })
+        showToast('No se pudieron determinar los límites del área actual.', { type: 'error' })
         return false
       }
 
@@ -377,7 +377,7 @@ export function useAutoPaste() {
       if (!spaceResult.found) {
         const elementType = elemento.ubicacion === 'pared' ? 'de pared' : 'de suelo'
         showToast(
-          `No se encontró espacio disponible para elemento ${elementType} "${elemento.nombre || elemento.tipo}"`,
+          `No se encontró espacio disponible para ${elementType} "${elemento.nombre || elemento.tipo}". Intenta mover otros elementos o ajustar el tamaño.`,
           { type: 'error', timeout: 4000 }
         )
         return false
@@ -390,7 +390,7 @@ export function useAutoPaste() {
 
       if (!validation.valid) {
         showToast(
-          `No se puede pegar: ${validation.reason}`,
+          `No se pudo pegar: ${validation.reason}`,
           { type: 'error', timeout: 4000 }
         )
         return false
@@ -402,7 +402,7 @@ export function useAutoPaste() {
       if (elementoId) {
         const nombreElemento = elemento.nombre || elemento.tipo
         showToast(
-          `"${nombreElemento}" pegado automáticamente`,
+          `"${nombreElemento}" pegado correctamente.`,
           { type: 'success', timeout: 3000 }
         )
 

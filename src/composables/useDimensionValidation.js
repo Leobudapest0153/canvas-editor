@@ -269,7 +269,7 @@ export function useDimensionValidation() {
               tiposCambio.push('largo (crece ↓)')
             }
             
-            toast.showWarning(`Elemento reposicionado automáticamente para permitir crecimiento de ${tiposCambio.join(' y ')}.`)
+            toast.showWarning(`El elemento se reposicionó automáticamente para permitir el crecimiento de ${tiposCambio.join(' y ')}.`)
             toastMostrado = true
           }
         } else {
@@ -293,7 +293,7 @@ export function useDimensionValidation() {
         })
         
         if (!toastMostrado && !silencioso) {
-          toast.showError('Las nuevas dimensiones son demasiado grandes para el área disponible.')
+          toast.showError('Las nuevas dimensiones son demasiado grandes para el área disponible. Ajusta el tamaño o mueve otros elementos.')
           toastMostrado = true
         }
         
@@ -392,12 +392,8 @@ export function useDimensionValidation() {
     // PASO 4: Si llegamos aquí, las dimensiones son válidas
     
     // Mostrar toast de éxito si no se ha mostrado otro toast
-    if (!toastMostrado && !silencioso) {
-      if (posicionAjustada) {
-        // Ya se mostró el toast de reposicionamiento
-      } else {
-        toast.showSuccess('Dimensiones aplicadas correctamente.')
-      }
+    if (!toastMostrado && !silencioso && !posicionAjustada) {
+      toast.showSuccess('Dimensiones aplicadas correctamente.')
     }
     
     return {

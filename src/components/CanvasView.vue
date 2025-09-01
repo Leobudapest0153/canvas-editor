@@ -746,7 +746,7 @@ const {
 } = useObjectSnapping()
 
 // Estado para controlar si el snapping está habilitado (por defecto desactivado — evita alineado automático)
-const isSnappingEnabled = ref(false)
+const isSnappingEnabled = ref(true)
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -1699,12 +1699,12 @@ const createElementFromDrop = (data, dropEvent) => {
 
   // Verificar si el tipo puede ser creado en el contexto actual
   if (contextoActual === 'plantas' && tipoElemento !== 'elementos') {
-    showToast('En plantas solo se pueden agregar elementos', 'error')
+    showToast('No puedes agregar este tipo aquí. En la vista de plantas solo se permiten elementos.', 'error')
     return
   }
 
   if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
-    showToast('En elementos solo se pueden agregar contenedores', 'error')
+    showToast('No puedes agregar ese tipo aquí. Dentro de elementos solo se permiten contenedores.', 'error')
     return
   }
 
@@ -1811,7 +1811,7 @@ const createElementFromDrop = (data, dropEvent) => {
       let local = sess.toLocal({ x: candX, y: candY }, parent)
       local = sess.finalizeLocal(local)
       if (!sess.isValidLocal(local)) {
-        showToast('No hay espacio aquí', 'error')
+        showToast('No hay espacio suficiente aquí para colocar el elemento.', 'error')
         return
       }
       const world = sess.toWorld(local, parent)
@@ -1901,7 +1901,7 @@ const createElementFromDrop = (data, dropEvent) => {
 
   // 9. Si aún no hay posición válida, rechazar y mostrar toast
   if (!placementSuccessful) {
-    showToast('Fuera de los límites de la planta', 'error')
+    showToast('No fue posible colocar el elemento dentro de los límites de la planta.', 'error')
     return // NO crear la instancia, NO comprometer historial
   }
 
