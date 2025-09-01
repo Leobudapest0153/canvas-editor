@@ -199,3 +199,11 @@ export const GRID_SIZE = 20
 // Parámetros por defecto para guard de redimensionado
 export const MARGIN_CM = 5 // margen perimetral interno en cm para packing
 export const FACTOR_UTILIZACION = 0.9 // porcentaje máximo de ocupación de área
+
+// === CONFIGURACIÓN DE AUTOSAVE ===
+export const AUTOSAVE_CONFIG = {
+  INTERVAL_MS: 60000, // 30 segundos
+  MAX_BACKUPS: 10, // máximo número de copias de seguridad
+  STORAGE_KEY: 'canvas_autosave_backups',
+  ENABLED: true, // habilitar/deshabilitar autosave
+}

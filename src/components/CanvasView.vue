@@ -540,6 +540,7 @@
       :is-element-selected="canvasStore.elementoSeleccionado ? true : false"
       :is-element-locked="selectedElementLocked"
       :is-snapping-enabled="isSnappingEnabled"
+      :is-snapping="isSnapping"
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
 
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
@@ -664,6 +665,7 @@ import {
   nudgePlace,
 } from '@/utils/geometry'
 import { clampRectToPolygon, pointInPolygon, clampPointToPolygon } from '@/utils/polygonBounds'
+import { handleCanvasHotkeys } from '@/utils/canvasHotkeys'
 import { polygonInset } from '@/utils/polygonInset'
 import { GRID_SIZE, CM_TO_PX } from '@/utils/constants'
 import { getActiveBounds } from '@/utils/activeBounds'
@@ -674,7 +676,6 @@ import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { useWeightValidation } from '@/composables/useWeightValidation'
 import { applyEdgeConstraint } from '@/utils/edgeConstraint'
 import { resetEdgeState } from '@/composables/useEdgeState'
-import { resolveFinalByIntervals } from '@/utils/finalIntervals'
 import { finalizePlacement } from '@/utils/finalizeDrag'
 import { isPlacementValid } from '@/utils/isPlacementValid'
 import { makeInnerSession } from '@/composables/useInnerNoOverlap'
@@ -682,8 +683,8 @@ import { useObjectSnapping } from '@/composables/useObjectSnapping'
 import { usePlacementGuards } from '@/composables/usePlacementGuards'
 import FloatingToolbar from './FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/utils/simulateProducts'
-import {config} from '@vue/test-utils'
 import SnapGuides from './SnapGuides.vue'
+import { useToast } from '@/composables/useToast'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -1661,15 +1662,7 @@ const handleDrop = (e) => {
   }
 }
 
-// Función auxiliar para mostrar toast de error
-const showToast = (message, type = 'error') => {
-  if (typeof window !== 'undefined' && window.__toasts) {
-    window.__toasts.show(message, { type, timeout: 4000 })
-  } else {
-    console.warn('Toast:', message)
-  }
-}
-
+const { showToast } = useToast()
 
 const { simularLlenadoContenedor} = useProductSimulation({
   canvasStore,
@@ -1926,14 +1919,6 @@ const createElementFromDrop = (data, dropEvent) => {
     categoria: elemento.categoria, // Mantener también la categoría
     nombre: elemento.nombre || 'Nuevo elemento',
 
-    // Estructura correcta para posición
-    posicion: {
-      x: finalPosition.x,
-      y: finalPosition.y,
-      z: 0,
-      rotation: 0,
-    },
-
     // Estructura correcta para dimensiones (preservar todas las dimensiones independientemente de la vista)
     dimensiones: {
       ancho: anchoCm,
@@ -1963,15 +1948,7 @@ const createElementFromDrop = (data, dropEvent) => {
     // Copiar contenedores del elemento original si los tiene
     contenedores: elemento.contenedores ? [...elemento.contenedores] : [],
 
-    hijos: [],
-    metadata: {
-      pesoMaximo: elemento.pesoMaximo || 'N/A',
-      ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
-      descripcion: elemento.descripcion || '',
-      material: elemento.material || 'Estándar',
-      capacidad: elemento.capacidad || 'Variable',
-      personalizado: elemento.personalizado || false,
-    },
+    hijos: []
   }
 
   console.log('✅ Creando elemento desde drop en posición válida:', nuevoElemento)
@@ -2701,10 +2678,17 @@ const handleKeyDown = (e) => {
     canvasStore.toggleMostrarPropiedades();
     canvasStore.seleccionarElemento(null)
     // Asegurar que el transformer/edición se cierre
-  editingElementId.value = null
-  speedDialOpen.value = false
-  // Limpiar guías de snapping
-  clearGuides()
+    editingElementId.value = null
+    speedDialOpen.value = false
+    // Limpiar guías de snapping
+    clearGuides()
+  } else {
+    handleCanvasHotkeys(e, {
+      dragMode: dragModeGlobal,
+      toggleDragMode,
+      toggleSnapping,
+      toggleLock: () => toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado),
+    })
   }
 }
 let resizeObserver = null

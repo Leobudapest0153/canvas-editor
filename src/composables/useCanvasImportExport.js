@@ -69,6 +69,13 @@ export const useCanvasImportExport = () => {
       reader.onload = (e) => {
         try {
           const jsonString = e.target.result
+          // Validar estructura antes de deserializar
+          const validacion = validarJSON(jsonString)
+          if (!validacion.valido) {
+            reject(new Error(`Archivo JSON inválido: ${validacion.error || 'Estructura incorrecta'}`))
+            return
+          }
+
           const exito = canvasStore.deserialize(jsonString)
 
           if (exito) {
@@ -76,6 +83,12 @@ export const useCanvasImportExport = () => {
             const plantaActiva = canvasStore.plantaActiva
             if (plantaActiva) {
               canvasStore.navegarAPlanta(plantaActiva)
+            } else {
+              // Si no hay planta activa pero hay plantas, navegar a la primera
+              const plantas = canvasStore.plantas
+              if (plantas && plantas.length > 0) {
+                canvasStore.navegarAPlanta(plantas[0].id)
+              }
             }
 
             console.log('Canvas importado exitosamente desde:', archivo.name)
@@ -96,61 +109,7 @@ export const useCanvasImportExport = () => {
     })
   }
 
-  /**
-   * Exporta solo las plantas sin elementos
-   * @param {string} nombreArchivo - Nombre del archivo (opcional)
-   */
-  const exportarPlantas = (nombreArchivo = null) => {
-    try {
-      const plantasData = {
-        meta: {
-          version: '1.0.0',
-          timestamp: new Date().toISOString(),
-          tipo: 'plantas-only',
-          app: 'dv-canva-editor',
-        },
-        plantas: canvasStore.plantas.map((planta) => ({
-          id: planta.id,
-          nombre: planta.nombre,
-          descripcion: planta.descripcion || '',
-          dimensiones: {
-            alto: planta.dimensiones?.alto || 280,
-            ancho: planta.dimensiones?.ancho || 800,
-            largo: planta.dimensiones?.largo || 1000,
-          },
-          pesoMaximoSoportado: planta.pesoMaximoSoportado || 3000,
-          propiedadesPersonalizadas: planta.propiedadesPersonalizadas || {},
-        })),
-      }
 
-      const jsonData = JSON.stringify(plantasData, null, 2)
-
-      // Generar nombre de archivo
-      const fecha = new Date().toISOString().split('T')[0]
-      const filename = nombreArchivo || `plantas-${fecha}.json`
-
-      // Crear blob y descargar
-      const blob = new Blob([jsonData], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      link.style.display = 'none'
-
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      URL.revokeObjectURL(url)
-
-      console.log('Plantas exportadas exitosamente:', filename)
-      return true
-    } catch (error) {
-      console.error('Error al exportar plantas:', error)
-      return false
-    }
-  }
 
   /**
    * Copia el estado serializado al portapapeles
@@ -196,16 +155,21 @@ export const useCanvasImportExport = () => {
     try {
       const data = JSON.parse(jsonString)
 
-      const esCompleto = !!(data.plantas && data.elementos && data.configuracion)
-      const esSoloPlantas = !!(data.plantas && data.meta?.tipo === 'plantas-only')
-      const tieneVersion = !!data.meta?.version
+      // Validar estructura básica requerida
+      const tieneEstructuraBasica = !!(data.plantas && data.elementos)
+
+      if (!tieneEstructuraBasica) {
+        return {
+          valido: false,
+          error: 'El archivo debe contener plantas y elementos'
+        }
+      }
 
       return {
-        valido: esCompleto || esSoloPlantas,
-        tipo: esCompleto ? 'completo' : esSoloPlantas ? 'plantas' : 'desconocido',
-        version: data.meta?.version || 'desconocida',
+        valido: true,
         plantas: data.plantas?.length || 0,
         elementos: data.elementos?.length || 0,
+        version: data.meta?.version || 'desconociddasda',
         fecha: data.meta?.timestamp || null,
       }
     } catch (error) {
@@ -220,7 +184,6 @@ export const useCanvasImportExport = () => {
     // Funciones principales
     exportarCanvas,
     importarCanvas,
-    exportarPlantas,
 
     // Funciones de portapapeles
     copiarAlPortapapeles,
@@ -228,9 +191,5 @@ export const useCanvasImportExport = () => {
 
     // Utilidades
     validarJSON,
-
-    // Acceso directo a las funciones del store
-    serialize: canvasStore.serialize,
-    deserialize: canvasStore.deserialize,
   }
 }

@@ -10,20 +10,27 @@
 -->
 
 <template>
-  <div class="sidebar-panel">
+  <div class="h-full flex flex-col bg-white">
     <!-- Header con tabs -->
-    <div class="tab-header">
+    <div class="flex border-b border-slate-200 bg-slate-50">
       <button
         v-for="tab in tabs"
         :key="tab.id"
         @click="activeTab = tab.id"
-        :class="['tab-btn', 'relative' ,{ active: activeTab === tab.id }]"
+        :class="[
+          'flex-1 flex items-center justify-center gap-2 px-2 py-3 border-none bg-transparent cursor-pointer transition-all duration-200 text-slate-500 text-sm font-medium border-b-2 border-transparent',
+          'hover:bg-slate-100 hover:text-slate-600',
+          'relative',
+          {
+            'text-blue-500 bg-white border-b-blue-500': activeTab === tab.id
+          }
+        ]"
         :title="tab.tooltip"
       >
         <!-- Icono Cubo para Elementos -->
         <svg
           v-if="tab.id === 'elementos'"
-          class="tab-icon"
+          class="w-[18px] h-[18px] shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -39,7 +46,7 @@
         <!-- Icono Capas para Capas -->
         <svg
           v-else-if="tab.id === 'capas'"
-          class="tab-icon"
+          class="w-[18px] h-[18px] shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -56,7 +63,7 @@
         <!-- Icono Clipboard para Buffer -->
         <svg
           v-else-if="tab.id === 'buffer'"
-          class="tab-icon"
+          class="w-[18px] h-[18px] shrink-0"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -71,26 +78,26 @@
 
         <span
           v-if="tab.id === 'capas' && activeFilters"
-          class="absolute top-0 right-0  w-2 h-2 bg-red-500 rounded-full"
+          class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"
         ></span>
-        <span class="tab-label">{{ tab.label }}</span>
+        <span class="font-medium max-[360px]:hidden">{{ tab.label }}</span>
       </button>
     </div>
 
     <!-- Contenido de los tabs -->
-    <div class="tab-content">
+    <div class="flex-1 overflow-hidden">
       <!-- Tab Elementos -->
-      <div v-show="activeTab === 'elementos'" class="tab-pane">
+      <div v-show="activeTab === 'elementos'" class="h-full overflow-y-auto">
         <ElementosTab />
       </div>
 
       <!-- Tab Capas -->
-      <div v-show="activeTab === 'capas'" class="tab-pane">
+      <div v-show="activeTab === 'capas'" class="h-full overflow-y-auto">
         <CapasTab />
       </div>
 
       <!-- Tab Buffer -->
-      <div v-show="activeTab === 'buffer'" class="tab-pane">
+      <div v-show="activeTab === 'buffer'" class="h-full overflow-y-auto">
         <BufferTab />
       </div>
     </div>
@@ -135,75 +142,10 @@ const activeFilters = computed(() => {
 </script>
 
 <style scoped>
-.sidebar-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: white;
-}
-
-.tab-header {
-  display: flex;
-  border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
-}
-
-.tab-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 0.5rem;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: #64748b;
-  font-size: 0.875rem;
-  font-weight: 500;
-  border-bottom: 2px solid transparent;
-}
-
-.tab-btn:hover {
-  background: #f1f5f9;
-  color: #475569;
-}
-
-.tab-btn.active {
-  color: #3b82f6;
-  background: white;
-  border-bottom-color: #3b82f6;
-}
-
-.tab-icon {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-}
-
-.tab-label {
-  font-weight: 500;
-}
-
-.tab-content {
-  flex: 1;
-  overflow: hidden;
-}
-
-.tab-pane {
-  height: 100%;
-  overflow-y: auto;
-}
-
-/* Responsive para tabs pequeños */
+/* Breakpoint personalizado para pantallas muy pequeñas */
 @media (max-width: 360px) {
-  .tab-label {
-    display: none;
-  }
-
-  .tab-btn {
-    padding: 0.75rem 0.25rem;
+  .max-\[360px\]\:hidden {
+    display: none !important;
   }
 }
 </style>

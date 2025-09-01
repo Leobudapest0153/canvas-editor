@@ -47,19 +47,7 @@
                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
                 />
               </svg>
-              Canvas Completo
-            </button>
-
-            <button @click="exportarSoloPlantas" class="btn-action btn-secondary">
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"
-                />
-              </svg>
-              Solo Plantas
+              Exportar Canvas
             </button>
 
             <button @click="copiarPortapapeles" class="btn-action btn-info">
@@ -121,7 +109,7 @@
                 <span class="font-medium">Haz clic para seleccionar</span> o arrastra un archivo
                 JSON aquí
               </p>
-              <p class="text-sm text-gray-500 mt-2">Archivo JSON del canvas exportado</p>
+              <p class="text-sm text-gray-500 mt-2">Solo archivos JSON del canvas completo</p>
             </div>
 
             <button @click="pegarPortapapeles" class="btn-action btn-info w-full mt-3">
@@ -162,8 +150,8 @@
               <span class="stat-value">{{ canvasStore.elementos.length }}</span>
             </div>
             <div class="stat-item">
-              <span class="stat-label">Planta Activa:</span>
-              <span class="stat-value">{{ plantaActivaNombre }}</span>
+              <span class="stat-label">Contexto:</span>
+              <span class="stat-value">{{ contextoActual }}</span>
             </div>
           </div>
         </div>
@@ -224,6 +212,20 @@ const plantaActivaNombre = computed(() => {
   return planta?.nombre || 'Ninguna'
 })
 
+const contextoActual = computed(() => {
+  const contexto = canvasStore.contextoNavegacion
+  if (contexto.tipo === 'plantas') {
+    return `Planta: ${plantaActivaNombre.value}`
+  } else if (contexto.tipo === 'elementos') {
+    const elemento = canvasStore.elementoPorId(contexto.id)
+    return `Elemento: ${elemento?.nombre || 'Desconocido'}`
+  } else if (contexto.tipo === 'contenedores') {
+    const contenedor = canvasStore.elementoPorId(contexto.id)
+    return `Contenedor: ${contenedor?.nombre || 'Desconocido'}`
+  }
+  return 'Desconocido'
+})
+
 // Métodos
 const cerrar = () => {
   emit('cerrar')
@@ -249,19 +251,6 @@ const exportarCanvasCompleto = async () => {
       mostrarMensaje('Canvas exportado exitosamente', 'exito')
     } else {
       mostrarMensaje('Error al exportar el canvas', 'error')
-    }
-  } catch (error) {
-    mostrarMensaje(`Error: ${error.message}`, 'error')
-  }
-}
-
-const exportarSoloPlantas = async () => {
-  try {
-    const exito = await importExport.exportarPlantas()
-    if (exito) {
-      mostrarMensaje('Plantas exportadas exitosamente', 'exito')
-    } else {
-      mostrarMensaje('Error al exportar las plantas', 'error')
     }
   } catch (error) {
     mostrarMensaje(`Error: ${error.message}`, 'error')
@@ -398,7 +387,7 @@ const pegarPortapapeles = async () => {
 
 .button-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.75rem;
 }
 
