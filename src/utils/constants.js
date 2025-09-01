@@ -236,3 +236,31 @@ export const AUTOSAVE_CONFIG = {
   STORAGE_KEY: 'canvas_autosave_backups',
   ENABLED: true, // habilitar/deshabilitar autosave
 }
+
+// === POLÍTICAS DE DIMENSIONES (escalado por eje) ===
+// Nota: Reusar constantes existentes; no duplicar conversiones.
+export const DIMENSIONS = {
+  axisScaleDefault: { x: 0.2, y: 0.2, z: 0.2 },
+  // Overrides por tipo (usar keys reales del catálogo/base)
+  axisScaleByType: {
+    // Elementos de sistema por defecto
+    anaquel_metalico_grande: { x: 0.2, y: 0.2, z: 0.2 },
+    estante_pared_pequeno: { x: 0.2, y: 0.2, z: 0.2 },
+    barril_basico: { x: 0.2, y: 0.2, z: 0.2 },
+  },
+  // Límites por tipo
+  minMax: {
+    anaquel_metalico_grande: { min: { w: 30, h: 50, d: 30 }, max: { w: 500, h: 500, d: 500 } },
+    estante_pared_pequeno: { min: { w: 40, h: 30, d: 20 }, max: { w: 500, h: 500, d: 500 } },
+    barril_basico: { min: { w: 30, h: 30, d: 30 }, max: { w: 500, h: 500, d: 500 } },
+  },
+  autoResizeOnParentChange: true,
+  // Reusar conversión de cm→px existente
+  gridPxPerCm: CM_TO_PX,
+}
+
+// (Opcional) Política de peso — OFF por defecto
+export const WEIGHT = {
+  enableDefaultShareFromParent: false,
+  defaultShare: 0.2,
+}

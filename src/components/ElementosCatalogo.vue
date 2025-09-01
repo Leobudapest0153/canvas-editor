@@ -129,9 +129,7 @@
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Dim:</span>
                 <span class="spec-value text-gray-700">
-                    {{ elemento.dimensiones.ancho }}x{{ elemento.dimensiones.largo }}x{{
-                      elemento.dimensiones.alto
-                    }}
+                  {{ getCardDims(elemento).ancho }}x{{ getCardDims(elemento).largo }}x{{ getCardDims(elemento).alto }}
                 </span>
               </div>
               <div class="spec-item flex justify-between text-xs">
@@ -225,6 +223,8 @@ import {
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
 } from '@/utils/constants'
+import { CATALOGO } from '@/utils/constants'
+import { computeDimsByAxisScale } from '@/utils/dimensionPolicy'
 
 import ElementEditor from './modals/ElementEditor.vue'
 
@@ -325,6 +325,24 @@ const getShapeClass = (forma) => {
       return 'rounded-full aspect-square' // Añadimos aspect-square para mantener la relación de aspecto 1:1
     default:
       return 'rounded-sm'
+  }
+}
+
+// Dims preview para elementos de sistema por defecto
+const isSystemDefaultItem = (item) => !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
+
+const getCardDims = (item) => {
+  try {
+    if (!item?.dimensiones) return { ancho: 0, largo: 0, alto: 0 }
+    if (!isSystemDefaultItem(item)) return item.dimensiones
+    const planta = canvasStore.plantaActivaData
+    const dimsPlanta = planta?.dimensiones
+    if (!dimsPlanta) return item.dimensiones
+    const parentDims = { w: dimsPlanta.ancho, h: dimsPlanta.largo, d: dimsPlanta.alto }
+    const dims = computeDimsByAxisScale(item.id, parentDims, { snap: true })
+    return dims || item.dimensiones
+  } catch {
+    return item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
   }
 }
 
