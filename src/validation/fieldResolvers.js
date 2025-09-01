@@ -1,6 +1,6 @@
 export function resolveVerticalProps(element = {}, candidate = {}) {
   const locationKeys = ['ubicacion', 'ubic', 'location']
-  const zBaseKeys = ['zBase', 'alturaRespectoAlSuelo', 'z_base', 'baseZ']
+  const zBaseKeys = ['zBase', 'alturaRespectoAlSuelo', 'alturaSobreSueloCm', 'z_base', 'baseZ']
   const heightKeys = ['alto', 'altura', 'height', 'heightCm']
 
   const coalesce = (cand, el, keys) => {
