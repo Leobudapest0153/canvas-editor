@@ -551,6 +551,7 @@
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
       @fill-container="() => simularLlenadoContenedor(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
+      @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
     />
 
     <!-- Menú contextual -->
@@ -563,6 +564,7 @@
       @lockToggle="() => toggleLock(ctxElementId)"
       @delete="() => onDelete(ctxElementId)"
       @close="ctx.close()"
+      @properties="() => openProperties()"
     />
 
     <!-- Información de zoom, vista y dimensiones -->
@@ -1036,6 +1038,7 @@ const handleStageMouseDown = (e) => {
 const handleStageClick = (e) => {
   // Deseleccionar elemento si click en área vacía
   if (e.target === e.target.getStage()) {
+  canvasStore.toggleMostrarPropiedades();
   canvasStore.seleccionarElemento(null)
   // Cerrar controles y edición cuando se hace click en el stage vacío
   speedDialOpen.value = false
@@ -2701,6 +2704,7 @@ const handleGlobalClick = (e) => {
   const isFormElement = e.target.matches('input, button, select, textarea, [contenteditable]')
   const isInPropertiesPanel = e.target.closest('[data-properties-panel]')
   if (!containerRef.value?.contains(e.target) && !isFormElement && !isInPropertiesPanel) {
+    canvasStore.toggleMostrarPropiedades();
   canvasStore.seleccionarElemento(null)
   speedDialOpen.value = false
   editingElementId.value = null
@@ -2711,6 +2715,7 @@ const handleGlobalClick = (e) => {
 const handleKeyDown = (e) => {
   if (!e) return
   if (e.key === 'Escape' || e.key === 'Esc') {
+    canvasStore.toggleMostrarPropiedades();
     canvasStore.seleccionarElemento(null)
     // Asegurar que el transformer/edición se cierre
     editingElementId.value = null
@@ -2989,6 +2994,12 @@ const toggleLock = async (id) => {
   if (!id) return
   toggleLockElement(id)
   ctx.close()
+}
+
+// Abrir las propiedades
+const openProperties = () => {
+  canvasStore.toggleMostrarPropiedades(true);
+  ctx.close();
 }
 
 // Acción eliminar desde el menú contextual

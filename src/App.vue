@@ -15,14 +15,16 @@
       <!-- Canvas principal -->
       <div class="app-canvas">
         <CanvasView
-          :safeRight="showPropiedadesPanel ? 320 : 20"
+          @select="handleElementSelect"
+          @drill-down="handleDrillDown"
+          :safeRight="canvasStore.mostrarPropiedades ? 320 : 20"
         />
       </div>
 
       <!-- Panel de propiedades (superpuesto para no empujar el canvas) -->
       <div
         class="app-sidebar-right absolute inset-y-0 right-0"
-        v-if="showPropiedadesPanel"
+        v-if="canvasStore.mostrarPropiedades && canvasStore.elementoSeleccionado"
         data-properties-panel
       >
         <PropiedadesPanel />
@@ -60,7 +62,19 @@ const { undo, redo, store: canvasStore } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
 const { deleteSelected } = useDeleteElement()
 const { handlePaste } = useAutoPaste()
-const showPropiedadesPanel = computed(() => canvasStore.elementoSeleccionadoCompleto)
+
+const selectedElement = ref(null)
+
+const handleElementSelect = (elemento) => {
+  selectedElement.value = elemento
+  console.log('Elemento seleccionado:', elemento)
+}
+
+const handleDrillDown = (elemento) => {
+  console.log('Drill down a elemento:', elemento)
+  // TODO: Implementar navegación a vista hija
+  alert(`Navegando a vista hija de: ${elemento.tipo} (${elemento.id})`)
+}
 
 // Atajos de teclado globales
 const handleKeydown = (e) => {

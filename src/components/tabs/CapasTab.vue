@@ -19,6 +19,9 @@
           <span>Filtros</span>
           <span v-if="hayFiltrosActivos" class="w-2 h-2 bg-blue-500 rounded-full"></span>
         </button>
+        <span class="text-center w-full pt-2 block -mb-2 text-gray-700 text-sm"> 
+          Elementos en la capa: {{ canvasStore.elementosVisibles?.length ?? 0 }}
+        </span>
       </div>
 
       <!-- Panel de filtros desplegable -->
@@ -146,7 +149,7 @@
           <div class="flex items-center gap-2">
             <button
               @click.stop="canvasStore.destacarElemento(elemento.id)"
-              class="p-1 text-gray-400 hover:text-blue-600 cursor-pointer"
+              class="p-0 text-gray-400 hover:text-blue-600 cursor-pointer"
               title="Encontrar en el canvas"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -155,7 +158,7 @@
             </button>
             <button
               @click.stop="canvasStore.toggleElementoVisibilidad(elemento.id)"
-              class="p-1 text-gray-400 hover:text-gray-600 cursor-pointer"
+              class="p-0 text-gray-400 hover:text-gray-600 cursor-pointer"
               :title="elemento.visible === false ? 'Mostrar' : 'Ocultar'"
             >
               <svg
@@ -179,14 +182,38 @@
                 />
               </svg>
               <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <g 
+                  fill="none" 
+                  stroke="currentColor" 
+                  stroke-linecap="round" 
+                  stroke-width="2"
+                >
                 <path
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7 .525-1.664 1.373-3.16 2.42-4.418M15.35 15.35A3 3 0 0112 12a3 3 0 01-3.35-3.35M1.125 4.125L.172 3.172m1.953 1.953l18.8 18.8"
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
                 />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                />
+
+                <path d="m4 4l16 16"/>
+
+                </g>
               </svg>
             </button>
+            <button
+              @click.stop="onDelete(elemento.id)"
+              class="p-0 text-gray-400 hover:text-red-700 cursor-pointer"
+              title="Eliminar"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 1024 1024"><path fill="currentColor" d="M360 184h-8c4.4 0 8-3.6 8-8zh304v-8c0 4.4 3.6 8 8 8h-8v72h72v-80c0-35.3-28.7-64-64-64H352c-35.3 0-64 28.7-64 64v80h72zm504 72H160c-17.7 0-32 14.3-32 32v32c0 4.4 3.6 8 8 8h60.4l24.7 523c1.6 34.1 29.8 61 63.9 61h454c34.2 0 62.3-26.8 63.9-61l24.7-523H888c4.4 0 8-3.6 8-8v-32c0-17.7-14.3-32-32-32M731.3 840H292.7l-24.2-512h487z"/></svg>
+            </button>
+
           </div>
         </div>
       </div>
@@ -208,9 +235,12 @@ import { useCanvasStore } from '@/composables/useCanvasStore'
 import { CATEGORIAS } from '@/utils/constants'
 import TagFilter from '@/components/TagFilter.vue'
 import CreateTagModal from '@/components/CreateTagModal.vue'
+import {useDeleteElement} from '@/composables/useDeleteElement'
 
 // Composables
 const canvasStore = useCanvasStore()
+
+const deleteElement = useDeleteElement();
 
 // Estado local
 const filtroCategoria = ref('')
@@ -280,6 +310,26 @@ const limpiarFiltros = () => {
   filtroUbicacion.value = ''
   filtroNombre.value = '';
   canvasStore.limpiarSeleccion()
+}
+
+const onDelete = async (id) => {
+  if (!id) return
+  const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
+  if (el && (el.bloqueado === true || el.locked === true)) {
+    try {
+      if (typeof window !== 'undefined' && window.__toasts?.show) {
+        window.__toasts.show('Elemento bloqueado — desbloquéalo para eliminar', { type: 'warning', timeout: 3000 })
+      } else {
+        await confirmDialog.confirm({ title: 'Elemento bloqueado', message: 'Elemento bloqueado — desbloquéalo para eliminar', confirmLabel: 'Entendido', cancelLabel: 'Cerrar' })
+      }
+    } catch { /* ignore */ }
+    return
+  }
+  // Si no está seleccionado, seleccionarlo primero
+  if (canvasStore.elementoSeleccionado !== id) {
+    canvasStore.seleccionarElemento(id)
+  }
+  await deleteElement.deleteSelected({ withConfirm: true })
 }
 
 const abrirModalCrearEtiqueta = (texto) => {
