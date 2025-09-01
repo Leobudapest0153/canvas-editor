@@ -17,6 +17,11 @@ export const JERARQUIA_PERMITIDA = {
   contenedores: ['elementos', 'contenedores'], // Los contenedores pueden contener elementos Y otros contenedores
 }
 
+export const CATALOGO = {
+  // Tipos base visibles en el catálogo raíz (plantas)
+  SISTEMA_BASE_KEYS: ['anaquel_metalico_grande', 'estante_pared_pequeno', 'barril_basico'],
+}
+
 export const ELEMENTOS_PREDEFINIDOS = [
   // === ELEMENTOS (solo pueden ir en plantas) ===
 
@@ -37,6 +42,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     ubicacion: 'suelo',
     descripcion: 'Anaquel metálico de alta capacidad para almacenamiento pesado',
     icono: 'rack',
+    props: { system: true },
   },
 
   // Estante de pared
@@ -57,6 +63,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     alturaRespectoAlSuelo: 150, // cm - altura típica para estantes de pared
     descripcion: 'Estante montado en pared para almacenamiento ligero',
     icono: 'shelf',
+    props: { system: true },
   },
 
   // Armario de pared
@@ -77,6 +84,27 @@ export const ELEMENTOS_PREDEFINIDOS = [
     alturaRespectoAlSuelo: 50, // cm - altura moderada para armarios
     descripcion: 'Armario montado en pared para almacenamiento vertical',
     icono: 'cabinet',
+    props: { system: true },
+  },
+
+  // Barril
+  {
+    id: 'barril_basico',
+    nombre: 'Barril',
+    tipo: 'elementos',
+    categoria: 'contenedores',
+    forma: 'circular',
+    colorBase: '#f97316',
+    dimensiones: {
+      ancho: 60,
+      largo: 60,
+      alto: 90,
+    },
+    pesoMaximo: 200, // kg
+    ubicacion: 'suelo',
+    descripcion: 'Barril estándar de madera',
+    icono: 'barrel',
+    props: { system: true },
   },
 
   // === CONTENEDORES (solo pueden ir en elementos) ===
@@ -98,6 +126,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     ubicacion: 'interior',
     descripcion: 'Contenedor básico para almacenamiento organizado (redimensionable)',
     icono: 'box',
+    props: { system: true },
   },
 ]
 
@@ -206,4 +235,41 @@ export const AUTOSAVE_CONFIG = {
   MAX_BACKUPS: 10, // máximo número de copias de seguridad
   STORAGE_KEY: 'canvas_autosave_backups',
   ENABLED: true, // habilitar/deshabilitar autosave
+}
+
+// === POLÍTICAS DE DIMENSIONES (escalado por eje) ===
+// Nota: Reusar constantes existentes; no duplicar conversiones.
+export const DIMENSIONS = {
+  axisScaleDefault: { x: 0.2, y: 0.2, z: 0.2 },
+  // Overrides por tipo (usar keys reales del catálogo/base)
+  axisScaleByType: {
+    // Elementos de sistema por defecto
+    anaquel_metalico_grande: { x: 0.2, y: 0.2, z: 0.2 },
+    // Estante de pared: w=20% ancho, d=10% largo (profundidad), h=20% alto
+    estante_pared_pequeno: { x: 0.2, y: 0.1, z: 0.2 },
+    barril_basico: { x: 0.2, y: 0.2, z: 0.2 },
+  },
+  // Límites por tipo
+  minMax: {
+    anaquel_metalico_grande: { min: { w: 30, h: 50, d: 30 }, max: { w: 500, h: 500, d: 500 } },
+    estante_pared_pequeno: { min: { w: 40, h: 30, d: 20 }, max: { w: 500, h: 500, d: 500 } },
+    barril_basico: { min: { w: 30, h: 30, d: 30 }, max: { w: 500, h: 500, d: 500 } },
+  },
+  autoResizeOnParentChange: true,
+  // Reusar conversión de cm→px existente
+  gridPxPerCm: CM_TO_PX,
+}
+
+// Offset configurable por tipo (porcentaje de altura de planta desde el suelo)
+export const OFFSETS = {
+  offsetByType: {
+    // Estante de pared al 50% de la altura de la planta
+    estante_pared_pequeno: { zOffsetShare: 0.5 },
+  },
+}
+
+// (Opcional) Política de peso — OFF por defecto
+export const WEIGHT = {
+  enableDefaultShareFromParent: false,
+  defaultShare: 0.2,
 }
