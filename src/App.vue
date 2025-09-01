@@ -32,6 +32,8 @@
     <ToastContainer />
     <!-- Modal de confirmación global -->
     <ConfirmModal />
+    <!-- Loader global -->
+    <LoaderOverlay />
     <WorkspaceEditor/>
   </div>
 </template>
@@ -50,6 +52,7 @@ import { useDeleteElement } from './composables/useDeleteElement'
 import { useAutoPaste } from './composables/useAutoPaste'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
+import LoaderOverlay from './components/LoaderOverlay.vue'
 
 
 // Composable para undo/redo global

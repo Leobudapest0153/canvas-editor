@@ -17,6 +17,7 @@ import { useCanvasBuffer } from './useCanvasBuffer'
 import { useWeightValidation } from './useWeightValidation'
 import { usePlacementGuards } from './usePlacementGuards'
 import { useToast } from './useToast'
+import { useLoader } from './useLoader'
 import { nudgePlace } from '@/utils/geometry'
 import { detectConflictsFor } from '@/utils/collision'
 import { isPlacementValid } from '@/utils/isPlacementValid'
@@ -28,6 +29,7 @@ export function useAutoPaste() {
   const weightValidation = useWeightValidation()
   const placementGuards = usePlacementGuards()
   const { showToast } = useToast()
+  const { startLoading, stopLoading, isOperationInProgress } = useLoader()
 
   /**
    * Obtiene las dimensiones del área disponible en el contexto actual
@@ -162,16 +164,8 @@ export function useAutoPaste() {
     const areaWidth = areaBounds.maxX - areaBounds.minX
     const areaHeight = areaBounds.maxY - areaBounds.minY
 
-    console.log('🔍 Buscando espacio para:', {
-      elemento: elemento.nombre || elemento.tipo,
-      ubicacion: elemento.ubicacion || 'suelo',
-      dimensiones: { width: elementWidth, height: elementHeight },
-      area: { width: areaWidth, height: areaHeight }
-    })
-
     // Verificar que el elemento pueda caber en el área
     if (elementWidth > areaWidth || elementHeight > areaHeight) {
-      console.warn('🚫 Elemento demasiado grande para el área disponible')
       return { found: false }
     }
 
@@ -221,20 +215,11 @@ export function useAutoPaste() {
         const guardResult = placementGuards.onDragMoveGuard(elementoTemporal, position)
 
         if (guardResult && !guardResult.valid) {
-          // Para debugging, logear solo en casos específicos
-          if (elemento.ubicacion === 'pared') {
-            console.log('🚫 Placement guard failed for wall element:', {
-              position,
-              reason: guardResult.reason,
-              element: elemento.nombre || elemento.tipo
-            })
-          }
           return false
         }
 
         return true
       } catch (error) {
-        console.warn('⚠️ Error en placement guards durante búsqueda:', error.message)
         return false
       }
     }    // Configurar posición inicial (centro del área si no se especifica)
@@ -318,15 +303,10 @@ export function useAutoPaste() {
     }
 
     // Si no encuentra espacio en espiral, intentar búsqueda exhaustiva en grid más pequeño
-    console.log('🔍 Búsqueda espiral sin éxito, intentando búsqueda exhaustiva...')
-
     const smallGridSize = 15
-    let attempts = 0
     for (let y = areaBounds.minY; y <= areaBounds.maxY - elementHeight; y += smallGridSize) {
       for (let x = areaBounds.minX; x <= areaBounds.maxX - elementWidth; x += smallGridSize) {
-        attempts++
         if (isPositionValid(x, y)) {
-          console.log(`✅ Espacio encontrado en búsqueda exhaustiva después de ${attempts} intentos:`, { x, y })
           return {
             found: true,
             position: { x, y }
@@ -335,14 +315,6 @@ export function useAutoPaste() {
       }
     }
 
-    console.warn(`🚫 No se encontró espacio disponible en toda el área después de ${attempts} intentos`)
-    console.warn('🔍 Detalles del fallo:', {
-      elemento: elemento.nombre || elemento.tipo,
-      ubicacion: elemento.ubicacion || 'suelo',
-      dimensiones: { width: elementWidth, height: elementHeight },
-      areaBounds,
-      vecinos: neighbors.length
-    })
     return { found: false }
   }
 
@@ -350,6 +322,14 @@ export function useAutoPaste() {
    * Pega automáticamente el primer elemento del buffer
    */
   const handlePaste = async () => {
+    // Verificar si ya hay una operación de pegado en progreso
+    if (isOperationInProgress('paste')) {
+      showToast('Ya hay una operación de pegado en progreso', { type: 'warning' })
+      return false
+    }
+
+    let loadingId = null
+
     try {
       // Verificar que hay elementos en el buffer
       if (!buffer.hasItems.value) {
@@ -368,6 +348,21 @@ export function useAutoPaste() {
 
       const elemento = firstItem.elemento
 
+      // Iniciar loader con descripción específica
+      loadingId = startLoading(
+        'paste',
+        null,
+        `Pegando "${elemento.nombre || elemento.tipo}"...`
+      )
+
+      if (!loadingId) {
+        showToast('No se puede iniciar operación de pegado', { type: 'error' })
+        return false
+      }
+
+      // Pequeño delay para que la UI se actualice
+      await new Promise(resolve => setTimeout(resolve, 100))
+
       // Obtener límites del área actual
       const areaBounds = getAreaBounds()
 
@@ -375,14 +370,6 @@ export function useAutoPaste() {
         showToast('No se pueden determinar los límites del área actual', { type: 'error' })
         return false
       }
-
-      console.log('🔍 Iniciando pegado automático:', {
-        elemento: elemento.nombre || elemento.tipo,
-        ubicacion: elemento.ubicacion || 'suelo',
-        contexto: canvasStore.contextoActual,
-        areaBounds,
-        dimensiones: { width: elemento.width, height: elemento.height }
-      })
 
       // Buscar espacio disponible
       const spaceResult = findAvailableSpace(elemento, areaBounds)
@@ -422,12 +409,6 @@ export function useAutoPaste() {
         // Seleccionar el elemento recién pegado
         canvasStore.seleccionarElemento(elementoId)
 
-        console.log('✅ Elemento pegado exitosamente:', {
-          elementoId,
-          posicion: spaceResult.position,
-          nombre: nombreElemento
-        })
-
         return true
       } else {
         showToast('Error al pegar el elemento', { type: 'error' })
@@ -435,12 +416,16 @@ export function useAutoPaste() {
       }
 
     } catch (error) {
-      console.error('❌ Error en pegado automático:', error)
       showToast(
         `Error al pegar automáticamente: ${error.message}`,
         { type: 'error', timeout: 4000 }
       )
       return false
+    } finally {
+      // Siempre detener el loader al finalizar
+      if (loadingId) {
+        stopLoading(loadingId)
+      }
     }
   }
 
@@ -448,38 +433,119 @@ export function useAutoPaste() {
    * Intenta pegar múltiples elementos del buffer automáticamente
    */
   const handlePasteAll = async () => {
+    // Verificar si ya hay una operación de pegado en progreso
+    if (isOperationInProgress('paste') || isOperationInProgress('pasteAll')) {
+      showToast('Ya hay una operación de pegado en progreso', { type: 'warning' })
+      return
+    }
+
     if (!buffer.hasItems.value) {
       showToast('No hay elementos en el buffer para pegar', { type: 'warning' })
       return
     }
 
     const bufferItems = buffer.getBufferItems()
-    let successCount = 0
-    let failCount = 0
+    let loadingId = null
 
-    for (const item of bufferItems) {
-      const success = await handlePaste()
-      if (success) {
-        successCount++
-        // Remover del buffer después de pegar exitosamente
-        buffer.removeFromBuffer(item.id)
-      } else {
-        failCount++
+    try {
+      // Iniciar loader para pegado múltiple
+      loadingId = startLoading(
+        'pasteAll',
+        null,
+        `Pegando ${bufferItems.length} elementos del buffer...`
+      )
+
+      if (!loadingId) {
+        showToast('No se puede iniciar operación de pegado múltiple', { type: 'error' })
+        return
       }
-    }
 
-    if (successCount > 0) {
-      showToast(
-        `${successCount} elemento(s) pegado(s) automáticamente`,
-        { type: 'success' }
-      )
-    }
+      let successCount = 0
+      let failCount = 0
 
-    if (failCount > 0) {
+      // Nota: No usamos handlePaste() aquí para evitar múltiples loaders
+      // En su lugar, procesamos cada elemento directamente
+      for (let i = 0; i < bufferItems.length; i++) {
+        const item = bufferItems[i]
+        const elemento = item.elemento
+
+        // Actualizar descripción del loader
+        const currentLoader = loadingId
+        if (currentLoader) {
+          stopLoading(currentLoader)
+          loadingId = startLoading(
+            'pasteAll',
+            null,
+            `Pegando elemento ${i + 1} de ${bufferItems.length}: "${elemento.nombre || elemento.tipo}"`
+          )
+        }
+
+        try {
+          // Obtener límites del área actual
+          const areaBounds = getAreaBounds()
+
+          if (areaBounds.maxX === 0 || areaBounds.maxY === 0) {
+            failCount++
+            continue
+          }
+
+          // Buscar espacio disponible
+          const spaceResult = findAvailableSpace(elemento, areaBounds)
+
+          if (!spaceResult.found) {
+            failCount++
+            continue
+          }
+
+          // Validar la colocación
+          const validation = validatePlacement(elemento, spaceResult.position, areaBounds)
+
+          if (!validation.valid) {
+            failCount++
+            continue
+          }
+
+          // Pegar el elemento
+          const elementoId = buffer.pasteFromBuffer(item.id, spaceResult.position)
+
+          if (elementoId) {
+            successCount++
+            // Remover del buffer después de pegar exitosamente
+            buffer.removeFromBuffer(item.id)
+          } else {
+            failCount++
+          }
+
+        } catch (error) {
+          failCount++
+        }
+      }
+
+      // Mostrar resultados
+      if (successCount > 0) {
+        showToast(
+          `${successCount} elemento(s) pegado(s) automáticamente`,
+          { type: 'success' }
+        )
+      }
+
+      if (failCount > 0) {
+        showToast(
+          `${failCount} elemento(s) no pudieron ser pegados`,
+          { type: 'warning' }
+        )
+      }
+
+    } catch (error) {
       showToast(
-        `${failCount} elemento(s) no pudieron ser pegados`,
-        { type: 'warning' }
+        `Error en pegado múltiple: ${error.message}`,
+        { type: 'error', timeout: 4000 }
       )
+    } finally {
+      // Siempre detener el loader al finalizar
+      if (loadingId) {
+        stopLoading(loadingId)
+      }
     }
   }
 
