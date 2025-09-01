@@ -267,11 +267,11 @@ const guardar = async () => {
     largoCm = Number(edited.value?.dimensiones?.largo)
   }
   altoCm = Number(edited.value?.dimensiones?.alto)
-  if (!Number.isFinite(anchoCm) || anchoCm <= 0 || !Number.isFinite(largoCm) || largoCm <= 0 || !Number.isFinite(altoCm) || altoCm <= 0) {
-    dimensionError.value = 'Las dimensiones deben ser números válidos y mayores a 0.'
+  const isValidDimension = (value) => Number.isFinite(value) && value >= 0
+  if (!isValidDimension(anchoCm) || !isValidDimension(largoCm) || !isValidDimension(altoCm)) {
+    dimensionError.value = 'Las dimensiones deben ser números válidos y no negativos.'
     isSaving.value = false
     return
-  }
   }
 
   const resultadoDims = validarDimensiones(
@@ -334,6 +334,7 @@ const guardar = async () => {
     showSuccess(diamChanged ? 'Diámetro actualizado' : 'Cambios guardados')
   }
   isSaving.value = false
+}
 
 const validarDimension = (prop) => {
   const val = Number(edited.value.dimensiones[prop])
