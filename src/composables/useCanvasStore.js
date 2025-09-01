@@ -80,6 +80,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const etiquetasSeleccionadas = ref([])
 
   const elementoSeleccionado = ref(null)
+  const mostrarPropiedades = ref(false);
   const vistaActiva = computed(() => {
     // Vista automática según el contexto
     if (estaEnPlanta.value) {
@@ -1479,6 +1480,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     console.log('💾 Instancia de autosave establecida en el store')
   }
 
+  const toggleMostrarPropiedades = (newValue = false) => {
+    mostrarPropiedades.value = newValue;
+  }
+
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
   watch(
     () => [contextoNavegacion.value.tipo, contextoNavegacion.value.id],
@@ -1527,6 +1532,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     idsElementosFiltrados,
     elementoAura,
     isDraggable,
+    mostrarPropiedades,
 
     // Getters
     elementosVisibles,
@@ -1611,5 +1617,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     actualizarIdsFiltrados,
 
     setDraggableMode,
+
+    // == Propiedades
+    toggleMostrarPropiedades,
   }
 })

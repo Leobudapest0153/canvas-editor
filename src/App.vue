@@ -17,14 +17,14 @@
         <CanvasView
           @select="handleElementSelect"
           @drill-down="handleDrillDown"
-          :safeRight="showPropiedadesPanel ? 320 : 20"
+          :safeRight="canvasStore.mostrarPropiedades ? 320 : 20"
         />
       </div>
 
       <!-- Panel de propiedades (superpuesto para no empujar el canvas) -->
       <div
         class="app-sidebar-right absolute inset-y-0 right-0"
-        v-if="showPropiedadesPanel"
+        v-if="canvasStore.mostrarPropiedades && canvasStore.elementoSeleccionado"
         data-properties-panel
       >
         <PropiedadesPanel />
@@ -57,8 +57,6 @@ import ConfirmModal from './components/ConfirmModal.vue'
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
 const { deleteSelected } = useDeleteElement()
-
-const showPropiedadesPanel = computed(() => canvasStore.elementoSeleccionadoCompleto)
 
 const selectedElement = ref(null)
 
