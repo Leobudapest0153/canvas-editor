@@ -163,16 +163,33 @@ export async function runFinalClamp({ shape, el, areaBounds, grid = 50, elements
     const r = Math.min(el.width, el.height) / 2
     const cx = xf + r
     const cy = yf + r
-    const sx = Math.round(cx / grid) * grid
-    const sy = Math.round(cy / grid) * grid
-    const cxClamped = Math.max(bStroke.minX + r, Math.min(sx, bStroke.maxX - r))
-    const cyClamped = Math.max(bStroke.minY + r, Math.min(sy, bStroke.maxY - r))
-    xf = cxClamped - r
-    yf = cyClamped - r
+    // Snap solo si grid > 0
+    if (typeof grid === 'number' && grid > 0) {
+      const sx = Math.round(cx / grid) * grid
+      const sy = Math.round(cy / grid) * grid
+      const cxClamped = Math.max(bStroke.minX + r, Math.min(sx, bStroke.maxX - r))
+      const cyClamped = Math.max(bStroke.minY + r, Math.min(sy, bStroke.maxY - r))
+      xf = cxClamped - r
+      yf = cyClamped - r
+    } else {
+      // No snap: solo clamp
+      const cxClamped = Math.max(bStroke.minX + r, Math.min(cx, bStroke.maxX - r))
+      const cyClamped = Math.max(bStroke.minY + r, Math.min(cy, bStroke.maxY - r))
+      xf = cxClamped - r
+      yf = cyClamped - r
+    }
   } else {
-    const fr = finalizeRectClampSnapReclamp(xf, yf, el.width, el.height, bStroke, grid)
-    xf = fr.x
-    yf = fr.y
+    // finalizeRectClampSnapReclamp internamente hacía snap; si grid <= 0 evitamos el snap
+    if (typeof grid === 'number' && grid > 0) {
+      const fr = finalizeRectClampSnapReclamp(xf, yf, el.width, el.height, bStroke, grid)
+      xf = fr.x
+      yf = fr.y
+    } else {
+      // Solo clamp
+      const cHard = clampRectToBounds(xf, yf, el.width, el.height, bStroke)
+      xf = cHard.x
+      yf = cHard.y
+    }
   }
 
   // Aplicar en shape
