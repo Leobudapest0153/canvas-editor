@@ -1,7 +1,8 @@
 import { mapDimsByView } from '@/utils/innerViewDims'
 import { toLocal, toWorld } from '@/utils/innerLocalCoords'
 import { clampRectToBounds, overlap } from '@/utils/innerAABB'
-export function makeInnerSession({ parentEl, movingEl, siblings, vista, CM_TO_PX }) {
+import { CM_TO_PX, GRID_SIZE } from '@/utils/constants'
+export function makeInnerSession({ parentEl, movingEl, siblings, vista }) {
   const { wCm, hCm } = mapDimsByView(parentEl, vista)
   const bounds = {
     minX: 0,
@@ -104,7 +105,7 @@ export function makeInnerSession({ parentEl, movingEl, siblings, vista, CM_TO_PX
     contact = { id: null, axis: null }
     let p = clampRectToBounds(candidateLocal, mSize, bounds)
     if (!isValidLocal(p)) p = lastGoodLocal
-    const G = Math.max(1, window.__GRID_SIZE_PX || 10)
+    const G = Math.max(1, GRID_SIZE || 10)
     p = { x: Math.round(p.x / G) * G, y: Math.round(p.y / G) * G }
     p = clampRectToBounds(p, mSize, bounds)
     if (!isValidLocal(p)) p = lastGoodLocal
