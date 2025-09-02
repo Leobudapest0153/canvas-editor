@@ -146,6 +146,7 @@
               shadowOpacity: getElementShadow(elemento).opacity,
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
             }"
+            :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
             @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
@@ -219,6 +220,7 @@
               shadowOpacity: getElementShadow(elemento).opacity,
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'circle'),
             }"
+            :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
             @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
@@ -252,6 +254,7 @@
               shadowOpacity: 0.3,
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento, 'rect'),
             }"
+            :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento.id)"
             @dblclick="() => handleElementDoubleClick(elemento)"
             @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
@@ -650,6 +653,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useCacheOnDrag } from '@/composables/useCacheOnDrag'
 import { setupRafDrag } from '@/composables/useRafDrag'
 import { enablePerfMode } from '@/composables/usePerfMode'
 import { throttleEveryNFrames } from '@/utils/dragMath'
@@ -706,6 +710,19 @@ const stageRef = ref(null)
 const layerRef = ref(null)
 const backgroundLayerRef = ref(null)
 const overlaysLayerRef = ref(null)
+
+// Map of template refs for draggable nodes, keyed by element id
+const draggableNodeRefs = new Map()
+const registerDraggableRef = (id, node) => {
+  let r = draggableNodeRefs.get(id)
+  if (!r) {
+    r = ref(null)
+    draggableNodeRefs.set(id, r)
+    // Enable caching on drag for this node
+    useCacheOnDrag(r)
+  }
+  r.value = node
+}
 
 const innerSessions = new Map()
 let needsDraw = false
