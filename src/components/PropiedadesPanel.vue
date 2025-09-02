@@ -178,6 +178,7 @@ import { useToast } from '@/composables/useToast.js'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { useWeightValidation } from '@/composables/useWeightValidation.js'
 import { useDimensionValidation } from '@/composables/useDimensionValidation.js'
+import { EPSILON } from '@/utils/geometry.js'
 
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
