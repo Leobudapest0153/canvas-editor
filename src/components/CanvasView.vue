@@ -160,8 +160,8 @@
                 width: elemento.width,
                 height: elemento.height,
                 stroke: getStrokeColor(elemento.id),
-                strokeWidth: 1,
-                fill: 'transparent',
+                strokeWidth: atEdgeMap.value.get(elemento.id) ? 1 : 0,
+                fillEnabled: false,
                 listening: false,
                 name: 'bbox',
               }"
@@ -254,9 +254,8 @@
                 y: 0,
                 width: elemento.width,
                 height: elemento.height,
-                stroke: getStrokeColor(elemento.id),
-                strokeWidth: 1,
-                fill: 'transparent',
+                fillEnabled: false,
+                strokeWidth: 0,
                 listening: false,
                 name: 'bbox',
               }"
@@ -271,6 +270,8 @@
                 shadowColor: getElementShadow(elemento).color,
                 shadowBlur: getElementShadow(elemento).blur / canvasStore.zoom,
                 shadowOpacity: getElementShadow(elemento).opacity,
+                stroke: getStrokeColor(elemento.id),
+                strokeWidth: atEdgeMap.value.get(elemento.id) ? 1 : 0,
               }"
             />
           </v-group>
@@ -308,8 +309,8 @@
                 width: elemento.width,
                 height: elemento.height,
                 stroke: getStrokeColor(elemento.id),
-                strokeWidth: 1,
-                fill: 'transparent',
+                strokeWidth: atEdgeMap.value.get(elemento.id) ? 1 : 0,
+                fillEnabled: false,
                 listening: false,
                 name: 'bbox',
               }"
@@ -1164,10 +1165,10 @@ const lastDesiredPosMap = ref(new Map())
 const lastVelocityMap = ref(new Map())
 
 // Helper: color de borde con feedback
-// No usamos un color oscuro para el elemento seleccionado — mantenemos un borde sutil.
+// Color de borde para feedback visual cuando el elemento está en el borde
 const getStrokeColor = (elementId) => {
-  if (atEdgeMap.value.get(elementId)) return '#f59e0b' // advertencia en borde
-  return '#666'
+  if (atEdgeMap.value.get(elementId)) return '#f59e0b'
+  return undefined
 }
 
 // Convierte posición stage->layer considerando zoom/pan
