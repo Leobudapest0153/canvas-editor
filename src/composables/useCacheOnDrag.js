@@ -77,7 +77,7 @@ export function useCacheOnDrag(refNode) {
   const inst = getCurrentInstance()
   if (inst) {
     onUnmounted(() => {
-      try { stop && stop() } catch {}
+      try { stop && stop() } catch { /* ignore */ }
       detach()
     })
   }
