@@ -1823,7 +1823,6 @@ const createElementFromDrop = (data, dropEvent) => {
         movingEl: temp,
         siblings,
         vista: canvasStore.vistaActiva,
-        CM_TO_PX,
       })
       let local = sess.toLocal({ x: candX, y: candY }, parent)
       local = sess.finalizeLocal(local)
@@ -2021,7 +2020,6 @@ const onShapeDragStart = (e, el) => {
       movingEl: el,
       siblings,
       vista: canvasStore.vistaActiva,
-      CM_TO_PX,
     })
     const pointer = e.evt ? { x: e.evt.clientX || 0, y: e.evt.clientY || 0 } : { x: 0, y: 0 }
     innerSessions.set(el.id, {
