@@ -38,6 +38,23 @@
                   placeholder="#3B82F6" :disabled="isSaving" />
               </div>
             </div>
+
+            <!-- Etiquetas -->
+            <div>
+              <TagFilter
+                class="pb-3"
+                :selected-ids="edited?.tags || []"
+                @add="onTagAdd"
+                @remove="onTagRemove"
+                @create="onTagCreateOpen"
+              />
+              <CreateTagModal
+                :show="createTagModalOpen"
+                :initial-text="newTagText"
+                @close="createTagModalOpen = false"
+                @save="onTagCreateSave"
+              />
+            </div>
           </div>
         </details>
 
@@ -178,6 +195,9 @@ import { useToast } from '@/composables/useToast.js'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { useWeightValidation } from '@/composables/useWeightValidation.js'
 import { useDimensionValidation } from '@/composables/useDimensionValidation.js'
+import { EPSILON } from '@/utils/geometry.js'
+import TagFilter from '@/components/TagFilter.vue'
+import CreateTagModal from '@/components/CreateTagModal.vue'
 
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
@@ -209,6 +229,8 @@ const cargarDesdeStore = (el) => deepClone({
   diametroCm: (el.forma === 'circular')
     ? Number(el.dimensiones?.ancho ?? el.dimensiones?.largo ?? 0)
     : 0,
+  // Buffer local de etiquetas (IDs)
+  tags: Array.isArray(el.etiquetas) ? [...el.etiquetas] : [],
 })
 
 watch(() => elementoSeleccionado.value?.id, (id) => {
@@ -221,9 +243,15 @@ watch(() => elementoSeleccionado.value?.id, (id) => {
   }
 }, { immediate: true })
 
+// Comparación order-insensitive solo para tags
+const normalizeForCompare = (obj) => {
+  const c = deepClone(obj || {})
+  if (Array.isArray(c.tags)) c.tags = [...c.tags].sort((a, b) => a - b)
+  return c
+}
 const isDirty = computed(() => {
   if (!edited.value || !snapshotOriginal.value) return false
-  return !deepEqual(edited.value, snapshotOriginal.value)
+  return !deepEqual(normalizeForCompare(edited.value), normalizeForCompare(snapshotOriginal.value))
 })
 
 const guardarDeshabilitado = computed(() =>
@@ -290,6 +318,15 @@ const guardar = async () => {
     posicionAjustadaBadge.value = !!res?.posicionAjustada
   }
   const patch = makePatch(snapshotOriginal.value, edited.value)
+
+  // Mapear buffer local de tags -> propiedad real del store 'etiquetas' si cambió (orden-insensible)
+  const sortIds = (arr) => (Array.isArray(arr) ? [...arr].sort((a, b) => a - b) : [])
+  const origTags = sortIds(snapshotOriginal.value?.tags)
+  const newTags = sortIds(edited.value?.tags)
+  if (!deepEqual(origTags, newTags)) {
+    patch.etiquetas = [...newTags]
+  }
+  delete patch.tags
 
   // Si es un elemento de pared, reflejar valores verticales y posicionar Y en px
   if (esPared.value) {
@@ -516,6 +553,44 @@ const validarAlturaSobreSuelo = () => {
 
 const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
+}
+
+// ====== Gestión de etiquetas (buffer local) ======
+const createTagModalOpen = ref(false)
+const newTagText = ref('')
+
+const onTagAdd = (tagId) => {
+  if (!edited.value) return
+  if (!Array.isArray(edited.value.tags)) edited.value.tags = []
+  if (!edited.value.tags.includes(tagId)) edited.value.tags.push(tagId)
+}
+
+const onTagRemove = (tagId) => {
+  if (!edited.value || !Array.isArray(edited.value.tags)) return
+  edited.value.tags = edited.value.tags.filter((id) => id !== tagId)
+}
+
+const onTagCreateOpen = (text) => {
+  newTagText.value = text || ''
+  createTagModalOpen.value = true
+}
+
+const onTagCreateSave = async (payload) => {
+  // payload: { nombre?: string, texto?: string, color?: string, colorFondo?, colorTexto? }
+  const texto = (payload?.nombre || payload?.texto || newTagText.value || '').trim()
+  if (!texto) return
+  const nueva = {
+    texto,
+    colorFondo: payload?.colorFondo || payload?.color || '#DBEAFE',
+    colorTexto: payload?.colorTexto || '#1E40AF',
+  }
+  // Crear en catálogo global
+  canvasStore.agregarEtiqueta(nueva)
+  // Obtener el ID recién creado (max actual)
+  const tagId = Math.max(0, ...canvasStore.etiquetas.map((e) => e.id))
+  onTagAdd(tagId)
+  createTagModalOpen.value = false
+  newTagText.value = ''
 }
 
 const onKeydown = (e) => {
