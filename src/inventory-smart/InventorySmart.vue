@@ -137,8 +137,10 @@ const handleCopyToBuffer = () => {
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   try {
+    window.addEventListener('keydown', handleKeydown)
+
     // Si no se provee una configuracion inicial
     if (!props.configCanvas) {
       showToast('Iniciando entorno', { type: 'info' })
@@ -158,14 +160,12 @@ onMounted(async () => {
 
     showToast('Iniciando entorno', { type: 'info' })
     // Restaurar estado
-    await canvasStore.deserialize(props.configCanvas)
-
+    canvasStore.deserialize(props.configCanvas)
   } catch (error) {
+    window.removeEventListener('keydown', handleKeydown)
     showToast('Ha ocurrido un error al importar la configuración', { type: 'error' })
     console.error('Error al importar la configuración:', error)
   }
-
-  window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {

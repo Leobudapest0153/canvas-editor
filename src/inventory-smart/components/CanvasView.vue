@@ -2728,7 +2728,7 @@ const handleKeyDown = (e) => {
     e.preventDefault()
     propertiesStore.toggle()
     if (canvasStore.mostrarPropiedades.value) {
-      nextTick(() => focusPrimerCampo())
+      // nextTick(() => focusPrimerCampo())
     }
   } else {
     handleCanvasHotkeys(e, {
