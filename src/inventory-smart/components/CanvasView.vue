@@ -630,8 +630,8 @@
       @close="ctx.close()"
     />
 
-    <!-- Información de zoom, vista y dimensiones -->
-    <div class="canvas-info">
+  <!-- Información de zoom, vista y dimensiones -->
+  <div ref="canvasInfoRef" class="canvas-info" :style="canvasInfoStyle">
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
       <span>{{ t('views.label') }}: {{ t(`views.${canvasStore.vistaActiva}`) }}</span>
       <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
@@ -659,8 +659,8 @@
       </span>
     </div>
 
-    <!-- Botones flotantes de Undo/Redo y Bloqueo -->
-    <div class="floating-controls" :style="{ right: `${props.safeRight}px` }">
+  <!-- Botones flotantes de Undo/Redo y Bloqueo -->
+  <div ref="floatingControlsRef" class="floating-controls" :style="{ right: `${props.safeRight}px` }">
       <button
         @click="undo()"
         :disabled="!canUndo"
@@ -676,7 +676,6 @@
           />
         </svg>
       </button>
-
       <button
         @click="redo()"
         :disabled="!canRedo"
@@ -693,6 +692,30 @@
         </svg>
       </button>
 
+      <!-- Botones de Zoom: ubicados junto a 'fit' pero después de redo para mantener undo+redo juntos -->
+      <button
+        @click="zoomOut()"
+        :disabled="!canZoomOut"
+        class="floating-btn btn-zoom btn-zoom-out"
+        title="Alejar (Ctrl+ -)"
+      >
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <button
+        @click="zoomIn()"
+        :disabled="!canZoomIn"
+        class="floating-btn btn-zoom btn-zoom-in"
+        title="Acercar (Ctrl+ +)"
+      >
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <line x1="12" y1="5" x2="12" y2="19" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
       <!-- Botón ajustar a planta activa -->
       <button
         @click="fitToPlanta"
@@ -701,9 +724,12 @@
         class="floating-btn btn-fit"
         title="Ajustar vista a la planta activa"
       >
+        <!-- Icono de ajustar/fit: flechas hacia las esquinas -->
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35" />
-          <circle cx="11" cy="11" r="6" stroke-width="2" />
+          <polyline points="4 9 4 4 9 4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="20 15 20 20 15 20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="4" y1="4" x2="10" y2="10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="20" y1="20" x2="14" y2="14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
 
@@ -763,6 +789,38 @@ import { useToast } from '@/inventory-smart/composables/useToast'
 const props = defineProps({
   safeRight: { type: Number, default: 20 },
 })
+
+// Refs para evitar solapamientos entre canvas-info y floating-controls
+const canvasInfoRef = ref(null)
+const floatingControlsRef = ref(null)
+
+// Estilo reactivo aplicado en línea a .canvas-info (max-width para evitar solapamiento)
+const canvasInfoStyle = ref({})
+
+function recomputeCanvasInfoMaxWidth() {
+  try {
+    const container = containerRef.value
+    const infoEl = canvasInfoRef.value
+    const controlsEl = floatingControlsRef.value
+    if (!container || !infoEl || !controlsEl) {
+      canvasInfoStyle.value = {}
+      return
+    }
+
+    const containerRect = container.getBoundingClientRect()
+    const controlsRect = controlsEl.getBoundingClientRect()
+    const margin = 12 // espacio mínimo entre info y controles
+
+    // calcular espacio disponible a la derecha del info antes de llegar a los controls
+    const availableToRight = controlsRect.left - containerRect.left - margin
+
+    // si info está muy a la derecha, permitir que haga wrap y limitar su max-width
+    const maxW = Math.max(120, availableToRight - 24) // mínimo 120px
+    canvasInfoStyle.value = { maxWidth: `${maxW}px` }
+  } catch (e) {
+    canvasInfoStyle.value = {}
+  }
+}
 
 
 // Referencia segura a Konva (cuando está disponible globalmente via vue-konva)
@@ -1102,6 +1160,51 @@ const handleWheel = (e) => {
   canvasStore.configurarPan(newPos.x, newPos.y)
   try { canvasStore.view.hasUserZoomPan = true } catch { /* ignore */ }
 }
+
+// Zoom programático (para botones)
+const MIN_ZOOM = 0.1
+const MAX_ZOOM = 5
+const ZOOM_STEP = 1.1
+
+const canZoomIn = computed(() => (canvasStore.zoom || 1) < MAX_ZOOM)
+const canZoomOut = computed(() => (canvasStore.zoom || 1) > MIN_ZOOM)
+
+const zoomBy = (factor) => {
+  try {
+    const stage = stageRef.value.getNode()
+    const oldScale = stage.scaleX()
+    const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, oldScale * factor))
+    // Mantener el centro de la vista
+    const center = { x: stage.width() / 2, y: stage.height() / 2 }
+    const mousePointTo = {
+      x: (center.x - stage.x()) / oldScale,
+      y: (center.y - stage.y()) / oldScale,
+    }
+    const newPos = {
+      x: center.x - mousePointTo.x * newScale,
+      y: center.y - mousePointTo.y * newScale,
+    }
+    canvasStore.configurarZoom(newScale)
+    canvasStore.configurarPan(newPos.x, newPos.y)
+    try { canvasStore.view.hasUserZoomPan = true } catch { /* ignore */ }
+  } catch (err) {
+    console.warn('zoomBy error', err)
+  }
+}
+
+const zoomIn = () => zoomBy(ZOOM_STEP)
+const zoomOut = () => zoomBy(1 / ZOOM_STEP)
+
+// Keybindings: Ctrl + '+' / Ctrl + '-' => zoom, handled globally
+const onKeyDown = (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+    if (e.key === '+') { e.preventDefault(); zoomIn() }
+    if (e.key === '=') { e.preventDefault(); zoomIn() }
+    if (e.key === '-') { e.preventDefault(); zoomOut() }
+  }
+}
+onMounted(() => window.addEventListener('keydown', onKeyDown))
+onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 
 // === FUNCIONES DE CANVAS/STAGE ===
 const handleStageMouseDown = (e) => {
@@ -2764,13 +2867,14 @@ const handleKeyDown = (e) => {
     })
   }
 }
-let resizeObserver = null
+let sizeResizeObserver = null
+let infoResizeObserver = null
 onMounted(async () => {
   await nextTick()
   updateStageSize()
   if (containerRef.value) {
-    resizeObserver = new ResizeObserver(updateStageSize)
-    resizeObserver.observe(containerRef.value)
+  sizeResizeObserver = new ResizeObserver(updateStageSize)
+  sizeResizeObserver.observe(containerRef.value)
   }
   await nextTick()
   centrarPlantaEnCanvas()
@@ -2779,12 +2883,36 @@ onMounted(async () => {
   fitToPlanta()
   window.addEventListener('click', handleGlobalClick)
   window.addEventListener('keydown', handleKeyDown)
+  // Recompute canvas-info max width on mount and on resize
+  await nextTick()
+  recomputeCanvasInfoMaxWidth()
+  window.addEventListener('resize', recomputeCanvasInfoMaxWidth)
+  try {
+    if (containerRef.value) {
+      infoResizeObserver = new ResizeObserver(recomputeCanvasInfoMaxWidth)
+      infoResizeObserver.observe(containerRef.value)
+    }
+  } catch (e) { /* ignore */ }
 })
 onUnmounted(() => {
-  if (resizeObserver) resizeObserver.disconnect()
+  if (sizeResizeObserver) sizeResizeObserver.disconnect()
+  if (infoResizeObserver) infoResizeObserver.disconnect()
   window.removeEventListener('click', handleGlobalClick)
   window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('resize', recomputeCanvasInfoMaxWidth)
 })
+
+// Helper: enfoca el primer input dentro del panel de propiedades si existe
+function focusPrimerCampo() {
+  try {
+    const panel = document.querySelector('[data-properties-panel]')
+    if (!panel) return
+    const input = panel.querySelector('input, textarea, select, [contenteditable]')
+    if (input && typeof input.focus === 'function') input.focus()
+  } catch (e) {
+    console.warn('focusPrimerCampo error', e)
+  }
+}
 
 // Eliminar referencia originalStartElementDrag no usada
 
@@ -3078,8 +3206,9 @@ const onDelete = async (id) => {
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 12px;
-  display: flex;
-  gap: 16px;
+  display: inline-flex;
+  gap: 12px;
+  flex-wrap: wrap; /* permitir dividir información si no cabe */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   pointer-events: none;
 }
@@ -3112,6 +3241,29 @@ const onDelete = async (id) => {
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Botones de zoom: heredan tamaño de .floating-btn y comparten color/hover con btn-undo */
+.btn-zoom:not(:disabled) {
+  color: #3b82f6;
+}
+.btn-zoom:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+/* Si el espacio horizontal es reducido, desplazar .canvas-info hacia la izquierda y reducir su padding */
+@media (max-width: 900px) {
+  .canvas-info { left: 16px; top: 24px; padding: 6px 8px; font-size: 11px }
+  .floating-controls { top: 24px; right: 12px }
+  .floating-btn { width: 40px; height: 40px }
+}
+
+/* Si todavía hay conflicto visual, forzar que .canvas-info tome dos líneas y tenga menor gap */
+@media (max-width: 640px) {
+  .canvas-info { gap: 8px; font-size: 11px }
+  .floating-controls { gap: 6px }
+  .floating-btn { width: 36px; height: 36px }
 }
 
 .floating-btn:hover:not(:disabled) {
