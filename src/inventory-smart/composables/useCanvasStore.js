@@ -19,6 +19,7 @@ import { ref, computed, watch } from 'vue'
 import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
 import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
@@ -28,6 +29,7 @@ import {
 
 export const useCanvasStore = defineStore('canvas', () => {
   const { showToast } = useToast()
+  const { serialize: _serialize, deserialize: _deserialize, persist: _persist } = useStatePersistence()
 
   // === INTEGRACIÓN CON HISTORIAL ===
   // Instancia del historial - se establece desde useCanvasWithHistory
@@ -678,12 +680,15 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const persist = () => {
     try {
-      const data = serialize()
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('canvas-data', data)
+      const state = {
+        plantas: plantas.value,
+        elementos: elementos.value
       }
+      const data = _serialize(state)
+      return _persist(data)
     } catch (e) {
       console.warn('Error persisting state', e)
+      return false
     }
   }
 
@@ -1119,92 +1124,10 @@ export const useCanvasStore = defineStore('canvas', () => {
    */
   const serialize = () => {
     const state = {
-      // Información básica del canvas
-      meta: {
-        version: '1.0.0',
-        timestamp: new Date().toISOString(),
-        app: 'inventory-smart',
-      },
-
-      // Estado de plantas con todas sus propiedades
-      plantas: plantas.value.map((planta) => {
-        return {
-          id: planta.id,
-          nombre: planta.nombre,
-          descripcion: planta.descripcion || '',
-          dimensiones: {
-            alto: planta.dimensiones.alto,
-            ancho: planta.dimensiones.ancho,
-            largo: planta.dimensiones.largo,
-          },
-          poligono: planta.poligono || [],
-          pesoMaximoSoportado: planta.pesoMaximoSoportado,
-          elementos: planta.elementos || [],
-          activa: planta.activa || false,
-          propiedadesPersonalizadas: planta.propiedadesPersonalizadas || {},
-        }
-      }),
-
-      // Estado de elementos
-      elementos: elementos.value.map((elemento) => ({
-        // Identificación básica
-        id: elemento.id,
-        nombre: elemento.nombre,
-        descripcion: elemento.descripcion || '',
-        tipo: elemento.tipo,
-        categoria: elemento.categoria,
-        plantaId: elemento.plantaId,
-        etiquetas: elemento.etiquetas || [],
-
-        alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
-
-        posicion: {
-          x: elemento.x || 0,
-          y: elemento.y || 0,
-          // Unused
-          z: elemento.z || 0,
-          rotation: elemento.rotation || 0,
-        },
-
-        dimensiones: {
-          ancho: elemento.dimensiones.ancho,
-          largo: elemento.dimensiones.largo,
-          alto: elemento.dimensiones.alto,
-        },
-
-        color: elemento.color || elemento.colorBase || '#3b82f6',
-        colorBase: elemento.colorBase || '#3b82f6',
-        forma: elemento.forma || 'rectangular',
-        visible: elemento.visible,
-        pesoMaximo: elemento.pesoMaximo || 0,
-        volumenMaximo: elemento.volumenMaximo || 0,
-        ubicacion: elemento.ubicacion || 'suelo',
-        // Política de dimensiones
-        dimensionLock: elemento.dimensionLock === true,
-        systemTypeKey: elemento.systemTypeKey || null,
-
-        // Canvas representacion
-        canvas: {
-          width: elemento.width,
-          height: elemento.height
-        },
-
-        // Uso real
-        uso: {
-          peso: elemento?.uso?.peso || 0,
-          volumen: elemento?.uso?.volumen || 0
-        },
-
-        // Jerarquía
-        padre: elemento.padre || null,
-        hijos: elemento.hijos || [],
-
-        // Propiedades personalizadas
-        propiedadesPersonalizadas: elemento.propiedadesPersonalizadas || {},
-      })),
+      plantas: plantas.value,
+      elementos: elementos.value
     }
-
-    return JSON.stringify(state, null, 2)
+    return _serialize(state)
   }
 
   /**
@@ -1213,125 +1136,45 @@ export const useCanvasStore = defineStore('canvas', () => {
    * @returns {boolean} true si la deserialización fue exitosa
    */
   const deserialize = (jsonString) => {
-    try {
-      const state = JSON.parse(jsonString)
+    const storeActions = {
+      clearState: () => {
+        plantas.value = []
+        elementos.value = []
+      },
+      addPlanta: (plantaData) => {
+        plantas.value.push(plantaData)
+      },
+      addElemento: (elementoData) => {
+        elementos.value.push(elementoData)
+      },
+      setInitialNavigation: (plantaId, plantaNombre) => {
+        // Establecer la primera planta como activa siempre
+        plantaActiva.value = plantaId
 
-      // Validar estructura básica
-      if (!state || !state.plantas || !state.elementos) {
-        console.error('Estructura JSON inválida')
-        return false
+        // Establecer contexto de navegación siempre en la primera planta
+        contextoNavegacion.value = {
+          tipo: 'plantas',
+          id: plantaId,
+          path: [
+            {
+              tipo: 'plantas',
+              id: plantaId,
+              nombre: plantaNombre,
+            },
+          ],
+        }
+
+        // Resetear valores temporales a sus defaults
+        elementoSeleccionado.value = null
+        zoom.value = 1
+        panX.value = 0
+        panY.value = 0
+
+        // Canvas adaptativo se recalculará automáticamente por el watcher
       }
-
-      // Limpiar estado actual
-      plantas.value = []
-      elementos.value = []
-
-      // Restaurar plantas
-      state.plantas.forEach((plantaData) => {
-        plantas.value.push({
-          id: plantaData.id,
-          nombre: plantaData.nombre,
-          descripcion: plantaData.descripcion || '',
-          dimensiones: {
-            alto: plantaData.dimensiones.alto,
-            ancho: plantaData.dimensiones.ancho,
-            largo: plantaData.dimensiones.largo,
-          },
-          poligono: plantaData.poligono || [],
-          pesoMaximoSoportado: plantaData.pesoMaximoSoportado,
-          elementos: plantaData.elementos || [],
-          activa: plantaData.activa || false,
-          propiedadesPersonalizadas: plantaData.propiedadesPersonalizadas || {},
-        })
-      })
-
-      // Restaurar elementos
-      const elementosData = state.elementos || []
-
-      elementosData.forEach((elementoData) => {
-        elementos.value.push({
-          id: elementoData.id,
-          nombre: elementoData.nombre,
-                    descripcion: elementoData.descripcion || '',
-          tipo: elementoData.tipo,
-          categoria: elementoData.categoria,
-          plantaId: elementoData.plantaId,
-          etiquetas: elementoData.etiquetas || [],
-
-          x: elementoData.posicion.x,
-          y: elementoData.posicion.y,
-          z: elementoData.posicion.z,
-          rotation: elementoData.posicion.rotation,
-
-          dimensiones: {
-            ancho: elementoData.dimensiones.ancho,
-            largo: elementoData.dimensiones.largo,
-            alto: elementoData.dimensiones.alto,
-          },
-
-          colorBase: elementoData.colorBase || '#3b82f6',
-          color: elementoData.color || '#3b82f6',
-          forma: elementoData.forma || 'rectangular',
-          visible: elementoData.visible !== false,
-          pesoMaximo: elementoData.pesoMaximo || 0,
-          volumenMaximo: elementoData.volumenMaximo || 0,
-          ubicacion: elementoData.ubicacion || 'suelo',
-          // Política de dimensiones
-          dimensionLock: elementoData.dimensionLock === true,
-          systemTypeKey: elementoData.systemTypeKey || null,
-
-          width: elementoData.canvas.width,
-          height: elementoData.canvas.height || 60,
-
-          padre: elementoData.padre || null,
-          hijos: elementoData.hijos || [],
-
-          propiedadesPersonalizadas: elementoData.propiedadesPersonalizadas || {},
-        })
-      })
-
-      // Validar que hay al menos una planta antes de continuar
-      if (plantas.value.length === 0) {
-        console.error('No se puede deserializar: no hay plantas en el archivo JSON')
-        return false
-      }
-
-      // Establecer la primera planta como activa siempre
-      const primeraPlanta = plantas.value[0]
-      plantaActiva.value = primeraPlanta.id
-
-      // Establecer contexto de navegación siempre en la primera planta
-      contextoNavegacion.value = {
-        tipo: 'plantas',
-        id: primeraPlanta.id,
-        path: [
-          {
-            tipo: 'plantas',
-            id: primeraPlanta.id,
-            nombre: primeraPlanta.nombre,
-          },
-        ],
-      }
-
-      // Resetear valores temporales a sus defaults
-      elementoSeleccionado.value = null
-      zoom.value = 1
-      panX.value = 0
-      panY.value = 0
-
-      // Canvas adaptativo se recalculará automáticamente por el watcher
-
-      console.log('Estado deserializado exitosamente:', {
-        plantas: plantas.value.length,
-        elementos: elementos.value.length,
-        plantaActiva: plantaActiva.value,
-      })
-
-      return true
-    } catch (error) {
-      console.error('Error al deserializar JSON:', error)
-      return false
     }
+
+    return _deserialize(jsonString, storeActions)
   }
 
   // === FIN FUNCIONES DE SERIALIZACIÓN ===
