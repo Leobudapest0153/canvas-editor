@@ -286,3 +286,44 @@ export function resolveCandidateWithBoundary(movingEl, allElements, W, H, iterat
   }
   return { x, y, fellBack: false }
 }
+
+export function clampResizeDeltaToContact(rect, delta, neighbors) {
+  let x = rect.x + (delta.dx || 0)
+  let y = rect.y + (delta.dy || 0)
+  let w = rect.width + (delta.dw || 0)
+  let h = rect.height + (delta.dh || 0)
+
+  for (const n of neighbors) {
+    const overlaps = !(x + w <= n.x || n.x + n.width <= x || y + h <= n.y || n.y + n.height <= y)
+    if (!overlaps) continue
+    const { dx, dy } = computeMTD(x, y, w, h, n.x, n.y, n.width, n.height)
+    if (dx !== 0) {
+      if (delta.dw > 0 && dx < 0) {
+        w += dx
+      } else if (delta.dw < 0 && dx > 0) {
+        w -= dx
+        x += dx
+      } else {
+        x += dx
+      }
+    }
+    if (dy !== 0) {
+      if (delta.dh > 0 && dy < 0) {
+        h += dy
+      } else if (delta.dh < 0 && dy > 0) {
+        h -= dy
+        y += dy
+      } else {
+        y += dy
+      }
+    }
+  }
+
+  return {
+    dx: x - rect.x,
+    dy: y - rect.y,
+    dw: w - rect.width,
+    dh: h - rect.height,
+  }
+}
+

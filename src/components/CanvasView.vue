@@ -179,6 +179,18 @@
                 shadowOpacity: getElementShadow(elemento).opacity,
               }"
             />
+            <v-circle
+              v-if="resizingElementId === elemento.id && notifier.overlapState === 'overlapping'"
+              :config="{
+                x: elemento.width,
+                y: 0,
+                radius: 6 / canvasStore.zoom,
+                fill: '#ef4444',
+                stroke: '#fff',
+                strokeWidth: 1 / canvasStore.zoom,
+                listening: false,
+              }"
+            />
           </v-group>
           <!-- Icono de candado para elemento bloqueado -->
           <v-group
@@ -274,6 +286,18 @@
                 strokeWidth: 0,
               }"
             />
+            <v-circle
+              v-if="resizingElementId === elemento.id && notifier.overlapState === 'overlapping'"
+              :config="{
+                x: elemento.width,
+                y: 0,
+                radius: 6 / canvasStore.zoom,
+                fill: '#ef4444',
+                stroke: '#fff',
+                strokeWidth: 1 / canvasStore.zoom,
+                listening: false,
+              }"
+            />
           </v-group>
 
           <!-- Elementos circulares en vista XZ se muestran como rectángulos (cilindro visto de frente) -->
@@ -326,6 +350,18 @@
                 shadowColor: 'black',
                 shadowBlur: 4,
                 shadowOpacity: 0.3,
+              }"
+            />
+            <v-circle
+              v-if="resizingElementId === elemento.id && notifier.overlapState === 'overlapping'"
+              :config="{
+                x: elemento.width,
+                y: 0,
+                radius: 6 / canvasStore.zoom,
+                fill: '#ef4444',
+                stroke: '#fff',
+                strokeWidth: 1 / canvasStore.zoom,
+                listening: false,
               }"
             />
           </v-group>
@@ -756,6 +792,8 @@ import FloatingToolbar from './FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/utils/simulateProducts'
 import SnapGuides from './SnapGuides.vue'
 import { useToast } from '@/composables/useToast'
+import { clampResizeDeltaToContact } from '@/utils/collision'
+import { useCollisionNotifier } from '@/composables/useCollisionNotifier'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -826,6 +864,9 @@ const {
 
 // Estado para controlar si el snapping está habilitado (por defecto desactivado — evita alineado automático)
 const isSnappingEnabled = ref(true)
+const notifier = useCollisionNotifier()
+const resizingElementId = ref(null)
+let lastResizeCheck = 0
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -2496,6 +2537,7 @@ const handleTransformStart = (e, elementId) => {
     const state = { x, y, width, height, rotation: node.rotation?.() || 0 }
     transformInitialState.set(elementId, state)
     console.debug('[transform-debug] start', elementId, state)
+    resizingElementId.value = elementId
   } catch { /* ignore */ }
 }
 
@@ -2617,6 +2659,28 @@ const handleTransformMove = (e, elementId) => {
 
     const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
     const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+
+    const now = performance.now()
+    let overlaps = false
+    if (now - lastResizeCheck > 1000 / 60) {
+      lastResizeCheck = now
+      overlaps = !isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+      notifier.onOverlapChange(overlaps)
+      if (overlaps) {
+        const delta = {
+          dx: x - elemento.x,
+          dy: y - elemento.y,
+          dw: width - elemento.width,
+          dh: height - elemento.height,
+        }
+        const clamped = clampResizeDeltaToContact(elemento, delta, neighbors)
+        x = elemento.x + clamped.dx
+        y = elemento.y + clamped.dy
+        width = elemento.width + clamped.dw
+        height = elemento.height + clamped.dh
+      }
+    }
+
     const valid = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
 
     // Aplicar stroke rojo si inválido, volver al color habitual si válido
@@ -2981,6 +3045,8 @@ const onShapePointerDown = (evt, elemento) => {
 }
 const onShapePointerUp = () => {
   clearTimeout(longPressTimer)
+  notifier.reset()
+  resizingElementId.value = null
 }
 
 // Acción bloquear/desbloquear desde el menú contextual
