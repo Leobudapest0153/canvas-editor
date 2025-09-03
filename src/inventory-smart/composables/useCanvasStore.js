@@ -84,7 +84,11 @@ export const useCanvasStore = defineStore('canvas', () => {
   const etiquetasSeleccionadas = ref([])
 
   const elementoSeleccionado = ref(null)
+  // Permite forzar un modo de vista específico. 'auto' utiliza la lógica
+  // basada en el contexto (planta/elemento/contenedor).
+  const viewMode = ref('auto') // 'auto' | 'XY' | 'XZ'
   const vistaActiva = computed(() => {
+    if (viewMode.value !== 'auto') return viewMode.value
     // Vista automática según el contexto
     if (estaEnPlanta.value) {
       return 'XY' // Vista superior para plantas
@@ -119,6 +123,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     const e = Number(epsPx)
     if (!Number.isFinite(e)) return
     snapGridEps.value = Math.max(0, Math.min(50, e))
+  }
+
+  const setViewMode = (mode) => {
+    if (['auto', 'XY', 'XZ'].includes(mode)) {
+      viewMode.value = mode
+    }
   }
 
   // === NAVEGACIÓN JERÁRQUICA ===
@@ -448,6 +458,13 @@ export const useCanvasStore = defineStore('canvas', () => {
       path: path,
     }
 
+    // Forzar vista de frente cuando se navega a elementos/contenedores
+    if (tipo === 'plantas') {
+      setViewMode('XY')
+    } else {
+      setViewMode('XZ')
+    }
+
     // Actualizar canvas adaptativo según el nuevo contexto
     if (tipo === 'plantas') {
       const planta = plantaPorId.value(id)
@@ -491,6 +508,9 @@ export const useCanvasStore = defineStore('canvas', () => {
         },
       ],
     }
+
+    // Vista aérea para plantas
+    setViewMode('XY')
 
     // Actualizar planta activa
     plantaActiva.value = plantaId
@@ -1387,6 +1407,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     plantaActiva,
     elementoSeleccionado,
     vistaActiva,
+    viewMode,
     zoom,
     panX,
     panY,
@@ -1430,6 +1451,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     configurarPan,
     setGridSize,
     setSnapGridEps,
+    setViewMode,
 
     // Actions - Plantas
     seleccionarPlanta,

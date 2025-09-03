@@ -647,8 +647,12 @@
       >
         {{ canvasStore.estaEnElemento ? 'Elemento' : 'Contenedor' }}:
         {{ canvasStore.elementoContenedorActual.nombre }}
-        <template v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones">
-          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }}×{{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }} - Vista de frente)
+        <template
+          v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones"
+        >
+          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }} ancho ×
+          {{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }} altura - Vista de
+          frente)
         </template>
         <template v-else>
           ({{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.width, viewport.cmPerPx)) }}×{{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.height, viewport.cmPerPx)) }})

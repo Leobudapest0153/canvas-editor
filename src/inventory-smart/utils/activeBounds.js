@@ -1,4 +1,5 @@
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { cmToPx } from '@/inventory-smart/utils/units'
 
 // Map physical dimensions (cm) to width/height depending on active view
 // dims: {ancho, largo, alto}
@@ -25,8 +26,9 @@ export function getActiveBounds(canvasStore) {
     const dims = elem.dimensiones || {}
     let { widthCm, heightCm } = mapDimsByView(dims, canvasStore.vistaActiva)
 
-    let widthPx = widthCm * CM_TO_PX
-    let heightPx = heightCm * CM_TO_PX
+    // Convertir dimensiones a píxeles usando la relación cm→px
+    let widthPx = cmToPx(widthCm, 1 / CM_TO_PX)
+    let heightPx = cmToPx(heightCm, 1 / CM_TO_PX)
 
     // Fallback to legacy pixel dimensions if cm dims missing
     if (!widthPx || !heightPx) {
@@ -57,8 +59,8 @@ export function getActiveBounds(canvasStore) {
 
   const ancho = planta.dimensiones?.ancho || 0
   const largo = planta.dimensiones?.largo || 0
-  const width = ancho * CM_TO_PX
-  const height = largo * CM_TO_PX
+  const width = cmToPx(ancho, 1 / CM_TO_PX)
+  const height = cmToPx(largo, 1 / CM_TO_PX)
   const polygonPx = [
     { x: 0, y: 0 },
     { x: width, y: 0 },
