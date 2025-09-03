@@ -59,6 +59,49 @@
       </UiIconButton>
     </div>
 
+    <!-- Grupo de zoom -->
+    <div class="flex items-center h-[40px] gap-1" role="group" aria-label="Controles de zoom">
+      <UiIconButton
+        class="hover:bg-black/[.05] dark:hover:bg-white/[.06]"
+        aria-label="Alejar"
+        :disabled="!canZoomOut"
+        @click.stop="() => { viewport.zoomOut(); $emit('recenter') }"
+      >
+        <svg viewBox="0 0 24 24" class="h-[20px] w-[20px] fill-current" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M15.5 14h-.79l-.28-.27A6 6 0 1 0 9 15a6 6 0 0 0 9.33 5l.27.28v.79l5 5L24 24l-5-5zm-6.5 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9m-2-4.5h4v-1h-4z"
+          />
+        </svg>
+      </UiIconButton>
+      <UiIconButton
+        class="hover:bg-black/[.05] dark:hover:bg-white/[.06]"
+        aria-label="Restablecer zoom"
+        :disabled="!canReset"
+        @click.stop="() => { viewport.resetZoom(); $emit('recenter') }"
+      >
+        <svg viewBox="0 0 24 24" class="h-[20px] w-[20px] fill-current" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M12 6v3l4-4l-4-4v3c-4.418 0-8 3.582-8 8c0 1.59.469 3.069 1.268 4.318l1.516-1.316A5.97 5.97 0 0 1 6 14c0-3.309 2.691-6 6-6m6.732 1.682l-1.516 1.316A5.97 5.97 0 0 1 18 14c0 3.309-2.691 6-6 6v-3l-4 4l4 4v-3c4.418 0 8-3.582 8-8c0-1.59-.469-3.069-1.268-4.318"
+          />
+        </svg>
+      </UiIconButton>
+      <UiIconButton
+        class="hover:bg-black/[.05] dark:hover:bg-white/[.06]"
+        aria-label="Acercar"
+        :disabled="!canZoomIn"
+        @click.stop="() => { viewport.zoomIn(); $emit('recenter') }"
+      >
+        <svg viewBox="0 0 24 24" class="h-[20px] w-[20px] fill-current" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M15.5 14h-.79l-.28-.27A6 6 0 1 0 9 15a6 6 0 0 0 9.33 5l.27.28v.79l5 5L24 24l-5-5zm-6.5 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9m2-4h-1.5v1.5h-1v-1.5H7v-1h1.5V8h1v1.5H11v1z"
+          />
+        </svg>
+      </UiIconButton>
+    </div>
+
     <!-- Divider between group and secondary actions -->
     <div class="h-6 w-px bg-white/10 dark:bg-white/10 mx-1.5" aria-hidden="true" />
 
@@ -138,7 +181,10 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import UiIconButton from './ui/UiIconButton.vue'
+import { useViewportStore } from '@/stores/viewport'
+import { createPinia, getActivePinia, setActivePinia } from 'pinia'
 defineProps({
   activeMode: { type: String, default: 'drag' },
   isElementSelected: { type: Boolean, default: false },
@@ -148,8 +194,15 @@ defineProps({
   isSnapping: { type: Boolean, default: false },
   avoidOverlap: { type: Boolean, default: false },
 })
+if (!getActivePinia()) {
+  setActivePinia(createPinia())
+}
+const viewport = useViewportStore()
+const canZoomIn = computed(() => viewport.zoom < viewport.maxZoom)
+const canZoomOut = computed(() => viewport.zoom > viewport.minZoom)
+const canReset = computed(() => viewport.zoom !== 1)
 
-defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'fill-container', 'delete'])
+defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'fill-container', 'delete', 'recenter'])
 </script>
 
 <style>

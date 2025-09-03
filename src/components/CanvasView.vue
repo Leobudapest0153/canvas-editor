@@ -616,6 +616,7 @@
       @fill-container="() => simularLlenadoContenedor(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
       @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
+      @recenter="centrarPlantaEnCanvas"
     />
 
     <!-- Menú contextual -->
@@ -738,6 +739,8 @@ import { dimsCmFor, clampInsideArea } from '@/utils/bounds'
 import { handleCanvasHotkeys } from '@/utils/canvasHotkeys'
 import { polygonInset } from '@/utils/polygonInset'
 import { GRID_SIZE, CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/utils/constants'
+import { useViewportStore } from '@/stores/viewport'
+import { createPinia, getActivePinia, setActivePinia } from 'pinia'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/utils/dimensionPolicy'
 import { getActiveBounds } from '@/utils/activeBounds'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
@@ -803,6 +806,10 @@ function scheduleDraw() {
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
+if (!getActivePinia()) {
+  setActivePinia(createPinia())
+}
+const viewport = useViewportStore()
 const {
   onDragStartGuard,
   onDragMoveGuard,
@@ -826,6 +833,24 @@ const {
 
 // Estado para controlar si el snapping está habilitado (por defecto desactivado — evita alineado automático)
 const isSnappingEnabled = ref(true)
+
+watch(
+  () => viewport.zoom,
+  (z) => {
+    if (canvasStore.zoom !== z) {
+      canvasStore.configurarZoom(z)
+    }
+  },
+)
+
+watch(
+  () => canvasStore.zoom,
+  (z) => {
+    if (viewport.zoom !== z) {
+      viewport.setZoom(z)
+    }
+  },
+)
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -1083,7 +1108,7 @@ const handleWheel = (e) => {
 
   const scaleBy = 1.1
   const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
-  const clampedScale = Math.max(0.1, Math.min(5, newScale))
+  const clampedScale = Math.max(viewport.minZoom, Math.min(viewport.maxZoom, newScale))
 
   const mousePointTo = {
     x: (pointer.x - stage.x()) / oldScale,
@@ -1095,7 +1120,7 @@ const handleWheel = (e) => {
     y: pointer.y - mousePointTo.y * clampedScale,
   }
 
-  canvasStore.configurarZoom(clampedScale)
+  viewport.setZoom(clampedScale)
   canvasStore.configurarPan(newPos.x, newPos.y)
   try { canvasStore.view.hasUserZoomPan = true } catch { /* ignore */ }
 }
