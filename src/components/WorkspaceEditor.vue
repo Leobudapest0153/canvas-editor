@@ -152,6 +152,7 @@ import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { useCanvasStore } from '@/composables/useCanvasStore'
 import { useWeightValidation } from '@/composables/useWeightValidation'
 import { useToast } from '@/composables/useToast';
+import { CM_TO_PX } from '@/utils/constants';
 import DrawEditor from './DrawEditor.vue';
 
 const canvasStore = useCanvasStore();
@@ -161,7 +162,7 @@ const canvasEditorRef = ref(null);
 
 const ovalSamplePoints = (cx, cy, rx, ry, n) => Array.from({length:n},(_,i)=>{const a=i/n*2*Math.PI;return{x:cx+rx*Math.cos(a),y:cy+ry*Math.sin(a)}})
 
-const PIXELS_PER_CM = 10
+const PIXELS_PER_CM = CM_TO_PX
 
 const rectW = ref(500)
 const rectL = ref(500)

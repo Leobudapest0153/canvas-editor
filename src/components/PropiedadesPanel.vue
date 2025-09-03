@@ -38,12 +38,29 @@
                   placeholder="#3B82F6" :disabled="isSaving" />
               </div>
             </div>
+
+            <!-- Etiquetas -->
+            <div>
+              <TagFilter
+                class="pb-3"
+                :selected-ids="edited?.tags || []"
+                @add="onTagAdd"
+                @remove="onTagRemove"
+                @create="onTagCreateOpen"
+              />
+              <CreateTagModal
+                :show="createTagModalOpen"
+                :initial-text="newTagText"
+                @close="createTagModalOpen = false"
+                @save="onTagCreateSave"
+              />
+            </div>
           </div>
         </details>
 
         <!-- Dimensiones -->
         <details v-if="mostrarDimensiones" open class="bg-gray-50 rounded-lg p-4">
-          <summary class="text-sm font-medium text-gray-700 cursor-pointer">Dimensiones (cm)</summary>
+          <summary class="text-sm font-medium text-gray-700 cursor-pointer">Dimensiones ({{ t('units.cm') }})</summary>
           <div class="mt-3 space-y-3">
             <!-- Para formas no circulares, mostrar ancho/largo -->
             <div v-if="!ocultarAnchoLargo" class="grid grid-cols-2 gap-3">
@@ -54,7 +71,7 @@
                     @change="validarDimension('ancho')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     :disabled="isSaving" />
-                  <span class="ml-1 text-sm text-gray-500">cm</span>
+                  <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
                 </div>
               </div>
               <div>
@@ -64,17 +81,17 @@
                     @change="validarDimension('largo')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     :disabled="isSaving" />
-                  <span class="ml-1 text-sm text-gray-500">cm</span>
+                  <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
                 </div>
               </div>
             </div>
-            <div>
+            <div v-if="!esCircular">
               <label class="text-sm text-gray-500">Alto</label>
               <div class="flex items-center">
                 <input type="number" min="0" v-model.number="edited.dimensiones.alto" @change="validarDimension('alto')"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                   :disabled="isSaving" />
-                <span class="ml-1 text-sm text-gray-500">cm</span>
+                <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
             </div>
             <!-- Diámetro para circulares -->
@@ -85,13 +102,18 @@
                   @change="validarDiametro"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                   :disabled="isSaving" />
-                <span class="ml-1 text-sm text-gray-500">cm</span>
+                <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
               <p v-if="advertenciaDiametroLimite" class="text-xs text-amber-600">{{ advertenciaDiametroLimite }}</p>
               <p v-if="advertenciaDiametroContencion" class="text-xs text-amber-600">{{ advertenciaDiametroContencion }}
               </p>
             </div>
             <p v-if="advertenciaAltura" class="text-xs text-amber-600">{{ advertenciaAltura }}</p>
+            <p v-if="dimensionError" class="text-xs text-red-600">{{ dimensionError }}</p>
+            <ul v-if="dimensionSugerencias && dimensionSugerencias.length" class="list-disc ml-5 text-xs text-gray-600">
+              <li v-for="(s,i) in dimensionSugerencias" :key="i">{{ s }}</li>
+            </ul>
+            <p v-if="posicionAjustadaBadge" class="text-xs text-emerald-700">Se ajustó posición para evitar desbordamiento/colisión.</p>
           </div>
         </details>
 
@@ -106,7 +128,7 @@
                   @change="validarAlturaSobreSuelo"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                   :disabled="isSaving || !esPared" />
-                <span class="ml-1 text-sm text-gray-500">cm</span>
+                <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
               <p v-if="advertenciaZBase" class="text-xs text-amber-600">{{ advertenciaZBase }}</p>
             </div>
@@ -125,6 +147,7 @@
                   :disabled="isSaving" />
                 <span class="ml-1 text-sm text-gray-500">kg</span>
               </div>
+              <p v-if="advertenciaPeso" class="text-xs text-amber-600">{{ advertenciaPeso }}</p>
             </div>
             <div v-if="volumen !== null">
               <label class="text-sm text-gray-500">Volumen</label>
@@ -133,6 +156,9 @@
                   class="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-500" />
                 <span class="ml-1 text-sm text-gray-500">m³</span>
               </div>
+            </div>
+            <div v-if="infoPesoPadre.limiteDePeso" class="text-xs text-gray-600">
+              {{ capacidadContextoTexto }}
             </div>
           </div>
         </details>
@@ -167,16 +193,27 @@ import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX } from '@/utils/constants
 import { deepClone, deepEqual, makePatch } from '@/utils/object'
 import { useToast } from '@/composables/useToast.js'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
+import { useWeightValidation } from '@/composables/useWeightValidation.js'
+import { useDimensionValidation } from '@/composables/useDimensionValidation.js'
+import { EPSILON } from '@/utils/geometry.js'
+import { t } from '@/utils/i18n.js'
+import TagFilter from '@/components/TagFilter.vue'
+import CreateTagModal from '@/components/CreateTagModal.vue'
 
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
 const confirmDialog = useConfirmDialog()
+const { validarPesoElemento, calcularPesoDisponible, contextoActualTieneLimiteDePeso, infoPesoContextoActual } = useWeightValidation()
+const { validarDimensiones, aplicarResultadoValidacion } = useDimensionValidation()
 
 const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoCompleto)
 
 const snapshotOriginal = ref(null)
 const edited = ref(null)
 const isSaving = ref(false)
+const dimensionError = ref(null)
+const dimensionSugerencias = ref([])
+const posicionAjustadaBadge = ref(false)
 
 const cargarDesdeStore = (el) => deepClone({
   nombre: el.nombre || '',
@@ -193,6 +230,8 @@ const cargarDesdeStore = (el) => deepClone({
   diametroCm: (el.forma === 'circular')
     ? Number(el.dimensiones?.ancho ?? el.dimensiones?.largo ?? 0)
     : 0,
+  // Buffer local de etiquetas (IDs)
+  tags: Array.isArray(el.etiquetas) ? [...el.etiquetas] : [],
 })
 
 watch(() => elementoSeleccionado.value?.id, (id) => {
@@ -205,9 +244,15 @@ watch(() => elementoSeleccionado.value?.id, (id) => {
   }
 }, { immediate: true })
 
+// Comparación order-insensitive solo para tags
+const normalizeForCompare = (obj) => {
+  const c = deepClone(obj || {})
+  if (Array.isArray(c.tags)) c.tags = [...c.tags].sort((a, b) => a - b)
+  return c
+}
 const isDirty = computed(() => {
   if (!edited.value || !snapshotOriginal.value) return false
-  return !deepEqual(edited.value, snapshotOriginal.value)
+  return !deepEqual(normalizeForCompare(edited.value), normalizeForCompare(snapshotOriginal.value))
 })
 
 const guardarDeshabilitado = computed(() =>
@@ -215,18 +260,74 @@ const guardarDeshabilitado = computed(() =>
   !!advertenciaAltura.value ||
   !!advertenciaZBase.value ||
   !!advertenciaDiametroLimite.value ||
-  !!advertenciaDiametroContencion.value,
+  !!advertenciaDiametroContencion.value ||
+  !!advertenciaPeso.value,
 )
 
 const revertir = () => {
   edited.value = deepClone(snapshotOriginal.value)
+  dimensionError.value = null
+  dimensionSugerencias.value = []
+  posicionAjustadaBadge.value = false
 }
 
 const guardar = async () => {
   if (!elementoSeleccionado.value) return
   if (guardarDeshabilitado.value) return
   isSaving.value = true
+  // Reset UI de validación
+  dimensionError.value = null
+  dimensionSugerencias.value = []
+  posicionAjustadaBadge.value = false
+
+  // 1) Validación de dimensiones (cm)
+  let anchoCm, largoCm, altoCm
+  if (esCircular.value) {
+    const diam = Number(edited.value?.diametroCm)
+    if (!Number.isFinite(diam) || diam <= 0) {
+      dimensionError.value = 'El diámetro debe ser mayor a 0.'
+      isSaving.value = false
+      return
+    }
+    anchoCm = diam
+    largoCm = diam
+  } else {
+    anchoCm = Number(edited.value?.dimensiones?.ancho)
+    largoCm = Number(edited.value?.dimensiones?.largo)
+  }
+  altoCm = Number(edited.value?.dimensiones?.alto)
+  const isValidDimension = (value) => Number.isFinite(value) && value >= 0
+  if (!isValidDimension(anchoCm) || !isValidDimension(largoCm) || !isValidDimension(altoCm)) {
+    dimensionError.value = 'Las dimensiones deben ser números válidos y no negativos.'
+    isSaving.value = false
+    return
+  }
+
+  const resultadoDims = validarDimensiones(
+    elementoSeleccionado.value.id,
+    { ancho: anchoCm, largo: largoCm, alto: altoCm },
+    { silencioso: false },
+  )
+  if (!resultadoDims?.valida) {
+    dimensionError.value = resultadoDims?.razon || 'Dimensiones inválidas'
+    dimensionSugerencias.value = resultadoDims?.sugerencias || []
+    isSaving.value = false
+    return
+  }
+  if (resultadoDims?.accion === 'aplicar') {
+    const res = aplicarResultadoValidacion(elementoSeleccionado.value.id, resultadoDims)
+    posicionAjustadaBadge.value = !!res?.posicionAjustada
+  }
   const patch = makePatch(snapshotOriginal.value, edited.value)
+
+  // Mapear buffer local de tags -> propiedad real del store 'etiquetas' si cambió (orden-insensible)
+  const sortIds = (arr) => (Array.isArray(arr) ? [...arr].sort((a, b) => a - b) : [])
+  const origTags = sortIds(snapshotOriginal.value?.tags)
+  const newTags = sortIds(edited.value?.tags)
+  if (!deepEqual(origTags, newTags)) {
+    patch.etiquetas = [...newTags]
+  }
+  delete patch.tags
 
   // Si es un elemento de pared, reflejar valores verticales y posicionar Y en px
   if (esPared.value) {
@@ -256,6 +357,15 @@ const guardar = async () => {
     delete patch.diametroCm
   }
   const diamChanged = esCircular.value && (snapshotOriginal.value?.diametroCm !== edited.value?.diametroCm)
+
+  // 3) Validación de peso después de dimensiones
+  if (advertenciaPeso.value) {
+    showWarning(advertenciaPeso.value)
+    isSaving.value = false
+    return
+  }
+
+  // 4) Persistencia final
   const ok = await canvasStore.updateElementById(elementoSeleccionado.value.id, patch)
   if (ok) {
     snapshotOriginal.value = deepClone(edited.value)
@@ -266,29 +376,43 @@ const guardar = async () => {
 
 const validarDimension = (prop) => {
   const val = Number(edited.value.dimensiones[prop])
-  const max = alturaPlanta.value
-
   if (isNaN(val) || val < 0) {
     showWarning('El valor debe ser mayor o igual a 0')
-    edited.value.dimensiones[prop] = snapshotOriginal.value.dimensiones[prop]
-  } else if (val > max) {
-    showWarning(`La altura no debe superar ${max} cm`)
     edited.value.dimensiones[prop] = snapshotOriginal.value.dimensiones[prop]
   }
 }
 
-const plantaActiva = computed(() => canvasStore.plantaPorId(canvasStore.plantaActiva) || 0);
-const pesoMaximoSoportado = computed(() => plantaActiva.value?.pesoMaximoSoportado || 0);
+// Contexto padre del elemento editado (planta o elemento/contenedor padre)
+const padreContext = computed(() => {
+  const el = elementoSeleccionado.value
+  if (!el) return { padreId: null, padreType: null }
+  if (el.padre) {
+    const padre = canvasStore.elementoPorId(el.padre)
+    const padreType = padre?.tipo || 'elementos'
+    return { padreId: el.padre, padreType }
+  }
+  return { padreId: el.plantaId, padreType: 'plantas' }
+})
+const infoPesoPadre = computed(() => {
+  const { padreId, padreType } = padreContext.value
+  if (!padreId || !padreType) return { limiteDePeso: false, usado: 0, maximo: 0, disponible: Infinity, porcentajeUsado: 0 }
+  return calcularPesoDisponible(padreId, padreType)
+})
+
+const capacidadContextoTexto = computed(() => {
+  const info = infoPesoPadre.value
+  return `Actualmente la bodega tiene ${info.usado} kg ocupados (${Math.round(info.porcentajeUsado)}% de su capacidad). 
+  Todavía puedes ocupar ${info.disponible} kg sin problemas.`;
+})
 
 const validarPeso = () => {
   const val = Number(edited.value.pesoMaximo)
   if (isNaN(val) || val < 0) {
     showWarning('El valor debe ser mayor o igual a 0')
     edited.value.pesoMaximo = snapshotOriginal.value.pesoMaximo
-  } else if (val > pesoMaximoSoportado.value) {
-    showWarning(`El valor no debe superar ${pesoMaximoSoportado.value} kg, que es el peso máximo soportado por la planta activa.`)
-    edited.value.pesoMaximo = snapshotOriginal.value.pesoMaximo
+    return
   }
+  // Mantener input; la validación de límite se refleja con advertenciaPeso y bloqueo de Guardar
 }
 
 const getTipoNombre = (tipo) => {
@@ -338,6 +462,23 @@ const advertenciaAltura = computed(() => {
   const max = alturaPlanta.value;
   const actual = edited.value?.dimensiones?.alto || 0
   return actual > max ? `La altura no debe superar ${max} cm` : null
+})
+
+// Advertencia de peso por límite del contexto padre (bloquea Guardar)
+const advertenciaPeso = computed(() => {
+  const info = infoPesoPadre.value
+  if (!info.limiteDePeso) return null
+  const oldVal = Number(elementoSeleccionado.value?.pesoMaximo || 0)
+  const newVal = Number(edited.value?.pesoMaximo || 0)
+  if (!Number.isFinite(newVal) || newVal < 0) return 'La capacidad debe ser un número válido.'
+  const delta = newVal - oldVal
+  if (delta <= 0) return null
+  const disponible = Number.isFinite(info.disponible) ? info.disponible : Infinity
+  if (delta > disponible + EPSILON) {
+    const pesoTotalFinal = info.usado - oldVal + newVal
+    return `Se excede el límite de peso del contenedor. Exceso: ${(delta - disponible).toFixed(2)} kg (Usado: ${pesoTotalFinal.toFixed(2)}/${info.maximo} kg).`
+  }
+  return null
 })
 
 // ===== Validaciones para círculo (diametro y contención) =====
@@ -413,6 +554,44 @@ const validarAlturaSobreSuelo = () => {
 
 const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
+}
+
+// ====== Gestión de etiquetas (buffer local) ======
+const createTagModalOpen = ref(false)
+const newTagText = ref('')
+
+const onTagAdd = (tagId) => {
+  if (!edited.value) return
+  if (!Array.isArray(edited.value.tags)) edited.value.tags = []
+  if (!edited.value.tags.includes(tagId)) edited.value.tags.push(tagId)
+}
+
+const onTagRemove = (tagId) => {
+  if (!edited.value || !Array.isArray(edited.value.tags)) return
+  edited.value.tags = edited.value.tags.filter((id) => id !== tagId)
+}
+
+const onTagCreateOpen = (text) => {
+  newTagText.value = text || ''
+  createTagModalOpen.value = true
+}
+
+const onTagCreateSave = async (payload) => {
+  // payload: { nombre?: string, texto?: string, color?: string, colorFondo?, colorTexto? }
+  const texto = (payload?.nombre || payload?.texto || newTagText.value || '').trim()
+  if (!texto) return
+  const nueva = {
+    texto,
+    colorFondo: payload?.colorFondo || payload?.color || '#DBEAFE',
+    colorTexto: payload?.colorTexto || '#1E40AF',
+  }
+  // Crear en catálogo global
+  canvasStore.agregarEtiqueta(nueva)
+  // Obtener el ID recién creado (max actual)
+  const tagId = Math.max(0, ...canvasStore.etiquetas.map((e) => e.id))
+  onTagAdd(tagId)
+  createTagModalOpen.value = false
+  newTagText.value = ''
 }
 
 const onKeydown = (e) => {
