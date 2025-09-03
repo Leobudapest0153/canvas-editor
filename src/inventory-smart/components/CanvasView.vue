@@ -222,7 +222,7 @@
               />
           </v-group>
 
-          <!-- Elementos circulares: en vista XY son círculos, en vista XZ son rectángulos -->
+          <!-- Elementos circulares: en vista aérea (XY) son círculos, en vista de frente (XZ) son rectángulos -->
           <v-group
             v-else-if="elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
             :config="{
@@ -276,7 +276,7 @@
             />
           </v-group>
 
-          <!-- Elementos circulares en vista XZ se muestran como rectángulos (cilindro visto de frente) -->
+          <!-- Elementos circulares en vista de frente (XZ) se muestran como rectángulos (cilindro visto de frente) -->
           <v-group
             v-else-if="elemento.forma === 'circular' && canvasStore.vistaActiva === 'XZ'"
             :config="{
@@ -329,7 +329,7 @@
               }"
             />
           </v-group>
-          <!-- Icono de candado para elemento circular bloqueado en vista XY -->
+          <!-- Icono de candado para elemento circular bloqueado en vista aérea (XY) -->
           <v-group
             v-if="isElementLocked(elemento.id) && elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
             :config="{
@@ -369,7 +369,7 @@
             />
           </v-group>
 
-          <!-- Icono de candado para elemento circular bloqueado en vista XZ (rectangular) -->
+          <!-- Icono de candado para elemento circular bloqueado en vista de frente (XZ) (rectangular) -->
           <v-group
             v-if="isElementLocked(elemento.id) && elemento.forma === 'circular' && canvasStore.vistaActiva === 'XZ'"
             :config="{
@@ -519,8 +519,8 @@
             y: -(39 / canvasStore.zoom),
             text:
               canvasStore.estaEnElemento || canvasStore.estaEnContenedor
-                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${layerConfig.width}x${layerConfig.height}px (Adaptativo)`
-                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
+                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))}x${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))} (Adaptativo)`
+                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))}x${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))} (${fmtCm(canvasStore.plantaActivaData?.dimensiones.ancho)}x${fmtCm(canvasStore.plantaActivaData?.dimensiones.largo)})`,
             fontSize: 12 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#3b82f6',
@@ -634,11 +634,11 @@
     <!-- Información de zoom, vista y dimensiones -->
     <div class="canvas-info">
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
-      <span>Vista: {{ canvasStore.vistaActiva }}</span>
+      <span>{{ t('views.label') }}: {{ t(`views.${canvasStore.vistaActiva}`) }}</span>
       <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
-        Planta: {{ canvasStore.plantaActivaData.dimensiones.ancho }}×{{
-          canvasStore.plantaActivaData.dimensiones.largo
-        }}cm (Vista desde arriba)
+        Planta: {{ fmtCm(canvasStore.plantaActivaData.dimensiones.ancho) }}×{{
+          fmtCm(canvasStore.plantaActivaData.dimensiones.largo)
+        }} (Vista aérea)
       </span>
       <span
         v-if="
@@ -649,10 +649,10 @@
         {{ canvasStore.estaEnElemento ? 'Elemento' : 'Contenedor' }}:
         {{ canvasStore.elementoContenedorActual.nombre }}
         <template v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones">
-          ({{ canvasStore.elementoContenedorActual.dimensiones.ancho }}×{{ canvasStore.elementoContenedorActual.dimensiones.alto }}cm - Vista de frente)
+          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }}×{{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }} - Vista de frente)
         </template>
         <template v-else>
-          ({{ canvasStore.canvasAdaptativo.width }}×{{ canvasStore.canvasAdaptativo.height }}px)
+          ({{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.width, viewport.cmPerPx)) }}×{{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.height, viewport.cmPerPx)) }})
         </template>
       </span>
       <span v-if="canvasStore.elementoSeleccionado">
@@ -714,6 +714,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { t } from '@/inventory-smart/i18n'
 import { useCacheOnDrag } from '@/inventory-smart/composables/useCacheOnDrag'
 import { setupRafDrag } from '@/inventory-smart/composables/useRafDrag'
 import { enablePerfMode } from '@/inventory-smart/composables/usePerfMode'
@@ -739,6 +740,8 @@ import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
 import { GRID_SIZE, CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
+import { cmToPx, pxToCm, fmtCm } from '@/inventory-smart/utils/units'
+import { useViewportStore } from '@/inventory-smart/stores/viewport'
 import { getActiveBounds } from '@/inventory-smart/utils/activeBounds'
 import SpeedDialContext from '@/inventory-smart/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/inventory-smart/composables/useContextMenu'
@@ -756,6 +759,7 @@ import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/inventory-smart/utils/simulateProducts'
 import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import { usePropertiesStore } from '@/inventory-smart/stores/properties.js'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -803,6 +807,7 @@ function scheduleDraw() {
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
+const propertiesStore = usePropertiesStore()
 const {
   onDragStartGuard,
   onDragMoveGuard,
@@ -833,6 +838,7 @@ const isSnappingEnabled = ref(true)
  * @param {Object} elemento - El elemento del cual obtener dimensiones
  * @returns {Object} - { width: number, height: number } en píxeles
  */
+const viewport = useViewportStore()
 const getElementPixelDimensions = (elemento) => {
   // Si ya tiene width/height en píxeles, usarlos solo si no tiene dimensiones en cm
   // Esto es para compatibilidad con elementos legacy que solo tienen width/height
@@ -845,22 +851,22 @@ const getElementPixelDimensions = (elemento) => {
     let widthCm, heightCm
 
     if (canvasStore.vistaActiva === 'XY') {
-      // Vista superior (XY): width = ancho, height = largo
-      widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
-      heightCm = elemento.dimensiones.largo || (elemento.height ? elemento.height / CM_TO_PX : 6)
+      // Vista aérea (XY): width = ancho, height = largo
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else if (canvasStore.vistaActiva === 'XZ') {
-      // Vista frontal (XZ): width = ancho, height = alto
-      widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
-      heightCm = elemento.dimensiones.alto || (elemento.height ? elemento.height / CM_TO_PX : 6)
+      // Vista de frente (XZ): width = ancho, height = alto
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.alto || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else {
-      // Fallback a vista XY
-      widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
-      heightCm = elemento.dimensiones.largo || (elemento.height ? elemento.height / CM_TO_PX : 6)
+      // Fallback a vista aérea (XY)
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     }
 
     return {
-      width: Math.round(widthCm * CM_TO_PX),
-      height: Math.round(heightCm * CM_TO_PX),
+      width: Math.round(cmToPx(widthCm, viewport.cmPerPx)),
+      height: Math.round(cmToPx(heightCm, viewport.cmPerPx)),
     }
   }
 
@@ -1131,6 +1137,9 @@ const handleStageClick = (e) => {
 const selectElement = (elementId) => {
   console.log('Seleccionando elemento:', elementId)
   canvasStore.seleccionarElemento(elementId)
+  if (elementId) {
+    propertiesStore.openFor(elementId)
+  }
   // Si el modo arrastre global está activado y el elemento NO está bloqueado, activar edición (transformer)
   if (dragModeGlobal.value && elementId && !isElementLocked(elementId)) {
     editingElementId.value = elementId
@@ -1964,10 +1973,10 @@ const createElementFromDrop = (data, dropEvent) => {
 
       // La altura en píxeles para el renderizado depende de la vista
       if (canvasStore.vistaActiva === 'XY') {
-        // En vista XY, la altura visual corresponde al largo
+        // En vista aérea (XY), la altura visual corresponde al largo
         finalHeightFinal = largoCmFinal * CM_TO_PX;
       } else if (canvasStore.vistaActiva === 'XZ') {
-        // En vista XZ, la altura visual corresponde al alto, no al largo
+        // En vista de frente (XZ), la altura visual corresponde al alto, no al largo
         // No modificamos finalHeightFinal en este caso
       }
 
@@ -2259,7 +2268,7 @@ const createElementFromBuffer = (data, dropEvent) => {
     // Obtener el elemento padre (el elemento actual donde estamos)
     const elementoPadre = canvasStore.elementoContenedorActual;
     if (elementoPadre && elementoPadre.dimensiones) {
-      // Si estamos en vista XZ (frontal), ajustar el alto según el largo del padre
+      // Si estamos en vista de frente (XZ), ajustar el alto según el largo del padre
       if (canvasStore.vistaActiva === 'XZ') {
         const largoPadreCm = elementoPadre.dimensiones.largo;
 
@@ -2706,14 +2715,21 @@ const handleGlobalClick = (e) => {
 // Deseleccionar al presionar Escape
 const handleKeyDown = (e) => {
   if (!e) return
-  if (e.key === 'Escape' || e.key === 'Esc') {
-    canvasStore.toggleMostrarPropiedades();
+  const key = e.key.toLowerCase()
+  if (key === 'escape' || key === 'esc') {
+    canvasStore.toggleMostrarPropiedades()
     canvasStore.seleccionarElemento(null)
     // Asegurar que el transformer/edición se cierre
     editingElementId.value = null
     speedDialOpen.value = false
     // Limpiar guías de snapping
     clearGuides()
+  } else if (key === 'p') {
+    e.preventDefault()
+    propertiesStore.toggle()
+    if (canvasStore.mostrarPropiedades.value) {
+      nextTick(() => focusPrimerCampo())
+    }
   } else {
     handleCanvasHotkeys(e, {
       dragMode: dragModeGlobal,
@@ -2990,8 +3006,11 @@ const toggleLock = async (id) => {
 
 // Abrir las propiedades
 const openProperties = () => {
-  canvasStore.toggleMostrarPropiedades(true);
-  ctx.close();
+  const id = canvasStore.elementoSeleccionado
+  if (id) {
+    propertiesStore.openFor(id)
+  }
+  ctx.close()
 }
 
 // Acción eliminar desde el menú contextual

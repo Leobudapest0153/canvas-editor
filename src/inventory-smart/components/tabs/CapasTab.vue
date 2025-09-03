@@ -262,7 +262,9 @@ const categorias = computed(() => CATEGORIAS)
 const elementosFiltrados = computed(() => {
   // --- CAMBIO CLAVE AQUÍ ---
   // Usamos la nueva computed property segura del store
-  let elementos = canvasStore.elementosVisiblesParaCapas
+  let elementos = [...canvasStore.elementosVisiblesParaCapas].sort(
+    (a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0)
+  )
 
   if (filtroNombre.value) {
     elementos = elementos.filter((elemento) => elemento.nombre.toLowerCase().includes(filtroNombre.value.toLowerCase()));

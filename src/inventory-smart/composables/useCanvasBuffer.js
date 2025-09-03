@@ -571,7 +571,8 @@ export const useCanvasBuffer = () => {
    * Obtener todos los elementos del buffer
    */
   const getBufferItems = () => {
-    return bufferItems.value
+    // Retornar siempre los elementos más recientes primero
+    return [...bufferItems.value].sort((a, b) => b.addedToBuffer - a.addedToBuffer)
   }
 
   /**
@@ -602,7 +603,9 @@ export const useCanvasBuffer = () => {
 
   return {
     // Estado
-    bufferItems: computed(() => bufferItems.value),
+    bufferItems: computed(() =>
+      [...bufferItems.value].sort((a, b) => b.addedToBuffer - a.addedToBuffer)
+    ),
     hasItems,
     itemCount,
 
