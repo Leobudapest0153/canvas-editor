@@ -527,11 +527,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     let elementWidthPx, elementHeightPx
 
     if (elemento.dimensiones) {
-      // Para elementos/contenedores usamos vista XZ: ancho × alto
+      // Para elementos/contenedores usamos vista de frente (XZ): ancho × alto
       // (ya que navegamos "dentro" del elemento, vemos su vista frontal)
       elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
       elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
-      console.log('Usando dimensiones en cm (Vista XZ - ancho × alto):', {
+      console.log('Usando dimensiones en cm (Vista de frente - ancho × alto):', {
         anchoCm: elemento.dimensiones.ancho,
         altoCm: elemento.dimensiones.alto,
         widthPx: elementWidthPx,
@@ -649,7 +649,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (propiedades.dimensiones) {
         // Actualizar width/height dependiendo de la vista activa
         if (vistaActiva.value === 'XY') {
-          // En vista XY (superior): ancho->width, largo->height
+          // En vista aérea (XY): ancho->width, largo->height
           if (propiedades.dimensiones.ancho !== undefined) {
             elemento.width = elemento.dimensiones.ancho * CM_TO_PX
           }
@@ -657,14 +657,14 @@ export const useCanvasStore = defineStore('canvas', () => {
             elemento.height = elemento.dimensiones.largo * CM_TO_PX
           }
         } else if (vistaActiva.value === 'XZ') {
-          // En vista XZ (frontal): ancho->width, alto->height
+          // En vista de frente (XZ): ancho->width, alto->height
           if (propiedades.dimensiones.ancho !== undefined) {
             elemento.width = elemento.dimensiones.ancho * CM_TO_PX
           }
           if (propiedades.dimensiones.alto !== undefined) {
             elemento.height = elemento.dimensiones.alto * CM_TO_PX
           }
-          // Nota: largo no afecta a width/height en vista XZ
+          // Nota: largo no afecta a width/height en vista de frente (XZ)
         }
       }
 

@@ -222,7 +222,7 @@
               />
           </v-group>
 
-          <!-- Elementos circulares: en vista XY son círculos, en vista XZ son rectángulos -->
+          <!-- Elementos circulares: en vista aérea (XY) son círculos, en vista de frente (XZ) son rectángulos -->
           <v-group
             v-else-if="elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
             :config="{
@@ -276,7 +276,7 @@
             />
           </v-group>
 
-          <!-- Elementos circulares en vista XZ se muestran como rectángulos (cilindro visto de frente) -->
+          <!-- Elementos circulares en vista de frente (XZ) se muestran como rectángulos (cilindro visto de frente) -->
           <v-group
             v-else-if="elemento.forma === 'circular' && canvasStore.vistaActiva === 'XZ'"
             :config="{
@@ -329,7 +329,7 @@
               }"
             />
           </v-group>
-          <!-- Icono de candado para elemento circular bloqueado en vista XY -->
+          <!-- Icono de candado para elemento circular bloqueado en vista aérea (XY) -->
           <v-group
             v-if="isElementLocked(elemento.id) && elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
             :config="{
@@ -369,7 +369,7 @@
             />
           </v-group>
 
-          <!-- Icono de candado para elemento circular bloqueado en vista XZ (rectangular) -->
+          <!-- Icono de candado para elemento circular bloqueado en vista de frente (XZ) (rectangular) -->
           <v-group
             v-if="isElementLocked(elemento.id) && elemento.forma === 'circular' && canvasStore.vistaActiva === 'XZ'"
             :config="{
@@ -634,11 +634,11 @@
     <!-- Información de zoom, vista y dimensiones -->
     <div class="canvas-info">
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
-      <span>Vista: {{ canvasStore.vistaActiva }}</span>
+      <span>{{ t('views.label') }}: {{ t(`views.${canvasStore.vistaActiva}`) }}</span>
       <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
         Planta: {{ canvasStore.plantaActivaData.dimensiones.ancho }}×{{
           canvasStore.plantaActivaData.dimensiones.largo
-        }}cm (Vista desde arriba)
+        }}cm (Vista aérea)
       </span>
       <span
         v-if="
@@ -714,6 +714,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { t } from '@/i18n'
 import { useCacheOnDrag } from '@/composables/useCacheOnDrag'
 import { setupRafDrag } from '@/composables/useRafDrag'
 import { enablePerfMode } from '@/composables/usePerfMode'
@@ -845,15 +846,15 @@ const getElementPixelDimensions = (elemento) => {
     let widthCm, heightCm
 
     if (canvasStore.vistaActiva === 'XY') {
-      // Vista superior (XY): width = ancho, height = largo
+      // Vista aérea (XY): width = ancho, height = largo
       widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
       heightCm = elemento.dimensiones.largo || (elemento.height ? elemento.height / CM_TO_PX : 6)
     } else if (canvasStore.vistaActiva === 'XZ') {
-      // Vista frontal (XZ): width = ancho, height = alto
+      // Vista de frente (XZ): width = ancho, height = alto
       widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
       heightCm = elemento.dimensiones.alto || (elemento.height ? elemento.height / CM_TO_PX : 6)
     } else {
-      // Fallback a vista XY
+      // Fallback a vista aérea (XY)
       widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
       heightCm = elemento.dimensiones.largo || (elemento.height ? elemento.height / CM_TO_PX : 6)
     }
@@ -1965,10 +1966,10 @@ const createElementFromDrop = (data, dropEvent) => {
 
       // La altura en píxeles para el renderizado depende de la vista
       if (canvasStore.vistaActiva === 'XY') {
-        // En vista XY, la altura visual corresponde al largo
+        // En vista aérea (XY), la altura visual corresponde al largo
         finalHeightFinal = largoCmFinal * CM_TO_PX;
       } else if (canvasStore.vistaActiva === 'XZ') {
-        // En vista XZ, la altura visual corresponde al alto, no al largo
+        // En vista de frente (XZ), la altura visual corresponde al alto, no al largo
         // No modificamos finalHeightFinal en este caso
       }
 
@@ -2261,7 +2262,7 @@ const createElementFromBuffer = (data, dropEvent) => {
     // Obtener el elemento padre (el elemento actual donde estamos)
     const elementoPadre = canvasStore.elementoContenedorActual;
     if (elementoPadre && elementoPadre.dimensiones) {
-      // Si estamos en vista XZ (frontal), ajustar el alto según el largo del padre
+      // Si estamos en vista de frente (XZ), ajustar el alto según el largo del padre
       if (canvasStore.vistaActiva === 'XZ') {
         const largoPadreCm = elementoPadre.dimensiones.largo;
 
