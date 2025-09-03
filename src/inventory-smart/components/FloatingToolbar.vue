@@ -80,8 +80,16 @@
           :aria-pressed="isSnappingEnabled ? 'true' : 'false'"
         >
           <!-- Icono Snap (imán) -->
-          <svg viewBox="0 0 24 24" class="pointer-events-none h-[20px] w-[20px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
-            <path d="M20 19.88V22l-1.8-1.17l-4.79-9a4.9 4.9 0 0 0 1.78-1M15 7a3 3 0 0 1-3 3a3 3 0 0 1-.44 0L5.8 20.83L4 22v-2.12L9.79 9A3 3 0 0 1 12 4V2a1 1 0 0 1 1 1v1.18A3 3 0 0 1 15 7m-2 0a1 1 0 1 0-1 1a1 1 0 0 0 1-1m-8.78 3L6 11.8l-1.44 2.76L2.1 12.1m9.9 5.66l-1.5-1.51L9 19l3 3l3-3l-1.47-2.77M19.78 10L18 11.8l1.5 2.76l2.4-2.46Z" />
+          <svg viewBox="0 0 24 24" class="pointer-events-none h-[24px] w-[24px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
+            <path 
+              fill="currentColor" 
+              d="M9.479 3.5a1.5 1.5 0 0 0-2.12 0L3.5 7.35a1.52 1.52 0 0 0-.44 1.06a1.5 1.5 0 0 0 .44 1.06L14.519 20.5a1.51 1.51 0 0 0 2.13 0l3.85-3.86a1.49 1.49 0 0 0 0-2.12Zm-1.12 3.58a.5.5 0 0 0 0 .71a.524.524 0 0 0 .71 0c.55-.56 1.09-1.1 1.65-1.64l1.25 1.25l-.9.9a.483.483 0 0 0 0 .7a.5.5 0 0 0 .71 0c.29-.3.6-.6.9-.89l1.25 1.25l-1.64 1.65a.495.495 0 0 0 .7.7c.56-.55 1.1-1.09 1.65-1.64l1.25 1.25l-.9.9a.52.52 0 0 0-.14.36a.5.5 0 0 0 .14.35a.513.513 0 0 0 .71 0l.9-.9l1.26 1.26l-1.65 1.64a.5.5 0 0 0 .71.71c.55-.56 1.09-1.1 1.65-1.64l1.23 1.23a.5.5 0 0 1 0 .7l-3.86 3.86a.5.5 0 0 1-.71 0L4.209 8.77a.5.5 0 0 1-.15-.36a.5.5 0 0 1 .15-.35l3.86-3.86a.51.51 0 0 1 .7 0l1.24 1.24Z"
+              />
+
+            <path 
+              fill="currentColor" 
+              d="m18.939 12.96l-.04-.04c.01 0 .01 0 .02.01s.02.02.02.03"
+            />
           </svg>
         </UiIconButton>
         <span v-if="isSnappingEnabled" class="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--primary,theme(colors.blue.600))] ring-2 ring-slate-900/60"></span>
