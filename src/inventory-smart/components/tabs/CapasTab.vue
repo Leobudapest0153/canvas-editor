@@ -148,7 +148,7 @@
           <!-- Controles -->
           <div class="flex items-center gap-2">
             <button
-              @click.stop="canvasStore.destacarElemento(elemento.id)"
+              @click.stop="() => {canvasStore.seleccionarElemento(elemento.id);  canvasStore.destacarElemento(elemento.id);}"
               class="p-0 text-gray-400 hover:text-blue-600 cursor-pointer"
               title="Encontrar en el canvas"
             >

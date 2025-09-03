@@ -20,7 +20,7 @@
       <!-- Panel de propiedades (superpuesto para no empujar el canvas) -->
       <div
         class="app-sidebar-right absolute inset-y-0 right-0"
-        v-if="canvasStore.mostrarPropiedades && canvasStore.elementoSeleccionado"
+        v-if="canvasStore.elementoSeleccionado"
         data-properties-panel
       >
         <PropiedadesPanel />

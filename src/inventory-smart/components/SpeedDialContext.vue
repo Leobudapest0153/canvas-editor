@@ -11,15 +11,6 @@
     @contextmenu.prevent
   >
     <button
-      ref="itemRefs[2]"
-      class="sdx-item"
-      role="menuitem"
-      aria-label="Propiedades"
-      @click="emitProperties"
-    >
-      Propiedades
-    </button>
-    <button
       ref="itemRefs[0]"
       class="sdx-item"
       role="menuitem"
@@ -51,7 +42,7 @@ const props = defineProps({
   y: { type: Number, default: 0 },
   isLocked: { type: Boolean, default: false },
 })
-const emit = defineEmits(['lockToggle', 'delete', 'close', 'properties'])
+const emit = defineEmits(['lockToggle', 'delete', 'close'])
 
 const menuRef = ref(null)
 const itemRefs = [ref(null), ref(null)]
@@ -131,9 +122,6 @@ const emitLock = () => {
 }
 const emitDelete = () => {
   emit('delete')
-}
-const emitProperties = () => {
-  emit('properties');
 }
 </script>
 
