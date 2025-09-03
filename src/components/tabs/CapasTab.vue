@@ -148,7 +148,7 @@
           <!-- Controles -->
           <div class="flex items-center gap-2">
             <button
-              @click.stop="canvasStore.destacarElemento(elemento.id)"
+              @click.stop="focusElemento(elemento.id)"
               class="p-0 text-gray-400 hover:text-blue-600 cursor-pointer"
               title="Encontrar en el canvas"
             >
@@ -237,6 +237,7 @@ import TagFilter from '@/components/TagFilter.vue'
 import CreateTagModal from '@/components/CreateTagModal.vue'
 import {useDeleteElement} from '@/composables/useDeleteElement'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
+import { focusAndSelectById } from '@/utils/focusAndSelectById'
 
 // Composables
 const canvasStore = useCanvasStore()
@@ -312,6 +313,10 @@ const limpiarFiltros = () => {
   filtroUbicacion.value = ''
   filtroNombre.value = '';
   canvasStore.limpiarSeleccion()
+}
+
+const focusElemento = (id) => {
+  focusAndSelectById({ stage: canvasStore.stage, layer: canvasStore.layer, id })
 }
 
 const onDelete = async (id) => {

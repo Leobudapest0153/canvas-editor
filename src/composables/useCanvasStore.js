@@ -84,6 +84,10 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const elementoSeleccionado = ref(null)
   const mostrarPropiedades = ref(false);
+  const selectedIds = ref([])
+  const activeTool = ref('select')
+  const stage = ref(null)
+  const layer = ref(null)
   const vistaActiva = computed(() => {
     // Vista automática según el contexto
     if (estaEnPlanta.value) {
@@ -119,6 +123,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     const e = Number(epsPx)
     if (!Number.isFinite(e)) return
     snapGridEps.value = Math.max(0, Math.min(50, e))
+  }
+
+  const setStageRef = (node) => {
+    stage.value = node
+  }
+
+  const setLayerRef = (node) => {
+    layer.value = node
   }
 
   // === NAVEGACIÓN JERÁRQUICA ===
@@ -610,6 +622,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Actions
   const seleccionarElemento = (id) => {
     elementoSeleccionado.value = id
+    selectedIds.value = id ? [id] : []
   }
 
   const actualizarPosicion = (id, x, y, saveHistory = false, description = null) => {
@@ -1549,6 +1562,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     plantas,
     plantaActiva,
     elementoSeleccionado,
+    selectedIds,
+    activeTool,
+    stage,
+    layer,
     vistaActiva,
     zoom,
     panX,
@@ -1594,6 +1611,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     configurarPan,
     setGridSize,
     setSnapGridEps,
+    setStageRef,
+    setLayerRef,
 
     // Actions - Plantas
     seleccionarPlanta,

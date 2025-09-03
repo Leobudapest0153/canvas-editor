@@ -816,6 +816,13 @@ const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
 
+onMounted(() => {
+  const stageNode = stageRef.value?.getNode?.()
+  const layerNode = layerRef.value?.getNode?.()
+  if (stageNode) canvasStore.setStageRef(stageNode)
+  if (layerNode) canvasStore.setLayerRef(layerNode)
+})
+
 // Object snapping
 const {
   activeGuides: snapGuides,
