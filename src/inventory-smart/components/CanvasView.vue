@@ -630,8 +630,8 @@
       @close="ctx.close()"
     />
 
-    <!-- Información de zoom, vista y dimensiones -->
-    <div class="canvas-info">
+  <!-- Información de zoom, vista y dimensiones -->
+  <div ref="canvasInfoRef" class="canvas-info" :style="canvasInfoStyle">
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
       <span>{{ t('views.label') }}: {{ t(`views.${canvasStore.vistaActiva}`) }}</span>
       <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
@@ -659,8 +659,8 @@
       </span>
     </div>
 
-    <!-- Botones flotantes de Undo/Redo y Bloqueo -->
-    <div class="floating-controls" :style="{ right: `${props.safeRight}px` }">
+  <!-- Botones flotantes de Undo/Redo y Bloqueo -->
+  <div ref="floatingControlsRef" class="floating-controls" :style="{ right: `${floatingRight}px` }">
       <button
         @click="undo()"
         :disabled="!canUndo"
@@ -676,7 +676,6 @@
           />
         </svg>
       </button>
-
       <button
         @click="redo()"
         :disabled="!canRedo"
@@ -693,6 +692,30 @@
         </svg>
       </button>
 
+      <!-- Botones de Zoom: ubicados junto a 'fit' pero después de redo para mantener undo+redo juntos -->
+      <button
+        @click="zoomOut()"
+        :disabled="!canZoomOut"
+        class="floating-btn btn-zoom btn-zoom-out"
+        title="Alejar (Ctrl+ -)"
+      >
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <button
+        @click="zoomIn()"
+        :disabled="!canZoomIn"
+        class="floating-btn btn-zoom btn-zoom-in"
+        title="Acercar (Ctrl+ +)"
+      >
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <line x1="12" y1="5" x2="12" y2="19" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
       <!-- Botón ajustar a planta activa -->
       <button
         @click="fitToPlanta"
@@ -701,9 +724,12 @@
         class="floating-btn btn-fit"
         title="Ajustar vista a la planta activa"
       >
+        <!-- Icono de ajustar/fit: flechas hacia las esquinas -->
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35" />
-          <circle cx="11" cy="11" r="6" stroke-width="2" />
+          <polyline points="4 9 4 4 9 4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="20 15 20 20 15 20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="4" y1="4" x2="10" y2="10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="20" y1="20" x2="14" y2="14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
 
@@ -763,6 +789,72 @@ import { useToast } from '@/inventory-smart/composables/useToast'
 const props = defineProps({
   safeRight: { type: Number, default: 20 },
 })
+
+// Refs para evitar solapamientos entre canvas-info y 
+
+const canvasInfoRef = ref(null)
+const floatingControlsRef = ref(null)
+const floatingRight = ref(props.safeRight)
+
+let panelObserver = null
+let panelResizeObserver = null
+
+// Estilo reactivo aplicado en línea a .canvas-info (max-width para evitar solapamiento)
+const canvasInfoStyle = ref({})
+
+function recomputeCanvasInfoMaxWidth() {
+  try {
+    const container = containerRef.value
+    const infoEl = canvasInfoRef.value
+    const controlsEl = floatingControlsRef.value
+    if (!container || !infoEl || !controlsEl) {
+      canvasInfoStyle.value = {}
+      return
+    }
+
+    const containerRect = container.getBoundingClientRect()
+    const controlsRect = controlsEl.getBoundingClientRect()
+    const margin = 12 // espacio mínimo entre info y controles
+
+    // calcular espacio disponible a la derecha del info antes de llegar a los controls
+    const availableToRight = controlsRect.left - containerRect.left - margin
+
+    // medir el ancho natural del elemento info (sin restricciones)
+    const infoElRect = infoEl.getBoundingClientRect()
+    // preferir scrollWidth si está disponible para medir contenido interno
+    const naturalWidth = infoEl.scrollWidth || Math.ceil(infoElRect.width)
+
+    // Si el contenido natural cabe en el espacio disponible, quitar cualquier limitación
+    if (naturalWidth + 24 <= availableToRight) {
+      canvasInfoStyle.value = { maxWidth: 'none' }
+      infoEl.classList.remove('should-wrap')
+    } else {
+      // aplicar max-width y activar wrap para evitar solapamiento
+      const maxW = Math.max(120, availableToRight - 24) // mínimo 120px
+      canvasInfoStyle.value = { maxWidth: `${maxW}px` }
+      infoEl.classList.add('should-wrap')
+    }
+  } catch (e) {
+    canvasInfoStyle.value = {}
+  }
+  // también recalcular el desplazamiento de los controles cuando cambia el layout
+  recomputeFloatingRight()
+}
+
+function recomputeFloatingRight() {
+  try {
+    const panel = document.querySelector('[data-properties-panel]')
+    const margin = 12
+    if (panel && panel.offsetParent !== null) {
+      const rect = panel.getBoundingClientRect()
+      floatingRight.value = Math.ceil(props.safeRight + rect.width + margin)
+    } else {
+      floatingRight.value = props.safeRight
+    }
+  } catch (e) {
+    floatingRight.value = props.safeRight
+  }
+}
 
 
 // Referencia segura a Konva (cuando está disponible globalmente via vue-konva)
@@ -1102,6 +1194,51 @@ const handleWheel = (e) => {
   canvasStore.configurarPan(newPos.x, newPos.y)
   try { canvasStore.view.hasUserZoomPan = true } catch { /* ignore */ }
 }
+
+// Zoom programático (para botones)
+const MIN_ZOOM = 0.1
+const MAX_ZOOM = 5
+const ZOOM_STEP = 1.1
+
+const canZoomIn = computed(() => (canvasStore.zoom || 1) < MAX_ZOOM)
+const canZoomOut = computed(() => (canvasStore.zoom || 1) > MIN_ZOOM)
+
+const zoomBy = (factor) => {
+  try {
+    const stage = stageRef.value.getNode()
+    const oldScale = stage.scaleX()
+    const newScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, oldScale * factor))
+    // Mantener el centro de la vista
+    const center = { x: stage.width() / 2, y: stage.height() / 2 }
+    const mousePointTo = {
+      x: (center.x - stage.x()) / oldScale,
+      y: (center.y - stage.y()) / oldScale,
+    }
+    const newPos = {
+      x: center.x - mousePointTo.x * newScale,
+      y: center.y - mousePointTo.y * newScale,
+    }
+    canvasStore.configurarZoom(newScale)
+    canvasStore.configurarPan(newPos.x, newPos.y)
+    try { canvasStore.view.hasUserZoomPan = true } catch { /* ignore */ }
+  } catch (err) {
+    console.warn('zoomBy error', err)
+  }
+}
+
+const zoomIn = () => zoomBy(ZOOM_STEP)
+const zoomOut = () => zoomBy(1 / ZOOM_STEP)
+
+// Keybindings: Ctrl + '+' / Ctrl + '-' => zoom, handled globally
+const onKeyDown = (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+    if (e.key === '+') { e.preventDefault(); zoomIn() }
+    if (e.key === '=') { e.preventDefault(); zoomIn() }
+    if (e.key === '-') { e.preventDefault(); zoomOut() }
+  }
+}
+onMounted(() => window.addEventListener('keydown', onKeyDown))
+onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 
 // === FUNCIONES DE CANVAS/STAGE ===
 const handleStageMouseDown = (e) => {
@@ -2501,7 +2638,7 @@ const handleTransformStart = (e, elementId) => {
   } catch { /* ignore */ }
 }
 
-// Manejar fin de transformación con validación y revert si no es válido
+// Manejar fin de transformación - CONCENTRA TODA LA VALIDACIÓN Y PERSISTENCIA
 const handleTransformEnd = (e, elementId) => {
   isInteractingWithTransformer.value = false;
   try {
@@ -2518,61 +2655,90 @@ const handleTransformEnd = (e, elementId) => {
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
 
-    const guardRes = onTransformEndGuard(
-      elemento,
-      { x, y, width, height, rotation },
-      {
-        revert: () => {
-          const prev =
-            transformInitialState.get(elementId) ||
-            { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation || 0 }
-          try {
-            node.x(prev.x)
-            node.y(prev.y)
-            node.width && node.width(prev.width)
-            node.height && node.height(prev.height)
-            node.rotation && node.rotation(prev.rotation || 0)
-          } catch {
-            /* ignore */
-          }
-          needsDraw = true
-          scheduleDraw()
-        },
-      },
-    )
-    if (!guardRes.valid) return
+    // Limpiar estado de transformación
+    transformState.delete(elementId)
 
-    // Validar con isPlacementValid contra vecinos y área
-    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
-    const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    const isValidNow = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+    // Helper para revert visual y lógico
+    const revertTransform = (reason = '') => {
+      const prev = transformInitialState.get(elementId) ||
+        { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation || 0 }
 
-  console.debug('[transform-debug] end', elementId, { prev: transformInitialState.get(elementId), new: { x, y, width, height, rotation }, isValidNow })
-  if (!isValidNow) {
-      // Revertir al estado inicial guardado
-      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height }
       try {
         node.x(prev.x)
         node.y(prev.y)
         node.width && node.width(prev.width)
         node.height && node.height(prev.height)
-        node.scaleX && node.scaleX(1); node.scaleY && node.scaleY(1)
+        node.scaleX && node.scaleX(1)
+        node.scaleY && node.scaleY(1)
         node.rotation && node.rotation(prev.rotation || 0)
+
+        // Limpiar feedback visual
+        const stage = stageRef.value.getNode()
+        const shape = stage.findOne(`#${elementId}`)
+        if (shape) {
+          const bbox = shape.findOne('.bbox')
+          const circle = elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'
+            ? shape.findOne('Circle') : null
+
+          if (circle) {
+            circle.stroke(undefined)
+            circle.strokeWidth(0)
+          } else {
+            bbox?.stroke(undefined)
+            bbox?.strokeWidth(0)
+          }
+        }
+
         const layer = layerRef.value?.getNode?.()
         layer?.batchDraw?.()
       } catch { /* ignore */ }
-      console.debug('[transform-debug] reverted', elementId, prev)
 
-      // Persistir la reversión en el store
+      // Persistir reversión en el store
       try {
-        canvasStore.actualizarElemento(elementId, { x: prev.x, y: prev.y, width: prev.width, height: prev.height, rotation: prev.rotation })
+        canvasStore.actualizarElemento(elementId, {
+          x: prev.x, y: prev.y, width: prev.width, height: prev.height, rotation: prev.rotation
+        })
         lastValidPositions.value.set(elementId, { x: prev.x, y: prev.y })
-      } catch (err) { console.warn('Error persisting transform revert', err) }
+      } catch (err) {
+        console.warn('Error persisting transform revert', err)
+      }
+
+      console.debug('[transform-debug] reverted', elementId, { reason, prev })
+    }
+
+    // VALIDACIÓN 1: Guards del sistema
+    const guardRes = onTransformEndGuard(
+      elemento,
+      { x, y, width, height, rotation },
+      { revert: () => revertTransform('guard validation failed') }
+    )
+    if (!guardRes.valid) return
+
+    // VALIDACIÓN 2: Placement validation (colisiones, área)
+    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
+    const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+    const isValidNow = isPlacementValid({
+      pos: { x, y },
+      movingEl: { ...elemento, width, height },
+      neighbors,
+      areaBounds,
+      CM_TO_PX,
+      epsPx: 0.5
+    })
+
+    console.debug('[transform-debug] end', elementId, {
+      prev: transformInitialState.get(elementId),
+      new: { x, y, width, height, rotation },
+      isValidNow
+    })
+
+    if (!isValidNow) {
+      revertTransform('placement validation failed')
       nextTick(() => setupTransformer())
       return
     }
 
-    // Si es válido, persistir cambios como antes
+    // APLICACIÓN EXITOSA: Calcular dimensiones y persistir
     let newDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
     if (newDimensiones) {
       const widthCm = Math.round(width / CM_TO_PX)
@@ -2587,94 +2753,103 @@ const handleTransformEnd = (e, elementId) => {
       }
     }
 
+    // Aplicar transformación final
     node.width(width)
     node.height(height)
     node.scaleX(1)
     node.scaleY(1)
     node.x(x)
     node.y(y)
+
+    // Limpiar feedback visual
+    try {
+      const stage = stageRef.value.getNode()
+      const shape = stage.findOne(`#${elementId}`)
+      if (shape) {
+        const bbox = shape.findOne('.bbox')
+        const circle = elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'
+          ? shape.findOne('Circle') : null
+
+        if (circle) {
+          circle.stroke(undefined)
+          circle.strokeWidth(0)
+        } else {
+          bbox?.stroke(undefined)
+          bbox?.strokeWidth(0)
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Persistir en el store con descripción
     canvasStore.actualizarElemento(
       elementId,
       { x, y, width, height, rotation, dimensiones: newDimensiones, dimensionLock: true },
       true,
       `Elemento redimensionado: ${elemento?.nombre || elemento?.tipo || elementId}`
     )
+
     lastValidPositions.value.set(elementId, { x, y })
     nextTick(() => setupTransformer())
+
   } catch (err) {
     console.warn('Error en handleTransformEnd:', err)
   }
 }
 
-// Mientras se transforma (resize/rotate) dar feedback visual en tiempo real y actualizar propiedades
+const transformState = new Map() // Cache de estado de transform por elemento
+const throttleTransform = throttleEveryNFrames(3) // Solo cada 3 frames (~50ms)
+
+// Función ligera de feedback visual sin validación pesada
+const updateTransformVisualFeedback = (node, elementId) => {
+  try {
+    const stage = stageRef.value.getNode()
+    const shape = stage.findOne(`#${elementId}`)
+    if (!shape) return
+
+    // Solo feedback visual básico: mostrar que está transformándose
+    const bbox = shape.findOne('.bbox')
+    const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
+
+    if (elemento?.forma === 'circular' && canvasStore.vistaActiva === 'XY') {
+      const circle = shape.findOne('Circle')
+      // Stroke azul durante transformación (sin validación)
+      circle?.stroke('#3b82f6')
+      circle?.strokeWidth(1)
+    } else {
+      // Stroke azul durante transformación (sin validación)
+      bbox?.stroke('#3b82f6')
+      bbox?.strokeWidth(1)
+    }
+
+    // Un solo batchDraw optimizado
+    shape.getLayer()?.batchDraw?.()
+  } catch { /* ignore */ }
+}
+
+// Mientras se transforma (resize/rotate) - OPTIMIZADO para performance
 const handleTransformMove = (e, elementId) => {
   try {
     const node = e.target
     if (!node) return
-    const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
-    if (!elemento) return
-    let width = node.width() * node.scaleX()
-    let height = node.height() * node.scaleY()
-    let x = node.x()
-    let y = node.y()
 
-    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
-    const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    const valid = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+    // Guardar estado actual para el final
+    const width = node.width() * node.scaleX()
+    const height = node.height() * node.scaleY()
+    const x = node.x()
+    const y = node.y()
 
-    // Aplicar stroke rojo si inválido, volver al color habitual si válido
-    try {
-      const stage = stageRef.value.getNode()
-      const shape = stage.findOne(`#${elementId}`)
-      if (shape) {
-        const bbox = shape.findOne('.bbox')
-        const circle =
-          elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'
-            ? shape.findOne('Circle')
-            : null
-        if (elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY') {
-          circle?.stroke(valid ? undefined : '#ef4444')
-          circle?.strokeWidth(valid ? 0 : 2)
-        } else {
-          bbox?.stroke(valid ? undefined : '#ef4444')
-          bbox?.strokeWidth(valid ? 0 : 2)
-        }
-        shape.getLayer()?.batchDraw?.()
-      }
-    } catch { /* ignore */ }
+    // Actualizar cache de estado sin tocar el store
+    transformState.set(elementId, { x, y, width, height })
 
-    // Actualizar propiedades en tiempo real para reflejar cambios en PropiedadesPanel
-    let newDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
-    if (newDimensiones) {
-      const widthCm = Math.round(width / CM_TO_PX)
-      const heightCm = Math.round(height / CM_TO_PX)
-      if (canvasStore.vistaActiva === 'XY') {
-        newDimensiones.ancho = widthCm
-        newDimensiones.largo = heightCm
-      } else if (canvasStore.vistaActiva === 'XZ') {
-        newDimensiones.ancho = widthCm
-        newDimensiones.alto = heightCm
-        if (newDimensiones.largo === undefined) newDimensiones.largo = elemento.dimensiones?.largo || 60
-      }
-    }
-
-    // Actualizar en el store para reflejar cambios en tiempo real en PropiedadesPanel
-    canvasStore.actualizarElemento(elementId, {
-      x,
-      y,
-      width,
-      height,
-      dimensiones: newDimensiones
-    })
+    // Feedback visual ligero throttleado (cada 3 frames)
+    throttleTransform(() => {
+      updateTransformVisualFeedback(node, elementId)
+    })()
 
   } catch (err) {
     console.warn('Error en handleTransformMove:', err)
   }
 }
-
-
-// Ajustar startElementDrag para nuevo modo (ya no se necesita wrapper)
-// (Se elimina originalStartElementDrag no usado)
 
 
 // === UTILIDADES DE TAMAÑO Y CENTRADO (restauradas) ===
@@ -2729,13 +2904,14 @@ const handleKeyDown = (e) => {
     })
   }
 }
-let resizeObserver = null
+let sizeResizeObserver = null
+let infoResizeObserver = null
 onMounted(async () => {
   await nextTick()
   updateStageSize()
   if (containerRef.value) {
-    resizeObserver = new ResizeObserver(updateStageSize)
-    resizeObserver.observe(containerRef.value)
+  sizeResizeObserver = new ResizeObserver(updateStageSize)
+  sizeResizeObserver.observe(containerRef.value)
   }
   await nextTick()
   centrarPlantaEnCanvas()
@@ -2744,12 +2920,49 @@ onMounted(async () => {
   fitToPlanta()
   window.addEventListener('click', handleGlobalClick)
   window.addEventListener('keydown', handleKeyDown)
+  // Recompute canvas-info max width on mount and on resize
+  await nextTick()
+  recomputeCanvasInfoMaxWidth()
+  window.addEventListener('resize', recomputeCanvasInfoMaxWidth)
+  try {
+    if (containerRef.value) {
+      infoResizeObserver = new ResizeObserver(recomputeCanvasInfoMaxWidth)
+      infoResizeObserver.observe(containerRef.value)
+    }
+  } catch (e) { /* ignore */ }
+  // Observar aparición/desaparición del panel de propiedades y su resize
+  try {
+    panelObserver = new MutationObserver(() => {
+      recomputeFloatingRight()
+      // si el panel existe, observar su tamaño
+      const panel = document.querySelector('[data-properties-panel]')
+      if (panel) {
+        if (!panelResizeObserver) panelResizeObserver = new ResizeObserver(recomputeFloatingRight)
+        try { panelResizeObserver.observe(panel) } catch { /* ignore */ }
+      }
+    })
+    panelObserver.observe(document.body, { childList: true, subtree: true, attributes: true })
+  } catch (e) { /* ignore */ }
 })
 onUnmounted(() => {
-  if (resizeObserver) resizeObserver.disconnect()
+  if (sizeResizeObserver) sizeResizeObserver.disconnect()
+  if (infoResizeObserver) infoResizeObserver.disconnect()
   window.removeEventListener('click', handleGlobalClick)
   window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('resize', recomputeCanvasInfoMaxWidth)
 })
+
+// Helper: enfoca el primer input dentro del panel de propiedades si existe
+function focusPrimerCampo() {
+  try {
+    const panel = document.querySelector('[data-properties-panel]')
+    if (!panel) return
+    const input = panel.querySelector('input, textarea, select, [contenteditable]')
+    if (input && typeof input.focus === 'function') input.focus()
+  } catch (e) {
+    console.warn('focusPrimerCampo error', e)
+  }
+}
 
 // Eliminar referencia originalStartElementDrag no usada
 
@@ -3052,8 +3265,9 @@ const onDelete = async (id) => {
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 12px;
-  display: flex;
-  gap: 16px;
+  display: inline-flex;
+  gap: 12px;
+  /* por defecto NO hacer wrap; se aplica dinámicamente solo cuando haga falta */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   pointer-events: none;
 }
@@ -3062,6 +3276,8 @@ const onDelete = async (id) => {
   color: #475569;
   font-weight: 500;
 }
+
+.canvas-info.should-wrap { flex-wrap: wrap; gap: 10px }
 
 /* Botones flotantes para undo/redo */
 .floating-controls {
@@ -3086,6 +3302,29 @@ const onDelete = async (id) => {
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Botones de zoom: heredan tamaño de .floating-btn y comparten color/hover con btn-undo */
+.btn-zoom:not(:disabled) {
+  color: #3b82f6;
+}
+.btn-zoom:hover:not(:disabled) {
+  background: #eff6ff;
+  border-color: #3b82f6;
+}
+
+/* Si el espacio horizontal es reducido, desplazar .canvas-info hacia la izquierda y reducir su padding */
+@media (max-width: 900px) {
+  .canvas-info { left: 16px; top: 24px; padding: 6px 8px; font-size: 11px }
+  .floating-controls { top: 24px; right: 12px }
+  .floating-btn { width: 40px; height: 40px }
+}
+
+/* Si todavía hay conflicto visual, forzar que .canvas-info tome dos líneas y tenga menor gap */
+@media (max-width: 640px) {
+  .canvas-info { gap: 8px; font-size: 11px }
+  .floating-controls { gap: 6px }
+  .floating-btn { width: 36px; height: 36px }
 }
 
 .floating-btn:hover:not(:disabled) {
