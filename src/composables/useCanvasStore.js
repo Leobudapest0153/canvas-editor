@@ -1391,7 +1391,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (contextoNavegacion.value.tipo === 'plantas') {
       const plantaId = contextoNavegacion.value.id
       const elementosEnEstaPlanta = elementosLimpios.filter((el) => el.plantaId === plantaId)
-      return elementosEnEstaPlanta.filter((el) => !el.padre && el.tipo === 'elementos')
+      return elementosEnEstaPlanta
+        .filter((el) => !el.padre && el.tipo === 'elementos')
+        .slice()
+        .reverse()
     }
 
     // Si estamos dentro de un elemento, mostrar solo contenedores hijos
@@ -1401,6 +1404,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         return elementoPadre.hijos
           .map((hijoId) => elementosLimpios.find((el) => el.id === hijoId))
           .filter((hijo) => hijo && hijo.tipo === 'contenedores')
+          .slice()
+          .reverse()
       }
     }
 
@@ -1411,6 +1416,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         return contenedorPadre.hijos
           .map((hijoId) => elementosLimpios.find((el) => el.id === hijoId))
           .filter((hijo) => hijo && (hijo.tipo === 'elementos' || hijo.tipo === 'contenedores'))
+          .slice()
+          .reverse()
       }
     }
 

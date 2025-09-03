@@ -54,6 +54,7 @@ export const useCanvasBuffer = () => {
         ...sourceInfo,
       },
       addedToBuffer: currentTimestamp,
+      createdAt: currentTimestamp,
     }
   }
 
@@ -602,7 +603,9 @@ export const useCanvasBuffer = () => {
 
   return {
     // Estado
-    bufferItems: computed(() => bufferItems.value),
+    bufferItems: computed(() =>
+      [...bufferItems.value].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+    ),
     hasItems,
     itemCount,
 
