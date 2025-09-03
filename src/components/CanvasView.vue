@@ -760,7 +760,6 @@ import { getUsoInfo, useProductSimulation } from '@/utils/simulateProducts'
 import SnapGuides from './SnapGuides.vue'
 import { useToast } from '@/composables/useToast'
 import { usePropertiesStore } from '@/stores/properties.js'
-import { focusPrimerCampo } from '@/utils/focusPrimerCampo.js'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -1140,7 +1139,6 @@ const selectElement = (elementId) => {
   canvasStore.seleccionarElemento(elementId)
   if (elementId) {
     propertiesStore.openFor(elementId)
-    nextTick(() => focusPrimerCampo())
   }
   // Si el modo arrastre global está activado y el elemento NO está bloqueado, activar edición (transformer)
   if (dragModeGlobal.value && elementId && !isElementLocked(elementId)) {
@@ -3011,7 +3009,6 @@ const openProperties = () => {
   const id = canvasStore.elementoSeleccionado
   if (id) {
     propertiesStore.openFor(id)
-    nextTick(() => focusPrimerCampo())
   }
   ctx.close()
 }
