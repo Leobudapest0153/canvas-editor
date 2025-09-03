@@ -19,9 +19,6 @@
       </div>
       <div class="flex flex-col md:flex-row gap-6 p-6">
         <!-- Columna izquierda: Canvas Vue-Konva -->
-        <!-- <div class="w-full md:w-2/3 flex flex-col items-center justify-start relative">
-          <h3 class="text-lg font-medium text-gray-800 mb-3">Vista de frente</h3>
-        </div> -->
         <!-- Columna derecha: Formulario y preview -->
         <form @submit.prevent="handleSubmit" class="w-full">
           <div class="max-h-[70vh] overflow-y-auto pr-2">
@@ -186,7 +183,7 @@
             </div>
             <!-- Preview del nuevo elemento -->
             <div class="bg-gray-50 rounded-lg p-4 mb-6">
-              <h3 class="text-lg font-medium text-gray-800 mb-3">Vista Previa (desde arriba)</h3>
+              <h3 class="text-lg font-medium text-gray-800 mb-3">Vista Previa ({{ t('views.aerial') }})</h3>
               <div class="flex items-center p-3 bg-white rounded border">
                 <div
                   :class="[
@@ -242,6 +239,7 @@ import {
   errorsPlacement,
 } from '@/validation/placementOrchestrator'
 import { useToast } from '@/composables/useToast'
+import { t } from '@/i18n'
 const { showToast } = useToast()
 
 const props = defineProps({

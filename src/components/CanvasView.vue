@@ -634,11 +634,11 @@
     <!-- Información de zoom, vista y dimensiones -->
     <div class="canvas-info">
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
-      <span>Vista: {{ canvasStore.vistaActiva }}</span>
+      <span>Vista: {{ vistaLabel }}</span>
       <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
         Planta: {{ canvasStore.plantaActivaData.dimensiones.ancho }}×{{
           canvasStore.plantaActivaData.dimensiones.largo
-        }}cm (Vista desde arriba)
+        }}cm ({{ t('views.aerial') }})
       </span>
       <span
         v-if="
@@ -649,7 +649,7 @@
         {{ canvasStore.estaEnElemento ? 'Elemento' : 'Contenedor' }}:
         {{ canvasStore.elementoContenedorActual.nombre }}
         <template v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones">
-          ({{ canvasStore.elementoContenedorActual.dimensiones.ancho }}×{{ canvasStore.elementoContenedorActual.dimensiones.alto }}cm - Vista de frente)
+          ({{ canvasStore.elementoContenedorActual.dimensiones.ancho }}×{{ canvasStore.elementoContenedorActual.dimensiones.alto }}cm - {{ t('views.front') }})
         </template>
         <template v-else>
           ({{ canvasStore.canvasAdaptativo.width }}×{{ canvasStore.canvasAdaptativo.height }}px)
@@ -756,6 +756,7 @@ import FloatingToolbar from './FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/utils/simulateProducts'
 import SnapGuides from './SnapGuides.vue'
 import { useToast } from '@/composables/useToast'
+import { t, viewLabels } from '@/i18n'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -826,6 +827,8 @@ const {
 
 // Estado para controlar si el snapping está habilitado (por defecto desactivado — evita alineado automático)
 const isSnappingEnabled = ref(true)
+
+const vistaLabel = computed(() => viewLabels[canvasStore.vistaActiva] || canvasStore.vistaActiva)
 
 // === HELPERS DE CONVERSIÓN ===
 /**

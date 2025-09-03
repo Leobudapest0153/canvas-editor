@@ -26,6 +26,7 @@ import {
   validateZStacking,
   errorsPlacement,
 } from '@/validation/placementOrchestrator'
+import { viewLabels } from '@/i18n'
 
 export const useCanvasStore = defineStore('canvas', () => {
   const { showToast } = useToast()
@@ -527,11 +528,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     let elementWidthPx, elementHeightPx
 
     if (elemento.dimensiones) {
-      // Para elementos/contenedores usamos vista XZ: ancho × alto
+      // Para elementos/contenedores usamos vista frontal (XZ): ancho × alto
       // (ya que navegamos "dentro" del elemento, vemos su vista frontal)
       elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
       elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
-      console.log('Usando dimensiones en cm (Vista XZ - ancho × alto):', {
+      console.log(`Usando dimensiones en cm (${viewLabels.XZ} - ancho × alto):`, {
         anchoCm: elemento.dimensiones.ancho,
         altoCm: elemento.dimensiones.alto,
         widthPx: elementWidthPx,
