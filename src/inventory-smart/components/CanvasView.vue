@@ -660,7 +660,7 @@
     </div>
 
   <!-- Botones flotantes de Undo/Redo y Bloqueo -->
-  <div ref="floatingControlsRef" class="floating-controls" :style="{ right: `${props.safeRight}px` }">
+  <div ref="floatingControlsRef" class="floating-controls" :style="{ right: `${floatingRight}px` }">
       <button
         @click="undo()"
         :disabled="!canUndo"
@@ -790,9 +790,14 @@ const props = defineProps({
   safeRight: { type: Number, default: 20 },
 })
 
-// Refs para evitar solapamientos entre canvas-info y floating-controls
+// Refs para evitar solapamientos entre canvas-info y 
+
 const canvasInfoRef = ref(null)
 const floatingControlsRef = ref(null)
+const floatingRight = ref(props.safeRight)
+
+let panelObserver = null
+let panelResizeObserver = null
 
 // Estilo reactivo aplicado en línea a .canvas-info (max-width para evitar solapamiento)
 const canvasInfoStyle = ref({})
@@ -814,11 +819,40 @@ function recomputeCanvasInfoMaxWidth() {
     // calcular espacio disponible a la derecha del info antes de llegar a los controls
     const availableToRight = controlsRect.left - containerRect.left - margin
 
-    // si info está muy a la derecha, permitir que haga wrap y limitar su max-width
-    const maxW = Math.max(120, availableToRight - 24) // mínimo 120px
-    canvasInfoStyle.value = { maxWidth: `${maxW}px` }
+    // medir el ancho natural del elemento info (sin restricciones)
+    const infoElRect = infoEl.getBoundingClientRect()
+    // preferir scrollWidth si está disponible para medir contenido interno
+    const naturalWidth = infoEl.scrollWidth || Math.ceil(infoElRect.width)
+
+    // Si el contenido natural cabe en el espacio disponible, quitar cualquier limitación
+    if (naturalWidth + 24 <= availableToRight) {
+      canvasInfoStyle.value = { maxWidth: 'none' }
+      infoEl.classList.remove('should-wrap')
+    } else {
+      // aplicar max-width y activar wrap para evitar solapamiento
+      const maxW = Math.max(120, availableToRight - 24) // mínimo 120px
+      canvasInfoStyle.value = { maxWidth: `${maxW}px` }
+      infoEl.classList.add('should-wrap')
+    }
   } catch (e) {
     canvasInfoStyle.value = {}
+  }
+  // también recalcular el desplazamiento de los controles cuando cambia el layout
+  recomputeFloatingRight()
+}
+
+function recomputeFloatingRight() {
+  try {
+    const panel = document.querySelector('[data-properties-panel]')
+    const margin = 12
+    if (panel && panel.offsetParent !== null) {
+      const rect = panel.getBoundingClientRect()
+      floatingRight.value = Math.ceil(props.safeRight + rect.width + margin)
+    } else {
+      floatingRight.value = props.safeRight
+    }
+  } catch (e) {
+    floatingRight.value = props.safeRight
   }
 }
 
@@ -2893,6 +2927,19 @@ onMounted(async () => {
       infoResizeObserver.observe(containerRef.value)
     }
   } catch (e) { /* ignore */ }
+  // Observar aparición/desaparición del panel de propiedades y su resize
+  try {
+    panelObserver = new MutationObserver(() => {
+      recomputeFloatingRight()
+      // si el panel existe, observar su tamaño
+      const panel = document.querySelector('[data-properties-panel]')
+      if (panel) {
+        if (!panelResizeObserver) panelResizeObserver = new ResizeObserver(recomputeFloatingRight)
+        try { panelResizeObserver.observe(panel) } catch { /* ignore */ }
+      }
+    })
+    panelObserver.observe(document.body, { childList: true, subtree: true, attributes: true })
+  } catch (e) { /* ignore */ }
 })
 onUnmounted(() => {
   if (sizeResizeObserver) sizeResizeObserver.disconnect()
@@ -3208,7 +3255,7 @@ const onDelete = async (id) => {
   font-size: 12px;
   display: inline-flex;
   gap: 12px;
-  flex-wrap: wrap; /* permitir dividir información si no cabe */
+  /* por defecto NO hacer wrap; se aplica dinámicamente solo cuando haga falta */
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   pointer-events: none;
 }
@@ -3217,6 +3264,8 @@ const onDelete = async (id) => {
   color: #475569;
   font-weight: 500;
 }
+
+.canvas-info.should-wrap { flex-wrap: wrap; gap: 10px }
 
 /* Botones flotantes para undo/redo */
 .floating-controls {
