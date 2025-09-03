@@ -2499,7 +2499,7 @@ const handleTransformStart = (e, elementId) => {
   } catch { /* ignore */ }
 }
 
-// Manejar fin de transformación con validación y revert si no es válido
+// Manejar fin de transformación - CONCENTRA TODA LA VALIDACIÓN Y PERSISTENCIA
 const handleTransformEnd = (e, elementId) => {
   try {
     const node = e.target
@@ -2515,61 +2515,90 @@ const handleTransformEnd = (e, elementId) => {
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
     if (!elemento) return
 
-    const guardRes = onTransformEndGuard(
-      elemento,
-      { x, y, width, height, rotation },
-      {
-        revert: () => {
-          const prev =
-            transformInitialState.get(elementId) ||
-            { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation || 0 }
-          try {
-            node.x(prev.x)
-            node.y(prev.y)
-            node.width && node.width(prev.width)
-            node.height && node.height(prev.height)
-            node.rotation && node.rotation(prev.rotation || 0)
-          } catch {
-            /* ignore */
-          }
-          needsDraw = true
-          scheduleDraw()
-        },
-      },
-    )
-    if (!guardRes.valid) return
+    // Limpiar estado de transformación
+    transformState.delete(elementId)
 
-    // Validar con isPlacementValid contra vecinos y área
-    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
-    const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    const isValidNow = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+    // Helper para revert visual y lógico
+    const revertTransform = (reason = '') => {
+      const prev = transformInitialState.get(elementId) ||
+        { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation || 0 }
 
-  console.debug('[transform-debug] end', elementId, { prev: transformInitialState.get(elementId), new: { x, y, width, height, rotation }, isValidNow })
-  if (!isValidNow) {
-      // Revertir al estado inicial guardado
-      const prev = transformInitialState.get(elementId) || { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height }
       try {
         node.x(prev.x)
         node.y(prev.y)
         node.width && node.width(prev.width)
         node.height && node.height(prev.height)
-        node.scaleX && node.scaleX(1); node.scaleY && node.scaleY(1)
+        node.scaleX && node.scaleX(1)
+        node.scaleY && node.scaleY(1)
         node.rotation && node.rotation(prev.rotation || 0)
+
+        // Limpiar feedback visual
+        const stage = stageRef.value.getNode()
+        const shape = stage.findOne(`#${elementId}`)
+        if (shape) {
+          const bbox = shape.findOne('.bbox')
+          const circle = elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'
+            ? shape.findOne('Circle') : null
+
+          if (circle) {
+            circle.stroke(undefined)
+            circle.strokeWidth(0)
+          } else {
+            bbox?.stroke(undefined)
+            bbox?.strokeWidth(0)
+          }
+        }
+
         const layer = layerRef.value?.getNode?.()
         layer?.batchDraw?.()
       } catch { /* ignore */ }
-      console.debug('[transform-debug] reverted', elementId, prev)
 
-      // Persistir la reversión en el store
+      // Persistir reversión en el store
       try {
-        canvasStore.actualizarElemento(elementId, { x: prev.x, y: prev.y, width: prev.width, height: prev.height, rotation: prev.rotation })
+        canvasStore.actualizarElemento(elementId, {
+          x: prev.x, y: prev.y, width: prev.width, height: prev.height, rotation: prev.rotation
+        })
         lastValidPositions.value.set(elementId, { x: prev.x, y: prev.y })
-      } catch (err) { console.warn('Error persisting transform revert', err) }
+      } catch (err) {
+        console.warn('Error persisting transform revert', err)
+      }
+
+      console.debug('[transform-debug] reverted', elementId, { reason, prev })
+    }
+
+    // VALIDACIÓN 1: Guards del sistema
+    const guardRes = onTransformEndGuard(
+      elemento,
+      { x, y, width, height, rotation },
+      { revert: () => revertTransform('guard validation failed') }
+    )
+    if (!guardRes.valid) return
+
+    // VALIDACIÓN 2: Placement validation (colisiones, área)
+    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
+    const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+    const isValidNow = isPlacementValid({
+      pos: { x, y },
+      movingEl: { ...elemento, width, height },
+      neighbors,
+      areaBounds,
+      CM_TO_PX,
+      epsPx: 0.5
+    })
+
+    console.debug('[transform-debug] end', elementId, {
+      prev: transformInitialState.get(elementId),
+      new: { x, y, width, height, rotation },
+      isValidNow
+    })
+
+    if (!isValidNow) {
+      revertTransform('placement validation failed')
       nextTick(() => setupTransformer())
       return
     }
 
-    // Si es válido, persistir cambios como antes
+    // APLICACIÓN EXITOSA: Calcular dimensiones y persistir
     let newDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
     if (newDimensiones) {
       const widthCm = Math.round(width / CM_TO_PX)
@@ -2584,94 +2613,103 @@ const handleTransformEnd = (e, elementId) => {
       }
     }
 
+    // Aplicar transformación final
     node.width(width)
     node.height(height)
     node.scaleX(1)
     node.scaleY(1)
     node.x(x)
     node.y(y)
+
+    // Limpiar feedback visual
+    try {
+      const stage = stageRef.value.getNode()
+      const shape = stage.findOne(`#${elementId}`)
+      if (shape) {
+        const bbox = shape.findOne('.bbox')
+        const circle = elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'
+          ? shape.findOne('Circle') : null
+
+        if (circle) {
+          circle.stroke(undefined)
+          circle.strokeWidth(0)
+        } else {
+          bbox?.stroke(undefined)
+          bbox?.strokeWidth(0)
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Persistir en el store con descripción
     canvasStore.actualizarElemento(
       elementId,
       { x, y, width, height, rotation, dimensiones: newDimensiones, dimensionLock: true },
       true,
       `Elemento redimensionado: ${elemento?.nombre || elemento?.tipo || elementId}`
     )
+
     lastValidPositions.value.set(elementId, { x, y })
     nextTick(() => setupTransformer())
+
   } catch (err) {
     console.warn('Error en handleTransformEnd:', err)
   }
 }
 
-// Mientras se transforma (resize/rotate) dar feedback visual en tiempo real y actualizar propiedades
+const transformState = new Map() // Cache de estado de transform por elemento
+const throttleTransform = throttleEveryNFrames(3) // Solo cada 3 frames (~50ms)
+
+// Función ligera de feedback visual sin validación pesada
+const updateTransformVisualFeedback = (node, elementId) => {
+  try {
+    const stage = stageRef.value.getNode()
+    const shape = stage.findOne(`#${elementId}`)
+    if (!shape) return
+
+    // Solo feedback visual básico: mostrar que está transformándose
+    const bbox = shape.findOne('.bbox')
+    const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
+
+    if (elemento?.forma === 'circular' && canvasStore.vistaActiva === 'XY') {
+      const circle = shape.findOne('Circle')
+      // Stroke azul durante transformación (sin validación)
+      circle?.stroke('#3b82f6')
+      circle?.strokeWidth(1)
+    } else {
+      // Stroke azul durante transformación (sin validación)
+      bbox?.stroke('#3b82f6')
+      bbox?.strokeWidth(1)
+    }
+
+    // Un solo batchDraw optimizado
+    shape.getLayer()?.batchDraw?.()
+  } catch { /* ignore */ }
+}
+
+// Mientras se transforma (resize/rotate) - OPTIMIZADO para performance
 const handleTransformMove = (e, elementId) => {
   try {
     const node = e.target
     if (!node) return
-    const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
-    if (!elemento) return
-    let width = node.width() * node.scaleX()
-    let height = node.height() * node.scaleY()
-    let x = node.x()
-    let y = node.y()
 
-    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
-    const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    const valid = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+    // Guardar estado actual para el final
+    const width = node.width() * node.scaleX()
+    const height = node.height() * node.scaleY()
+    const x = node.x()
+    const y = node.y()
 
-    // Aplicar stroke rojo si inválido, volver al color habitual si válido
-    try {
-      const stage = stageRef.value.getNode()
-      const shape = stage.findOne(`#${elementId}`)
-      if (shape) {
-        const bbox = shape.findOne('.bbox')
-        const circle =
-          elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'
-            ? shape.findOne('Circle')
-            : null
-        if (elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY') {
-          circle?.stroke(valid ? undefined : '#ef4444')
-          circle?.strokeWidth(valid ? 0 : 2)
-        } else {
-          bbox?.stroke(valid ? undefined : '#ef4444')
-          bbox?.strokeWidth(valid ? 0 : 2)
-        }
-        shape.getLayer()?.batchDraw?.()
-      }
-    } catch { /* ignore */ }
+    // Actualizar cache de estado sin tocar el store
+    transformState.set(elementId, { x, y, width, height })
 
-    // Actualizar propiedades en tiempo real para reflejar cambios en PropiedadesPanel
-    let newDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
-    if (newDimensiones) {
-      const widthCm = Math.round(width / CM_TO_PX)
-      const heightCm = Math.round(height / CM_TO_PX)
-      if (canvasStore.vistaActiva === 'XY') {
-        newDimensiones.ancho = widthCm
-        newDimensiones.largo = heightCm
-      } else if (canvasStore.vistaActiva === 'XZ') {
-        newDimensiones.ancho = widthCm
-        newDimensiones.alto = heightCm
-        if (newDimensiones.largo === undefined) newDimensiones.largo = elemento.dimensiones?.largo || 60
-      }
-    }
-
-    // Actualizar en el store para reflejar cambios en tiempo real en PropiedadesPanel
-    canvasStore.actualizarElemento(elementId, {
-      x,
-      y,
-      width,
-      height,
-      dimensiones: newDimensiones
-    })
+    // Feedback visual ligero throttleado (cada 3 frames)
+    throttleTransform(() => {
+      updateTransformVisualFeedback(node, elementId)
+    })()
 
   } catch (err) {
     console.warn('Error en handleTransformMove:', err)
   }
 }
-
-
-// Ajustar startElementDrag para nuevo modo (ya no se necesita wrapper)
-// (Se elimina originalStartElementDrag no usado)
 
 
 // === UTILIDADES DE TAMAÑO Y CENTRADO (restauradas) ===
