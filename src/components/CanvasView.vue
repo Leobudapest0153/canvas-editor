@@ -179,6 +179,18 @@
                 shadowOpacity: getElementShadow(elemento).opacity,
               }"
             />
+            <v-circle
+              v-if="elemento.id === transformingId && overlapState === 'overlapping'"
+              :config="{
+                x: 6 / canvasStore.zoom,
+                y: 6 / canvasStore.zoom,
+                radius: 6 / canvasStore.zoom,
+                fill: '#ef4444',
+                stroke: '#fff',
+                strokeWidth: 1 / canvasStore.zoom,
+                listening: false,
+              }"
+            />
           </v-group>
           <!-- Icono de candado para elemento bloqueado -->
           <v-group
@@ -274,6 +286,18 @@
                 strokeWidth: 0,
               }"
             />
+            <v-circle
+              v-if="elemento.id === transformingId && overlapState === 'overlapping'"
+              :config="{
+                x: 6 / canvasStore.zoom,
+                y: 6 / canvasStore.zoom,
+                radius: 6 / canvasStore.zoom,
+                fill: '#ef4444',
+                stroke: '#fff',
+                strokeWidth: 1 / canvasStore.zoom,
+                listening: false,
+              }"
+            />
           </v-group>
 
           <!-- Elementos circulares en vista XZ se muestran como rectángulos (cilindro visto de frente) -->
@@ -326,6 +350,18 @@
                 shadowColor: 'black',
                 shadowBlur: 4,
                 shadowOpacity: 0.3,
+              }"
+            />
+            <v-circle
+              v-if="elemento.id === transformingId && overlapState === 'overlapping'"
+              :config="{
+                x: 6 / canvasStore.zoom,
+                y: 6 / canvasStore.zoom,
+                radius: 6 / canvasStore.zoom,
+                fill: '#ef4444',
+                stroke: '#fff',
+                strokeWidth: 1 / canvasStore.zoom,
+                listening: false,
               }"
             />
           </v-group>
@@ -756,6 +792,8 @@ import FloatingToolbar from './FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/utils/simulateProducts'
 import SnapGuides from './SnapGuides.vue'
 import { useToast } from '@/composables/useToast'
+import { useCollisionNotifier } from '@/composables/useCollisionNotifier'
+import { clampResizeDeltaToContact } from '@/utils/clampResizeDeltaToContact'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -815,6 +853,17 @@ const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId:
 const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
+
+const notifier = useCollisionNotifier()
+const overlapState = notifier.overlapState
+const transformingId = ref(null)
+const isOverlapping = ref(false)
+const collisionCheck = throttle((rect, neighbors) => {
+  isOverlapping.value = neighbors.some(
+    (n) => !(rect.x + rect.width <= n.x || n.x + n.width <= rect.x || rect.y + rect.height <= n.y || n.y + n.height <= rect.y),
+  )
+  notifier.onOverlapChange(isOverlapping.value)
+}, 16)
 
 // Object snapping
 const {
@@ -2489,6 +2538,7 @@ const handleTransformStart = (e, elementId) => {
   try {
     const node = e.target
     if (!node) return
+    transformingId.value = elementId
     const x = node.x()
     const y = node.y()
     const width = node.width() * node.scaleX()
@@ -2502,6 +2552,7 @@ const handleTransformStart = (e, elementId) => {
 // Manejar fin de transformación con validación y revert si no es válido
 const handleTransformEnd = (e, elementId) => {
   try {
+    transformingId.value = null
     const node = e.target
     let width = node.width() * node.scaleX()
     let height = node.height() * node.scaleY()
@@ -2615,7 +2666,34 @@ const handleTransformMove = (e, elementId) => {
     let x = node.x()
     let y = node.y()
 
-    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
+    const baseRect = { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height }
+    const delta = { dx: x - baseRect.x, dy: y - baseRect.y, dw: width - baseRect.width, dh: height - baseRect.height }
+    const neighborsEls = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
+    const neighborRects = neighborsEls.map(n => ({ x: n.x, y: n.y, width: n.width, height: n.height }))
+    const candidate = {
+      x: baseRect.x + delta.dx,
+      y: baseRect.y + delta.dy,
+      width: baseRect.width + delta.dw,
+      height: baseRect.height + delta.dh,
+    }
+    collisionCheck(candidate, neighborRects)
+    if (isOverlapping.value) {
+      const clamped = clampResizeDeltaToContact(baseRect, delta, neighborRects)
+      x = baseRect.x + clamped.dx
+      y = baseRect.y + clamped.dy
+      width = baseRect.width + clamped.dw
+      height = baseRect.height + clamped.dh
+      try {
+        node.width(width)
+        node.height(height)
+        node.scaleX(1)
+        node.scaleY(1)
+        node.x(x)
+        node.y(y)
+      } catch { /* ignore */ }
+    }
+
+    const neighbors = neighborsEls
     const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
     const valid = isPlacementValid({ pos: { x, y }, movingEl: { ...elemento, width, height }, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
 
@@ -2981,6 +3059,8 @@ const onShapePointerDown = (evt, elemento) => {
 }
 const onShapePointerUp = () => {
   clearTimeout(longPressTimer)
+  notifier.reset()
+  transformingId.value = null
 }
 
 // Acción bloquear/desbloquear desde el menú contextual
