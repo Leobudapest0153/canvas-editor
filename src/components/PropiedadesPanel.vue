@@ -60,7 +60,7 @@
 
         <!-- Dimensiones -->
         <details v-if="mostrarDimensiones" open class="bg-gray-50 rounded-lg p-4">
-          <summary class="text-sm font-medium text-gray-700 cursor-pointer">Dimensiones (cm)</summary>
+          <summary class="text-sm font-medium text-gray-700 cursor-pointer">Dimensiones ({{ t('units.cm') }})</summary>
           <div class="mt-3 space-y-3">
             <!-- Para formas no circulares, mostrar ancho/largo -->
             <div v-if="!ocultarAnchoLargo" class="grid grid-cols-2 gap-3">
@@ -71,7 +71,7 @@
                     @change="validarDimension('ancho')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     :disabled="isSaving" />
-                  <span class="ml-1 text-sm text-gray-500">cm</span>
+                  <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
                 </div>
               </div>
               <div>
@@ -81,7 +81,7 @@
                     @change="validarDimension('largo')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     :disabled="isSaving" />
-                  <span class="ml-1 text-sm text-gray-500">cm</span>
+                  <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
                 </div>
               </div>
             </div>
@@ -91,7 +91,7 @@
                 <input type="number" min="0" v-model.number="edited.dimensiones.alto" @change="validarDimension('alto')"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                   :disabled="isSaving" />
-                <span class="ml-1 text-sm text-gray-500">cm</span>
+                <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
             </div>
             <!-- Diámetro para circulares -->
@@ -102,7 +102,7 @@
                   @change="validarDiametro"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                   :disabled="isSaving" />
-                <span class="ml-1 text-sm text-gray-500">cm</span>
+                <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
               <p v-if="advertenciaDiametroLimite" class="text-xs text-amber-600">{{ advertenciaDiametroLimite }}</p>
               <p v-if="advertenciaDiametroContencion" class="text-xs text-amber-600">{{ advertenciaDiametroContencion }}
@@ -128,7 +128,7 @@
                   @change="validarAlturaSobreSuelo"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                   :disabled="isSaving || !esPared" />
-                <span class="ml-1 text-sm text-gray-500">cm</span>
+                <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
               <p v-if="advertenciaZBase" class="text-xs text-amber-600">{{ advertenciaZBase }}</p>
             </div>
@@ -196,6 +196,7 @@ import { useConfirmDialog } from '@/composables/useConfirmDialog'
 import { useWeightValidation } from '@/composables/useWeightValidation.js'
 import { useDimensionValidation } from '@/composables/useDimensionValidation.js'
 import { EPSILON } from '@/utils/geometry.js'
+import { t } from '@/utils/i18n.js'
 import TagFilter from '@/components/TagFilter.vue'
 import CreateTagModal from '@/components/CreateTagModal.vue'
 

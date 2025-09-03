@@ -519,8 +519,8 @@
             y: -(39 / canvasStore.zoom),
             text:
               canvasStore.estaEnElemento || canvasStore.estaEnContenedor
-                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${layerConfig.width}x${layerConfig.height}px (Adaptativo)`
-                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${layerConfig.width}x${layerConfig.height}px (${canvasStore.plantaActivaData?.dimensiones.ancho}x${canvasStore.plantaActivaData?.dimensiones.largo}cm)`,
+                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))}x${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))} (Adaptativo)`
+                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))}x${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))} (${fmtCm(canvasStore.plantaActivaData?.dimensiones.ancho)}x${fmtCm(canvasStore.plantaActivaData?.dimensiones.largo)})`,
             fontSize: 12 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#3b82f6',
@@ -636,9 +636,9 @@
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
       <span>{{ t('views.label') }}: {{ t(`views.${canvasStore.vistaActiva}`) }}</span>
       <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
-        Planta: {{ canvasStore.plantaActivaData.dimensiones.ancho }}×{{
-          canvasStore.plantaActivaData.dimensiones.largo
-        }}cm (Vista aérea)
+        Planta: {{ fmtCm(canvasStore.plantaActivaData.dimensiones.ancho) }}×{{
+          fmtCm(canvasStore.plantaActivaData.dimensiones.largo)
+        }} (Vista aérea)
       </span>
       <span
         v-if="
@@ -649,10 +649,10 @@
         {{ canvasStore.estaEnElemento ? 'Elemento' : 'Contenedor' }}:
         {{ canvasStore.elementoContenedorActual.nombre }}
         <template v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones">
-          ({{ canvasStore.elementoContenedorActual.dimensiones.ancho }}×{{ canvasStore.elementoContenedorActual.dimensiones.alto }}cm - Vista de frente)
+          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }}×{{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }} - Vista de frente)
         </template>
         <template v-else>
-          ({{ canvasStore.canvasAdaptativo.width }}×{{ canvasStore.canvasAdaptativo.height }}px)
+          ({{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.width, viewport.cmPerPx)) }}×{{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.height, viewport.cmPerPx)) }})
         </template>
       </span>
       <span v-if="canvasStore.elementoSeleccionado">
@@ -740,6 +740,8 @@ import { handleCanvasHotkeys } from '@/utils/canvasHotkeys'
 import { polygonInset } from '@/utils/polygonInset'
 import { GRID_SIZE, CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/utils/dimensionPolicy'
+import { cmToPx, pxToCm, fmtCm } from '@/utils/units'
+import { useViewportStore } from '@/stores/viewport'
 import { getActiveBounds } from '@/utils/activeBounds'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/composables/useContextMenu'
@@ -837,6 +839,7 @@ const isSnappingEnabled = ref(true)
  * @param {Object} elemento - El elemento del cual obtener dimensiones
  * @returns {Object} - { width: number, height: number } en píxeles
  */
+const viewport = useViewportStore()
 const getElementPixelDimensions = (elemento) => {
   // Si ya tiene width/height en píxeles, usarlos solo si no tiene dimensiones en cm
   // Esto es para compatibilidad con elementos legacy que solo tienen width/height
@@ -850,21 +853,21 @@ const getElementPixelDimensions = (elemento) => {
 
     if (canvasStore.vistaActiva === 'XY') {
       // Vista aérea (XY): width = ancho, height = largo
-      widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
-      heightCm = elemento.dimensiones.largo || (elemento.height ? elemento.height / CM_TO_PX : 6)
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else if (canvasStore.vistaActiva === 'XZ') {
       // Vista de frente (XZ): width = ancho, height = alto
-      widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
-      heightCm = elemento.dimensiones.alto || (elemento.height ? elemento.height / CM_TO_PX : 6)
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.alto || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else {
       // Fallback a vista aérea (XY)
-      widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
-      heightCm = elemento.dimensiones.largo || (elemento.height ? elemento.height / CM_TO_PX : 6)
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     }
 
     return {
-      width: Math.round(widthCm * CM_TO_PX),
-      height: Math.round(heightCm * CM_TO_PX),
+      width: Math.round(cmToPx(widthCm, viewport.cmPerPx)),
+      height: Math.round(cmToPx(heightCm, viewport.cmPerPx)),
     }
   }
 
