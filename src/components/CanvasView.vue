@@ -614,11 +614,8 @@
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
       @fill-container="() => simularLlenadoContenedor(canvasStore.elementoSeleccionado)"
-      @toggle-snapping="toggleSnapping"
-      @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
-      @zoom-in="onZoomIn"
-      @zoom-out="onZoomOut"
-      @reset-zoom="onResetZoom"
+        @toggle-snapping="toggleSnapping"
+        @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
     />
 
     <!-- Menú contextual -->
@@ -698,20 +695,62 @@
       </button>
 
       <!-- Botón ajustar a planta activa -->
-      <button
-        @click="fitToPlanta"
-        @mouseenter="speedDialOpen = false"
-        :disabled="!canvasStore.plantaActivaData"
-        class="floating-btn btn-fit"
-        title="Ajustar vista a la planta activa"
-      >
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35" />
-          <circle cx="11" cy="11" r="6" stroke-width="2" />
-        </svg>
-      </button>
+        <button
+          @click="fitToPlanta"
+          @mouseenter="speedDialOpen = false"
+          :disabled="!canvasStore.plantaActivaData"
+          class="floating-btn btn-fit"
+          title="Ajustar vista a la planta activa"
+        >
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35" />
+            <circle cx="11" cy="11" r="6" stroke-width="2" />
+          </svg>
+        </button>
 
-    </div>
+        <button
+          @click="onZoomOut"
+          :disabled="viewportStore.zoom <= viewportStore.minZoom"
+          class="floating-btn"
+          title="Alejar"
+        >
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              fill="currentColor"
+              d="M10.5 3a7.5 7.5 0 105.266 12.77l4.743 4.743a.75.75 0 101.06-1.06l-4.743-4.743A7.5 7.5 0 1010.5 3zm-3 9.75a.75.75 0 000 1.5h6a.75.75 0 000-1.5h-6z"
+            />
+          </svg>
+        </button>
+
+        <button
+          @click="onResetZoom"
+          :disabled="viewportStore.zoom === 1"
+          class="floating-btn"
+          title="Restablecer zoom"
+        >
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              fill="currentColor"
+              d="M4.5 4.5h7.125a.375.375 0 00.375-.375V3a.75.75 0 011.28-.53l3.97 3.97a.75.75 0 010 1.06l-3.97 3.97a.75.75 0 01-1.28-.53V9.375A.375.375 0 0011.625 9H4.5a3 3 0 00-3 3v6.75a3 3 0 003 3h15a3 3 0 003-3V12a3 3 0 00-3-3H16.5a.75.75 0 010-1.5h3a4.5 4.5 0 014.5 4.5v6.75a4.5 4.5 0 01-4.5 4.5h-15A4.5 4.5 0 010 18.75V12a4.5 4.5 0 014.5-4.5z"
+            />
+          </svg>
+        </button>
+
+        <button
+          @click="onZoomIn"
+          :disabled="viewportStore.zoom >= viewportStore.maxZoom"
+          class="floating-btn"
+          title="Acercar"
+        >
+          <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              fill="currentColor"
+              d="M10.5 3a7.5 7.5 0 105.266 12.77l4.743 4.743a.75.75 0 101.06-1.06l-4.743-4.743A7.5 7.5 0 1010.5 3zm.75 4.5a.75.75 0 00-1.5 0V9H8.25a.75.75 0 000 1.5H9.75v1.5a.75.75 0 001.5 0V10.5h1.5a.75.75 0 000-1.5H10.5V7.5z"
+            />
+          </svg>
+        </button>
+
+      </div>
   </div>
 </template>
 

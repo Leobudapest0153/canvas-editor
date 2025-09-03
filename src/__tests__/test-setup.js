@@ -1,4 +1,5 @@
-import { vi } from 'vitest'
+import { vi, beforeEach } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 
 // Stub vue-konva components globally
 vi.mock('vue-konva', () => ({
@@ -30,3 +31,7 @@ if (typeof globalThis !== 'undefined') {
   // @ts-ignore
   globalThis.ResizeObserver = ResizeObserver
 }
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
