@@ -74,7 +74,7 @@ describe('FloatingToolbar UI (segmented control)', () => {
 
   it('secondary buttons are 36x36 with 18px icons', () => {
     const wrapper = mountToolbar()
-    const snapBtn = wrapper.get('button[aria-label="Alternar snapping"]')
+    const snapBtn = wrapper.get('button[aria-label="Alternar ajuste automático (S)"]')
     expect(snapBtn.classes()).toContain('h-[36px]')
     expect(snapBtn.classes()).toContain('w-[36px]')
     const svg = snapBtn.get('svg')
@@ -117,7 +117,7 @@ describe('FloatingToolbar UI (segmented control)', () => {
 
   it('secondary buttons declare strong on-state styles', () => {
     const wrapper = mountToolbar({ activeMode: 'drag', isSnappingEnabled: true })
-    const snapBtn = wrapper.get('button[aria-label="Alternar snapping"]')
+    const snapBtn = wrapper.get('button[aria-label="Alternar ajuste automático (S)"]')
     expect(snapBtn.classes()).toContain('data-[state=on]:bg-white/10')
     expect(snapBtn.classes()).toContain('data-[state=on]:ring-1')
     expect(snapBtn.classes()).toContain('data-[state=on]:ring-white/15')
@@ -128,7 +128,7 @@ describe('FloatingToolbar UI (segmented control)', () => {
 
   it('edit icon renders 18x18 and turns white when active', async () => {
     const wrapper = mountToolbar({ activeMode: 'edit' })
-    const editBtn = wrapper.get('button[aria-label="Modo edición"]')
+    const editBtn = wrapper.get('button[aria-label="Editar elementos (E)"]')
     const editSvg = editBtn.get('svg')
     expect(editSvg.classes()).toContain('h-[18px]')
     expect(editSvg.classes()).toContain('w-[18px]')
