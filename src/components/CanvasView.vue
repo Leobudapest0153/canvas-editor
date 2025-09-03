@@ -756,6 +756,8 @@ import FloatingToolbar from './FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/utils/simulateProducts'
 import SnapGuides from './SnapGuides.vue'
 import { useToast } from '@/composables/useToast'
+import { usePropertiesStore } from '@/stores/properties.js'
+import { focusPrimerCampo } from '@/utils/focusPrimerCampo.js'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -803,6 +805,7 @@ function scheduleDraw() {
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
+const propertiesStore = usePropertiesStore()
 const {
   onDragStartGuard,
   onDragMoveGuard,
@@ -1131,6 +1134,10 @@ const handleStageClick = (e) => {
 const selectElement = (elementId) => {
   console.log('Seleccionando elemento:', elementId)
   canvasStore.seleccionarElemento(elementId)
+  if (elementId) {
+    propertiesStore.openFor(elementId)
+    nextTick(() => focusPrimerCampo())
+  }
   // Si el modo arrastre global está activado y el elemento NO está bloqueado, activar edición (transformer)
   if (dragModeGlobal.value && elementId && !isElementLocked(elementId)) {
     editingElementId.value = elementId
@@ -2708,14 +2715,21 @@ const handleGlobalClick = (e) => {
 // Deseleccionar al presionar Escape
 const handleKeyDown = (e) => {
   if (!e) return
-  if (e.key === 'Escape' || e.key === 'Esc') {
-    canvasStore.toggleMostrarPropiedades();
+  const key = e.key.toLowerCase()
+  if (key === 'escape' || key === 'esc') {
+    canvasStore.toggleMostrarPropiedades()
     canvasStore.seleccionarElemento(null)
     // Asegurar que el transformer/edición se cierre
     editingElementId.value = null
     speedDialOpen.value = false
     // Limpiar guías de snapping
     clearGuides()
+  } else if (key === 'p') {
+    e.preventDefault()
+    propertiesStore.toggle()
+    if (canvasStore.mostrarPropiedades.value) {
+      nextTick(() => focusPrimerCampo())
+    }
   } else {
     handleCanvasHotkeys(e, {
       dragMode: dragModeGlobal,
@@ -2992,8 +3006,12 @@ const toggleLock = async (id) => {
 
 // Abrir las propiedades
 const openProperties = () => {
-  canvasStore.toggleMostrarPropiedades(true);
-  ctx.close();
+  const id = canvasStore.elementoSeleccionado
+  if (id) {
+    propertiesStore.openFor(id)
+    nextTick(() => focusPrimerCampo())
+  }
+  ctx.close()
 }
 
 // Acción eliminar desde el menú contextual
