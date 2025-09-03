@@ -137,8 +137,10 @@ const handleCopyToBuffer = () => {
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   try {
+    window.addEventListener('keydown', handleKeydown)
+
     // Si no se provee una configuracion inicial
     if (!props.configCanvas) {
       showToast('Iniciando entorno', { type: 'info' })
@@ -158,20 +160,77 @@ onMounted(async () => {
 
     showToast('Iniciando entorno', { type: 'info' })
     // Restaurar estado
-    await canvasStore.deserialize(props.configCanvas)
-
+    canvasStore.deserialize(props.configCanvas)
   } catch (error) {
+    window.removeEventListener('keydown', handleKeydown)
     showToast('Ha ocurrido un error al importar la configuración', { type: 'error' })
     console.error('Error al importar la configuración:', error)
   }
-
-  window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
 })
 </script>
+
+<style>
+/* Design tokens and utility helpers */
+
+:root {
+  --ui-bg: rgba(255, 255, 255, 0.92);
+  --ui-bg-dark: rgba(15, 17, 20, 0.92);
+  --ui-border: rgba(0, 0, 0, 0.08);
+  --ui-border-dark: rgba(255, 255, 255, 0.06);
+  --ui-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  --ui-radius: 16px;
+  --btn-size: 40px;
+  --gap: 8px;
+  --primary: #2563eb;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --muted: #64748b;
+}
+
+@media (max-width: 480px) {
+  :root {
+    --btn-size: 36px;
+  }
+}
+
+/* Dark mode overrides */
+.dark {
+  --ui-bg: var(--ui-bg-dark);
+  --ui-border: var(--ui-border-dark);
+}
+
+/* Utility helpers */
+.ui-surface {
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+  backdrop-filter: saturate(140%) blur(10px);
+}
+
+.dark .ui-surface {
+  background: var(--ui-bg-dark);
+  border: 1px solid var(--ui-border-dark);
+}
+
+/* Keep .ui-ring consistent with surface look */
+.ui-ring {
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+  backdrop-filter: saturate(140%) blur(10px);
+}
+
+.dark .ui-ring {
+  background: var(--ui-bg-dark);
+  border: 1px solid var(--ui-border-dark);
+}
+</style>
 
 <style scoped>
 #inventory-smart {
