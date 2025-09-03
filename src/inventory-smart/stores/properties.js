@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { useCanvasStore } from '@/composables/useCanvasStore.js'
+import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
 
 export const usePropertiesStore = defineStore('properties', () => {
   const currentId = ref(null)

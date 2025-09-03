@@ -80,11 +80,11 @@ const handleConfigChanged = (configSerializada) => {
       console.warn('No se recibió configuración para actualizar')
       return
     }
-    
+
     // Emitir al componente padre la configuración actualizada
     emit('configUpdated', configSerializada)
-    
-    console.log('Configuración actualizada emitida al componente padre:', configSerializada)
+
+    console.log('Configuración actualizada emitida al componente padre')
   } catch (error) {
     console.error('Error al procesar la configuración actualizada:', error)
     showToast('Error al procesar la configuración actualizada', 'error')
