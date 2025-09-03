@@ -1,4 +1,5 @@
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { cmToPx, fmtCm } from '@/inventory-smart/utils/units'
 
 // Map physical dimensions (cm) to width/height depending on active view
 // dims: {ancho, largo, alto}
@@ -18,15 +19,17 @@ export function mapDimsByView(dims = {}, view = 'XY') {
 
 // Determine active working bounds (rectangle) and polygon in pixels
 // depending on navigation context. Returns { boundsPx:{width,height}, polygonPx }
-export function getActiveBounds(canvasStore) {
+export function getActiveBounds(canvasStore, cmPerPx = 1 / CM_TO_PX) {
   // Inside element/container: use its dimensions
   if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
     const elem = canvasStore.elementoContenedorActual || {}
     const dims = elem.dimensiones || {}
-    let { widthCm, heightCm } = mapDimsByView(dims, canvasStore.vistaActiva)
+    // Siempre utilizar vista de frente para detalle de elemento
+    let { widthCm, heightCm } = mapDimsByView(dims, 'XZ')
 
-    let widthPx = widthCm * CM_TO_PX
-    let heightPx = heightCm * CM_TO_PX
+    // Convertir dimensiones a píxeles usando el helper
+    let widthPx = cmToPx(widthCm, cmPerPx)
+    let heightPx = cmToPx(heightCm, cmPerPx)
 
     // Fallback to legacy pixel dimensions if cm dims missing
     if (!widthPx || !heightPx) {
@@ -41,7 +44,11 @@ export function getActiveBounds(canvasStore) {
       { x: 0, y: heightPx },
     ]
 
-    return { boundsPx: { width: widthPx, height: heightPx }, polygonPx }
+    return {
+      boundsPx: { width: widthPx, height: heightPx },
+      polygonPx,
+      labels: { width: fmtCm(widthCm), height: fmtCm(heightCm) },
+    }
   }
 
   // Root level: active plant polygon or rectangle from dimensions
@@ -57,14 +64,18 @@ export function getActiveBounds(canvasStore) {
 
   const ancho = planta.dimensiones?.ancho || 0
   const largo = planta.dimensiones?.largo || 0
-  const width = ancho * CM_TO_PX
-  const height = largo * CM_TO_PX
+  const width = cmToPx(ancho, cmPerPx)
+  const height = cmToPx(largo, cmPerPx)
   const polygonPx = [
     { x: 0, y: 0 },
     { x: width, y: 0 },
     { x: width, y: height },
     { x: 0, y: height },
   ]
-  return { boundsPx: { width, height }, polygonPx }
+  return {
+    boundsPx: { width, height },
+    polygonPx,
+    labels: { width: fmtCm(ancho), height: fmtCm(largo) },
+  }
 }
 

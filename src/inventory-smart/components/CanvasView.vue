@@ -563,6 +563,49 @@
             listening: false,
           }"
         />
+
+        <!-- Reglas y etiquetas de dimensiones en detalle -->
+        <template v-if="canvasStore.estaEnElemento || canvasStore.estaEnContenedor">
+          <!-- Regla horizontal (ancho) -->
+          <v-line
+            :config="{
+              points: [0, floorBoundary.height + 8 / canvasStore.zoom, floorBoundary.width, floorBoundary.height + 8 / canvasStore.zoom],
+              stroke: '#94a3b8',
+              dash: [4, 4],
+              listening: false,
+            }"
+          />
+          <v-text
+            :config="{
+              x: floorBoundary.width / 2,
+              y: floorBoundary.height + 12 / canvasStore.zoom,
+              text: dimensionLabels.width,
+              fontSize: 12 / canvasStore.zoom,
+              align: 'center',
+              listening: false,
+            }"
+          />
+          <!-- Regla vertical (altura) -->
+          <v-line
+            :config="{
+              points: [floorBoundary.width + 8 / canvasStore.zoom, 0, floorBoundary.width + 8 / canvasStore.zoom, floorBoundary.height],
+              stroke: '#94a3b8',
+              dash: [4, 4],
+              listening: false,
+            }"
+          />
+          <v-text
+            :config="{
+              x: floorBoundary.width + 12 / canvasStore.zoom,
+              y: floorBoundary.height / 2,
+              text: `altura ${dimensionLabels.height}`,
+              fontSize: 12 / canvasStore.zoom,
+              rotation: 90,
+              align: 'center',
+              listening: false,
+            }"
+          />
+        </template>
       </v-layer>
       <v-layer ref="overlaysLayerRef">
         <!-- Líneas guía de object snapping -->
@@ -1097,7 +1140,7 @@ const stageConfig = computed(() => {
   }
 })
 
-const activeBounds = computed(() => getActiveBounds(canvasStore))
+const activeBounds = computed(() => getActiveBounds(canvasStore, viewport.cmPerPx))
 
 const plantPolygon = computed(() => activeBounds.value.polygonPx)
 
@@ -1106,6 +1149,7 @@ const insetPoly = computed(() => polygonInset(plantPolygon.value, 1))
 const plantPolygonFlat = computed(() => plantPolygon.value.flatMap((p) => [p.x, p.y]))
 
 const floorBoundary = computed(() => activeBounds.value.boundsPx)
+const dimensionLabels = computed(() => activeBounds.value.labels || { width: '', height: '' })
 
 // Configuración del layer - SIEMPRE USA CANVAS ADAPTATIVO
 const layerConfig = computed(() => {
