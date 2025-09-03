@@ -174,7 +174,7 @@ export function useAutoPaste() {
       const planta = canvasStore.plantaPorId(contexto.id)
       // Intentar obtener el polígono de la planta primero
       if (planta?.poligono && Array.isArray(planta.poligono) && planta.poligono.length > 0) {
-        // Los puntos ya están en pixeles, y solo se usa en vista XY
+        // Los puntos ya están en pixeles, y solo se usa en vista aérea (XY)
         polygonPoints = planta.poligono.map(p => ({
           x: (p.x || 0),
           y: (p.y || 0)
