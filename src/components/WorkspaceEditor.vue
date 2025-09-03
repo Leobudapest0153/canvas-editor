@@ -112,7 +112,7 @@
                 <input type="number"
                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
                   :class="{'border-rose-500 ring-2 ring-rose-500/60': errors.dimensions}"
-                  v-model.number="heightMeters" />
+                  v-model.number="localRectYMeters" />
               </div>
             </div>
           </div>
@@ -165,9 +165,11 @@ const PIXELS_PER_CM = 10
 
 const rectW = ref(500)
 const rectL = ref(500)
+const rectY = ref(500);
 
 const localRectWMeters = ref(5);
 const localRectLMeters = ref(5);
+const localRectYMeters = ref(5);
 
 const worldWidth = computed(() => rectW.value * PIXELS_PER_CM)
 const worldHeight = computed(() => rectL.value * PIXELS_PER_CM)
@@ -216,6 +218,7 @@ function resetLocalState() {
 
   localRectWMeters.value = rectW.value / 100;
   localRectLMeters.value = rectL.value / 100;
+  localRectYMeters.value = rectY.value / 100;
 
   errors.name = false;
   errors.dimensions = false;
@@ -238,9 +241,10 @@ watch(() => canvasStore.plantaEnEdicion, (planta) => {
     rectL.value = planta.dimensiones.largo;
     localRectWMeters.value = planta.dimensiones.ancho / 100;
     localRectLMeters.value = planta.dimensiones.largo / 100;
+    localRectYMeters.value = planta.dimensiones.alto / 100;
 
-    local.height = planta.dimensiones.alto;
-    local.maxWeight = planta.pesoMaximoSoportado;
+    // local.height = planta.dimensiones.alto;
+    // local.maxWeight = planta.pesoMaximoSoportado;
     isManuallyEdited.value = true;
   } else {
     resetLocalState();
@@ -306,7 +310,7 @@ function applyCircle(w_cm, l_cm) {
 }
 
 // --- WATCH CORREGIDO ---
-watch([localRectWMeters, localRectLMeters], ([newW, newL]) => {
+watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY]) => {
   if (isLoadingData.value) return;
 
   clearTimeout(dimensionChangeDebounce);
@@ -317,23 +321,28 @@ watch([localRectWMeters, localRectLMeters], ([newW, newL]) => {
     return;
   }
 
+
   dimensionChangeDebounce = setTimeout(() => {
     const oldW_cm = rectW.value;
     const oldL_cm = rectL.value;
+    const oldY_cm = rectY.value;
 
     // Usamos los valores de las refs, que son la fuente de verdad
     const newW_cm = localRectWMeters.value * 100;
     const newL_cm = localRectLMeters.value * 100;
+    const newY_cm = localRectYMeters.value * 100;
 
     const oldWorldWidth = oldW_cm * PIXELS_PER_CM;
-    const oldWorldHeight = oldL_cm * PIXELS_PER_CM;
-    if (oldWorldWidth === 0 || oldWorldHeight === 0) return;
+    const oldWorldLength = oldL_cm * PIXELS_PER_CM;
+    const oldWorldHeight = oldY_cm * PIXELS_PER_CM;
+
+    if (oldWorldWidth === 0 || oldWorldHeight === 0 || oldWorldLength === 0) return;
 
     const newWorldWidth = newW_cm * PIXELS_PER_CM;
-    const newWorldHeight = newL_cm * PIXELS_PER_CM;
+    const newWorldLength = newL_cm * PIXELS_PER_CM;
 
     const scaleX = newWorldWidth / oldWorldWidth;
-    const scaleY = newWorldHeight / oldWorldHeight;
+    const scaleY = newWorldLength / oldWorldLength;
 
     const scaledPolygon = local.polygon.map(p => ({
       x: Math.round(p.x * scaleX),
@@ -346,8 +355,32 @@ watch([localRectWMeters, localRectLMeters], ([newW, newL]) => {
       return;
     }
 
+    // Verifica si los elementos caben por la altura
+
+    let alturaMinimaRequerida_cm = 0;
+    const elementosQueNoCaben = [];
+
+    for (const el of local.elements) {
+        const alturaTotalElemento_cm = el.dimensiones.alto + (el.alturaRespectoAlSuelo ?? 0);
+
+        alturaMinimaRequerida_cm = Math.max(alturaMinimaRequerida_cm, alturaTotalElemento_cm);
+
+        if (alturaTotalElemento_cm > newY_cm) {
+            elementosQueNoCaben.push(el.nombre || `ID ${el.id}`);
+        }
+    }
+
+    if (elementosQueNoCaben.length > 0) {
+        const alturaMinimaEnMetros = (alturaMinimaRequerida_cm / 100).toFixed(2);
+        const nombresElementos = elementosQueNoCaben.join(', ');
+
+        notice.value = `Altura insuficiente. Se requiere ${alturaMinimaEnMetros} m. Elementos afectados: ${nombresElementos}.`;
+        return;
+    }
+
     rectW.value = newW_cm;
     rectL.value = newL_cm;
+    rectY.value = newY_cm;
     local.polygon = scaledPolygon;
     notice.value = '';
 
