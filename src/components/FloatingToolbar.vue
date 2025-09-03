@@ -71,10 +71,10 @@
       :aria-label="'Alternar snapping'"
       :aria-pressed="isSnappingEnabled ? 'true' : 'false'"
     >
-      <!-- Icono Snap (imÃ¡n) -->
-      <svg viewBox="0 0 24 24" class="pointer-events-none h-[20px] w-[20px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
-        <path d="M20 19.88V22l-1.8-1.17l-4.79-9a4.9 4.9 0 0 0 1.78-1M15 7a3 3 0 0 1-3 3a3 3 0 0 1-.44 0L5.8 20.83L4 22v-2.12L9.79 9A3 3 0 0 1 12 4V2a1 1 0 0 1 1 1v1.18A3 3 0 0 1 15 7m-2 0a1 1 0 1 0-1 1a1 1 0 0 0 1-1m-8.78 3L6 11.8l-1.44 2.76L2.1 12.1m9.9 5.66l-1.5-1.51L9 19l3 3l3-3l-1.47-2.77M19.78 10L18 11.8l1.5 2.76l2.4-2.46Z" />
-      </svg>
+        <!-- Icono Ruler -->
+        <svg viewBox="0 0 24 24" class="pointer-events-none h-[20px] w-[20px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
+          <path d="M21 5H3a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Zm-1 12H4V7h16v10Zm-11-6H7v2h2v-2Zm4 0h-2v2h2v-2Zm4 0h-2v2h2v-2ZM7 13H5v2h2v-2Zm4 0H9v2h2v-2Zm4 0h-2v2h2v-2Z" />
+        </svg>
     </UiIconButton>
     <span v-if="isSnappingEnabled" class="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--primary,theme(colors.blue.600))] ring-2 ring-slate-900/60"></span>
     </div>
