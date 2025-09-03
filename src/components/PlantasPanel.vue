@@ -265,7 +265,7 @@
                 />
               </div>
               <div>
-                <label for="alto" class="block mb-1 text-xs font-medium text-gray-600">Alto</label>
+                <label for="alto" class="block mb-1 text-xs font-medium text-gray-600">Altura</label>
                 <input
                   id="alto"
                   v-model.number="formularioPlanta.dimensiones.alto"

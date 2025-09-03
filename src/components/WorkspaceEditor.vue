@@ -108,7 +108,7 @@
                   v-model.number="localRectLMeters" />
               </div>
               <div class="col-span-2">
-                <label class="mb-1 block text-xs text-slate-600">Alto (m)</label>
+                <label class="mb-1 block text-xs text-slate-600">Altura (m)</label>
                 <input type="number"
                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
                   :class="{'border-rose-500 ring-2 ring-rose-500/60': errors.dimensions}"

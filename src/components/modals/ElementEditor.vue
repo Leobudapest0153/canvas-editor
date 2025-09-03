@@ -128,7 +128,7 @@
                   />
                 </div>
                 <div class="mb-2">
-                  <label class="block text-sm font-medium text-gray-700">Alto</label>
+                <label class="block text-sm font-medium text-gray-700">Altura</label>
                   <input
                     v-model.number="localElemento.dimensiones.alto"
                     type="number"

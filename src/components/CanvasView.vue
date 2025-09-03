@@ -648,8 +648,8 @@
       >
         {{ canvasStore.estaEnElemento ? 'Elemento' : 'Contenedor' }}:
         {{ canvasStore.elementoContenedorActual.nombre }}
-        <template v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones">
-          ({{ canvasStore.elementoContenedorActual.dimensiones.ancho }}×{{ canvasStore.elementoContenedorActual.dimensiones.alto }}cm - Vista de frente)
+        <template v-if="canvasStore.elementoContenedorActual.dimensiones">
+          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }}×{{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }} - Vista de frente)
         </template>
         <template v-else>
           ({{ canvasStore.canvasAdaptativo.width }}×{{ canvasStore.canvasAdaptativo.height }}px)
@@ -738,6 +738,7 @@ import { dimsCmFor, clampInsideArea } from '@/utils/bounds'
 import { handleCanvasHotkeys } from '@/utils/canvasHotkeys'
 import { polygonInset } from '@/utils/polygonInset'
 import { GRID_SIZE, CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/utils/constants'
+import { cmToPx, fmtCm } from '@/utils/units'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/utils/dimensionPolicy'
 import { getActiveBounds } from '@/utils/activeBounds'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
@@ -840,27 +841,23 @@ const getElementPixelDimensions = (elemento) => {
     return { width: elemento.width, height: elemento.height }
   }
 
-  // Priorizar dimensiones en cm y convertir según la vista
+  // Priorizar dimensiones en cm y convertir según el contexto
   if (elemento.dimensiones) {
     let widthCm, heightCm
 
-    if (canvasStore.vistaActiva === 'XY') {
-      // Vista superior (XY): width = ancho, height = largo
+    if (canvasStore.estaEnPlanta) {
+      // Vista superior en planta: width = ancho, height = largo
       widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
       heightCm = elemento.dimensiones.largo || (elemento.height ? elemento.height / CM_TO_PX : 6)
-    } else if (canvasStore.vistaActiva === 'XZ') {
-      // Vista frontal (XZ): width = ancho, height = alto
+    } else {
+      // Detalle de elemento/contenedor: vista de frente
       widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
       heightCm = elemento.dimensiones.alto || (elemento.height ? elemento.height / CM_TO_PX : 6)
-    } else {
-      // Fallback a vista XY
-      widthCm = elemento.dimensiones.ancho || (elemento.width ? elemento.width / CM_TO_PX : 10)
-      heightCm = elemento.dimensiones.largo || (elemento.height ? elemento.height / CM_TO_PX : 6)
     }
 
     return {
-      width: Math.round(widthCm * CM_TO_PX),
-      height: Math.round(heightCm * CM_TO_PX),
+      width: cmToPx(widthCm),
+      height: cmToPx(heightCm),
     }
   }
 

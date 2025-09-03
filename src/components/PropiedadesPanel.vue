@@ -86,7 +86,7 @@
               </div>
             </div>
             <div v-if="!esCircular">
-              <label class="text-sm text-gray-500">Alto</label>
+              <label class="text-sm text-gray-500">Altura</label>
               <div class="flex items-center">
                 <input type="number" min="0" v-model.number="edited.dimensiones.alto" @change="validarDimension('alto')"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
