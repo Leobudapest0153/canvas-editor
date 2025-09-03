@@ -723,7 +723,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const configurarZoom = (nuevoZoom) => {
     const zoomAnterior = zoom.value
-    zoom.value = Math.max(0.1, Math.min(5, nuevoZoom))
+    zoom.value = Math.max(0.2, Math.min(4, nuevoZoom))
 
     // Solo guardar en historial si cambió significativamente
     if (Math.abs(zoom.value - zoomAnterior) > 0.01) {

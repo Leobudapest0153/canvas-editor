@@ -616,6 +616,9 @@
       @fill-container="() => simularLlenadoContenedor(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
       @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
+      @zoom-in="onZoomIn"
+      @zoom-out="onZoomOut"
+      @reset-zoom="onResetZoom"
     />
 
     <!-- Menú contextual -->
@@ -738,6 +741,7 @@ import { dimsCmFor, clampInsideArea } from '@/utils/bounds'
 import { handleCanvasHotkeys } from '@/utils/canvasHotkeys'
 import { polygonInset } from '@/utils/polygonInset'
 import { GRID_SIZE, CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/utils/constants'
+import { useViewportStore } from '@/stores/viewport'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/utils/dimensionPolicy'
 import { getActiveBounds } from '@/utils/activeBounds'
 import SpeedDialContext from '@/components/SpeedDialContext.vue'
@@ -803,6 +807,7 @@ function scheduleDraw() {
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
+const viewportStore = useViewportStore()
 const {
   onDragStartGuard,
   onDragMoveGuard,
@@ -1083,7 +1088,10 @@ const handleWheel = (e) => {
 
   const scaleBy = 1.1
   const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
-  const clampedScale = Math.max(0.1, Math.min(5, newScale))
+  const clampedScale = Math.max(
+    viewportStore.minZoom,
+    Math.min(viewportStore.maxZoom, newScale)
+  )
 
   const mousePointTo = {
     x: (pointer.x - stage.x()) / oldScale,
@@ -1095,9 +1103,24 @@ const handleWheel = (e) => {
     y: pointer.y - mousePointTo.y * clampedScale,
   }
 
-  canvasStore.configurarZoom(clampedScale)
+  viewportStore.setZoom(clampedScale)
   canvasStore.configurarPan(newPos.x, newPos.y)
   try { canvasStore.view.hasUserZoomPan = true } catch { /* ignore */ }
+}
+
+const onZoomIn = () => {
+  viewportStore.zoomIn()
+  centrarPlantaEnCanvas()
+}
+
+const onZoomOut = () => {
+  viewportStore.zoomOut()
+  centrarPlantaEnCanvas()
+}
+
+const onResetZoom = () => {
+  viewportStore.resetZoom()
+  centrarPlantaEnCanvas()
 }
 
 // === FUNCIONES DE CANVAS/STAGE ===
