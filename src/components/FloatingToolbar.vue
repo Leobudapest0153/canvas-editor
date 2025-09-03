@@ -18,57 +18,61 @@
         :style="{ left: 'calc(var(--seg-index) * 50%)' }"
         aria-hidden="true"
       ></div>
-      <UiIconButton
-        class="relative z-10 grid h-[34px] w-[34px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none transform transition data-[state=on]:scale-100 data-[state=off]:scale-95"
-        @click.stop="$emit('set-mode', 'drag')"
-        :state="activeMode === 'drag' ? 'on' : 'off'"
-        aria-label="Modo mano (mover lienzo)"
-        :aria-pressed="activeMode === 'drag' ? 'true' : 'false'"
-      >
-        <!-- Icono Mano -->
-        <svg
-          viewBox="0 0 512 512"
-          class="block h-[14px] w-[14px] pointer-events-none fill-current align-middle transition data-[state=on]:text-white data-[state=off]:text-slate-400/70 data-[state=off]:opacity-70 drop-shadow-[0_1px_1px_rgba(0,0,0,.25)]"
-          aria-hidden="true"
+      <Tooltip label="Modo mano (D)" :delay="200">
+        <UiIconButton
+          class="relative z-10 grid h-[34px] w-[34px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none transform transition data-[state=on]:scale-100 data-[state=off]:scale-95"
+          @click.stop="$emit('set-mode', 'drag')"
+          :state="activeMode === 'drag' ? 'on' : 'off'"
+          aria-label="Modo mano (D)"
+          :aria-pressed="activeMode === 'drag' ? 'true' : 'false'"
         >
-          <path 
-            fill="currentColor" 
-            d="M288 32c0-17.7-14.3-32-32-32s-32 14.3-32 32v208c0 8.8-7.2 16-16 16s-16-7.2-16-16V64c0-17.7-14.3-32-32-32s-32 14.3-32 32v272c0 1.5 0 3.1.1 4.6L67.6 283c-16-15.2-41.3-14.6-56.6 1.4s-14.6 41.3 1.4 56.6l112.4 107c43.1 41.1 100.4 64 160 64H304c97.2 0 176-78.8 176-176V128c0-17.7-14.3-32-32-32s-32 14.3-32 32v112c0 8.8-7.2 16-16 16s-16-7.2-16-16V64c0-17.7-14.3-32-32-32s-32 14.3-32 32v176c0 8.8-7.2 16-16 16s-16-7.2-16-16z"
-          />
-        </svg>
-      </UiIconButton>
-      <UiIconButton
-        class="relative z-10 grid h-[34px] w-[34px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none transform transition data-[state=on]:scale-100 data-[state=off]:scale-95"
-        @click.stop="$emit('set-mode', 'edit')"
-        :state="activeMode === 'edit' ? 'on' : 'off'"
-        aria-label="Modo edición"
-        :aria-pressed="activeMode === 'edit' ? 'true' : 'false'"
-      >
-        <!-- Icono Cursor -->
-        <svg 
-          viewBox="0 0 24 24" 
-          class="block h-[18px] w-[18px] pointer-events-none fill-current align-middle transition data-[state=on]:text-white data-[state=off]:text-slate-400/70 data-[state=off]:opacity-70 drop-shadow-[0_1px_1px_rgba(0,0,0,.25)]" 
-          aria-hidden="true">
-          <path 
-            fill="currentColor" 
-            fill-rule="evenodd" 
-            d="M4.38 3.075a1 1 0 0 0-1.305 1.306l7 17a1 1 0 0 0 1.844.013l2.685-6.265a1 1 0 0 1 .525-.525l6.265-2.685a1 1 0 0 0-.013-1.844z" 
-            clip-rule="evenodd"
-          />
-        </svg>
-      </UiIconButton>
+          <!-- Icono Mano -->
+          <svg
+            viewBox="0 0 512 512"
+            class="block h-[14px] w-[14px] pointer-events-none fill-current align-middle transition data-[state=on]:text-white data-[state=off]:text-slate-400/70 data-[state=off]:opacity-70 drop-shadow-[0_1px_1px_rgba(0,0,0,.25)]"
+            aria-hidden="true"
+          >
+            <path
+              fill="currentColor"
+              d="M288 32c0-17.7-14.3-32-32-32s-32 14.3-32 32v208c0 8.8-7.2 16-16 16s-16-7.2-16-16V64c0-17.7-14.3-32-32-32s-32 14.3-32 32v272c0 1.5 0 3.1.1 4.6L67.6 283c-16-15.2-41.3-14.6-56.6 1.4s-14.6 41.3 1.4 56.6l112.4 107c43.1 41.1 100.4 64 160 64H304c97.2 0 176-78.8 176-176V128c0-17.7-14.3-32-32-32s-32 14.3-32 32v112c0 8.8-7.2 16-16 16s-16-7.2-16-16V64c0-17.7-14.3-32-32-32s-32 14.3-32 32v176c0 8.8-7.2 16-16 16s-16-7.2-16-16z"
+            />
+          </svg>
+        </UiIconButton>
+      </Tooltip>
+      <Tooltip label="Modo edición (E)" :delay="200">
+        <UiIconButton
+          class="relative z-10 grid h-[34px] w-[34px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none transform transition data-[state=on]:scale-100 data-[state=off]:scale-95"
+          @click.stop="$emit('set-mode', 'edit')"
+          :state="activeMode === 'edit' ? 'on' : 'off'"
+          aria-label="Modo edición (E)"
+          :aria-pressed="activeMode === 'edit' ? 'true' : 'false'"
+        >
+          <!-- Icono Cursor -->
+          <svg
+            viewBox="0 0 24 24"
+            class="block h-[18px] w-[18px] pointer-events-none fill-current align-middle transition data-[state=on]:text-white data-[state=off]:text-slate-400/70 data-[state=off]:opacity-70 drop-shadow-[0_1px_1px_rgba(0,0,0,.25)]"
+            aria-hidden="true">
+            <path
+              fill="currentColor"
+              fill-rule="evenodd"
+              d="M4.38 3.075a1 1 0 0 0-1.305 1.306l7 17a1 1 0 0 0 1.844.013l2.685-6.265a1 1 0 0 1 .525-.525l6.265-2.685a1 1 0 0 0-.013-1.844z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </UiIconButton>
+      </Tooltip>
     </div>
 
     <!-- Divider between group and secondary actions -->
     <div class="h-6 w-px bg-white/10 dark:bg-white/10 mx-1.5" aria-hidden="true" />
 
     <!-- Snapping -->
-    <div class="relative group">
+    <Tooltip label="Alternar snapping (S)" :delay="200" class="group">
     <UiIconButton
       class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
       @click.stop="$emit('toggle-snapping')"
       :state="isSnappingEnabled ? 'on' : 'off'"
-      :aria-label="'Alternar snapping'"
+      aria-label="Alternar snapping (S)"
       :aria-pressed="isSnappingEnabled ? 'true' : 'false'"
     >
       <!-- Icono Snap (imÃ¡n) -->
@@ -77,54 +81,68 @@
       </svg>
     </UiIconButton>
     <span v-if="isSnappingEnabled" class="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--primary,theme(colors.blue.600))] ring-2 ring-slate-900/60"></span>
-    </div>
+    </Tooltip>
 
     <!-- Lock / Unlock -->
-    <UiIconButton
+    <Tooltip
       v-if="isElementSelected"
-      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
-      @click.stop="$emit('toggle-lock')"
-      :state="isElementLocked ? 'on' : 'off'"
-      :aria-label="isElementLocked ? 'Desbloquear elemento' : 'Bloquear elemento'"
-      :aria-pressed="isElementLocked ? 'true' : 'false'"
-      :class="{ 'text-amber-600 dark:text-amber-400': isElementLocked }"
+      :label="isElementLocked ? 'Desbloquear elemento (L)' : 'Bloquear elemento (L)'"
+      :delay="200"
     >
-      <!-- Icono candado -->
-      <svg v-if="isElementLocked" viewBox="0 0 512 512" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
-        <path d="M420 192h-68v-80a96 96 0 1 0-192 0v80H92a12 12 0 0 0-12 12v280a12 12 0 0 0 12 12h328a12 12 0 0 0 12-12V204a12 12 0 0 0-12-12m-106 0H198v-80.75a58 58 0 1 1 116 0Z" />
-      </svg>
-      <svg v-else viewBox="0 0 512 512" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
-        <path d="M420 192H198v-80.75a58.08 58.08 0 0 1 99.07-41.07A59.4 59.4 0 0 1 314 112h38a96 96 0 1 0-192 0v80H92a12 12 0 0 0-12 12v280a12 12 0 0 0 12 12h328a12 12 0 0 0 12-12V204a12 12 0 0 0-12-12" />
-      </svg>
-    </UiIconButton>
+      <UiIconButton
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
+        @click.stop="$emit('toggle-lock')"
+        :state="isElementLocked ? 'on' : 'off'"
+        :aria-label="isElementLocked ? 'Desbloquear elemento (L)' : 'Bloquear elemento (L)'"
+        :aria-pressed="isElementLocked ? 'true' : 'false'"
+        :class="{ 'text-amber-600 dark:text-amber-400': isElementLocked }"
+      >
+        <!-- Icono candado -->
+        <svg v-if="isElementLocked" viewBox="0 0 512 512" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
+          <path d="M420 192h-68v-80a96 96 0 1 0-192 0v80H92a12 12 0 0 0-12 12v280a12 12 0 0 0 12 12h328a12 12 0 0 0 12-12V204a12 12 0 0 0-12-12m-106 0H198v-80.75a58 58 0 1 1 116 0Z" />
+        </svg>
+        <svg v-else viewBox="0 0 512 512" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
+          <path d="M420 192H198v-80.75a58.08 58.08 0 0 1 99.07-41.07A59.4 59.4 0 0 1 314 112h38a96 96 0 1 0-192 0v80H92a12 12 0 0 0-12 12v280a12 12 0 0 0 12 12h328a12 12 0 0 0 12-12V204a12 12 0 0 0-12-12" />
+        </svg>
+      </UiIconButton>
+    </Tooltip>
 
     <!-- Delete button -->
-    <UiIconButton
+    <Tooltip
       v-if="isElementSelected"
-      class="hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
-      aria-label="Eliminar elemento"
-      @click.stop="$emit('delete')"
+      label="Eliminar elemento (Supr)"
+      :delay="200"
     >
-      <svg 
-        xmlns="http://www.w3.org/2000/svg" 
-        class="pointer-events-none h-[22px] w-[22px] text-slate-300"
-        viewBox="0 0 24 24"
+      <UiIconButton
+        class="hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
+        aria-label="Eliminar elemento (Supr)"
+        @click.stop="$emit('delete')"
       >
-        <path 
-          fill="currentColor" 
-          d="M7.616 20q-.691 0-1.153-.462T6 18.384V6H5V5h4v-.77h6V5h4v1h-1v12.385q0 .69-.462 1.153T16.384 20zm2.192-3h1V8h-1zm3.384 0h1V8h-1z"
-        />
-      </svg>
-    </UiIconButton> 
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="pointer-events-none h-[22px] w-[22px] text-slate-300"
+          viewBox="0 0 24 24"
+        >
+          <path
+            fill="currentColor"
+            d="M7.616 20q-.691 0-1.153-.462T6 18.384V6H5V5h4v-.77h6V5h4v1h-1v12.385q0 .69-.462 1.153T16.384 20zm2.192-3h1V8h-1zm3.384 0h1V8h-1z"
+          />
+        </svg>
+      </UiIconButton>
+    </Tooltip>
 
     <!-- Fill container -->
-    <UiIconButton
+    <Tooltip
       v-if="isContainer && isElementSelected"
-      class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
-      @click.stop="$emit('fill-container')"
-      state="off"
-      aria-label="Llenar contenedor"
+      label="Llenar contenedor (F)"
+      :delay="200"
     >
+      <UiIconButton
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
+        @click.stop="$emit('fill-container')"
+        state="off"
+        aria-label="Llenar contenedor (F)"
+      >
       <!-- Icono fill -->
       <svg viewBox="0 0 48 48" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
         <path 
@@ -133,12 +151,14 @@
           d="m42.243 15.61l-1.183-.017c-1.586-3.963-3.464-7.44-4.637-9.472c-.964-1.67-2.742-2.621-4.61-2.621h-1.477c-.41-1.247-1.624-1.921-2.767-1.955c-.79-.023-1.963-.045-3.569-.045s-2.778.022-3.569.045c-1.143.034-2.357.708-2.767 1.955h-1.478c-1.867 0-3.645.95-4.61 2.621c-1.172 2.033-3.05 5.51-4.636 9.472l-1.183.018c-1.344.02-3.483.563-4.046 2.697C1.58 18.8 1.5 19.363 1.5 20s.081 1.2.21 1.692c.564 2.134 2.703 2.677 4.047 2.698c2.704.042 8.565.11 18.243.11s15.54-.068 18.243-.11c1.344-.021 3.483-.564 4.046-2.698c.13-.491.211-1.055.211-1.692s-.081-1.2-.21-1.692c-.564-2.134-2.703-2.677-4.047-2.698M27.57 8.456c-.79.023-1.963.045-3.569.045s-2.778-.022-3.569-.045c-1.143-.034-2.357-.708-2.767-1.955h-1.478c-.857 0-1.613.432-2.01 1.12a75 75 0 0 0-3.976 7.937c3.226-.03 7.773-.057 13.8-.057s10.574.027 13.8.057a75 75 0 0 0-3.975-7.936C33.427 6.93 32.67 6.5 31.814 6.5h-1.478c-.41 1.247-1.624 1.921-2.767 1.955M5.13 26.855l.057.44c.483 3.672 1.253 8.559 2.402 13.376a6.88 6.88 0 0 0 5.97 5.269c2.555.274 6.223.56 10.44.56s7.884-.286 10.44-.56a6.88 6.88 0 0 0 5.97-5.27c1.148-4.816 1.919-9.703 2.402-13.375l.057-.44q-.324.03-.586.034c-2.719.042-8.593.11-18.283.11s-15.564-.068-18.282-.11a8 8 0 0 1-.587-.033m10.657 3.66a1.5 1.5 0 0 1 1.697 1.273l1 7a1.5 1.5 0 1 1-2.97.424l-1-7a1.5 1.5 0 0 1 1.273-1.697m14.727 1.273a1.5 1.5 0 1 1 2.97.424l-1 7a1.5 1.5 0 1 1-2.97-.424zM24 30.5a1.5 1.5 0 0 1 1.5 1.5v7a1.5 1.5 0 0 1-3 0v-7a1.5 1.5 0 0 1 1.5-1.5" 
           clip-rule="evenodd"/>
       </svg>
-    </UiIconButton>
+      </UiIconButton>
+    </Tooltip>
   </div>
 </template>
 
 <script setup>
 import UiIconButton from './ui/UiIconButton.vue'
+import Tooltip from './ui/UiTooltip.vue'
 defineProps({
   activeMode: { type: String, default: 'drag' },
   isElementSelected: { type: Boolean, default: false },
