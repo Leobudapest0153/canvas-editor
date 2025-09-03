@@ -148,7 +148,7 @@
           <!-- Controles -->
           <div class="flex items-center gap-2">
             <button
-              @click.stop="canvasStore.destacarElemento(elemento.id)"
+              @click.stop="enfocarElemento(elemento.id)"
               class="p-0 text-gray-400 hover:text-blue-600 cursor-pointer"
               title="Encontrar en el canvas"
             >
@@ -235,8 +235,9 @@ import { useCanvasStore } from '@/composables/useCanvasStore'
 import { CATEGORIAS } from '@/utils/constants'
 import TagFilter from '@/components/TagFilter.vue'
 import CreateTagModal from '@/components/CreateTagModal.vue'
-import {useDeleteElement} from '@/composables/useDeleteElement'
+import { useDeleteElement } from '@/composables/useDeleteElement'
 import { useConfirmDialog } from '@/composables/useConfirmDialog'
+import { focusAndSelectById } from '@/utils/focusAndSelectById'
 
 // Composables
 const canvasStore = useCanvasStore()
@@ -342,6 +343,12 @@ const abrirModalCrearEtiqueta = (texto) => {
 const guardarNuevaEtiqueta = (nuevaEtiqueta) => {
   canvasStore.agregarYSeleccionarEtiqueta(nuevaEtiqueta)
   modalVisible.value = false;
+}
+
+const enfocarElemento = (id) => {
+  const stage = typeof window !== 'undefined' ? window.__konvaStage : null
+  const layer = typeof window !== 'undefined' ? window.__konvaLayer : null
+  focusAndSelectById({ stage, layer, id })
 }
 
 const handleClickOutside = (event) => {
