@@ -18,13 +18,13 @@
         :style="{ left: 'calc(var(--seg-index) * 50%)' }"
         aria-hidden="true"
       ></div>
-      <UiTooltip label="Modo mano (D)" :delay="200">
+      <UiTooltip label="Mover lienzo (D)" :delay="200">
         <UiIconButton
           class="relative z-10 grid h-[34px] w-[34px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none transform transition data-[state=on]:scale-100 data-[state=off]:scale-95"
           @click.stop="$emit('set-mode', 'drag')"
           :state="activeMode === 'drag' ? 'on' : 'off'"
-          aria-label="Modo mano (D)"
-          title="Modo mano (D)"
+          aria-label="Mover lienzo (D)"
+          title="Mover lienzo (D)"
           :aria-pressed="activeMode === 'drag' ? 'true' : 'false'"
         >
           <!-- Icono Mano -->
@@ -40,13 +40,13 @@
           </svg>
         </UiIconButton>
       </UiTooltip>
-      <UiTooltip label="Modo edición (E)" :delay="200">
+      <UiTooltip label="Editar elementos (E)" :delay="200">
         <UiIconButton
           class="relative z-10 grid h-[34px] w-[34px] place-items-center rounded-[12px] p-0 m-0 bg-transparent hover:bg-transparent leading-none transform transition data-[state=on]:scale-100 data-[state=off]:scale-95"
           @click.stop="$emit('set-mode', 'edit')"
           :state="activeMode === 'edit' ? 'on' : 'off'"
-          aria-label="Modo edición (E)"
-          title="Modo edición (E)"
+          aria-label="Editar elementos (E)"
+          title="Editar elementos (E)"
           :aria-pressed="activeMode === 'edit' ? 'true' : 'false'"
         >
           <!-- Icono Cursor -->
@@ -69,14 +69,14 @@
     <div class="h-6 w-px bg-white/10 dark:bg-white/10 mx-1.5" aria-hidden="true" />
 
     <!-- Snapping -->
-    <UiTooltip label="Snapping (S)" :delay="200">
+    <UiTooltip label="Ajuste automático (S)" :delay="200">
       <div class="relative group">
         <UiIconButton
           class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
           @click.stop="$emit('toggle-snapping')"
           :state="isSnappingEnabled ? 'on' : 'off'"
-          aria-label="Alternar snapping (S)"
-          title="Alternar snapping (S)"
+          aria-label="Alternar ajuste automático (S)"
+          title="Alternar ajuste automático (S)"
           :aria-pressed="isSnappingEnabled ? 'true' : 'false'"
         >
           <!-- Icono Snap (imán) -->
@@ -114,11 +114,11 @@
     </UiTooltip>
 
     <!-- Delete button -->
-    <UiTooltip v-if="isElementSelected" label="Eliminar elemento (Supr)" :delay="200">
+    <UiTooltip v-if="isElementSelected" label="Borrar elemento (Supr)" :delay="200">
       <UiIconButton
         class="hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
-        aria-label="Eliminar elemento (Supr)"
-        title="Eliminar elemento (Supr)"
+        aria-label="Borrar elemento (Supr)"
+        title="Borrar elemento (Supr)"
         @click.stop="$emit('delete')"
       >
         <svg
@@ -137,15 +137,15 @@
     <!-- Fill container -->
     <UiTooltip
       v-if="isContainer && isElementSelected"
-      label="Llenar contenedor (F)"
+      label="Ajustar al contenedor (F)"
       :delay="200"
     >
       <UiIconButton
         class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
         @click.stop="$emit('fill-container')"
         state="off"
-        aria-label="Llenar contenedor (F)"
-        title="Llenar contenedor (F)"
+        aria-label="Ajustar al contenedor (F)"
+        title="Ajustar al contenedor (F)"
       >
         <!-- Icono fill -->
         <svg viewBox="0 0 48 48" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
