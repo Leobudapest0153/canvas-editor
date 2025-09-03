@@ -128,7 +128,7 @@
           :key="elemento.id"
           class="flex items-center gap-3 p-3 border border-gray-200 rounded-lg mb-2 bg-white cursor-pointer transition-all hover:border-gray-300 hover:bg-gray-50"
           :class="{
-            'border-blue-500 bg-blue-50 ring ring-blue-100': esElementoSeleccionado(elemento.id),
+            'border-blue-500 !bg-blue-100 ring ring-blue-600': esElementoSeleccionado(elemento.id),
             'opacity-60 bg-gray-100': elemento.visible === false,
           }"
           @click="seleccionarElemento(elemento.id)"
