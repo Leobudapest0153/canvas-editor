@@ -77,7 +77,7 @@
         :aria-label="'Alternar snapping'"
         :aria-pressed="isSnappingEnabled ? 'true' : 'false'"
       >
-        <!-- Icono Guías (regla) -->
+        <!-- Icono Guías (cuadrícula) -->
         <svg
           viewBox="0 0 24 24"
           class="pointer-events-none h-[20px] w-[20px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300"
@@ -85,7 +85,7 @@
         >
           <path
             fill="currentColor"
-            d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5Zm2 0v4h2V5H5Zm4 0v2h2V5H9Zm4 0v4h2V5h-2Zm4 0v2h2V5h-2ZM5 15v4h2v-4H5Zm4 0v2h2v-2H9Zm4 0v4h2v-4h-2Zm4 0v2h2v-2h-2Z"
+            d="M3 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm10 0h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm-10 10h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Zm10 0h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-8a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z"
           />
         </svg>
       </UiIconButton>
