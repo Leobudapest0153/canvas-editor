@@ -58,11 +58,11 @@ export const useCanvasBuffer = () => {
   }
 
   /**
-   * Clonar elemento con todos sus hijos recursivamente
-   * Genera nuevos IDs únicos para evitar conflictos
-   * Retorna un objeto con el elemento principal y todos los elementos de la estructura
+   * Serializar un elemento con todos sus hijos recursivamente.
+   * Genera copias profundas y nuevos IDs únicos para evitar conflictos.
+   * Retorna un objeto con el elemento raíz y un mapa de todos los elementos.
    */
-  const cloneElementWithChildren = (elementoId, offsetX = 0, offsetY = 0) => {
+  const serializeElementForTemplate = (elementoId, offsetX = 0, offsetY = 0) => {
     const elemento = canvasStore.elementoPorId(elementoId)
     if (!elemento) {
       console.warn('⚠️ Elemento no encontrado para clonar:', elementoId)
@@ -186,7 +186,7 @@ export const useCanvasBuffer = () => {
     }
 
     // Clonar la estructura completa
-    const clonedStructure = cloneElementWithChildren(elementoId)
+    const clonedStructure = serializeElementForTemplate(elementoId)
     if (!clonedStructure) {
       console.error('⚠️ Error al clonar la estructura del elemento')
       return false
@@ -539,6 +539,28 @@ export const useCanvasBuffer = () => {
   }
 
   /**
+   * Pegar estructura desde un payload serializado (plantillas)
+   */
+  const pasteFromSerialized = (payload, position = { x: 100, y: 100 }) => {
+    if (!payload || !payload.rootId || !Array.isArray(payload.elements)) {
+      console.warn('⚠️ Payload de plantilla inválido')
+      return false
+    }
+
+    const allElementsMap = new Map()
+    for (const el of payload.elements) {
+      allElementsMap.set(el.id, { ...JSON.parse(JSON.stringify(el)) })
+    }
+
+    const { newElementsMap, newIdMapping } = regenerateUniqueIds(allElementsMap)
+    const newRootId = newIdMapping.get(payload.rootId)
+    const newRootElement = newElementsMap.get(newRootId)
+    if (!newRootElement) return false
+
+    return pasteStructureRecursive(newRootElement, position, newElementsMap)
+  }
+
+  /**
    * Remover elemento del buffer
    */
   const removeFromBuffer = (bufferItemId) => {
@@ -613,6 +635,7 @@ export const useCanvasBuffer = () => {
     addToBuffer,
     copyToBuffer,
     pasteFromBuffer,
+    pasteFromSerialized,
     removeFromBuffer,
     clearBuffer,
 
@@ -621,5 +644,8 @@ export const useCanvasBuffer = () => {
     getBufferItems,
     isInBuffer,
     getBufferInfo,
+
+    // Utilidades
+    serializeElementForTemplate,
   }
 }
