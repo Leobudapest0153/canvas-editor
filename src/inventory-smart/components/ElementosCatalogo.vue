@@ -220,6 +220,7 @@ import {
   TODAS_LAS_CATEGORIAS,
   TIPOS_ENTIDAD,
   getColorPorTipo,
+  getColorCategoria,
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
 } from '@/inventory-smart/utils/constants'

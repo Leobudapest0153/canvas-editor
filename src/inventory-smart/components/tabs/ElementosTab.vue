@@ -106,7 +106,7 @@
             @dragstart="onTemplateDragStart(tpl, $event)"
             @dragend="onTemplateDragEnd"
             class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]"
-            :style="{ borderLeftColor: '#3b82f6' }"
+            :style="{ borderLeftColor: getTemplateColor(tpl) }"
           >
             <div class="elemento-preview flex items-center justify-center mb-3">
               <div
@@ -114,7 +114,7 @@
                   'preview-shape rounded-sm flex items-center justify-center relative shadow-sm border border-white/20',
                   'w-12 h-8',
                 ]"
-                style="background-color: #3b82f6"
+                :style="{ backgroundColor: getTemplateColor(tpl) }"
               >
                 <component :is="getIconComponent('box')" class="w-4 h-4 text-white" />
               </div>
@@ -133,18 +133,18 @@
                 </div>
                 <div class="spec-item flex justify-between text-xs">
                   <span class="spec-label text-gray-500 font-medium">Peso:</span>
-                  <span class="spec-value text-gray-700">—</span>
+                  <span class="spec-value text-gray-700">{{ formatTemplateWeight(tpl) }}</span>
                 </div>
                 <div class="spec-item flex justify-between text-xs">
                   <span class="spec-label text-gray-500 font-medium">Ubic:</span>
-                  <span class="spec-value text-gray-700">—</span>
+                  <span class="spec-value text-gray-700 capitalize">{{ formatTemplateLocation(tpl) }}</span>
                 </div>
               </div>
 
               <div class="mt-2 flex gap-1">
                 <span
                   class="inline-block px-2 py-1 text-xs rounded-full text-white"
-                  style="background-color: #3b82f6"
+                  :style="{ backgroundColor: getTemplateColor(tpl) }"
                 >
                   Plantillas
                 </span>
@@ -207,6 +207,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
+import { getColorCategoria } from '@/inventory-smart/utils/constants'
 
 const catalogStore = useCatalogStore()
 const { selectedCatalog, searchText } = storeToRefs(catalogStore)
@@ -270,6 +271,38 @@ const getTemplateDims = (tpl) => ({
 })
 
 const getIconComponent = () => 'svg'
+
+const getTemplateRoot = (tpl) => {
+  const elems = tpl.payload?.elements || []
+  return elems.find((e) => e.id === tpl.payload?.rootId) || elems[0] || {}
+}
+
+const getTemplateColor = (tpl) => {
+  const root = getTemplateRoot(tpl)
+  return root.color || root.colorBase || getColorCategoria(root.categoria)
+}
+
+const getTemplateWeightVal = (tpl) => {
+  if (tpl.meta?.weight != null) return tpl.meta.weight
+  const root = getTemplateRoot(tpl)
+  return root.pesoMaximo
+}
+
+const getTemplateLocationVal = (tpl) => {
+  if (tpl.meta?.location) return tpl.meta.location
+  const root = getTemplateRoot(tpl)
+  return root.ubicacion
+}
+
+const formatTemplateWeight = (tpl) => {
+  const w = getTemplateWeightVal(tpl)
+  return w != null ? `${w}kg` : '—'
+}
+
+const formatTemplateLocation = (tpl) => {
+  const loc = getTemplateLocationVal(tpl)
+  return loc || '—'
+}
 
 const onTemplateDragStart = (tpl, event) => {
   const dragData = {

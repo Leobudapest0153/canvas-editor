@@ -1022,6 +1022,10 @@ const saveTemplate = () => {
   }
   isSaving.value = true
   const now = new Date().toISOString()
+  const root =
+    templatePayload.value?.elements?.find(
+      (e) => e.id === templatePayload.value?.rootId,
+    ) || {}
   const template = {
     id: `tpl_${Date.now().toString(36)}`,
     name,
@@ -1033,6 +1037,8 @@ const saveTemplate = () => {
       height: templateSummary.value.height,
       depth: templateSummary.value.depth,
       childrenCount: templateSummary.value.childrenCount,
+      weight: root.pesoMaximo,
+      location: root.ubicacion,
     },
     payload: templatePayload.value,
     notes: templateNotes.value.trim() || undefined,
