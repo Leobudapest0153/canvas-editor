@@ -74,7 +74,7 @@
       v-else
       class="flex-1 overflow-hidden flex flex-col"
     >
-      <div class="catalogo-header p-4 border-b border-gray-200">
+      <div class="catalogo-header p-1 border-b border-gray-200">
         <div class="relative">
           <input
             v-model="searchText"
