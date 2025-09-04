@@ -592,7 +592,7 @@
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
-      @fill-container="() => simularLlenadoContenedor(canvasStore.elementoSeleccionado)"
+      @fill-container="() => simularLlenadoElemento(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
       @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
     />
@@ -760,7 +760,7 @@ import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverla
 import { useObjectSnapping } from '@/inventory-smart/composables/useObjectSnapping'
 import { usePlacementGuards } from '@/inventory-smart/composables/usePlacementGuards'
 import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
-import { getUsoInfo, useProductSimulation } from '@/inventory-smart/utils/simulateProducts'
+import { getUsoInfo, useProductSimulation } from '@/inventory-smart/composables/useSimulateProducts'
 import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
 
@@ -1819,7 +1819,7 @@ const handleDrop = (e) => {
 
 const { showToast } = useToast()
 
-const { simularLlenadoContenedor} = useProductSimulation({
+const { simularLlenadoElemento } = useProductSimulation({
   canvasStore,
   showToast,
   forceRedraw
@@ -2122,7 +2122,7 @@ const createElementFromDrop = (data, dropEvent) => {
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
-    volumenMaximo: anchoCm * largoCmFinal * altoCm,
+    volumenMaximo: (anchoCm * largoCmFinal * altoCm) / 100,
     // Política de dimensiones
     dimensionLock: false,
     systemTypeKey: elemento.id,
