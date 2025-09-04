@@ -260,7 +260,7 @@ const nuevoElemento = ref({
 // Computed: título dinámico según el contexto
 const tituloContextual = computed(() => {
   if (catalogContext.value.mode === 'root') {
-    return 'Catálogo de Elementos'
+    return ''
   } else if (catalogContext.value.mode === 'detail-element') {
     return 'Catálogo de Contenedores'
   } else if (catalogContext.value.mode === 'detail-container') {
