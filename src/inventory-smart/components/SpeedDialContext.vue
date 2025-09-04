@@ -11,28 +11,22 @@
     @contextmenu.prevent
   >
     <button
-      ref="itemRefs[0]"
+      v-for="(item, i) in visibleItems"
+      :key="i"
+      :ref="el => (itemRefs[i] = el)"
       class="sdx-item"
+      :class="item.class"
       role="menuitem"
-      :aria-label="isLocked ? 'Desbloquear' : 'Bloquear'"
-      @click="emitLock"
+      :aria-label="item.aria"
+      @click="item.action"
     >
-      {{ isLocked ? 'Desbloquear' : 'Bloquear' }}
-    </button>
-    <button
-      ref="itemRefs[1]"
-      class="sdx-item sdx-danger"
-      role="menuitem"
-      aria-label="Eliminar"
-      @click="emitDelete"
-    >
-      Eliminar
+      {{ item.label }}
     </button>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount, nextTick, defineOptions } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick, defineOptions, computed } from 'vue'
 
 defineOptions({ name: 'SpeedDialContext' })
 
@@ -41,11 +35,13 @@ const props = defineProps({
   x: { type: Number, default: 0 },
   y: { type: Number, default: 0 },
   isLocked: { type: Boolean, default: false },
+  showLock: { type: Boolean, default: true },
+  showSaveTemplate: { type: Boolean, default: true },
 })
-const emit = defineEmits(['lockToggle', 'delete', 'close'])
+const emit = defineEmits(['lockToggle', 'delete', 'saveTemplate', 'close'])
 
 const menuRef = ref(null)
-const itemRefs = [ref(null), ref(null)]
+const itemRefs = []
 const focusedIndex = ref(0)
 
 const pos = ref({ left: 0, top: 0 })
@@ -62,16 +58,48 @@ const clampToViewport = () => {
   pos.value = { left, top }
 }
 
-watch(() => [props.visible, props.x, props.y], async () => {
-  await nextTick()
-  clampToViewport()
-  if (props.visible) {
-    focusedIndex.value = 0
-    openedAt.value = (typeof performance !== 'undefined' ? performance.now() : Date.now())
-    await nextTick()
-    itemRefs[0].value?.focus?.()
+const visibleItems = computed(() => {
+  const items = []
+  if (props.showLock) {
+    items.push({
+      label: props.isLocked ? 'Desbloquear' : 'Bloquear',
+      action: emitLock,
+      aria: props.isLocked ? 'Desbloquear' : 'Bloquear',
+      class: '',
+    })
   }
-}, { immediate: true })
+  if (props.showSaveTemplate) {
+    items.push({
+      label: 'Guardar como plantilla',
+      action: emitSaveTemplate,
+      aria: 'Guardar como plantilla',
+      class: '',
+    })
+  }
+  items.push({
+    label: 'Eliminar',
+    action: emitDelete,
+    aria: 'Eliminar',
+    class: 'sdx-danger',
+  })
+  return items
+})
+
+watch(
+  () => [props.visible, props.x, props.y, visibleItems.value.length],
+  async () => {
+    await nextTick()
+    clampToViewport()
+    if (props.visible) {
+      focusedIndex.value = 0
+      openedAt.value =
+        typeof performance !== 'undefined' ? performance.now() : Date.now()
+      await nextTick()
+      itemRefs[0]?.focus?.()
+    }
+  },
+  { immediate: true }
+)
 
 const onGlobalClick = (e) => {
   if (!props.visible) return
@@ -105,13 +133,12 @@ onBeforeUnmount(() => {
 const onKeydown = (e) => {
   if (e.key === 'ArrowDown') {
     focusedIndex.value = (focusedIndex.value + 1) % itemRefs.length
-    itemRefs[focusedIndex.value].value?.focus?.()
+    itemRefs[focusedIndex.value]?.focus?.()
   } else if (e.key === 'ArrowUp') {
     focusedIndex.value = (focusedIndex.value - 1 + itemRefs.length) % itemRefs.length
-    itemRefs[focusedIndex.value].value?.focus?.()
+    itemRefs[focusedIndex.value]?.focus?.()
   } else if (e.key === 'Enter' || e.key === ' ') {
-    if (focusedIndex.value === 0) emitLock()
-    else emitDelete()
+    visibleItems.value[focusedIndex.value]?.action()
   } else if (e.key === 'Escape') {
     emit('close')
   }
@@ -119,6 +146,9 @@ const onKeydown = (e) => {
 
 const emitLock = () => {
   emit('lockToggle')
+}
+const emitSaveTemplate = () => {
+  emit('saveTemplate')
 }
 const emitDelete = () => {
   emit('delete')

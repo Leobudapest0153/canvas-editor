@@ -389,7 +389,11 @@ onMounted(() => {
   const elementosGuardados = localStorage.getItem('elementos-personalizados')
   if (elementosGuardados) {
     try {
-      JSON.parse(elementosGuardados).forEach((el) => items.value.push(el))
+      JSON.parse(elementosGuardados).forEach((el) => {
+        if (!items.value.some((existing) => existing.id === el.id)) {
+          items.value.push(el)
+        }
+      })
     } catch (error) {
       console.error('Error cargando elementos personalizados:', error)
     }
