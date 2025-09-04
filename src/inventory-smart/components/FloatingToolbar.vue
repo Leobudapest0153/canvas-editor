@@ -8,13 +8,13 @@
   >
     <!-- Grupo conmutador Mano / Edición -->
     <div
-      class="relative isolate flex items-center h-[40px] rounded-[14px] border border-white/10 dark:border-white/8 bg-white/35 dark:bg-white/5 overflow-hidden"
+      class="relative isolate flex items-center h-[40px] rounded-[14px] border border-white/10 dark:border-white/8 bg-white/35 dark:bg-white/5 overflow-visible"
       role="group"
       aria-label="Cambiar modo"
       :style="{ '--seg-w':'36px','--seg-gap':'8px','--seg-pad':'0px','--seg-index': activeMode==='edit' ? 1 : 0 }"
     >
       <div
-        class="seg-slider absolute top-1/2 left-0 z-0 h-[36px] w-[36px] ml-px rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_8px_24px_rgba(37,99,235,.35)] ring-2 ring-white/15 ring-[var(--primary,theme(colors.blue.600))]/20 -translate-y-1/2 transform transition-all duration-220 ease-[cubic-bezier(.25,1.1,.4,1)] will-change-transform"
+        class="seg-slider absolute top-1/2 left-0 z-0 h-[36px] w-[36px] ml-px rounded-full bg-[var(--primary,theme(colors.blue.600))] shadow-[0_8px_24px_rgba(37,99,235,.35)] ring-2 ring-white/15 -translate-y-1/2 transform transition-all duration-220 ease-[cubic-bezier(.25,1.1,.4,1)] will-change-transform"
         :style="{ left: 'calc(var(--seg-index) * 50%)' }"
         aria-hidden="true"
       ></div>
@@ -24,7 +24,6 @@
           @click.stop="$emit('set-mode', 'drag')"
           :state="activeMode === 'drag' ? 'on' : 'off'"
           aria-label="Mover lienzo (D)"
-          title="Mover lienzo (D)"
           :aria-pressed="activeMode === 'drag' ? 'true' : 'false'"
         >
           <!-- Icono Mano -->
@@ -46,7 +45,6 @@
           @click.stop="$emit('set-mode', 'edit')"
           :state="activeMode === 'edit' ? 'on' : 'off'"
           aria-label="Editar elementos (E)"
-          title="Editar elementos (E)"
           :aria-pressed="activeMode === 'edit' ? 'true' : 'false'"
         >
           <!-- Icono Cursor -->
@@ -76,18 +74,17 @@
           @click.stop="$emit('toggle-snapping')"
           :state="isSnappingEnabled ? 'on' : 'off'"
           aria-label="Alternar ajuste automático (S)"
-          title="Alternar ajuste automático (S)"
           :aria-pressed="isSnappingEnabled ? 'true' : 'false'"
         >
           <!-- Icono Snap (imán) -->
           <svg viewBox="0 0 24 24" class="pointer-events-none h-[24px] w-[24px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
-            <path 
-              fill="currentColor" 
+            <path
+              fill="currentColor"
               d="M9.479 3.5a1.5 1.5 0 0 0-2.12 0L3.5 7.35a1.52 1.52 0 0 0-.44 1.06a1.5 1.5 0 0 0 .44 1.06L14.519 20.5a1.51 1.51 0 0 0 2.13 0l3.85-3.86a1.49 1.49 0 0 0 0-2.12Zm-1.12 3.58a.5.5 0 0 0 0 .71a.524.524 0 0 0 .71 0c.55-.56 1.09-1.1 1.65-1.64l1.25 1.25l-.9.9a.483.483 0 0 0 0 .7a.5.5 0 0 0 .71 0c.29-.3.6-.6.9-.89l1.25 1.25l-1.64 1.65a.495.495 0 0 0 .7.7c.56-.55 1.1-1.09 1.65-1.64l1.25 1.25l-.9.9a.52.52 0 0 0-.14.36a.5.5 0 0 0 .14.35a.513.513 0 0 0 .71 0l.9-.9l1.26 1.26l-1.65 1.64a.5.5 0 0 0 .71.71c.55-.56 1.09-1.1 1.65-1.64l1.23 1.23a.5.5 0 0 1 0 .7l-3.86 3.86a.5.5 0 0 1-.71 0L4.209 8.77a.5.5 0 0 1-.15-.36a.5.5 0 0 1 .15-.35l3.86-3.86a.51.51 0 0 1 .7 0l1.24 1.24Z"
               />
 
-            <path 
-              fill="currentColor" 
+            <path
+              fill="currentColor"
               d="m18.939 12.96l-.04-.04c.01 0 .01 0 .02.01s.02.02.02.03"
             />
           </svg>
@@ -107,7 +104,6 @@
         @click.stop="$emit('toggle-lock')"
         :state="isElementLocked ? 'on' : 'off'"
         :aria-label="isElementLocked ? 'Desbloquear elemento (L)' : 'Bloquear elemento (L)'"
-        :title="isElementLocked ? 'Desbloquear elemento (L)' : 'Bloquear elemento (L)'"
         :aria-pressed="isElementLocked ? 'true' : 'false'"
         :class="{ 'text-amber-600 dark:text-amber-400': isElementLocked }"
       >
@@ -126,7 +122,6 @@
       <UiIconButton
         class="hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
         aria-label="Borrar elemento (Supr)"
-        title="Borrar elemento (Supr)"
         @click.stop="$emit('delete')"
       >
         <svg
@@ -144,16 +139,15 @@
 
     <!-- Fill container -->
     <UiTooltip
-      v-if="isContainer && isElementSelected"
-      label="Ajustar al contenedor (F)"
+      v-if="isElementSelected && !isContainer"
+      label="Asignar datos de uso"
       :delay="200"
     >
       <UiIconButton
         class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
         @click.stop="$emit('fill-container')"
+        aria-label="Asignar datos de uso"
         state="off"
-        aria-label="Ajustar al contenedor (F)"
-        title="Ajustar al contenedor (F)"
       >
         <!-- Icono fill -->
         <svg viewBox="0 0 48 48" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
