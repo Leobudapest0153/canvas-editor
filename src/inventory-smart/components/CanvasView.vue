@@ -2531,6 +2531,7 @@ const dragModeGlobal = ref(true)
 // Id del elemento actualmente en modo edición (transformer). Se activa al seleccionar un elemento cuando dragModeGlobal está ON
 const editingElementId = ref(null)
 const transformerRef = ref(null)
+const isInteractingWithTransformer = ref(false);
 // Estado para guardar dimensiones/pos antes de transformar (para poder revertir)
 const transformInitialState = new Map()
 
@@ -2623,6 +2624,7 @@ const setupTransformer = () => {
 
 // Guardar estado inicial de la transformación para posible revert
 const handleTransformStart = (e, elementId) => {
+  isInteractingWithTransformer.value = true;
   try {
     const node = e.target
     if (!node) return
@@ -2638,6 +2640,7 @@ const handleTransformStart = (e, elementId) => {
 
 // Manejar fin de transformación - CONCENTRA TODA LA VALIDACIÓN Y PERSISTENCIA
 const handleTransformEnd = (e, elementId) => {
+  isInteractingWithTransformer.value = false;
   try {
     const node = e.target
     let width = node.width() * node.scaleX()
@@ -3005,6 +3008,15 @@ watch(
     forceRedraw()
   },
 )
+
+watch(() => canvasStore.elementoSeleccionadoCompleto, (elementoActual) => {
+  // Comprobamos si hay un cambio Y SI NO estamos interactuando con el transformer.
+  if (elementoActual && isEditingSelected.value && !isInteractingWithTransformer.value) {
+    nextTick(() => {
+      setupTransformer();
+    });
+  }
+}, { deep: true });
 
 // Ajustar la vista para encuadrar la planta activa (usa polígono si existe o dimensiones en cm)
 const fitToPlanta = () => {

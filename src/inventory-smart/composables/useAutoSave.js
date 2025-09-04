@@ -12,8 +12,10 @@
 
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { AUTOSAVE_CONFIG } from '@/inventory-smart/utils/constants'
+import { useStatePersistence } from './useStatePersistence'
 
 export function useAutoSave(canvasStore, options = {}) {
+  const { validateStructure } = useStatePersistence()
   // Configuración con valores por defecto
   const config = {
     intervalMs: options.intervalMs || AUTOSAVE_CONFIG.INTERVAL_MS,
@@ -74,14 +76,15 @@ export function useAutoSave(canvasStore, options = {}) {
    */
   function createBackupMetadata(canvasData) {
     const parsed = typeof canvasData === 'string' ? JSON.parse(canvasData) : canvasData
+    const validation = validateStructure(JSON.stringify(parsed))
 
     return {
       timestamp: new Date().toISOString(),
       id: `backup_${Date.now()}`,
-      plantas: parsed.plantas?.length || 0,
-      elementos: parsed.elementos?.length || 0,
+      plantas: validation.plantas || 0,
+      elementos: validation.elementos || 0,
       size: JSON.stringify(parsed).length, // tamaño en bytes
-      version: parsed.meta?.version || '1.0.0',
+      version: validation.version || '1.0.0',
     }
   }
 

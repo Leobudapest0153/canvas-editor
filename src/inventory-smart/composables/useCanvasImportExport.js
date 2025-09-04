@@ -6,9 +6,11 @@
  */
 
 import { useCanvasStore } from './useCanvasStore'
+import { useStatePersistence } from './useStatePersistence'
 
 export const useCanvasImportExport = () => {
   const canvasStore = useCanvasStore()
+  const { validateStructure, generateValidationReport } = useStatePersistence()
 
   /**
    * Exporta el estado actual del canvas a un archivo JSON
@@ -69,12 +71,40 @@ export const useCanvasImportExport = () => {
       reader.onload = (e) => {
         try {
           const jsonString = e.target.result
-          // Validar estructura antes de deserializar
-          const validacion = validarJSON(jsonString)
-          if (!validacion.valido) {
-            reject(new Error(`Archivo JSON inválido: ${validacion.error || 'Estructura incorrecta'}`))
+
+          // Validación mejorada con reporte detallado
+          const validacion = validateStructure(jsonString, true) // Modo estricto
+
+          if (!validacion.valid) {
+            // Generar reporte detallado para mejor debugging
+            const reporte = generateValidationReport(jsonString)
+            console.error('📋 Reporte de validación:', reporte)
+
+            let errorMessage = `Archivo JSON inválido: ${validacion.error}`
+
+            if (validacion.errors?.length > 0) {
+              errorMessage += `\n\nErrores encontrados:\n${validacion.errors.map(e => `• ${e}`).join('\n')}`
+            }
+
+            if (validacion.warnings?.length > 0) {
+              errorMessage += `\n\nAdvertencias:\n${validacion.warnings.map(w => `• ${w}`).join('\n')}`
+            }
+
+            reject(new Error(errorMessage))
             return
           }
+
+          // Mostrar información de validación exitosa
+          if (validacion.warnings?.length > 0) {
+            console.warn('⚠️ Archivo válido pero con advertencias:', validacion.warnings)
+          }
+
+          console.log('✅ Archivo validado exitosamente:', {
+            plantas: validacion.plantas,
+            elementos: validacion.elementos,
+            version: validacion.version,
+            advertencias: validacion.warnings?.length || 0
+          })
 
           const exito = canvasStore.deserialize(jsonString)
 
@@ -152,31 +182,14 @@ export const useCanvasImportExport = () => {
    * @returns {object} Resultado de la validación
    */
   const validarJSON = (jsonString) => {
-    try {
-      const data = JSON.parse(jsonString)
-
-      // Validar estructura básica requerida
-      const tieneEstructuraBasica = !!(data.plantas && data.elementos)
-
-      if (!tieneEstructuraBasica) {
-        return {
-          valido: false,
-          error: 'El archivo debe contener plantas y elementos'
-        }
-      }
-
-      return {
-        valido: true,
-        plantas: data.plantas?.length || 0,
-        elementos: data.elementos?.length || 0,
-        version: data.meta?.version || 'desconociddasda',
-        fecha: data.meta?.timestamp || null,
-      }
-    } catch (error) {
-      return {
-        valido: false,
-        error: error.message,
-      }
+    const result = validateStructure(jsonString)
+    return {
+      valido: result.valid,
+      error: result.error,
+      plantas: result.plantas,
+      elementos: result.elementos,
+      version: result.version,
+      fecha: result.timestamp,
     }
   }
 
@@ -191,5 +204,21 @@ export const useCanvasImportExport = () => {
 
     // Utilidades
     validarJSON,
+
+    // Utilidades avanzadas de validación
+    obtenerEstadisticasArchivo: (jsonString) => {
+      const reporte = generateValidationReport(jsonString)
+      return {
+        valido: reporte.summary.valid,
+        plantas: reporte.details.plantas.count,
+        elementos: reporte.details.elementos.count,
+        elementosPorTipo: reporte.details.elementos.byType,
+        errores: reporte.summary.criticalIssues,
+        advertencias: reporte.summary.warnings,
+        recomendaciones: reporte.recommendations
+      }
+    },
+
+    generarReporteCompleto: generateValidationReport,
   }
 }
