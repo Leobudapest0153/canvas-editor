@@ -9,6 +9,10 @@
  * @param {Function} ctx.toggleLock
  */
 export function handleCanvasHotkeys(e, { dragMode, toggleDragMode, toggleSnapping, toggleLock }) {
+    // Solo procesar si no estamos en un input
+  if (e.target.matches('input, textarea, select, [contenteditable]')) {
+    return
+  }
   if (!e) return
   const key = e.key.toLowerCase()
   if (key === 'd') {

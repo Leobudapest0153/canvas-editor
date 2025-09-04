@@ -3162,8 +3162,6 @@ const handleKeyDown = (e) => {
     speedDialOpen.value = false
     // Limpiar guías de snapping
     clearGuides()
-  } else if (key === 'p') {
-    e.preventDefault()
   } else {
     handleCanvasHotkeys(e, {
       dragMode: dragModeGlobal,
