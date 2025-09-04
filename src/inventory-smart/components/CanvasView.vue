@@ -21,27 +21,6 @@
     @dragenter="handleDragEnter"
     @dragleave="handleDragLeave"
   >
-    <!-- Indicador de peso máximo (solo se muestra cuando hay un límite de peso) -->
-    <!-- <div
-      v-if="weightValidation.contextoActualTieneLimiteDePeso"
-      class="weight-indicator"
-      :class="{
-        'weight-warning': weightValidation.infoPesoContextoActual.porcentajeUsado > 75,
-        'weight-danger': weightValidation.infoPesoContextoActual.porcentajeUsado > 90
-      }"
-    >
-      <div class="weight-icon">⚖️</div>
-      <div class="weight-bar">
-        <div
-          class="weight-progress"
-          :style="{ width: `${Math.min(100, weightValidation.infoPesoContextoActual.porcentajeUsado)}%` }"
-        ></div>
-      </div>
-      <div class="weight-text">
-        {{ Math.round(weightValidation.infoPesoContextoActual.usado) }} u/
-        {{ weightValidation.infoPesoContextoActual.maximo }} m kg
-      </div>
-    </div> -->
     <v-stage
       ref="stageRef"
       :config="stageConfig"
@@ -517,8 +496,8 @@
             y: -(39 / canvasStore.zoom),
             text:
               canvasStore.estaEnElemento || canvasStore.estaEnContenedor
-                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))}x${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))} (Adaptativo)`
-                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))}x${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))} (${fmtCm(canvasStore.plantaActivaData?.dimensiones.ancho)}x${fmtCm(canvasStore.plantaActivaData?.dimensiones.largo)})`,
+                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`
+                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`,
             fontSize: 12 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#3b82f6',
@@ -611,7 +590,7 @@
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
-      @fill-container="() => simularLlenadoContenedor(canvasStore.elementoSeleccionado)"
+      @fill-container="() => simularLlenadoElemento(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
       @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
     />
@@ -633,9 +612,9 @@
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
       <span>{{ t('views.label') }}: {{ t(`views.${canvasStore.vistaActiva}`) }}</span>
       <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
-        Planta: {{ fmtCm(canvasStore.plantaActivaData.dimensiones.ancho) }}×{{
+        Planta: {{ fmtCm(canvasStore.plantaActivaData.dimensiones.ancho) }} x {{
           fmtCm(canvasStore.plantaActivaData.dimensiones.largo)
-        }} (Vista aérea)
+        }}
       </span>
       <span
         v-if="
@@ -646,15 +625,15 @@
         {{ canvasStore.estaEnElemento ? 'Elemento' : 'Contenedor' }}:
         {{ canvasStore.elementoContenedorActual.nombre }}
         <template v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones">
-          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }}×{{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }} - Vista de frente)
+          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }} x {{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }})
         </template>
         <template v-else>
-          ({{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.width, viewport.cmPerPx)) }}×{{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.height, viewport.cmPerPx)) }})
+          ({{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.width, viewport.cmPerPx)) }} x {{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.height, viewport.cmPerPx)) }})
         </template>
       </span>
-      <span v-if="canvasStore.elementoSeleccionado">
+      <!-- <span v-if="canvasStore.elementoSeleccionado">
         Seleccionado: {{ canvasStore.elementoSeleccionado }}
-      </span>
+      </span> -->
     </div>
 
   <!-- Botones flotantes de Undo/Redo y Bloqueo -->
@@ -779,7 +758,7 @@ import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverla
 import { useObjectSnapping } from '@/inventory-smart/composables/useObjectSnapping'
 import { usePlacementGuards } from '@/inventory-smart/composables/usePlacementGuards'
 import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
-import { getUsoInfo, useProductSimulation } from '@/inventory-smart/utils/simulateProducts'
+import { getUsoInfo, useProductSimulation } from '@/inventory-smart/composables/useSimulateProducts'
 import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
 
@@ -788,7 +767,7 @@ const props = defineProps({
   safeRight: { type: Number, default: 20 },
 })
 
-// Refs para evitar solapamientos entre canvas-info y 
+// Refs para evitar solapamientos entre canvas-info y
 
 const canvasInfoRef = ref(null)
 const floatingControlsRef = ref(null)
@@ -1342,7 +1321,7 @@ const dragBoundForElement = (pos, elemento) => {
   try {
     const lp = toLayerCoords(pos)
     const boundary = computeBoundary()
-    const { w_cm, h_cm } = dimsCmFor(elemento)
+  const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
     const w = w_cm * CM_TO_PX
     const h = h_cm * CM_TO_PX
     const c = clampInsideArea(lp.x, lp.y, w, h, boundary)
@@ -1869,7 +1848,7 @@ const handleDrop = (e) => {
 
 const { showToast } = useToast()
 
-const { simularLlenadoContenedor} = useProductSimulation({
+const { simularLlenadoElemento } = useProductSimulation({
   canvasStore,
   showToast,
   forceRedraw
@@ -2172,7 +2151,7 @@ const createElementFromDrop = (data, dropEvent) => {
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
-    volumenMaximo: anchoCm * largoCmFinal * altoCm,
+    volumenMaximo: (anchoCm * largoCmFinal * altoCm) / 100,
     // Política de dimensiones
     dimensionLock: false,
     systemTypeKey: elemento.id,
@@ -2427,17 +2406,17 @@ const createElementFromBuffer = (data, dropEvent) => {
     // Obtener el elemento padre (el elemento actual donde estamos)
     const elementoPadre = canvasStore.elementoContenedorActual;
     if (elementoPadre && elementoPadre.dimensiones) {
-      // Si estamos en vista de frente (XZ), ajustar el alto según el largo del padre
+      // Si estamos en vista de frente (XZ), ajustar el alto según el alto del padre
       if (canvasStore.vistaActiva === 'XZ') {
-        const largoPadreCm = elementoPadre.dimensiones.largo;
+        const altoPadreCm = elementoPadre.dimensiones.alto;
 
         // Actualizar también las dimensiones en el elemento del buffer
         if (elemento.dimensiones) {
-          elemento.dimensiones.largo = largoPadreCm;
+          elemento.dimensiones.alto = altoPadreCm;
         }
 
-        console.log('Buffer: Contenedor ajustado al largo del elemento padre:', {
-          largoPadreCm,
+        console.log('Buffer: Contenedor ajustado al alto del elemento padre:', {
+          altoPadreCm,
           altoPixelesFinal: height
         });
       }

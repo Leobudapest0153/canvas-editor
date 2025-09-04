@@ -5,14 +5,25 @@ import { clampRectToPolygon } from '@/inventory-smart/utils/polygonBounds'
 // Returns width/height in centimeters for an element.
 // Rectangular elements use dimensiones.ancho × dimensiones.largo/prof.
 // Circular elements use diametro (or ancho/largo fallbacks).
-export function dimsCmFor(el = {}) {
+export function dimsCmFor(el = {}, vista = 'XY') {
   const dims = el.dimensiones || {}
   if (el.forma === 'circular') {
     const d = el.diametroCm || dims.diametro || dims.ancho || dims.largo || Math.max(el.width || 0, el.height || 0) / CM_TO_PX
     return { w_cm: d, h_cm: d }
   }
+
   const w = dims.ancho != null ? dims.ancho : (el.width || 0) / CM_TO_PX
-  const h = dims.prof != null ? dims.prof : dims.largo != null ? dims.largo : (el.height || 0) / CM_TO_PX
+
+  // Seleccionar la dimensión vertical adecuada según la vista:
+  // - En vista XY (planta) la dimensión vertical corresponde a 'largo' (o 'prof')
+  // - En vista XZ (frontal) la dimensión vertical corresponde a 'alto' (o 'prof')
+  let h
+  if (vista === 'XZ') {
+    h = dims.alto != null ? dims.alto : dims.prof != null ? dims.prof : dims.largo != null ? dims.largo : (el.height || 0) / CM_TO_PX
+  } else {
+    h = dims.prof != null ? dims.prof : dims.largo != null ? dims.largo : (el.height || 0) / CM_TO_PX
+  }
+
   return { w_cm: w, h_cm: h }
 }
 
