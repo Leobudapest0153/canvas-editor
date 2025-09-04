@@ -21,27 +21,6 @@
     @dragenter="handleDragEnter"
     @dragleave="handleDragLeave"
   >
-    <!-- Indicador de peso máximo (solo se muestra cuando hay un límite de peso) -->
-    <!-- <div
-      v-if="weightValidation.contextoActualTieneLimiteDePeso"
-      class="weight-indicator"
-      :class="{
-        'weight-warning': weightValidation.infoPesoContextoActual.porcentajeUsado > 75,
-        'weight-danger': weightValidation.infoPesoContextoActual.porcentajeUsado > 90
-      }"
-    >
-      <div class="weight-icon">⚖️</div>
-      <div class="weight-bar">
-        <div
-          class="weight-progress"
-          :style="{ width: `${Math.min(100, weightValidation.infoPesoContextoActual.porcentajeUsado)}%` }"
-        ></div>
-      </div>
-      <div class="weight-text">
-        {{ Math.round(weightValidation.infoPesoContextoActual.usado) }} u/
-        {{ weightValidation.infoPesoContextoActual.maximo }} m kg
-      </div>
-    </div> -->
     <v-stage
       ref="stageRef"
       :config="stageConfig"
@@ -519,8 +498,8 @@
             y: -(39 / canvasStore.zoom),
             text:
               canvasStore.estaEnElemento || canvasStore.estaEnContenedor
-                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))}x${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))} (Adaptativo)`
-                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))}x${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))} (${fmtCm(canvasStore.plantaActivaData?.dimensiones.ancho)}x${fmtCm(canvasStore.plantaActivaData?.dimensiones.largo)})`,
+                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`
+                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`,
             fontSize: 12 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#3b82f6',
@@ -635,9 +614,9 @@
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
       <span>{{ t('views.label') }}: {{ t(`views.${canvasStore.vistaActiva}`) }}</span>
       <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
-        Planta: {{ fmtCm(canvasStore.plantaActivaData.dimensiones.ancho) }}×{{
+        Planta: {{ fmtCm(canvasStore.plantaActivaData.dimensiones.ancho) }} x {{
           fmtCm(canvasStore.plantaActivaData.dimensiones.largo)
-        }} (Vista aérea)
+        }}
       </span>
       <span
         v-if="
@@ -648,15 +627,15 @@
         {{ canvasStore.estaEnElemento ? 'Elemento' : 'Contenedor' }}:
         {{ canvasStore.elementoContenedorActual.nombre }}
         <template v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones">
-          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }}×{{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }} - Vista de frente)
+          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }} x {{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }})
         </template>
         <template v-else>
-          ({{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.width, viewport.cmPerPx)) }}×{{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.height, viewport.cmPerPx)) }})
+          ({{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.width, viewport.cmPerPx)) }} x {{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.height, viewport.cmPerPx)) }})
         </template>
       </span>
-      <span v-if="canvasStore.elementoSeleccionado">
+      <!-- <span v-if="canvasStore.elementoSeleccionado">
         Seleccionado: {{ canvasStore.elementoSeleccionado }}
-      </span>
+      </span> -->
     </div>
 
   <!-- Botones flotantes de Undo/Redo y Bloqueo -->
@@ -790,7 +769,7 @@ const props = defineProps({
   safeRight: { type: Number, default: 20 },
 })
 
-// Refs para evitar solapamientos entre canvas-info y 
+// Refs para evitar solapamientos entre canvas-info y
 
 const canvasInfoRef = ref(null)
 const floatingControlsRef = ref(null)
