@@ -6,6 +6,7 @@ export const useCatalogStore = defineStore('catalog', () => {
   const items = ref(ELEMENTOS_PREDEFINIDOS)
   const searchText = ref('')
   const selectedCategory = ref(null)
+  const selectedCatalog = ref('elementos')
 
   const catalogContext = ref({ mode: 'root', currentId: undefined, currentType: undefined })
 
@@ -54,6 +55,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     items,
     searchText,
     selectedCategory,
+    selectedCatalog,
     catalogContext,
     setCatalogContext,
     allowedTypesForContext,
