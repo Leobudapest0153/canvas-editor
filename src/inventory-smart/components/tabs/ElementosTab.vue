@@ -105,9 +105,25 @@
             :draggable="true"
             @dragstart="onTemplateDragStart(tpl, $event)"
             @dragend="onTemplateDragEnd"
+            @contextmenu.prevent="openTemplateContextMenu($event, tpl)"
             class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]"
             :style="{ borderLeftColor: getTemplateColor(tpl) }"
           >
+            <!-- Botón de acciones (tres puntos) -->
+            <button
+              type="button"
+              class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-haspopup="menu"
+              :aria-expanded="ctxMenu.visible && ctxMenu.template?.id === tpl.id ? 'true' : 'false'"
+              :aria-controls="`tpl-menu-${tpl.id}`"
+              title="Acciones"
+              @click.stop="toggleTemplateKebab($event, tpl)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 14a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
+              </svg>
+            </button>
+
             <div class="elemento-preview flex items-center justify-center mb-3">
               <div
                 :class="[
@@ -159,7 +175,7 @@
             </div>
 
             <div
-              class="drag-indicator absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
+              class="drag-indicator absolute top-2 right-8 opacity-0 transition-opacity group-hover:opacity-100"
             >
               <svg
                 class="w-4 h-4 text-gray-400"
@@ -198,23 +214,49 @@
           </p>
         </div>
       </div>
+
+      <!-- Menú contextual para plantillas (clic derecho o kebab) -->
+      <div
+        v-if="ctxMenu.visible"
+        class="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-1"
+        :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
+        role="menu"
+        :id="`tpl-menu-${ctxMenu.template?.id || 'ctx'}`"
+        @keydown.esc.stop.prevent="closeTemplateContextMenu"
+      >
+        <button
+          class="block w-full text-left px-3 py-2 rounded text-red-600 hover:bg-red-50"
+          role="menuitem"
+          @click.stop="handleDeleteTemplate(ctxMenu.template)"
+        >
+          Eliminar
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, watch, computed, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
 import { getColorCategoria } from '@/inventory-smart/utils/constants'
+import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
+import { useToast } from '@/inventory-smart/composables/useToast'
 
 const catalogStore = useCatalogStore()
 const { selectedCatalog, searchText } = storeToRefs(catalogStore)
 
+const { showSuccess, showInfo, showError } = useToast()
+const confirmDialog = useConfirmDialog()
+
 const focusedTab = ref(null)
 const tabElementos = ref(null)
 const tabPlantillas = ref(null)
+
+// Estado de menú contextual de plantillas
+const ctxMenu = ref({ visible: false, x: 0, y: 0, template: null })
 
 const selectCatalog = (value) => {
   catalogStore.setSelectedCatalog(value)
@@ -243,6 +285,11 @@ onMounted(() => {
   }
   localStorage.setItem('inventory.selectedCatalog', selectedCatalog.value)
   catalogStore.loadTemplatesFromLocalStorage()
+  window.addEventListener('click', onGlobalClick, { capture: true })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('click', onGlobalClick, { capture: true })
 })
 
 watch(selectedCatalog, (val) => {
@@ -319,6 +366,69 @@ const onTemplateDragStart = (tpl, event) => {
 const onTemplateDragEnd = (event) => {
   const card = event.currentTarget
   if (card && card.classList) card.classList.remove('opacity-50', 'scale-95')
+}
+
+// Abrir menú contextual (clic derecho)
+const openTemplateContextMenu = (evt, tpl) => {
+  ctxMenu.value = {
+    visible: true,
+    x: evt.clientX,
+    y: evt.clientY,
+    template: tpl,
+  }
+}
+
+// Abrir/cerrar menú desde botón de acciones (kebab)
+const toggleTemplateKebab = (evt, tpl) => {
+  evt.preventDefault()
+  const isSame = ctxMenu.value.visible && ctxMenu.value.template?.id === tpl.id
+  ctxMenu.value = isSame
+    ? { visible: false, x: 0, y: 0, template: null }
+    : { visible: true, x: evt.clientX, y: evt.clientY, template: tpl }
+}
+
+const closeTemplateContextMenu = () => {
+  ctxMenu.value = { visible: false, x: 0, y: 0, template: null }
+}
+
+const onGlobalClick = (e) => {
+  if (!ctxMenu.value.visible) return
+  // Si el click no proviene del propio menú, cerramos
+  const menuId = `tpl-menu-${ctxMenu.value.template?.id || 'ctx'}`
+  const path = e.composedPath ? e.composedPath() : (e.path || [])
+  const clickedInside = path.some((n) => n?.id === menuId)
+  if (!clickedInside) closeTemplateContextMenu()
+}
+
+// Eliminar plantilla con confirmación reutilizando ConfirmModal
+const handleDeleteTemplate = async (tpl) => {
+  if (!tpl) return closeTemplateContextMenu()
+
+  // Si la plantilla ya no existe
+  const exists = !!catalogStore.templates.find((t) => t.id === tpl.id)
+  if (!exists) {
+    showInfo('La plantilla ya no existe — refrescando lista')
+    catalogStore.loadTemplatesFromLocalStorage()
+    return closeTemplateContextMenu()
+  }
+
+  const ok = await confirmDialog.confirm({
+    title: 'Eliminar plantilla',
+    message: `Se eliminará la plantilla “${tpl.name}”. Esta acción no afectará los elementos ya colocados en el lienzo.`,
+    confirmLabel: 'Eliminar',
+    cancelLabel: 'Cancelar',
+    // Usamos los mismos estilos de botón peligro que el flujo de eliminar elemento (valores por defecto ya son rojo)
+  })
+  if (!ok) return closeTemplateContextMenu()
+
+  try {
+    catalogStore.removeTemplate(tpl.id)
+    showSuccess('Plantilla eliminada')
+  } catch (e) {
+    showError('No se pudo eliminar la plantilla')
+  } finally {
+    closeTemplateContextMenu()
+  }
 }
 </script>
 
