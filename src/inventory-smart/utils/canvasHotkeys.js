@@ -12,9 +12,9 @@ export function handleCanvasHotkeys(e, { dragMode, toggleDragMode, toggleSnappin
   if (!e) return
   const key = e.key.toLowerCase()
   if (key === 'd') {
-    if (!dragMode.value) toggleDragMode()
-  } else if (key === 'e') {
     if (dragMode.value) toggleDragMode()
+  } else if (key === 'e') {
+    if (!dragMode.value) toggleDragMode()
   } else if (key === 's') {
     toggleSnapping()
   } else if (key === 'l') {

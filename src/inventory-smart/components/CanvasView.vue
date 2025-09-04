@@ -21,27 +21,6 @@
     @dragenter="handleDragEnter"
     @dragleave="handleDragLeave"
   >
-    <!-- Indicador de peso máximo (solo se muestra cuando hay un límite de peso) -->
-    <!-- <div
-      v-if="weightValidation.contextoActualTieneLimiteDePeso"
-      class="weight-indicator"
-      :class="{
-        'weight-warning': weightValidation.infoPesoContextoActual.porcentajeUsado > 75,
-        'weight-danger': weightValidation.infoPesoContextoActual.porcentajeUsado > 90
-      }"
-    >
-      <div class="weight-icon">⚖️</div>
-      <div class="weight-bar">
-        <div
-          class="weight-progress"
-          :style="{ width: `${Math.min(100, weightValidation.infoPesoContextoActual.porcentajeUsado)}%` }"
-        ></div>
-      </div>
-      <div class="weight-text">
-        {{ Math.round(weightValidation.infoPesoContextoActual.usado) }} u/
-        {{ weightValidation.infoPesoContextoActual.maximo }} m kg
-      </div>
-    </div> -->
     <v-stage
       ref="stageRef"
       :config="stageConfig"
@@ -121,8 +100,6 @@
             }"
           />
 
-
-        <!-- Aquí podrías añadir v-circle, etc., si tienes otras formas -->
       </template>
 
         <!-- Renderizado de elementos del store -->
@@ -519,8 +496,8 @@
             y: -(39 / canvasStore.zoom),
             text:
               canvasStore.estaEnElemento || canvasStore.estaEnContenedor
-                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))}x${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))} (Adaptativo)`
-                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))}x${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))} (${fmtCm(canvasStore.plantaActivaData?.dimensiones.ancho)}x${fmtCm(canvasStore.plantaActivaData?.dimensiones.largo)})`,
+                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`
+                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`,
             fontSize: 12 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#3b82f6',
@@ -613,7 +590,7 @@
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
-      @fill-container="() => simularLlenadoContenedor(canvasStore.elementoSeleccionado)"
+      @fill-container="() => simularLlenadoElemento(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
       @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
     />
@@ -635,9 +612,9 @@
       <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
       <span>{{ t('views.label') }}: {{ t(`views.${canvasStore.vistaActiva}`) }}</span>
       <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
-        Planta: {{ fmtCm(canvasStore.plantaActivaData.dimensiones.ancho) }}×{{
+        Planta: {{ fmtCm(canvasStore.plantaActivaData.dimensiones.ancho) }} x {{
           fmtCm(canvasStore.plantaActivaData.dimensiones.largo)
-        }} (Vista aérea)
+        }}
       </span>
       <span
         v-if="
@@ -648,15 +625,15 @@
         {{ canvasStore.estaEnElemento ? 'Elemento' : 'Contenedor' }}:
         {{ canvasStore.elementoContenedorActual.nombre }}
         <template v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones">
-          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }}×{{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }} - Vista de frente)
+          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }} x {{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }})
         </template>
         <template v-else>
-          ({{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.width, viewport.cmPerPx)) }}×{{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.height, viewport.cmPerPx)) }})
+          ({{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.width, viewport.cmPerPx)) }} x {{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.height, viewport.cmPerPx)) }})
         </template>
       </span>
-      <span v-if="canvasStore.elementoSeleccionado">
+      <!-- <span v-if="canvasStore.elementoSeleccionado">
         Seleccionado: {{ canvasStore.elementoSeleccionado }}
-      </span>
+      </span> -->
     </div>
 
   <!-- Botones flotantes de Undo/Redo y Bloqueo -->
@@ -781,7 +758,7 @@ import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverla
 import { useObjectSnapping } from '@/inventory-smart/composables/useObjectSnapping'
 import { usePlacementGuards } from '@/inventory-smart/composables/usePlacementGuards'
 import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
-import { getUsoInfo, useProductSimulation } from '@/inventory-smart/utils/simulateProducts'
+import { getUsoInfo, useProductSimulation } from '@/inventory-smart/composables/useSimulateProducts'
 import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
 
@@ -790,7 +767,7 @@ const props = defineProps({
   safeRight: { type: Number, default: 20 },
 })
 
-// Refs para evitar solapamientos entre canvas-info y 
+// Refs para evitar solapamientos entre canvas-info y
 
 const canvasInfoRef = ref(null)
 const floatingControlsRef = ref(null)
@@ -1264,19 +1241,32 @@ const handleStageMouseDown = (e) => {
 
 const handleStageClick = (e) => {
   // Deseleccionar elemento si click en área vacía
-  if (e.target === e.target.getStage()) {
+  if (e.target === e.target.getStage() && !canvasStore.cambiosNoAplicados) {
   canvasStore.seleccionarElemento(null)
   // Cerrar controles y edición cuando se hace click en el stage vacío
   speedDialOpen.value = false
   editingElementId.value = null
   // Limpiar guías de snapping
   clearGuides()
+    return;
+  }
+
+  // Resaltar sección de guardados
+  if (canvasStore.cambiosNoAplicados && e.target === e.target.getStage() && canvasStore.elementoSeleccionado) {
+    const msg = "Tienes cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' })
   }
 }
 
 // === FUNCIONES DE ELEMENTOS ===
 const selectElement = (elementId) => {
   console.log('Seleccionando elemento:', elementId)
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elementId;
+  if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado && isNotCurrentElement) {
+    const msg = "No puedes seleccionar un nuevo elemento con cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' });
+    return;
+  }
   canvasStore.seleccionarElemento(elementId)
   // Si el modo arrastre global está activado y el elemento NO está bloqueado, activar edición (transformer)
   if (dragModeGlobal.value && elementId && !isElementLocked(elementId)) {
@@ -1293,6 +1283,11 @@ const handleElementDoubleClick = (elemento) => {
   // Verificar si el elemento puede tener hijos (contenedor)
   const tiposContenedor = ['elementos', 'contenedores']
 
+  if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
+    const msg = "No puedes entrar a un elemento si tienes cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' })
+    return;
+  }
   if (tiposContenedor.includes(elemento.tipo)) {
     console.log('Navegando al interior del elemento:', elemento.nombre)
     canvasStore.navegarAElemento(elemento.id)
@@ -1354,6 +1349,16 @@ const startElementDrag = (elementId) => {
     // Si está bloqueado, no iniciar drag ni mover el layer
     isElementDragging.value = false
     stageDragEnabled.value = false
+    return
+  }
+
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elementId;
+  if (canvasStore.cambiosNoAplicados && isNotCurrentElement) {
+    isElementDragging.value = false;
+    stageDragEnabled.value = false;
+
+    const msg = "No puedes arrastrar un elemento con cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' });
     return
   }
   console.log('Iniciando arrastre del elemento:', elementId)
@@ -1495,6 +1500,9 @@ const startElementDrag = (elementId) => {
 }
 
 const updateElementPosition = (e, elementId) => {
+  if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
+    return;
+  }
   const target = e.target
   let x = target.x()
   let y = target.y()
@@ -1864,7 +1872,7 @@ const handleDrop = (e) => {
 
 const { showToast } = useToast()
 
-const { simularLlenadoContenedor} = useProductSimulation({
+const { simularLlenadoElemento } = useProductSimulation({
   canvasStore,
   showToast,
   forceRedraw
@@ -2168,7 +2176,7 @@ const createElementFromDrop = (data, dropEvent) => {
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
-    volumenMaximo: anchoCm * largoCmFinal * altoCm,
+    volumenMaximo: (anchoCm * largoCmFinal * altoCm) / 100,
     // Política de dimensiones
     dimensionLock: false,
     systemTypeKey: elemento.id,
@@ -2624,7 +2632,9 @@ const toggleSnapping = () => {
 
 const canDragElement = (id) => {
   // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
-  if (isElementLocked(id)) return false
+  // Y si no hay cambios sin aplicar de otro elemento
+  const isNotCurrentElement = canvasStore.elementoSeleccionado != id;
+  if (isElementLocked(id) || (canvasStore.cambiosNoAplicados && isNotCurrentElement)) return false
   return dragModeGlobal.value
 }
 
@@ -3210,6 +3220,9 @@ const onShapeContextMenu = (evt, elemento) => {
   if (isElementDragging.value || (typeof window !== 'undefined' && window.__dvCanvasDragActive)) {
     return
   }
+  // No abrir si hay cambios pendientes
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elemento.id;
+  if (canvasStore.cambiosNoAplicados && isNotCurrentElement) return;
   // Asegurar selección del shape antes de abrir
   if (canvasStore.elementoSeleccionado !== elemento.id) {
     canvasStore.seleccionarElemento(elemento.id)

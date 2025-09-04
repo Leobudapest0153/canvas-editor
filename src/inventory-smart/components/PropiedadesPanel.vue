@@ -139,6 +139,7 @@
         <details v-if="mostrarCapacidad" open class="bg-gray-50 rounded-lg p-4">
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">Capacidad</summary>
           <div class="mt-3 space-y-3">
+            <!-- Capacidad de carga (peso) -->
             <div>
               <label class="text-sm text-gray-500">Capacidad de carga</label>
               <div class="flex items-center">
@@ -149,14 +150,66 @@
               </div>
               <p v-if="advertenciaPeso" class="text-xs text-amber-600">{{ advertenciaPeso }}</p>
             </div>
-            <div v-if="volumen !== null">
-              <label class="text-sm text-gray-500">Volumen</label>
+
+            <!-- Capacidad de volumen teórico -->
+            <div>
+              <label class="text-sm text-gray-500">Volumen teórico</label>
               <div class="flex items-center">
-                <input :value="volumen" disabled
-                  class="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-500" />
+                <input :value="volumenTeorico" disabled
+                  class="w-full px-2 py-1 bg-gray-50 border border-gray-300 rounded-md text-sm text-gray-500" />
                 <span class="ml-1 text-sm text-gray-500">m³</span>
               </div>
+              <p v-if="volumenTeorico" class="text-xs text-gray-500 mt-1">
+                {{ descripcionVolumenTeorico }}
+              </p>
             </div>
+
+            <!-- Uso real (solo lectura) -->
+            <div v-if="mostrarUsoReal" class="border-t pt-3">
+              <label class="text-sm font-medium text-gray-700 mb-2 block">Uso Real</label>
+
+              <!-- Peso real usado -->
+              <div class="mb-2">
+                <label class="text-xs text-gray-500">Peso usado</label>
+                <div class="flex items-center">
+                  <input :value="usoRealPeso" disabled
+                    class="w-full px-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600" />
+                  <span class="ml-1 text-sm text-gray-500">kg</span>
+                </div>
+                <div v-if="usoRealPeso > 0" class="mt-1">
+                  <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>{{ porcentajePesoUsado }}% usado</span>
+                    <span>{{ usoRealPeso }} / {{ edited.pesoMaximo || 0 }} kg</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="h-2 rounded-full transition-all duration-300"
+                         :style="{ width: porcentajePesoUsado + '%', backgroundColor: colorPesoUsado }"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Volumen real usado -->
+              <div>
+                <label class="text-xs text-gray-500">Volumen usado</label>
+                <div class="flex items-center">
+                  <input :value="usoRealVolumen" disabled
+                    class="w-full px-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600" />
+                  <span class="ml-1 text-sm text-gray-500">m³</span>
+                </div>
+                <div v-if="usoRealVolumen > 0" class="mt-1">
+                  <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>{{ porcentajeVolumenUsado }}% usado</span>
+                    <span>{{ usoRealVolumen }} / {{ volumenTeorico }} m³</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="h-2 rounded-full transition-all duration-300"
+                         :style="{ width: porcentajeVolumenUsado + '%', backgroundColor: colorVolumenUsado }"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Información del contexto padre -->
             <div v-if="infoPesoPadre.limiteDePeso" class="text-xs text-gray-600">
               {{ capacidadContextoTexto }}
             </div>
@@ -250,10 +303,22 @@ const normalizeForCompare = (obj) => {
   if (Array.isArray(c.tags)) c.tags = [...c.tags].sort((a, b) => a - b)
   return c
 }
-const isDirty = computed(() => {
+/*const isDirty = computed(() => {
   if (!edited.value || !snapshotOriginal.value) return false
   return !deepEqual(normalizeForCompare(edited.value), normalizeForCompare(snapshotOriginal.value))
-})
+})*/
+
+const isDirty = ref(false);
+watch([() => edited.value, () => snapshotOriginal.value], () => {
+  if (!edited.value || !snapshotOriginal.value) {
+    isDirty.value = false;
+    canvasStore.setCambiosNoAplicados()
+    return;
+  }
+
+  isDirty.value = !deepEqual(normalizeForCompare(edited.value), normalizeForCompare(snapshotOriginal.value));
+  canvasStore.setCambiosNoAplicados(isDirty.value);
+}, { deep: true });
 
 const guardarDeshabilitado = computed(() =>
   isSaving.value ||
@@ -456,6 +521,150 @@ const volumen = computed(() => {
   return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(2)
 })
 
+/**
+ * Calcula el volumen teórico basándose en los hijos del elemento
+ */
+const volumenTeorico = computed(() => {
+  const elemento = elementoSeleccionado.value
+  if (!elemento) return '0.00'
+
+  // Para contenedores: siempre calcular basándose en sus propias dimensiones
+  if (elemento.tipo === 'contenedores') {
+    const d = elemento.dimensiones || {}
+    if (elemento.forma === 'circular') {
+      const diam = d.ancho || 0
+      const alto = d.alto || 0
+      return ((Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000).toFixed(3)
+    }
+    return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(3)
+  }
+
+  // Para elementos: calcular basándose en el volumen de los contenedores que tiene dentro
+  if (elemento.tipo === 'elementos') {
+    return calcularVolumenPorHijos(elemento.id, 'contenedores')
+  }
+
+  // Fallback: calcular volumen por dimensiones propias
+  const d = elemento.dimensiones || {}
+  if (elemento.forma === 'circular') {
+    const diam = d.ancho || 0
+    const alto = d.alto || 0
+    return ((Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000).toFixed(3)
+  }
+  return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(3)
+})
+
+/**
+ * Calcula el volumen total de los hijos de un elemento
+ */
+const calcularVolumenPorHijos = (elementoId, tipoHijos) => {
+  const elemento = canvasStore.elementoPorId(elementoId)
+  if (!elemento || !elemento.hijos || elemento.hijos.length === 0) {
+    return '0.000'
+  }
+
+  let volumenTotal = 0
+
+  for (const hijoId of elemento.hijos) {
+    const hijo = canvasStore.elementoPorId(hijoId)
+    if (!hijo) continue
+
+    // Filtrar por tipo si es necesario
+    if (tipoHijos === 'contenedores' && hijo.tipo !== 'contenedores') continue
+
+    // Calcular volumen del hijo basándose en sus dimensiones
+    const dims = hijo.dimensiones || {}
+    let volumenHijo = 0
+
+    if (hijo.forma === 'circular') {
+      const diam = dims.ancho || 0
+      const alto = dims.alto || 0
+      volumenHijo = (Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000 // cm³ a m³
+    } else {
+      volumenHijo = ((dims.ancho || 0) * (dims.largo || 0) * (dims.alto || 0)) / 1_000_000 // cm³ a m³
+    }
+
+    volumenTotal += volumenHijo
+
+    // Si este hijo también tiene hijos, sumarlos recursivamente
+    if (hijo.hijos && hijo.hijos.length > 0) {
+      const volumenSubhijos = parseFloat(calcularVolumenPorHijos(hijoId, 'todos'))
+      volumenTotal += volumenSubhijos
+    }
+  }
+
+  return volumenTotal.toFixed(3)
+}
+
+const descripcionVolumenTeorico = computed(() => {
+  const elemento = elementoSeleccionado.value
+  if (!elemento) return ''
+
+  const numHijos = elemento.hijos?.length || 0
+
+  if (elemento.tipo === 'elementos') {
+    const contenedores = elemento.hijos?.filter(hijoId => {
+      const hijo = canvasStore.elementoPorId(hijoId)
+      return hijo && hijo.tipo === 'contenedores'
+    }).length || 0
+
+    if (contenedores === 0) return 'Sin contenedores internos'
+    return `Calculado desde ${contenedores} contenedor${contenedores > 1 ? 'es' : ''}`
+  }
+
+  if (elemento.tipo === 'contenedores') {
+    return 'Calculado desde dimensiones propias'
+  }
+
+  return 'Calculado desde dimensiones'
+})
+
+/**
+ * Uso real del elemento
+ */
+const mostrarUsoReal = computed(() => {
+  const elemento = elementoSeleccionado.value
+  return elemento && elemento.uso && (elemento.uso.peso > 0 || elemento.uso.volumen > 0)
+})
+
+const usoRealPeso = computed(() => {
+  const uso = elementoSeleccionado.value?.uso
+  return uso?.peso ? uso.peso.toFixed(2) : '0.00'
+})
+
+const usoRealVolumen = computed(() => {
+  const uso = elementoSeleccionado.value?.uso
+  return uso?.volumen ? uso.volumen.toFixed(3) : '0.000'
+})
+
+const porcentajePesoUsado = computed(() => {
+  const peso = parseFloat(usoRealPeso.value)
+  const maximo = edited.value?.pesoMaximo || 0
+  if (maximo === 0) return 0
+  return Math.min(100, Math.round((peso / maximo) * 100))
+})
+
+const porcentajeVolumenUsado = computed(() => {
+  const volumen = parseFloat(usoRealVolumen.value)
+  const maximo = parseFloat(volumenTeorico.value)
+  if (maximo === 0) return 0
+  return Math.min(100, Math.round((volumen / maximo) * 100))
+})
+
+const colorPesoUsado = computed(() => {
+  const porcentaje = porcentajePesoUsado.value
+  if (porcentaje < 50) return '#10b981' // Verde
+  if (porcentaje < 85) return '#f59e0b' // Amarillo
+  return '#ef4444' // Rojo
+})
+
+const colorVolumenUsado = computed(() => {
+  const porcentaje = porcentajeVolumenUsado.value
+  if (porcentaje < 50) return '#10b981' // Verde
+  if (porcentaje < 85) return '#f59e0b' // Amarillo
+  return '#ef4444' // Rojo
+})
+
 const alturaPlanta = computed(() => canvasStore.plantaPorId(canvasStore.plantaActiva)?.dimensiones?.alto || 0)
 const advertenciaAltura = computed(() => {
   if (!esAnaquelOEstante.value) return null
@@ -554,6 +763,7 @@ const validarAlturaSobreSuelo = () => {
 
 const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
+  canvasStore.setCambiosNoAplicados(false);
 }
 
 // ====== Gestión de etiquetas (buffer local) ======
