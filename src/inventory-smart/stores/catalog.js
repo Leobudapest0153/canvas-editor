@@ -51,6 +51,10 @@ export const useCatalogStore = defineStore('catalog', () => {
     catalogContext.value = ctx
   }
 
+  const setSelectedCatalog = (val) => {
+    selectedCatalog.value = val
+  }
+
   return {
     items,
     searchText,
@@ -58,6 +62,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     selectedCatalog,
     catalogContext,
     setCatalogContext,
+    setSelectedCatalog,
     allowedTypesForContext,
     baseSystemGuard,
     filteredCatalogItems,

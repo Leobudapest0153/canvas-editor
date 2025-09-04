@@ -83,7 +83,6 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
@@ -91,15 +90,12 @@ import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vu
 const catalogStore = useCatalogStore()
 const { selectedCatalog } = storeToRefs(catalogStore)
 
-const route = useRoute()
-const router = useRouter()
-
 const focusedTab = ref(null)
 const tabElementos = ref(null)
 const tabPlantillas = ref(null)
 
 const selectCatalog = (value) => {
-  selectedCatalog.value = value
+  catalogStore.setSelectedCatalog(value)
 }
 
 const onTabKeydown = (e, current) => {
@@ -119,21 +115,16 @@ const onTabKeydown = (e, current) => {
 }
 
 onMounted(() => {
-  const param = route.query.catalog
-  if (param === 'plantillas') {
-    selectedCatalog.value = 'plantillas'
-  } else {
-    selectedCatalog.value = 'elementos'
+  const saved = localStorage.getItem('inventory.selectedCatalog')
+  if (saved === 'plantillas' || saved === 'elementos') {
+    catalogStore.setSelectedCatalog(saved)
   }
-  router.replace({ query: { ...route.query, catalog: selectedCatalog.value } })
+  localStorage.setItem('inventory.selectedCatalog', selectedCatalog.value)
 })
 
-watch(
-  selectedCatalog,
-  (val) => {
-    router.replace({ query: { ...route.query, catalog: val } })
-  }
-)
+watch(selectedCatalog, (val) => {
+  localStorage.setItem('inventory.selectedCatalog', val)
+})
 </script>
 
 <style scoped>
