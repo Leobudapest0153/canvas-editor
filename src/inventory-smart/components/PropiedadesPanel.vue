@@ -303,10 +303,22 @@ const normalizeForCompare = (obj) => {
   if (Array.isArray(c.tags)) c.tags = [...c.tags].sort((a, b) => a - b)
   return c
 }
-const isDirty = computed(() => {
+/*const isDirty = computed(() => {
   if (!edited.value || !snapshotOriginal.value) return false
   return !deepEqual(normalizeForCompare(edited.value), normalizeForCompare(snapshotOriginal.value))
-})
+})*/
+
+const isDirty = ref(false);
+watch([() => edited.value, () => snapshotOriginal.value], () => {
+  if (!edited.value || !snapshotOriginal.value) {
+    isDirty.value = false;
+    canvasStore.setCambiosNoAplicados()
+    return;
+  }
+
+  isDirty.value = !deepEqual(normalizeForCompare(edited.value), normalizeForCompare(snapshotOriginal.value));
+  canvasStore.setCambiosNoAplicados(isDirty.value);
+}, { deep: true });
 
 const guardarDeshabilitado = computed(() =>
   isSaving.value ||
@@ -751,6 +763,7 @@ const validarAlturaSobreSuelo = () => {
 
 const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
+  canvasStore.setCambiosNoAplicados(false);
 }
 
 // ====== Gestión de etiquetas (buffer local) ======
