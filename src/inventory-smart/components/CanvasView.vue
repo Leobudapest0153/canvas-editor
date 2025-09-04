@@ -810,6 +810,7 @@ import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
+import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation'
 import { applyEdgeConstraint } from '@/inventory-smart/utils/edgeConstraint'
 import { resetEdgeState } from '@/inventory-smart/composables/useEdgeState'
 import { finalizePlacement } from '@/inventory-smart/utils/finalizeDrag'
@@ -1035,6 +1036,7 @@ watch(templateModalOpen, (val) => {
   if (val) window.addEventListener('keydown', onTemplateKeydown)
   else window.removeEventListener('keydown', onTemplateKeydown)
 })
+const dimensionValidation = useDimensionValidation()
 
 // Object snapping
 const {
@@ -2941,20 +2943,84 @@ const handleTransformEnd = (e, elementId) => {
       return
     }
 
-    // APLICACIÓN EXITOSA: Calcular dimensiones y persistir
-    let newDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
-    if (newDimensiones) {
+    // VALIDACIÓN 3: Dimension validation (contención de hijos, volumen mínimo, límites de área)
+    // Calcular las nuevas dimensiones primero para validar
+    let tempDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
+    if (tempDimensiones) {
       const widthCm = Math.round(width / CM_TO_PX)
       const heightCm = Math.round(height / CM_TO_PX)
       if (canvasStore.vistaActiva === 'XY') {
-        newDimensiones.ancho = widthCm
-        newDimensiones.largo = heightCm
+        tempDimensiones.ancho = widthCm
+        tempDimensiones.largo = heightCm
       } else if (canvasStore.vistaActiva === 'XZ') {
-        newDimensiones.ancho = widthCm
-        newDimensiones.alto = heightCm
-        if (newDimensiones.largo === undefined) newDimensiones.largo = elemento.dimensiones?.largo || 60
+        tempDimensiones.ancho = widthCm
+        tempDimensiones.alto = heightCm
+        if (tempDimensiones.largo === undefined) tempDimensiones.largo = elemento.dimensiones?.largo || 60
       }
     }
+
+    // Crear elemento temporal con las nuevas dimensiones para validación
+    const elementoTemporal = {
+      ...elemento,
+      x,
+      y,
+      width,
+      height,
+      dimensiones: tempDimensiones
+    }
+
+    console.debug('[dimension-debug] validating dimensions', elementId, {
+      elementoTemporal: {
+        id: elementoTemporal.id,
+        posicion: { x: x / CM_TO_PX, y: y / CM_TO_PX },
+        dimensiones: tempDimensiones,
+        vista: canvasStore.vistaActiva
+      }
+    })
+
+    // Ejecutar validación de dimensiones (silenciosa para manejar mensajes nosotros)
+    const resultadoValidacionDimensiones = dimensionValidation.validarDimensiones(
+      elementId,
+      {
+        ancho: tempDimensiones?.ancho,
+        largo: tempDimensiones?.largo,
+        alto: tempDimensiones?.alto
+      },
+      { silencioso: true }
+    )
+
+    console.debug('[dimension-debug] validation result', elementId, resultadoValidacionDimensiones)
+
+    if (!resultadoValidacionDimensiones.valida) {
+      // Mostrar mensaje de error específico al usuario
+      showToast(
+        resultadoValidacionDimensiones.razon,
+        'error',
+        {
+          timeout: 5000
+        }
+      )
+
+      // Mostrar sugerencias si están disponibles
+      // if (resultadoValidacionDimensiones.sugerencias && resultadoValidacionDimensiones.sugerencias.length > 0) {
+      //   setTimeout(() => {
+      //     showToast(
+      //       `Sugerencias: ${resultadoValidacionDimensiones.sugerencias.join(', ')}`,
+      //       'warning',
+      //       {
+      //         timeout: 7000
+      //       }
+      //     )
+      //   }, 1000)
+      // }
+
+      revertTransform(`dimension validation failed: ${resultadoValidacionDimensiones.razon}`)
+      nextTick(() => setupTransformer())
+      return
+    }
+
+    // APLICACIÓN EXITOSA: Usar las dimensiones ya calculadas
+    const newDimensiones = tempDimensiones
 
     // Aplicar transformación final
     node.width(width)
@@ -3096,8 +3162,6 @@ const handleKeyDown = (e) => {
     speedDialOpen.value = false
     // Limpiar guías de snapping
     clearGuides()
-  } else if (key === 'p') {
-    e.preventDefault()
   } else {
     handleCanvasHotkeys(e, {
       dragMode: dragModeGlobal,

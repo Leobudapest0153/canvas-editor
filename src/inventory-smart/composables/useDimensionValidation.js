@@ -52,19 +52,33 @@ export function useDimensionValidation() {
       }
     }
 
-    console.log('🔍 VALIDACIÓN DE DIMENSIONES - INICIO:', {
+    const vista = areaTotal.vista || 'XY'
+    const esVistaFrontal = vista === 'XZ'
+    const dimension2Nombre = esVistaFrontal ? 'alto' : 'largo'
+
+    console.log(`🔍 VALIDACIÓN DE DIMENSIONES - INICIO EN VISTA ${vista}:`, {
       elementoId: elementoId,
+      vista: vista,
+      tipoVista: esVistaFrontal ? 'Frontal (ancho × alto)' : 'Planta (ancho × largo)',
       dimensionesActuales: elemento ? { ancho: elemento.ancho, largo: elemento.largo, alto: elemento.alto } : 'no encontrado',
       dimensionesNuevas: nuevasDimensiones,
       dimensionesFinal: dimensionesFinal,
-      areaTotal: { ancho: areaTotal.ancho / CM_TO_PX, largo: areaTotal.largo / CM_TO_PX },
+      areaTotal: esVistaFrontal ?
+        { ancho: areaTotal.ancho / CM_TO_PX, alto: areaTotal.largo / CM_TO_PX } :
+        { ancho: areaTotal.ancho / CM_TO_PX, largo: areaTotal.largo / CM_TO_PX },
       posicionActual: { x: elemento.x / CM_TO_PX, y: elemento.y / CM_TO_PX },
-      dimensionesActualesPx: { width: elemento.width / CM_TO_PX, height: elemento.height / CM_TO_PX }
+      dimensionesActualesPx: { width: elemento.width / CM_TO_PX, height: elemento.height / CM_TO_PX },
+      contenedorInfo: areaTotal.contenedorId ? `Contenedor: ${areaTotal.contenedorId}` :
+                     areaTotal.plantaId ? `Planta: ${areaTotal.plantaId}` : 'Área por defecto'
     })
 
     // PASO 1: Crear elemento temporal con las nuevas dimensiones
+    // En vista frontal XZ: width=ancho, height=alto
+    // En vista planta XY: width=ancho, height=largo
     const widthPx = dimensionesFinal.ancho * CM_TO_PX
-    const heightPx = dimensionesFinal.largo * CM_TO_PX
+    const heightPx = esVistaFrontal ?
+      (dimensionesFinal.alto * CM_TO_PX) :
+      (dimensionesFinal.largo * CM_TO_PX)
 
     let elementoTemporal = {
       ...elemento,
@@ -73,11 +87,16 @@ export function useDimensionValidation() {
       dimensiones: dimensionesFinal
     }
 
-    console.log('🔍 ELEMENTO TEMPORAL CREADO:', {
+    console.log(`🔍 ELEMENTO TEMPORAL CREADO EN VISTA ${vista}:`, {
       id: elementoTemporal.id,
+      vista: vista,
       posicionOriginal: { x: elementoTemporal.x / CM_TO_PX, y: elementoTemporal.y / CM_TO_PX },
-      dimensionesOriginales: { width: elemento.width / CM_TO_PX, height: elemento.height / CM_TO_PX },
-      dimensionesNuevas: { width: elementoTemporal.width / CM_TO_PX, height: elementoTemporal.height / CM_TO_PX }
+      dimensionesOriginales: esVistaFrontal ?
+        { ancho: elemento.width / CM_TO_PX, alto: elemento.height / CM_TO_PX } :
+        { ancho: elemento.width / CM_TO_PX, largo: elemento.height / CM_TO_PX },
+      dimensionesNuevas: esVistaFrontal ?
+        { ancho: elementoTemporal.width / CM_TO_PX, alto: elementoTemporal.height / CM_TO_PX } :
+        { ancho: elementoTemporal.width / CM_TO_PX, largo: elementoTemporal.height / CM_TO_PX }
     })
 
     // PASO 2: Verificar si necesitamos reposicionar el elemento
@@ -89,19 +108,28 @@ export function useDimensionValidation() {
     const posXActual = elementoTemporal.x / CM_TO_PX
     const posYActual = elementoTemporal.y / CM_TO_PX
 
-    console.log('🔍 VERIFICANDO SI NECESITA REPOSICIONAMIENTO:', {
+    // En vista frontal XZ: Y representa alto, en vista planta XY: Y representa largo
+    const dimension2Final = esVistaFrontal ? dimensionesFinal.alto : dimensionesFinal.largo
+    const areaDimension2Cm = areaTotal.largo / CM_TO_PX // largo en XY, alto en XZ
+
+    console.log(`🔍 VERIFICANDO SI NECESITA REPOSICIONAMIENTO EN VISTA ${vista}:`, {
       posicionActual: { x: posXActual, y: posYActual },
-      dimensionesDeseadas: { ancho: dimensionesFinal.ancho, largo: dimensionesFinal.largo },
-      areaTotal: { ancho: areaAnchoCm, largo: areaLargoCm },
+      dimensionesDeseadas: esVistaFrontal ?
+        { ancho: dimensionesFinal.ancho, alto: dimension2Final } :
+        { ancho: dimensionesFinal.ancho, largo: dimension2Final },
+      areaTotal: esVistaFrontal ?
+        { ancho: areaAnchoCm, alto: areaDimension2Cm } :
+        { ancho: areaAnchoCm, largo: areaDimension2Cm },
       seSaleEnX: posXActual + dimensionesFinal.ancho > areaAnchoCm,
-      seSaleEnY: posYActual + dimensionesFinal.largo > areaLargoCm,
+      seSaleEnDimension2: posYActual + dimension2Final > areaDimension2Cm,
       posicionFinalX: posXActual + dimensionesFinal.ancho,
-      posicionFinalY: posYActual + dimensionesFinal.largo,
-      espacioDisponibleAbajo: areaLargoCm - posYActual
+      posicionFinalDimension2: posYActual + dimension2Final,
+      espacioDisponible: areaDimension2Cm - posYActual,
+      vista: vista
     })
 
     // Verificar si se sale del área O si hay colisiones en posición actual
-    const seSaleDelArea = (posXActual + dimensionesFinal.ancho > areaAnchoCm || posYActual + dimensionesFinal.largo > areaLargoCm)
+    const seSaleDelArea = (posXActual + dimensionesFinal.ancho > areaAnchoCm || posYActual + dimension2Final > areaDimension2Cm)
 
     // Verificar colisiones en posición actual
     const elementosExistentes = canvasStore.elementosVisibles.filter(el => el.id !== elementoId)
@@ -387,7 +415,35 @@ export function useDimensionValidation() {
 
     console.log('✅ VALIDACIÓN CRÍTICA EXITOSA - SIN COLISIONES NI DESBORDAMIENTO')
 
-    // PASO 4: Si llegamos aquí, las dimensiones son válidas
+    // PASO 4: NUEVAS VALIDACIONES ESPECÍFICAS
+
+    // VALIDACIÓN 4: Verificar que las nuevas dimensiones contengan a los elementos hijos
+    const validacionHijos = validarContencionHijos(elementoTemporal);
+    if (!validacionHijos.valida) {
+      console.log('❌ VALIDACIÓN DE HIJOS FALLIDA:', validacionHijos.razon);
+      return {
+        valida: false,
+        razon: validacionHijos.razon,
+        accion: 'rechazar',
+        sugerencias: validacionHijos.sugerencias || ['Aumentar las dimensiones para contener a todos los elementos hijos']
+      };
+    }
+
+    // VALIDACIÓN 5: Verificar que el nuevo volumen no sea menor al volumen usado
+    const validacionVolumen = validarVolumenMinimo(elementoTemporal);
+    if (!validacionVolumen.valida) {
+      console.log('❌ VALIDACIÓN DE VOLUMEN FALLIDA:', validacionVolumen.razon);
+      return {
+        valida: false,
+        razon: validacionVolumen.razon,
+        accion: 'rechazar',
+        sugerencias: validacionVolumen.sugerencias || ['Aumentar las dimensiones para mantener el volumen requerido']
+      };
+    }
+
+    console.log('✅ TODAS LAS VALIDACIONES EXITOSAS');
+
+    // PASO 5: Si llegamos aquí, las dimensiones son válidas
 
     // Mostrar toast de éxito si no se ha mostrado otro toast
     if (!toastMostrado && !silencioso && !posicionAjustada) {
@@ -407,44 +463,77 @@ export function useDimensionValidation() {
   }
 
   /**
-   * Obtiene las dimensiones del área contenedora (planta)
+   * Obtiene las dimensiones del área contenedora según la vista actual
+   * - Plantas: Vista XY (ancho × largo)
+   * - Elementos/Contenedores: Vista XZ (ancho × alto)
    */
   function obtenerDimensionesArea(elemento) {
     try {
-      // Si el elemento tiene un padre, usar sus dimensiones
-      if (elemento.parentId) {
-        const parent = canvasStore.elementoPorId(elemento.parentId)
-        if (parent && parent.dimensiones) {
-          return {
-            ancho: parent.dimensiones.ancho * CM_TO_PX,
-            largo: parent.dimensiones.largo * CM_TO_PX
-          }
-        }
+      // Determinar el contexto y la vista
+      const contextoActual = canvasStore.contextoNavegacion
+      let vistaActual = 'XY' // Por defecto vista planta
+      let contenedor = null
+
+      // Si el elemento tiene un padre, estamos en vista frontal XZ
+      if (elemento.parentId || elemento.padre) {
+        vistaActual = 'XZ'
+        const parentId = elemento.parentId || elemento.padre
+        contenedor = canvasStore.elementoPorId(parentId)
+      } else if (contextoActual && contextoActual.tipo === 'elementos') {
+        // Si estamos navegando dentro de un elemento, vista frontal XZ
+        vistaActual = 'XZ'
+        contenedor = canvasStore.elementoPorId(contextoActual.id)
       }
 
-      // Usar las dimensiones de la planta activa
-      const contextoActual = canvasStore.contextoNavegacion
-      if (contextoActual && contextoActual.tipo === 'planta') {
-        const planta = canvasStore.elementoPorId(contextoActual.id)
+      console.log('🔍 DETERMINANDO ÁREA CONTENEDORA:', {
+        elementoId: elemento.id,
+        vistaDetectada: vistaActual,
+        contenedorId: contenedor?.id,
+        contextoNavegacion: contextoActual
+      })
+
+      if (vistaActual === 'XZ' && contenedor && contenedor.dimensiones) {
+        // Vista frontal XZ: validar contra ancho × alto del contenedor
+        return {
+          ancho: contenedor.dimensiones.ancho * CM_TO_PX,
+          largo: contenedor.dimensiones.alto * CM_TO_PX, // En vista XZ, Y representa el alto
+          vista: 'XZ',
+          contenedorId: contenedor.id
+        }
+      } else {
+        // Vista planta XY: usar dimensiones de la planta activa
+        let planta = null
+
+        if (contextoActual && contextoActual.tipo === 'planta') {
+          planta = canvasStore.elementoPorId(contextoActual.id)
+        }
+
         if (planta && planta.dimensiones) {
           return {
             ancho: planta.dimensiones.ancho * CM_TO_PX,
-            largo: planta.dimensiones.largo * CM_TO_PX
+            largo: planta.dimensiones.largo * CM_TO_PX,
+            vista: 'XY',
+            plantaId: planta.id
           }
         }
-      }
 
-      // Fallback por defecto: 5m x 5m
-      console.warn('No se pudo determinar el área contenedora, usando 5m x 5m por defecto')
-      return {
-        ancho: 500 * CM_TO_PX, // 5m = 500cm
-        largo: 500 * CM_TO_PX  // 5m = 500cm
+        // Fallback por defecto: 5m x 5m en vista XY
+        console.warn('No se pudo determinar el área contenedora, usando 5m x 5m por defecto en vista XY')
+        return {
+          ancho: 500 * CM_TO_PX, // 5m = 500cm
+          largo: 500 * CM_TO_PX,  // 5m = 500cm
+          vista: 'XY',
+          esDefault: true
+        }
       }
     } catch (error) {
       console.error('Error al obtener dimensiones del área:', error)
       return {
         ancho: 500 * CM_TO_PX,
-        largo: 500 * CM_TO_PX
+        largo: 500 * CM_TO_PX,
+        vista: 'XY',
+        esDefault: true,
+        error: error.message
       }
     }
   }
@@ -479,20 +568,29 @@ export function useDimensionValidation() {
   }
 
   /**
-   * Calcula el espacio real disponible considerando la posición específica del elemento
+   * Calcula el espacio real disponible considerando la posición específica del elemento y la vista actual
    */
   function calcularEspacioRealDisponible(elementoTemporal, elementosExistentes, areaTotal) {
     const posXCm = elementoTemporal.x / CM_TO_PX
     const posYCm = elementoTemporal.y / CM_TO_PX
     const anchoCm = elementoTemporal.width / CM_TO_PX
-    const largoCm = elementoTemporal.height / CM_TO_PX
+    const dimension2Cm = elementoTemporal.height / CM_TO_PX // largo en XY, alto en XZ
     const areaAnchoCm = areaTotal.ancho / CM_TO_PX
-    const areaLargoCm = areaTotal.largo / CM_TO_PX
+    const areaDimension2Cm = areaTotal.largo / CM_TO_PX // largo en XY, alto en XZ
 
-    console.log('🔍 CALCULANDO ESPACIO REAL DISPONIBLE:', {
+    const vista = areaTotal.vista || 'XY'
+    const esVistaFrontal = vista === 'XZ'
+    const dimension2Nombre = esVistaFrontal ? 'alto' : 'largo'
+
+    console.log(`🔍 CALCULANDO ESPACIO REAL DISPONIBLE EN VISTA ${vista}:`, {
       elementoPos: { x: posXCm, y: posYCm },
-      elementoDims: { ancho: anchoCm, largo: largoCm },
-      areaTotal: { ancho: areaAnchoCm, largo: areaLargoCm }
+      elementoDims: esVistaFrontal ?
+        { ancho: anchoCm, alto: dimension2Cm } :
+        { ancho: anchoCm, largo: dimension2Cm },
+      areaTotal: esVistaFrontal ?
+        { ancho: areaAnchoCm, alto: areaDimension2Cm } :
+        { ancho: areaAnchoCm, largo: areaDimension2Cm },
+      vista: vista
     })
 
     // Verificar si el elemento cabe en el área total
@@ -500,17 +598,19 @@ export function useDimensionValidation() {
       const exceso = (posXCm + anchoCm) - areaAnchoCm
       return {
         cabe: false,
-        razon: `El elemento se sale del área por ${exceso.toFixed(1)}cm en el ancho (posición: ${posXCm.toFixed(1)}cm + ancho: ${anchoCm}cm = ${(posXCm + anchoCm).toFixed(1)}cm > área: ${areaAnchoCm}cm)`,
-        sugerencias: [`Reducir ancho en ${exceso.toFixed(1)}cm`]
+        razon: `El elemento se sale del área por ${exceso.toFixed(1)}cm en el ancho (posición: ${posXCm.toFixed(1)}cm + ancho: ${anchoCm}cm = ${(posXCm + anchoCm).toFixed(1)}cm > área: ${areaAnchoCm}cm) en vista ${vista}`,
+        sugerencias: [`Reducir ancho en ${exceso.toFixed(1)}cm`],
+        vista: vista
       }
     }
 
-    if (posYCm + largoCm > areaLargoCm) {
-      const exceso = (posYCm + largoCm) - areaLargoCm
+    if (posYCm + dimension2Cm > areaDimension2Cm) {
+      const exceso = (posYCm + dimension2Cm) - areaDimension2Cm
       return {
         cabe: false,
-        razon: `El elemento se sale del área por ${exceso.toFixed(1)}cm en el largo (posición: ${posYCm.toFixed(1)}cm + largo: ${largoCm}cm = ${(posYCm + largoCm).toFixed(1)}cm > área: ${areaLargoCm}cm)`,
-        sugerencias: [`Reducir largo en ${exceso.toFixed(1)}cm`]
+        razon: `El elemento se sale del área por ${exceso.toFixed(1)}cm en el ${dimension2Nombre} (posición: ${posYCm.toFixed(1)}cm + ${dimension2Nombre}: ${dimension2Cm}cm = ${(posYCm + dimension2Cm).toFixed(1)}cm > área: ${areaDimension2Cm}cm) en vista ${vista}`,
+        sugerencias: [`Reducir ${dimension2Nombre} en ${exceso.toFixed(1)}cm`],
+        vista: vista
       }
     }
 
@@ -519,15 +619,19 @@ export function useDimensionValidation() {
       const elPosX = (elemento.x || 0) / CM_TO_PX
       const elPosY = (elemento.y || 0) / CM_TO_PX
       const elAncho = (elemento.width || 0) / CM_TO_PX
-      const elLargo = (elemento.height || 0) / CM_TO_PX
+      const elDimension2 = (elemento.height || 0) / CM_TO_PX // largo en XY, alto en XZ
 
       // Verificar si hay solapamiento real (no solo adyacencia)
       const solapamientoX = Math.min(posXCm + anchoCm, elPosX + elAncho) - Math.max(posXCm, elPosX)
-      const solapamientoY = Math.min(posYCm + largoCm, elPosY + elLargo) - Math.max(posYCm, elPosY)
+      const solapamientoY = Math.min(posYCm + dimension2Cm, elPosY + elDimension2) - Math.max(posYCm, elPosY)
 
-      console.log(`🔍 Verificando solapamiento con elemento ${elemento.id}:`, {
-        elementoActual: { x: posXCm, y: posYCm, ancho: anchoCm, largo: largoCm },
-        elementoExistente: { x: elPosX, y: elPosY, ancho: elAncho, largo: elLargo },
+      console.log(`🔍 Verificando solapamiento con elemento ${elemento.id} en vista ${vista}:`, {
+        elementoActual: esVistaFrontal ?
+          { x: posXCm, y: posYCm, ancho: anchoCm, alto: dimension2Cm } :
+          { x: posXCm, y: posYCm, ancho: anchoCm, largo: dimension2Cm },
+        elementoExistente: esVistaFrontal ?
+          { x: elPosX, y: elPosY, ancho: elAncho, alto: elDimension2 } :
+          { x: elPosX, y: elPosY, ancho: elAncho, largo: elDimension2 },
         solapamiento: { x: solapamientoX, y: solapamientoY }
       })
 
@@ -536,31 +640,45 @@ export function useDimensionValidation() {
       if (solapamientoX > tolerancia && solapamientoY > tolerancia) {
         return {
           cabe: false,
-          razon: `El elemento se solaparía ${solapamientoX.toFixed(1)}cm x ${solapamientoY.toFixed(1)}cm con el elemento ${elemento.id}`,
-          sugerencias: ['Reducir las dimensiones para evitar solapamiento', 'Cambiar la posición del elemento']
+          razon: `El elemento se solaparía ${solapamientoX.toFixed(1)}cm x ${solapamientoY.toFixed(1)}cm con el elemento ${elemento.id} en vista ${vista}`,
+          sugerencias: ['Reducir las dimensiones para evitar solapamiento', 'Cambiar la posición del elemento'],
+          vista: vista
         }
       }
     }
 
     return {
       cabe: true,
-      razon: 'El elemento cabe en el espacio disponible sin colisiones'
+      razon: `El elemento cabe en el espacio disponible sin colisiones en vista ${vista}`,
+      vista: vista
     }
   }
 
   /**
-   * Verifica si un elemento cabe dentro de los límites del área
+   * Verifica si un elemento cabe dentro de los límites del área según la vista actual
+   * - Vista XY (plantas): valida ancho (X) y largo (Y)
+   * - Vista XZ (elementos): valida ancho (X) y alto (Y como Z)
    */
   function verificarLimitesArea(elemento, areaTotal) {
     const margen = 0.1 * CM_TO_PX // 1mm de margen
     const elementoFinalX = elemento.x + elemento.width
     const elementoFinalY = elemento.y + elemento.height
 
+    const vista = areaTotal.vista || 'XY'
+    const esVistaFrontal = vista === 'XZ'
+
     const calculo = {
       elementoPos: { x: elemento.x / CM_TO_PX, y: elemento.y / CM_TO_PX },
-      elementoDims: { ancho: elemento.width / CM_TO_PX, largo: elemento.height / CM_TO_PX },
+      elementoDims: {
+        ancho: elemento.width / CM_TO_PX,
+        dimension2: elemento.height / CM_TO_PX // largo en XY, alto en XZ
+      },
       elementoFinal: { x: elementoFinalX / CM_TO_PX, y: elementoFinalY / CM_TO_PX },
-      area: { ancho: areaTotal.ancho / CM_TO_PX, largo: areaTotal.largo / CM_TO_PX },
+      area: {
+        ancho: areaTotal.ancho / CM_TO_PX,
+        dimension2: areaTotal.largo / CM_TO_PX // largo en XY, alto en XZ
+      },
+      vista: vista,
       limites: {
         xValido: elementoFinalX <= (areaTotal.ancho + margen),
         yValido: elementoFinalY <= (areaTotal.largo + margen)
@@ -569,24 +687,34 @@ export function useDimensionValidation() {
 
     const validacion = {
       dentroEnX: calculo.limites.xValido,
-      dentroEnY: calculo.limites.yValido,
+      dentroEnDimension2: calculo.limites.yValido,
       cabe: calculo.limites.xValido && calculo.limites.yValido
     }
 
-    console.log('Debug verificarLimitesArea:', {
+    console.log(`🔍 VERIFICANDO LÍMITES EN VISTA ${vista}:`, {
       elemento: {
+        id: elemento.id,
         posicion: calculo.elementoPos,
-        dimensiones: calculo.elementoDims,
+        dimensiones: esVistaFrontal ?
+          { ancho: calculo.elementoDims.ancho, alto: calculo.elementoDims.dimension2 } :
+          { ancho: calculo.elementoDims.ancho, largo: calculo.elementoDims.dimension2 },
         posicionFinal: calculo.elementoFinal
       },
-      calculo: calculo,
-      area: calculo.area,
+      areaContenedora: {
+        id: areaTotal.contenedorId || areaTotal.plantaId || 'default',
+        dimensiones: esVistaFrontal ?
+          { ancho: calculo.area.ancho, alto: calculo.area.dimension2 } :
+          { ancho: calculo.area.ancho, largo: calculo.area.dimension2 },
+        vista: vista
+      },
       validacion: validacion
     })
 
     if (!validacion.cabe) {
       const problemas = []
       const sugerencias = []
+      const dimension2Nombre = esVistaFrontal ? 'alto' : 'largo'
+      const direccion2 = esVistaFrontal ? 'abajo' : 'arriba'
 
       if (!validacion.dentroEnX) {
         const exceso = calculo.elementoFinal.x - calculo.area.ancho
@@ -594,23 +722,256 @@ export function useDimensionValidation() {
         sugerencias.push(`Reducir ancho en ${exceso.toFixed(1)}cm o mover hacia la izquierda`)
       }
 
-      if (!validacion.dentroEnY) {
-        const exceso = calculo.elementoFinal.y - calculo.area.largo
-        problemas.push(`se sale ${exceso.toFixed(1)}cm en el largo`)
-        sugerencias.push(`Reducir largo en ${exceso.toFixed(1)}cm o mover hacia arriba`)
+      if (!validacion.dentroEnDimension2) {
+        const exceso = calculo.elementoFinal.y - calculo.area.dimension2
+        problemas.push(`se sale ${exceso.toFixed(1)}cm en el ${dimension2Nombre}`)
+        sugerencias.push(`El ${dimension2Nombre} máximo posible es de ${calculo.area.dimension2.toFixed(1)}cm. También puedes moverlo hacia ${direccion2}`)
       }
 
       return {
         cabe: false,
-        razon: `El elemento ${problemas.join(' y ')}`,
-        sugerencias: sugerencias
+        razon: `El elemento ${problemas.join(' y ')} en vista ${vista}`,
+        sugerencias: sugerencias,
+        vista: vista
       }
     }
 
     return {
       cabe: true,
-      razon: 'El elemento cabe dentro del área'
+      razon: `El elemento cabe dentro del área en vista ${vista}`,
+      vista: vista
     }
+  }
+
+  /**
+   * Valida que las nuevas dimensiones del elemento sean suficientes para contener a sus elementos hijos
+   * Considera la vista frontal (XZ) usando coordenadas Konva: x = ancho, y = alto
+   * IMPORTANTE: Valida posición + dimensión para verificar que el hijo no se salga del área del padre
+   * @param {Object} elemento - Elemento con las nuevas dimensiones a validar
+   * @returns {Object} Resultado de la validación
+   */
+  function validarContencionHijos(elemento) {
+    const hijos = canvasStore.elementos.filter(el => el.padre === elemento.id);
+
+    if (hijos.length === 0) {
+      return { valida: true, razon: 'No tiene elementos hijos' };
+    }
+
+    console.log('🔍 VALIDANDO CONTENCIÓN DE HIJOS:', {
+      elementoPadre: elemento.id,
+      cantidadHijos: hijos.length,
+      dimensionesPadre: elemento.dimensiones
+    });
+
+    const dimensionesPadre = elemento.dimensiones;
+    const problemasContención = [];
+
+    for (const hijo of hijos) {
+      // Obtener posición del hijo dentro del padre (en cm)
+      // En vista frontal XZ usando coordenadas Konva: x = ancho, y = alto
+      const posHijoX = (hijo.x || 0) / CM_TO_PX; // Posición en ancho
+      const posHijoY = (hijo.y || 0) / CM_TO_PX; // Posición en alto (no z!)
+
+      // Obtener dimensiones del hijo (en cm)
+      const dimHijo = hijo.dimensiones || {};
+      const anchoHijo = dimHijo.ancho || 0;
+      const altoHijo = dimHijo.alto || 0;
+
+      // Calcular límites del hijo en vista frontal (XZ)
+      // IMPORTANTE: posición + dimensión = límite final
+      const limiteDerechoHijo = posHijoX + anchoHijo;
+      const limiteAltoHijo = posHijoY + altoHijo;
+
+      console.log(`🔍 Analizando hijo ${hijo.id}:`, {
+        posicion: { x: posHijoX, y: posHijoY },
+        dimensiones: { ancho: anchoHijo, alto: altoHijo },
+        limites: { derecho: limiteDerechoHijo, alto: limiteAltoHijo },
+        padreDisponible: { ancho: dimensionesPadre.ancho, alto: dimensionesPadre.alto },
+        validacionAncho: limiteDerechoHijo <= dimensionesPadre.ancho,
+        validacionAlto: limiteAltoHijo <= dimensionesPadre.alto
+      });
+
+      // Verificar si el hijo se sale en ancho (X)
+      if (limiteDerechoHijo > dimensionesPadre.ancho) {
+        const exceso = limiteDerechoHijo - dimensionesPadre.ancho;
+        problemasContención.push({
+          hijo: hijo.id,
+          tipo: 'ancho',
+          exceso: exceso,
+          posicion: posHijoX,
+          dimension: anchoHijo,
+          limite: limiteDerechoHijo,
+          mensaje: `El elemento ${hijo.nombre || hijo.id} se sale ${exceso.toFixed(1)}cm en ancho`
+        });
+      }
+
+      // Verificar si el hijo se sale en alto (Y en vista frontal)
+      if (limiteAltoHijo > dimensionesPadre.alto) {
+        const exceso = limiteAltoHijo - dimensionesPadre.alto;
+        problemasContención.push({
+          hijo: hijo.id,
+          tipo: 'alto',
+          exceso: exceso,
+          posicion: posHijoY,
+          dimension: altoHijo,
+          limite: limiteAltoHijo,
+          mensaje: `El elemento ${hijo.nombre || hijo.id} se sale ${exceso.toFixed(1)}cm en alto`
+        });
+      }
+    }
+
+    if (problemasContención.length > 0) {
+      const mensajesProblemas = problemasContención.map(p => p.mensaje);
+      const excesoAncho = Math.max(0, ...problemasContención.filter(p => p.tipo === 'ancho').map(p => p.exceso));
+      const excesoAlto = Math.max(0, ...problemasContención.filter(p => p.tipo === 'alto').map(p => p.exceso));
+
+      const sugerencias = [];
+      if (excesoAncho > 0) {
+        sugerencias.push(`Aumentar ancho en ${excesoAncho.toFixed(1)}cm`);
+      }
+      if (excesoAlto > 0) {
+        sugerencias.push(`Aumentar alto en ${excesoAlto.toFixed(1)}cm`);
+      }
+
+      return {
+        valida: false,
+        razon: `Las nuevas dimensiones no son suficientes para contener a los elementos hijos: ${mensajesProblemas.join(', ')}`,
+        sugerencias: sugerencias,
+        problemasDetallados: problemasContención
+      };
+    }
+
+    return { valida: true, razon: 'Todos los elementos hijos caben dentro de las nuevas dimensiones' };
+  }
+
+  /**
+   * Valida que el nuevo volumen calculado no sea menor al volumen usado actual del elemento
+   * @param {Object} elemento - Elemento con las nuevas dimensiones a validar
+   * @returns {Object} Resultado de la validación
+   */
+  function validarVolumenMinimo(elemento) {
+    // Obtener el volumen usado actual del elemento
+    const usoActual = elemento.uso || {};
+    const volumenUsado = usoActual.volumen || 0;
+
+    // Si no hay volumen usado, la validación pasa
+    if (volumenUsado === 0) {
+      return { valida: true, razon: 'No hay volumen usado registrado' };
+    }
+
+    // Calcular el nuevo volumen teórico según el tipo de elemento
+    const dimensiones = elemento.dimensiones;
+    let nuevoVolumenTeorico = 0;
+
+    if (elemento.tipo === 'contenedores') {
+      // Para contenedores: volumen teórico = sus propias dimensiones
+      if (elemento.forma === 'circular') {
+        // Para formas circulares: V = π × r² × h
+        const radio = (dimensiones.ancho || 0) / 2;
+        const alto = dimensiones.alto || 0;
+        nuevoVolumenTeorico = (Math.PI * Math.pow(radio, 2) * alto) / 1_000_000; // cm³ a m³
+      } else {
+        // Para formas rectangulares: V = ancho × largo × alto
+        const ancho = dimensiones.ancho || 0;
+        const largo = dimensiones.largo || 0;
+        const alto = dimensiones.alto || 0;
+        nuevoVolumenTeorico = (ancho * largo * alto) / 1_000_000; // cm³ a m³
+      }
+    } else {
+      // Para elementos: volumen teórico = suma de volúmenes de sus contenedores hijos
+      const contenedoresHijos = canvasStore.elementos.filter(el =>
+        el.padre === elemento.id && el.tipo === 'contenedores'
+      );
+
+      nuevoVolumenTeorico = contenedoresHijos.reduce((suma, contenedor) => {
+        const dimContenedor = contenedor.dimensiones || {};
+        let volumenContenedor = 0;
+
+        if (contenedor.forma === 'circular') {
+          const radio = (dimContenedor.ancho || 0) / 2;
+          const alto = dimContenedor.alto || 0;
+          volumenContenedor = (Math.PI * Math.pow(radio, 2) * alto) / 1_000_000;
+        } else {
+          const ancho = dimContenedor.ancho || 0;
+          const largo = dimContenedor.largo || 0;
+          const alto = dimContenedor.alto || 0;
+          volumenContenedor = (ancho * largo * alto) / 1_000_000;
+        }
+
+        return suma + volumenContenedor;
+      }, 0);
+    }
+
+    console.log('🔍 VALIDANDO VOLUMEN MÍNIMO:', {
+      elemento: elemento.id,
+      tipo: elemento.tipo,
+      volumenUsado: volumenUsado,
+      nuevoVolumenTeorico: nuevoVolumenTeorico,
+      dimensiones: dimensiones,
+      forma: elemento.forma,
+      esContenedor: elemento.tipo === 'contenedores',
+      contenedoresHijos: elemento.tipo !== 'contenedores' ?
+        canvasStore.elementos.filter(el => el.padre === elemento.id && el.tipo === 'contenedores').length :
+        'N/A'
+    });
+
+    // Verificar si el nuevo volumen es suficiente
+    if (nuevoVolumenTeorico < volumenUsado) {
+      const deficit = volumenUsado - nuevoVolumenTeorico;
+
+      // Calcular sugerencias de ajuste según el tipo de elemento
+      const sugerencias = [];
+
+      if (elemento.tipo === 'contenedores') {
+        // Para contenedores: sugerir cambio de dimensiones propias
+        // const factorEscala = Math.cbrt(volumenUsado / nuevoVolumenTeorico); // Raíz cúbica para escalar proporcionalmente
+
+        if (elemento.forma === 'circular') {
+          // const nuevoDiametro = dimensiones.ancho * factorEscala;
+          // const nuevoAlto = dimensiones.alto * factorEscala;
+          sugerencias.push(`Verificar las dimensiones necesarias`);
+        } else {
+          // const nuevoAncho = dimensiones.ancho * factorEscala;
+          // const nuevoLargo = dimensiones.largo * factorEscala;
+          // const nuevoAlto = dimensiones.alto * factorEscala;
+          sugerencias.push(`Verificar las dimensiones necesarias`);
+        }
+      } else {
+        // Para elementos: sugerir agregar más contenedores o aumentar el tamaño de los existentes
+        const contenedoresHijos = canvasStore.elementos.filter(el =>
+          el.padre === elemento.id && el.tipo === 'contenedores'
+        );
+
+        if (contenedoresHijos.length === 0) {
+          sugerencias.push('Agregar más contenedores internos para alcanzar el volumen requerido');
+        } else {
+          const volumenAdicionalRequerido = volumenUsado - nuevoVolumenTeorico;
+          sugerencias.push(`Aumentar el volumen de los contenedores existentes en ${volumenAdicionalRequerido.toFixed(3)}m³`);
+          sugerencias.push('O agregar contenedores adicionales para completar el volumen requerido');
+        }
+      }
+
+      // const tipoElemento = elemento.tipo === 'contenedores' ? 'contenedores' : 'elementos';
+      const explicacionCalculo = elemento.tipo === 'contenedores' ?
+        'basado en sus dimensiones propias' :
+        'basado en la suma de volúmenes de sus contenedores hijos';
+
+      return {
+        valida: false,
+        razon: `El nuevo volumen (${nuevoVolumenTeorico.toFixed(3)}m³, ${explicacionCalculo}) no es suficiente para satisfacer su uso actual. Déficit: ${deficit.toFixed(3)}m³`,
+        sugerencias: sugerencias,
+        deficit: deficit,
+        volumenUsado: volumenUsado,
+        volumenNuevo: nuevoVolumenTeorico
+      };
+    }
+
+    const tipoElemento = elemento.tipo === 'contenedores' ? 'contenedores' : 'elementos';
+    const explicacionCalculo = elemento.tipo === 'contenedores' ?
+      'basado en sus dimensiones propias' :
+      'basado en la suma de volúmenes de sus contenedores hijos';
+
+    return { valida: true, razon: `El nuevo volumen del ${tipoElemento} (${nuevoVolumenTeorico.toFixed(3)}m³, ${explicacionCalculo}) es suficiente para el volumen usado (${volumenUsado.toFixed(3)}m³)` };
   }
 
   /**
