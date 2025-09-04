@@ -230,6 +230,95 @@ onUnmounted(() => {
   background: var(--ui-bg-dark);
   border: 1px solid var(--ui-border-dark);
 }
+
+/* ====== INVENTORY: Estilos para el conmutador de Catálogo (Elementos | Plantillas) ======
+   Contexto: pestaña Elementos — controla catálogo visible.
+   NOTA: no mover ni duplicar en otros archivos. Mantener aquí.
+======================================================================================== */
+.catalog-switch {
+  display: flex;
+  gap: var(--gap);
+  margin-bottom: var(--gap);
+}
+
+.catalog-switch--compact {
+  display: none;
+}
+
+.catalog-tab {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 9999px;
+  background: var(--ui-bg);
+  color: #334155;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.catalog-tab:hover {
+  background: #f1f5f9;
+}
+
+.catalog-tab.is-active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.catalog-tab.kb-focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 479px) {
+  .catalog-switch {
+    display: none;
+  }
+
+  .catalog-switch.catalog-switch--compact {
+    display: block;
+  }
+
+  .catalog-switch--compact select {
+    width: 100%;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--ui-border);
+    border-radius: 0.375rem;
+  }
+}
+
+/* ====== INVENTORY: Ajustes visuales para equiparar modal 'Guardar como plantilla' con 'Eliminar' ======
+   NOTA: Reusar las mismas clases de botones y layout. Solo correcciones menores aquí.
+======================================================================================================= */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1100}
+.modal{width:420px;max-width:92vw;background:#fff;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e5e7eb}
+.modal-header .title{font-size:16px;font-weight:600;color:#111827}
+.modal-header .close{background:transparent;border:none;font-size:20px;cursor:pointer;color:#6b7280}
+.modal-body{padding:16px;color:#374151}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid #e5e7eb}
+.btn{border:1px solid #e5e7eb;background:#fff;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer}
+.btn-primary{background:#2563eb;color:#fff;border-color:#2563eb}
+.btn-primary:hover{background:#1d4ed8}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.btn:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.template-modal__row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.template-modal__label { font-weight: 600; font-size: 0.95rem; }
+.template-modal__input,
+.template-modal__textarea {
+  width: 100%; border: 1px solid var(--border-color, #e3e6eb); border-radius: 8px;
+  padding: 8px 10px; background: #fff; font: inherit;
+}
+.template-modal__input:focus,
+.template-modal__textarea:focus {
+  outline: none; box-shadow: 0 0 0 3px rgba(38,132,255,.25);
+}
+.template-modal__summary {
+  font-size: 0.9rem; color: var(--text-muted, #5b6473);
+  background: var(--bg-muted, #f7f8fa); border: 1px solid var(--border-color, #e3e6eb);
+  border-radius: 8px; padding: 10px;
+}
+.template-modal__error { color: #c62828; font-size: 0.85rem; }
 </style>
 
 <style scoped>
