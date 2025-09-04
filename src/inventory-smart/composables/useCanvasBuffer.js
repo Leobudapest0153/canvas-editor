@@ -21,6 +21,89 @@ import { useToast } from './useToast'
 // Estado global del buffer (singleton)
 const bufferItems = ref([])
 
+/**
+ * Serializa un elemento con todos sus hijos generando nuevos IDs únicos.
+ * Se utiliza tanto para copiar al buffer/clipboard como para crear plantillas.
+ */
+export const serializeElementForTemplate = (elementoId, offsetX = 0, offsetY = 0) => {
+  const canvasStore = useCanvasStore()
+  const elemento = canvasStore.elementoPorId(elementoId)
+  if (!elemento) {
+    console.warn('⚠️ Elemento no encontrado para clonar:', elementoId)
+    return null
+  }
+
+  const idMapping = new Map()
+  const allClonedElements = new Map()
+  const baseTimestamp = Date.now()
+  let counter = 0
+
+  const cloneElementRecursive = (elem, parentNewId = null, level = 0) => {
+    const uniqueTimestamp = baseTimestamp + counter
+    const randomSuffix = Math.random().toString(36).substr(2, 9)
+    const newId = `${elem.tipo || elem.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
+    idMapping.set(elem.id, newId)
+    counter++
+
+    const clonedElement = {
+      ...JSON.parse(JSON.stringify(elem)),
+      id: newId,
+      x: elem.x + offsetX,
+      y: elem.y + offsetY,
+      padre: parentNewId,
+      hijos: [],
+    }
+
+    if (level === 0) {
+      delete clonedElement.plantaId
+      clonedElement.padre = null
+    }
+
+    allClonedElements.set(newId, clonedElement)
+
+    if (elem.hijos && elem.hijos.length > 0) {
+      console.log(`📋 Clonando ${elem.hijos.length} hijos para ${elem.nombre || elem.tipo}`)
+      for (const hijoId of elem.hijos) {
+        const hijo = canvasStore.elementoPorId(hijoId)
+        if (hijo) {
+          const clonedChild = cloneElementRecursive(hijo, newId, level + 1)
+          if (clonedChild) {
+            clonedElement.hijos.push(clonedChild.id)
+          }
+        }
+      }
+    }
+
+    console.log(`📋 Elemento clonado nivel ${level}:`, {
+      original: elem.id,
+      nuevo: newId,
+      nombre: elem.nombre || elem.tipo,
+      hijos: clonedElement.hijos.length,
+      padre: clonedElement.padre,
+    })
+
+    return clonedElement
+  }
+
+  const rootClonedElement = cloneElementRecursive(elemento, null, 0)
+
+  if (rootClonedElement) {
+    console.log('📋 Estructura clonada completa:', {
+      elementoOriginal: elemento.nombre || elemento.tipo,
+      elementosProcesados: idMapping.size,
+      mapeoIds: Array.from(idMapping.entries()),
+    })
+
+    return {
+      rootElement: rootClonedElement,
+      allElements: allClonedElements,
+      idMapping: idMapping,
+    }
+  }
+
+  return null
+}
+
 export const useCanvasBuffer = () => {
   const canvasStore = useCanvasStore()
   const weightValidation = useWeightValidation()
@@ -49,103 +132,12 @@ export const useCanvasBuffer = () => {
           year: 'numeric',
           hour: '2-digit',
           minute: '2-digit',
-          second: '2-digit'
+          second: '2-digit',
         }),
         ...sourceInfo,
       },
       addedToBuffer: currentTimestamp,
     }
-  }
-
-  /**
-   * Clonar elemento con todos sus hijos recursivamente
-   * Genera nuevos IDs únicos para evitar conflictos
-   * Retorna un objeto con el elemento principal y todos los elementos de la estructura
-   */
-  const cloneElementWithChildren = (elementoId, offsetX = 0, offsetY = 0) => {
-    const elemento = canvasStore.elementoPorId(elementoId)
-    if (!elemento) {
-      console.warn('⚠️ Elemento no encontrado para clonar:', elementoId)
-      return null
-    }
-
-    // Mapeo de IDs originales a nuevos IDs y elementos clonados
-    const idMapping = new Map()
-    const allClonedElements = new Map() // ID clonado -> elemento clonado
-    const baseTimestamp = Date.now()
-    let counter = 0
-
-    // Función recursiva para clonar un elemento y sus hijos
-    const cloneElementRecursive = (elem, parentNewId = null, level = 0) => {
-      // Generar nuevo ID único con timestamp incremental y sufijo aleatorio
-      const uniqueTimestamp = baseTimestamp + counter
-      const randomSuffix = Math.random().toString(36).substr(2, 9)
-      const newId = `${elem.tipo || elem.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
-      idMapping.set(elem.id, newId)
-      counter++
-
-      // Clonar el elemento
-      const clonedElement = {
-        ...JSON.parse(JSON.stringify(elem)), // Deep clone
-        id: newId,
-        x: elem.x + offsetX,
-        y: elem.y + offsetY,
-        padre: parentNewId, // Asignar nuevo padre si corresponde
-        hijos: [], // Se llenará después con los nuevos IDs
-      }
-
-      // Limpiar propiedades que se manejarán según el contexto
-      if (level === 0) {
-        // Solo para el elemento raíz, limpiar plantaId y padre
-        delete clonedElement.plantaId
-        clonedElement.padre = null
-      }
-
-      // Guardar elemento clonado usando ID clonado como clave
-      allClonedElements.set(newId, clonedElement)
-
-      // Si el elemento tiene hijos, clonarlos recursivamente
-      if (elem.hijos && elem.hijos.length > 0) {
-        console.log(`📋 Clonando ${elem.hijos.length} hijos para ${elem.nombre || elem.tipo}`)
-
-        for (const hijoId of elem.hijos) {
-          const hijo = canvasStore.elementoPorId(hijoId)
-          if (hijo) {
-            const clonedChild = cloneElementRecursive(hijo, newId, level + 1)
-            if (clonedChild) {
-              clonedElement.hijos.push(clonedChild.id)
-            }
-          }
-        }
-      }
-
-      console.log(`📋 Elemento clonado nivel ${level}:`, {
-        original: elem.id,
-        nuevo: newId,
-        nombre: elem.nombre || elem.tipo,
-        hijos: clonedElement.hijos.length,
-        padre: clonedElement.padre
-      })
-
-      return clonedElement
-    }    // Iniciar clonado recursivo
-    const rootClonedElement = cloneElementRecursive(elemento, null, 0)
-
-    if (rootClonedElement) {
-      console.log('📋 Estructura clonada completa:', {
-        elementoOriginal: elemento.nombre || elemento.tipo,
-        elementosProcesados: idMapping.size,
-        mapeoIds: Array.from(idMapping.entries())
-      })
-
-      return {
-        rootElement: rootClonedElement,
-        allElements: allClonedElements,
-        idMapping: idMapping
-      }
-    }
-
-    return null
   }
 
   /**
@@ -186,7 +178,7 @@ export const useCanvasBuffer = () => {
     }
 
     // Clonar la estructura completa
-    const clonedStructure = cloneElementWithChildren(elementoId)
+    const clonedStructure = serializeElementForTemplate(elementoId)
     if (!clonedStructure) {
       console.error('⚠️ Error al clonar la estructura del elemento')
       return false

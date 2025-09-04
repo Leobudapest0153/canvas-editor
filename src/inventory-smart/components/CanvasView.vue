@@ -626,9 +626,60 @@
       :y="ctxY"
       :isLocked="ctxIsLocked"
       @lockToggle="() => toggleLock(ctxElementId)"
+      @save-template="onSaveTemplate(ctxElementId)"
       @delete="() => onDelete(ctxElementId)"
       @close="ctx.close()"
     />
+
+    <!-- Modal Guardar como plantilla -->
+    <div
+      v-if="showTemplateModal"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-[1100]"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="templateModalTitle"
+      aria-describedby="templateSummary"
+      @click.self="closeTemplateModal"
+      @keydown.esc="closeTemplateModal"
+    >
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 id="templateModalTitle" class="text-lg font-medium mb-4">Guardar como plantilla</h3>
+        <form @submit.prevent="saveTemplate">
+          <div class="template-modal__row">
+            <label for="templateName" class="template-modal__label">Nombre de la plantilla</label>
+            <input
+              id="templateName"
+              ref="templateNameInput"
+              v-model="templateName"
+              class="template-modal__input"
+              maxlength="80"
+              required
+            />
+            <p v-if="templateError" class="template-modal__error">{{ templateError }}</p>
+          </div>
+          <div class="template-modal__row">
+            <div class="template-modal__summary" id="templateSummary">
+              Tipo: {{ templateSummary.type }}<br />
+              Dimensiones: {{ templateSummary.width }}×{{ templateSummary.height }}<span v-if="templateSummary.depth">×{{ templateSummary.depth }}</span><br />
+              Hijos: {{ templateSummary.children }}
+            </div>
+          </div>
+          <div class="template-modal__row">
+            <label for="templateNotes" class="template-modal__label">Notas</label>
+            <textarea
+              id="templateNotes"
+              v-model="templateNotes"
+              class="template-modal__textarea"
+              rows="3"
+            ></textarea>
+          </div>
+          <div class="template-modal__actions">
+            <button type="button" @click="closeTemplateModal">Cancelar</button>
+            <button type="submit" :disabled="!templateName.trim()">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
   <!-- Información de zoom, vista y dimensiones -->
   <div ref="canvasInfoRef" class="canvas-info" :style="canvasInfoStyle">
@@ -745,7 +796,7 @@ import { setupRafDrag } from '@/inventory-smart/composables/useRafDrag'
 import { enablePerfMode } from '@/inventory-smart/composables/usePerfMode'
 import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
-import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
+import { useCanvasBuffer, serializeElementForTemplate } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
 import RulersOverlay from '@/inventory-smart/components/RulersOverlay.vue'
 import {
@@ -784,6 +835,7 @@ import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/inventory-smart/utils/simulateProducts'
 import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -1839,6 +1891,84 @@ const handleDrop = (e) => {
 }
 
 const { showToast } = useToast()
+const catalogStore = useCatalogStore()
+
+const showTemplateModal = ref(false)
+const templateName = ref('')
+const templateNotes = ref('')
+const templateError = ref('')
+const templateSummary = ref({ type: '', width: 0, height: 0, depth: 0, children: 0 })
+const templatePayload = ref(null)
+const templateNameInput = ref(null)
+
+const openTemplateModal = (elementId) => {
+  const element = canvasStore.elementoPorId(elementId)
+  if (!element) return
+  const serialized = serializeElementForTemplate(elementId)
+  if (!serialized) return
+  templatePayload.value = serialized
+  const childrenCount = serialized.allElements.size - 1
+  const width = element.width || element.dimensiones?.ancho || 0
+  const height = element.height || element.dimensiones?.largo || 0
+  const depth = element.depth || element.dimensiones?.alto || 0
+  templateSummary.value = {
+    type: element.tipo || element.categoria || 'elemento',
+    width,
+    height,
+    depth,
+    children: childrenCount,
+  }
+  showTemplateModal.value = true
+  nextTick(() => {
+    templateNameInput.value?.focus()
+  })
+}
+
+const closeTemplateModal = () => {
+  showTemplateModal.value = false
+  templateName.value = ''
+  templateNotes.value = ''
+  templateError.value = ''
+  templatePayload.value = null
+}
+
+const saveTemplate = () => {
+  templateError.value = ''
+  const name = templateName.value.trim()
+  if (!name) {
+    templateError.value = 'El nombre es obligatorio'
+    return
+  }
+  if (catalogStore.getTemplateByName(name)) {
+    templateError.value = 'Ya existe una plantilla con ese nombre'
+    return
+  }
+  const now = new Date().toISOString()
+  const tpl = {
+    id: Date.now().toString(),
+    name,
+    createdAt: now,
+    updatedAt: now,
+    meta: {
+      elementType: templateSummary.value.type,
+      width: templateSummary.value.width,
+      height: templateSummary.value.height,
+      depth: templateSummary.value.depth,
+      childrenCount: templateSummary.value.children,
+    },
+    payload: templatePayload.value,
+    notes: templateNotes.value || '',
+    tags: [],
+  }
+  catalogStore.addTemplate(tpl)
+  showToast('Plantilla guardada', { type: 'success' })
+  closeTemplateModal()
+}
+
+const onSaveTemplate = (elementId) => {
+  ctx.close()
+  openTemplateModal(elementId)
+}
 
 const { simularLlenadoContenedor} = useProductSimulation({
   canvasStore,
