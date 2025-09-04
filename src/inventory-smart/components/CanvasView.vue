@@ -3207,6 +3207,9 @@ const onShapeContextMenu = (evt, elemento) => {
   if (isElementDragging.value || (typeof window !== 'undefined' && window.__dvCanvasDragActive)) {
     return
   }
+  // No abrir si hay cambios pendientes
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elemento.id;
+  if (canvasStore.cambiosNoAplicados && isNotCurrentElement) return;
   // Asegurar selección del shape antes de abrir
   if (canvasStore.elementoSeleccionado !== elemento.id) {
     canvasStore.seleccionarElemento(elemento.id)
