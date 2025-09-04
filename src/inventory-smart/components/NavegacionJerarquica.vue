@@ -33,28 +33,23 @@
           </svg>
         </span>
       </template>
+
+      <!-- Botón redondo con solo icono; tooltip indica a dónde regresa -->
+      <UiIconButton
+        v-if="canvasStore.puedeNavegar"
+        :ariaLabel="previousCrumb ? `Volver a ${previousCrumb.nombre}` : 'Volver al nivel anterior'"
+        :title="previousCrumb ? `Volver a ${previousCrumb.nombre}` : 'Volver al nivel anterior'"
+        @click="canvasStore.navegarAlPadre()"
+        class="breadcrumb-back"
+      >
+        <svg class="crumb-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+      </UiIconButton>
     </div>
 
     <!-- Controles de navegación -->
     <div class="nav-controls">
-      <!-- Botón regresar -->
-      <button
-        v-if="canvasStore.puedeNavegar"
-        @click="canvasStore.navegarAlPadre()"
-        class="nav-btn nav-back"
-        title="Regresar al nivel anterior"
-      >
-        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M10 19l-7-7m0 0l7-7m-7 7h18"
-          />
-        </svg>
-        <span>Regresar</span>
-      </button>
-
       <!-- Información del contexto actual -->
       <div class="context-info">
         <div class="context-type">
@@ -83,6 +78,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import UiIconButton from './ui/UiIconButton.vue'
 
 // Composables
 const canvasStore = useCanvasStore()
@@ -123,6 +119,14 @@ const navegarACrumb = (crumb, index) => {
     canvasStore.navegarAContexto(crumb.tipo, crumb.id, nuevoPath)
   }
 }
+
+// Computed: obtener el breadcrumb anterior (padre) para mostrar en el chip
+const previousCrumb = computed(() => {
+  const crumbs = canvasStore.breadcrumbs
+  if (!crumbs || crumbs.length < 2) return null
+  return crumbs[crumbs.length - 2]
+})
+
 </script>
 
 <style scoped>
@@ -160,6 +164,42 @@ const navegarACrumb = (crumb, index) => {
   transition: all 0.2s ease;
   white-space: nowrap;
 }
+
+/* Estilos para el botón "Regresar" dentro de las breadcrumbs */
+.breadcrumb-back {
+  background: linear-gradient(180deg,#ffffff 0%, #f1fdf6 100%);
+  border: 1px solid #c7e6d8;
+  color: #065f46;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(6,95,70,0.08);
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.crumb-back-icon { width: 1.125rem; height: 1.125rem }
+
+.breadcrumb-back:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(6,95,70,0.12);
+}
+
+/* Estilos del chip creativo */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(90deg,#ecfdf5 0%, #ffffff 100%);
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(6,95,70,0.08);
+}
+.chip-icon { width: 1rem; height: 1rem; color: #047857 }
+.chip-text { font-weight: 600; color: #065f46 }
 
 .breadcrumb-item:hover:not(.active) {
   background: #f3f4f6;
