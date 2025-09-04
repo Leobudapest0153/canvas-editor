@@ -446,6 +446,7 @@ const padreContext = computed(() => {
   }
   return { padreId: el.plantaId, padreType: 'plantas' }
 })
+
 const infoPesoPadre = computed(() => {
   const { padreId, padreType } = padreContext.value
   if (!padreId || !padreType) return { limiteDePeso: false, usado: 0, maximo: 0, disponible: Infinity, porcentajeUsado: 0 }
@@ -658,7 +659,7 @@ const advertenciaAltura = computed(() => {
   if (!esAnaquelOEstante.value) return null
   const max = alturaPlanta.value;
   const actual = edited.value?.dimensiones?.alto || 0
-  return actual > max ? `La altura no debe superar ${max} cm` : null
+  return actual > max ? `La altura no debe superar ${max} cm (debido a la altura de planta o un elemento situado encima)` : null
 })
 
 // Advertencia de peso por límite del contexto padre (bloquea Guardar)
