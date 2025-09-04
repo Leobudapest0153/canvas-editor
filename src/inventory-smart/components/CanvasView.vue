@@ -121,8 +121,6 @@
             }"
           />
 
-
-        <!-- Aquí podrías añadir v-circle, etc., si tienes otras formas -->
       </template>
 
         <!-- Renderizado de elementos del store -->
@@ -1256,19 +1254,32 @@ const handleStageMouseDown = (e) => {
 
 const handleStageClick = (e) => {
   // Deseleccionar elemento si click en área vacía
-  if (e.target === e.target.getStage()) {
+  if (e.target === e.target.getStage() && !canvasStore.cambiosNoAplicados) {
   canvasStore.seleccionarElemento(null)
   // Cerrar controles y edición cuando se hace click en el stage vacío
   speedDialOpen.value = false
   editingElementId.value = null
   // Limpiar guías de snapping
   clearGuides()
+    return;
+  }
+
+  // Resaltar sección de guardados
+  if (canvasStore.cambiosNoAplicados && e.target === e.target.getStage() && canvasStore.elementoSeleccionado) {
+    const msg = "Tienes cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' })
   }
 }
 
 // === FUNCIONES DE ELEMENTOS ===
 const selectElement = (elementId) => {
   console.log('Seleccionando elemento:', elementId)
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elementId;
+  if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado && isNotCurrentElement) {
+    const msg = "No puedes seleccionar un nuevo elemento con cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' });
+    return;
+  }
   canvasStore.seleccionarElemento(elementId)
   // Si el modo arrastre global está activado y el elemento NO está bloqueado, activar edición (transformer)
   if (dragModeGlobal.value && elementId && !isElementLocked(elementId)) {
@@ -1285,6 +1296,11 @@ const handleElementDoubleClick = (elemento) => {
   // Verificar si el elemento puede tener hijos (contenedor)
   const tiposContenedor = ['elementos', 'contenedores']
 
+  if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
+    const msg = "No puedes entrar a un elemento si tienes cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' })
+    return;
+  }
   if (tiposContenedor.includes(elemento.tipo)) {
     console.log('Navegando al interior del elemento:', elemento.nombre)
     canvasStore.navegarAElemento(elemento.id)
@@ -1346,6 +1362,16 @@ const startElementDrag = (elementId) => {
     // Si está bloqueado, no iniciar drag ni mover el layer
     isElementDragging.value = false
     stageDragEnabled.value = false
+    return
+  }
+
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elementId;
+  if (canvasStore.cambiosNoAplicados && isNotCurrentElement) {
+    isElementDragging.value = false;
+    stageDragEnabled.value = false;
+
+    const msg = "No puedes arrastrar un elemento con cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' });
     return
   }
   console.log('Iniciando arrastre del elemento:', elementId)
@@ -1487,6 +1513,9 @@ const startElementDrag = (elementId) => {
 }
 
 const updateElementPosition = (e, elementId) => {
+  if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
+    return;
+  }
   const target = e.target
   let x = target.x()
   let y = target.y()
@@ -2590,7 +2619,9 @@ const toggleSnapping = () => {
 
 const canDragElement = (id) => {
   // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
-  if (isElementLocked(id)) return false
+  // Y si no hay cambios sin aplicar de otro elemento
+  const isNotCurrentElement = canvasStore.elementoSeleccionado != id;
+  if (isElementLocked(id) || (canvasStore.cambiosNoAplicados && isNotCurrentElement)) return false
   return dragModeGlobal.value
 }
 
