@@ -1326,7 +1326,7 @@ const dragBoundForElement = (pos, elemento) => {
   try {
     const lp = toLayerCoords(pos)
     const boundary = computeBoundary()
-    const { w_cm, h_cm } = dimsCmFor(elemento)
+  const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
     const w = w_cm * CM_TO_PX
     const h = h_cm * CM_TO_PX
     const c = clampInsideArea(lp.x, lp.y, w, h, boundary)
@@ -2398,17 +2398,17 @@ const createElementFromBuffer = (data, dropEvent) => {
     // Obtener el elemento padre (el elemento actual donde estamos)
     const elementoPadre = canvasStore.elementoContenedorActual;
     if (elementoPadre && elementoPadre.dimensiones) {
-      // Si estamos en vista de frente (XZ), ajustar el alto según el largo del padre
+      // Si estamos en vista de frente (XZ), ajustar el alto según el alto del padre
       if (canvasStore.vistaActiva === 'XZ') {
-        const largoPadreCm = elementoPadre.dimensiones.largo;
+        const altoPadreCm = elementoPadre.dimensiones.alto;
 
         // Actualizar también las dimensiones en el elemento del buffer
         if (elemento.dimensiones) {
-          elemento.dimensiones.largo = largoPadreCm;
+          elemento.dimensiones.alto = altoPadreCm;
         }
 
-        console.log('Buffer: Contenedor ajustado al largo del elemento padre:', {
-          largoPadreCm,
+        console.log('Buffer: Contenedor ajustado al alto del elemento padre:', {
+          altoPadreCm,
           altoPixelesFinal: height
         });
       }
