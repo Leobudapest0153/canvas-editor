@@ -74,33 +74,129 @@
       v-else
       class="flex-1 overflow-hidden flex flex-col"
     >
-      <div class="p-4 border-b">
-        <input
-          v-model="searchText"
-          type="text"
-          placeholder="Buscar plantillas..."
-          class="w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100"
-        />
-      </div>
-      <div class="flex-1 overflow-y-auto p-4">
-        <div
-          v-if="filteredTemplates.length === 0"
-          class="h-full flex items-center justify-center text-slate-500 text-sm"
-        >
-          No hay plantillas aún
+      <div class="catalogo-header p-4 border-b border-gray-200">
+        <div class="relative">
+          <input
+            v-model="searchText"
+            type="text"
+            placeholder="Buscar plantillas..."
+            class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100"
+          />
+          <svg
+            class="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
         </div>
-        <ul v-else class="grid grid-cols-1 gap-3">
-          <li
+      </div>
+      <div class="elementos-lista flex-1 overflow-y-auto p-4">
+        <div class="grid grid-cols-1 gap-3">
+          <div
             v-for="tpl in filteredTemplates"
             :key="tpl.id"
-            class="border border-gray-200 rounded-lg p-3 cursor-grab hover:shadow-md transition-all duration-200"
-            draggable="true"
+            :draggable="true"
             @dragstart="onTemplateDragStart(tpl, $event)"
             @dragend="onTemplateDragEnd"
+            class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]"
+            :style="{ borderLeftColor: '#3b82f6' }"
           >
-            {{ tpl.name }}
-          </li>
-        </ul>
+            <div class="elemento-preview flex items-center justify-center mb-3">
+              <div
+                :class="[
+                  'preview-shape rounded-sm flex items-center justify-center relative shadow-sm border border-white/20',
+                  'w-12 h-8',
+                ]"
+                style="background-color: #3b82f6"
+              >
+                <component :is="getIconComponent('box')" class="w-4 h-4 text-white" />
+              </div>
+            </div>
+
+            <div class="elemento-info space-y-1">
+              <h3 class="font-semibold text-sm text-gray-800 mb-1">{{ tpl.name }}</h3>
+              <p class="text-xs text-gray-500 mb-2">{{ templateDescription(tpl) }}</p>
+
+              <div class="elemento-specs space-y-1">
+                <div class="spec-item flex justify-between text-xs">
+                  <span class="spec-label text-gray-500 font-medium">Dim:</span>
+                  <span class="spec-value text-gray-700">
+                    {{ getTemplateDims(tpl).ancho }}x{{ getTemplateDims(tpl).largo }}x{{ getTemplateDims(tpl).alto }}
+                  </span>
+                </div>
+                <div class="spec-item flex justify-between text-xs">
+                  <span class="spec-label text-gray-500 font-medium">Peso:</span>
+                  <span class="spec-value text-gray-700">—</span>
+                </div>
+                <div class="spec-item flex justify-between text-xs">
+                  <span class="spec-label text-gray-500 font-medium">Ubic:</span>
+                  <span class="spec-value text-gray-700">—</span>
+                </div>
+              </div>
+
+              <div class="mt-2 flex gap-1">
+                <span
+                  class="inline-block px-2 py-1 text-xs rounded-full text-white"
+                  style="background-color: #3b82f6"
+                >
+                  Plantillas
+                </span>
+                <span
+                  v-for="tag in tpl.tags"
+                  :key="tag"
+                  class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700"
+                >
+                  {{ tag }}
+                </span>
+              </div>
+            </div>
+
+            <div
+              class="drag-indicator absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
+            >
+              <svg
+                class="w-4 h-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="filteredTemplates.length === 0" class="text-center py-12">
+          <svg
+            class="w-12 h-12 text-gray-300 mx-auto mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m0 0v5m0-5v-5"
+            />
+          </svg>
+          <p class="text-gray-500 text-center">Aún no hay plantillas</p>
+          <p class="text-gray-400 text-sm text-center mt-1">
+            Crea una desde un elemento
+          </p>
+        </div>
       </div>
     </div>
   </div>
@@ -113,7 +209,7 @@ import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
 
 const catalogStore = useCatalogStore()
-const { selectedCatalog, searchText, templates } = storeToRefs(catalogStore)
+const { selectedCatalog, searchText } = storeToRefs(catalogStore)
 
 const focusedTab = ref(null)
 const tabElementos = ref(null)
@@ -155,6 +251,25 @@ watch(selectedCatalog, (val) => {
 const filteredTemplates = computed(() =>
   catalogStore.searchTemplates(searchText.value)
 )
+
+const formatDate = (iso) => {
+  try {
+    return new Date(iso).toLocaleDateString()
+  } catch {
+    return ''
+  }
+}
+
+const templateDescription = (tpl) =>
+  tpl.notes || `Plantilla guardada • ${formatDate(tpl.updatedAt)}`
+
+const getTemplateDims = (tpl) => ({
+  ancho: tpl.meta?.width || 0,
+  largo: tpl.meta?.depth || 0,
+  alto: tpl.meta?.height || 0,
+})
+
+const getIconComponent = () => 'svg'
 
 const onTemplateDragStart = (tpl, event) => {
   const dragData = {

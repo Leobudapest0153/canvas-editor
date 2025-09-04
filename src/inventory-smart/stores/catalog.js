@@ -93,7 +93,14 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   const searchTemplates = (query) => {
     const q = query?.toLowerCase?.() || ''
-    return templates.value.filter((t) => t.name?.toLowerCase?.().includes(q))
+    return templates.value
+      .slice()
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+      .filter(
+        (t) =>
+          t.name?.toLowerCase?.().includes(q) ||
+          t.notes?.toLowerCase?.().includes(q)
+      )
   }
 
   return {
