@@ -71,7 +71,7 @@ function getSnapPoints(element) {
  * @param {Array} otherElements - Otros elementos para comparar
  * @returns {Object} - Resultado del snap con posición ajustada y guías
  */
-function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBounds) {
+function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBounds, snapDistance = SNAP_DISTANCE) {
   // Validar entrada
   if (!movingElement || !Array.isArray(otherElements) || 
       typeof candidateX !== 'number' || typeof candidateY !== 'number') {
@@ -111,9 +111,9 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
     // Detectar snap vertical (líneas verticales)
     for (const movingVLine of movingPoints.verticalLines) {
       for (const otherVLine of otherPoints.verticalLines) {
-        const distance = Math.abs(movingVLine.x - otherVLine.x)
+  const distance = Math.abs(movingVLine.x - otherVLine.x)
         
-        if (distance <= SNAP_DISTANCE) {
+  if (distance <= snapDistance) {
           // Calcular prioridad (center > edge)
           const priority = (movingVLine.label === 'center' || otherVLine.label === 'center') ? 2 : 1
           
@@ -147,9 +147,9 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
     // Detectar snap horizontal (líneas horizontales)
     for (const movingHLine of movingPoints.horizontalLines) {
       for (const otherHLine of otherPoints.horizontalLines) {
-        const distance = Math.abs(movingHLine.y - otherHLine.y)
+  const distance = Math.abs(movingHLine.y - otherHLine.y)
         
-        if (distance <= SNAP_DISTANCE) {
+  if (distance <= snapDistance) {
           // Calcular prioridad (center > edge)
           const priority = (movingHLine.label === 'center' || otherHLine.label === 'center') ? 2 : 1
           
@@ -207,8 +207,8 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
     // Vertical page lines
     for (const movingVLine of movingPoints.verticalLines) {
       for (const pV of pageVLines) {
-        const distance = Math.abs(movingVLine.x - pV.x)
-        if (distance <= SNAP_DISTANCE) {
+  const distance = Math.abs(movingVLine.x - pV.x)
+  if (distance <= snapDistance) {
           const priority = (movingVLine.label === 'center' || pV.label.includes('center')) ? 2 : 1
           if (!snapResult.snappedX || priority > snapResult.snapPriorityX) {
             const adjustment = pV.x - movingVLine.x
@@ -236,8 +236,8 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
     // Horizontal page lines
     for (const movingHLine of movingPoints.horizontalLines) {
       for (const pH of pageHLines) {
-        const distance = Math.abs(movingHLine.y - pH.y)
-        if (distance <= SNAP_DISTANCE) {
+  const distance = Math.abs(movingHLine.y - pH.y)
+  if (distance <= snapDistance) {
           const priority = (movingHLine.label === 'center' || pH.label.includes('center')) ? 2 : 1
           if (!snapResult.snappedY || priority > snapResult.snapPriorityY) {
             const adjustment = pH.y - movingHLine.y
@@ -332,24 +332,36 @@ export function useObjectSnapping() {
    * @param {Array} otherElements - Otros elementos en el canvas
    * @returns {Object} - Posición final ajustada
    */
-  function performSnap(movingElement, candidateX, candidateY, otherElements, pageBounds) {
+  function performSnap(movingElement, candidateX, candidateY, otherElements, pageBounds, options = {}) {
     if (!movingElement) {
       clearGuides()
       return { x: candidateX, y: candidateY }
     }
 
     // Pasar pageBounds a detectSnap; permitir que pageBounds genere guías aun si no hay otros elementos
-    const snapResult = detectSnap(movingElement, candidateX, candidateY, otherElements || [], pageBounds)
+  // Allow caller to override snap distance (e.g. make XZ more strict)
+  const runtimeSnapDistance = (options && typeof options.snapDistance === 'number') ? options.snapDistance : snapDistance.value
+  const snapResult = detectSnap(movingElement, candidateX, candidateY, otherElements || [], pageBounds, runtimeSnapDistance)
     
     // Actualizar guías activas
     activeGuides.value = snapResult.guides
     isSnapping.value = snapResult.snappedX || snapResult.snappedY
-    
+
+    // Si se pidió solo mostrar guías, no ajustar la posición final
+    if (options && options.allowSnap === false) {
+      return {
+        x: candidateX,
+        y: candidateY,
+        snappedX: snapResult.snappedX,
+        snappedY: snapResult.snappedY,
+      }
+    }
+
     return {
       x: snapResult.x,
       y: snapResult.y,
       snappedX: snapResult.snappedX,
-      snappedY: snapResult.snappedY
+      snappedY: snapResult.snappedY,
     }
   }
   
@@ -361,40 +373,11 @@ export function useObjectSnapping() {
     isSnapping.value = false
   }
   
-  /**
-   * Establece la distancia de snap
-   */
-  function setSnapDistance(distance) {
-    snapDistance.value = Math.max(1, Math.min(50, distance))
-  }
-  
-  /**
-   * Establece la extensión de las guías
-   */
-  function setGuideExtend(extend) {
-    guideExtend.value = Math.max(10, Math.min(200, extend))
-  }
-  
-  // Computed para exponer configuración reactiva
-  const config = computed(() => ({
-    snapDistance: snapDistance.value,
-    guideExtend: guideExtend.value
-  }))
-  
+  // Retornar solo lo que se usa externamente (evitar exportar utilidades internas)
   return {
-    // Estado
     activeGuides: computed(() => activeGuides.value),
     isSnapping: computed(() => isSnapping.value),
-    config,
-    
-    // Métodos
     performSnap,
     clearGuides,
-    setSnapDistance,
-    setGuideExtend,
-    
-    // Utilidades para testing/debugging
-    getSnapPoints,
-    detectSnap
   }
 }

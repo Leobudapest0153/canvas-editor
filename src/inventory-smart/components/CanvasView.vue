@@ -100,8 +100,6 @@
             }"
           />
 
-
-        <!-- Aquí podrías añadir v-circle, etc., si tienes otras formas -->
       </template>
 
         <!-- Renderizado de elementos del store -->
@@ -606,8 +604,67 @@
       :isLocked="ctxIsLocked"
       @lockToggle="() => toggleLock(ctxElementId)"
       @delete="() => onDelete(ctxElementId)"
+      @saveTemplate="() => openTemplateModal(ctxElementId)"
       @close="ctx.close()"
     />
+
+    <!-- Modal Guardar como plantilla -->
+    <div
+      v-if="templateModalOpen"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="templateModalTitle"
+      @click.self="closeTemplateModal"
+    >
+      <form class="modal" @submit.prevent="saveTemplate">
+        <header class="modal-header">
+          <h3 id="templateModalTitle" class="title">Guardar como plantilla</h3>
+          <button type="button" class="close" @click="closeTemplateModal" aria-label="Cerrar">×</button>
+        </header>
+        <section class="modal-body">
+          <div class="template-modal__row">
+            <label for="templateName" class="template-modal__label">Nombre de la plantilla</label>
+            <input
+              id="templateName"
+              ref="templateNameInput"
+              v-model="templateName"
+              class="template-modal__input"
+              type="text"
+              maxlength="80"
+              required
+            />
+            <p v-if="templateError" class="template-modal__error">{{ templateError }}</p>
+          </div>
+          <div class="template-modal__row">
+            <div class="template-modal__summary" id="templateSummary">
+              <div>Tipo: {{ templateSummary.elementType }}</div>
+              <div>
+                Dimensiones: {{ templateSummary.width }}×{{ templateSummary.depth }}×{{
+                  templateSummary.height
+                }}
+              </div>
+              <div>Hijos: {{ templateSummary.childrenCount }}</div>
+            </div>
+          </div>
+          <div class="template-modal__row">
+            <label for="templateNotes" class="template-modal__label">Notas</label>
+            <textarea
+              id="templateNotes"
+              v-model="templateNotes"
+              class="template-modal__textarea"
+              rows="3"
+            ></textarea>
+          </div>
+        </section>
+        <footer class="modal-footer">
+          <button type="button" class="btn" @click="closeTemplateModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" :disabled="!templateName.trim() || isSaving">
+            Guardar
+          </button>
+        </footer>
+      </form>
+    </div>
 
   <!-- Información de zoom, vista y dimensiones -->
   <div ref="canvasInfoRef" class="canvas-info" :style="canvasInfoStyle">
@@ -752,6 +809,7 @@ import { useContextMenu } from '@/inventory-smart/composables/useContextMenu'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
+import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation'
 import { applyEdgeConstraint } from '@/inventory-smart/utils/edgeConstraint'
 import { resetEdgeState } from '@/inventory-smart/composables/useEdgeState'
@@ -889,6 +947,95 @@ const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId:
 const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
+const catalogStore = useCatalogStore()
+
+const templateModalOpen = ref(false)
+const templateName = ref('')
+const templateNotes = ref('')
+const templateError = ref('')
+const templateSummary = ref({ elementType: '', width: 0, height: 0, depth: 0, childrenCount: 0 })
+const templatePayload = ref(null)
+const templateNameInput = ref(null)
+const isSaving = ref(false)
+
+const openTemplateModal = (elementId) => {
+  const el = canvasStore.elementoPorId(elementId)
+  if (!el) return
+  const serialized = buffer.serializeElementForTemplate(elementId)
+  if (!serialized) return
+  const elementsArr = Array.from(serialized.allElements.values())
+  templatePayload.value = {
+    rootId: serialized.rootElement.id,
+    elements: elementsArr,
+  }
+  templateSummary.value = {
+    elementType: serialized.rootElement.tipo || '',
+    width: serialized.rootElement.dimensiones?.ancho || 0,
+    depth: serialized.rootElement.dimensiones?.largo || 0,
+    height: serialized.rootElement.dimensiones?.alto || 0,
+    childrenCount: elementsArr.length - 1,
+  }
+  templateName.value = el.nombre || ''
+  templateNotes.value = ''
+  templateError.value = ''
+  templateModalOpen.value = true
+  nextTick(() => templateNameInput.value?.focus?.())
+  ctx.close()
+}
+
+const closeTemplateModal = () => {
+  templateModalOpen.value = false
+}
+
+const saveTemplate = () => {
+  if (isSaving.value) return
+  const name = templateName.value.trim()
+  if (!name) {
+    templateError.value = 'El nombre es obligatorio'
+    return
+  }
+  if (catalogStore.getTemplateByName(name)) {
+    templateError.value = 'Ya existe una plantilla con ese nombre'
+    return
+  }
+  isSaving.value = true
+  const now = new Date().toISOString()
+  const root =
+    templatePayload.value?.elements?.find(
+      (e) => e.id === templatePayload.value?.rootId,
+    ) || {}
+  const template = {
+    id: `tpl_${Date.now().toString(36)}`,
+    name,
+    createdAt: now,
+    updatedAt: now,
+    meta: {
+      elementType: templateSummary.value.elementType,
+      width: templateSummary.value.width,
+      height: templateSummary.value.height,
+      depth: templateSummary.value.depth,
+      childrenCount: templateSummary.value.childrenCount,
+      weight: root.pesoMaximo,
+      location: root.ubicacion,
+    },
+    payload: templatePayload.value,
+    notes: templateNotes.value.trim() || undefined,
+    tags: [],
+  }
+  catalogStore.addTemplate(template)
+  showToast('Plantilla guardada', 'success')
+  templateModalOpen.value = false
+  isSaving.value = false
+}
+
+const onTemplateKeydown = (e) => {
+  if (e.key === 'Escape') closeTemplateModal()
+}
+
+watch(templateModalOpen, (val) => {
+  if (val) window.addEventListener('keydown', onTemplateKeydown)
+  else window.removeEventListener('keydown', onTemplateKeydown)
+})
 const dimensionValidation = useDimensionValidation()
 
 // Object snapping
@@ -1009,6 +1156,14 @@ const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
       accDy += dy
     }
 
+    // Ignorar correcciones muy pequeñas (ruido/rounding) SOLO en vista frontal (XZ)
+    if (canvasStore.vistaActiva === 'XZ') {
+      const MIN_NUDGE_PX = 0.5
+      if (Math.abs(accDx) < MIN_NUDGE_PX && Math.abs(accDy) < MIN_NUDGE_PX) break
+      if (Math.abs(accDx) < MIN_NUDGE_PX) accDx = 0
+      if (Math.abs(accDy) < MIN_NUDGE_PX) accDy = 0
+    }
+
     // Proyección del MTD contra el contorno rectangular
     if (boundary.type === 'rect') {
       const proj = projectMTDAgainstBoundary(x, y, accDx, accDy, w, h, W, H)
@@ -1030,8 +1185,8 @@ const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
       y = c2.y
     }
 
-    // Si la corrección fue nula, detener
-    if (Math.abs(accDx) < 1e-6 && Math.abs(accDy) < 1e-6) break
+  // Si la corrección fue nula o insignificante, detener
+  if (Math.abs(accDx) < 1e-6 && Math.abs(accDy) < 1e-6) break
   }
 
   // Validaciones finales: si aún hay colisión bloqueante o quedó fuera, volver a última válida
@@ -1237,19 +1392,32 @@ const handleStageMouseDown = (e) => {
 
 const handleStageClick = (e) => {
   // Deseleccionar elemento si click en área vacía
-  if (e.target === e.target.getStage()) {
+  if (e.target === e.target.getStage() && !canvasStore.cambiosNoAplicados) {
   canvasStore.seleccionarElemento(null)
   // Cerrar controles y edición cuando se hace click en el stage vacío
   speedDialOpen.value = false
   editingElementId.value = null
   // Limpiar guías de snapping
   clearGuides()
+    return;
+  }
+
+  // Resaltar sección de guardados
+  if (canvasStore.cambiosNoAplicados && e.target === e.target.getStage() && canvasStore.elementoSeleccionado) {
+    const msg = "Tienes cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' })
   }
 }
 
 // === FUNCIONES DE ELEMENTOS ===
 const selectElement = (elementId) => {
   console.log('Seleccionando elemento:', elementId)
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elementId;
+  if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado && isNotCurrentElement) {
+    const msg = "No puedes seleccionar un nuevo elemento con cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' });
+    return;
+  }
   canvasStore.seleccionarElemento(elementId)
   // Si el modo arrastre global está activado y el elemento NO está bloqueado, activar edición (transformer)
   if (dragModeGlobal.value && elementId && !isElementLocked(elementId)) {
@@ -1266,6 +1434,11 @@ const handleElementDoubleClick = (elemento) => {
   // Verificar si el elemento puede tener hijos (contenedor)
   const tiposContenedor = ['elementos', 'contenedores']
 
+  if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
+    const msg = "No puedes entrar a un elemento si tienes cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' })
+    return;
+  }
   if (tiposContenedor.includes(elemento.tipo)) {
     console.log('Navegando al interior del elemento:', elemento.nombre)
     canvasStore.navegarAElemento(elemento.id)
@@ -1327,6 +1500,16 @@ const startElementDrag = (elementId) => {
     // Si está bloqueado, no iniciar drag ni mover el layer
     isElementDragging.value = false
     stageDragEnabled.value = false
+    return
+  }
+
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elementId;
+  if (canvasStore.cambiosNoAplicados && isNotCurrentElement) {
+    isElementDragging.value = false;
+    stageDragEnabled.value = false;
+
+    const msg = "No puedes arrastrar un elemento con cambios pendientes de guardar";
+    window?.__toasts?.show?.(msg, { type: 'warn' });
     return
   }
   console.log('Iniciando arrastre del elemento:', elementId)
@@ -1468,6 +1651,9 @@ const startElementDrag = (elementId) => {
 }
 
 const updateElementPosition = (e, elementId) => {
+  if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
+    return;
+  }
   const target = e.target
   let x = target.x()
   let y = target.y()
@@ -1477,9 +1663,23 @@ const updateElementPosition = (e, elementId) => {
   // Aplicar object snapping solo si está habilitado y hay movimiento activo
   if (isSnappingEnabled.value && isElementDragging.value) {
     const otherElements = canvasStore.elementosVisibles.filter(el => el.id !== elementId)
-  const snapResult = performSnap(elemento, x, y, otherElements, { width: layerConfig.value.width, height: layerConfig.value.height })
+    // Evitar object-snapping en vista frontal (XZ) — causa "ajuste invisible"
+    let snapResult = { x, y }
+    if (canvasStore.vistaActiva !== 'XZ') {
+      snapResult = performSnap(elemento, x, y, otherElements, { width: layerConfig.value.width, height: layerConfig.value.height })
+    } else {
+      // En XZ mostrar guías pero no mover el elemento; usar snapDistance menor para mayor precisión visual
+      snapResult = performSnap(
+        elemento,
+        x,
+        y,
+        otherElements,
+        { width: layerConfig.value.width, height: layerConfig.value.height },
+        { allowSnap: false, snapDistance: 0.5 }
+      )
+    }
 
-    // Usar la posición ajustada por snapping
+    // Usar la posición ajustada por snapping (o la original si se omitió)
     x = snapResult.x
     y = snapResult.y
   } else {
@@ -1554,12 +1754,14 @@ const endElementDrag = async (elementId) => {
         asRect.__strokePx = strokePx
 
         // Ejecutar finalizePlacement primero
+        const effectiveGrid = canvasStore.vistaActiva === 'XZ' ? 0 : (canvasStore.gridSize ?? GRID_SIZE)
+
         const solved = finalizePlacement({
           candidate: { x: candX, y: candY },
           movingEl: asRect,
           neighbors,
           areaBounds,
-          grid: canvasStore.gridSize ?? GRID_SIZE,
+          grid: effectiveGrid,
           lastValidPos: lastPos,
           CM_TO_PX,
           strokePx,
@@ -1600,7 +1802,7 @@ const endElementDrag = async (elementId) => {
             movingEl: asRect,
             neighbors,
             areaBounds,
-            grid: canvasStore.gridSize ?? GRID_SIZE,
+            grid: effectiveGrid,
             lastValidPos: lastPos,
             CM_TO_PX,
             strokePx,
@@ -1813,6 +2015,8 @@ const handleDrop = (e) => {
       createElementFromDrop(data, e)
     } else if (data.tipo === 'buffer-element') {
       createElementFromBuffer(data, e)
+    } else if (data.tipo === 'plantilla-catalogo') {
+      createElementFromTemplate(data, e)
     }
   } catch (error) {
     console.error('Error procesando drop:', error)
@@ -1942,8 +2146,9 @@ const createElementFromDrop = (data, dropEvent) => {
   let candX = worldCoords.x - finalWidth / 2
   let candY = worldCoords.y - finalHeight / 2
 
-  // 3. Aplicar snap a grilla ANTES de validar (usar valor runtime de canvasStore.gridSize: 0 desactiva)
-  const snapped = snapToGrid(candX, candY, canvasStore.gridSize ?? GRID_SIZE)
+  // 3. Aplicar snap a grilla ANTES de validar (usar effectiveGrid: 0 en XZ desactiva)
+  const effectiveGrid = canvasStore.vistaActiva === 'XZ' ? 0 : (canvasStore.gridSize ?? GRID_SIZE)
+  const snapped = snapToGrid(candX, candY, effectiveGrid)
   candX = snapped.x
   candY = snapped.y
 
@@ -2039,7 +2244,7 @@ const createElementFromDrop = (data, dropEvent) => {
       boundary,
       allElements,
       tempElement,
-      canvasStore.gridSize ?? GRID_SIZE,
+      effectiveGrid,
       16, // máximo 16 intentos
       detectConflictsFor, // Pasar la función como parámetro
     )
@@ -2199,16 +2404,25 @@ const onShapeDragMove = (e, el) => {
       const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
       const otherElements = siblings.filter(sibling => sibling.id !== el.id)
 
-      if (otherElements.length > 0) {
+        if (otherElements.length > 0) {
         // Convertir posición del shape a coordenadas de elemento
         const elementX = constrainedWorld.x
         const elementY = constrainedWorld.y
 
-        // Aplicar snapping
-        const snapResult = performSnap(el, elementX, elementY, otherElements, { width: layerConfig.value.width, height: layerConfig.value.height })
+          // Aplicar snapping: en XZ solo mostrar guías (allowSnap:false)
+          const snapResult = canvasStore.vistaActiva !== 'XZ'
+            ? performSnap(el, elementX, elementY, otherElements, { width: layerConfig.value.width, height: layerConfig.value.height })
+            : performSnap(
+                el,
+                elementX,
+                elementY,
+                otherElements,
+                { width: layerConfig.value.width, height: layerConfig.value.height },
+                { allowSnap: false, snapDistance: 0.5 }
+              )
 
-        // Convertir de vuelta a coordenadas del shape
-        finalWorld = { x: snapResult.x, y: snapResult.y }
+          // Convertir de vuelta a coordenadas del shape (si allowSnap:false, snapResult.x/y == elementX/elementY)
+          finalWorld = { x: snapResult.x, y: snapResult.y }
       }
     }
 const guardRes = onDragMoveGuard(el, { x: finalWorld.x, y: finalWorld.y })
@@ -2504,6 +2718,14 @@ const createElementFromBuffer = (data, dropEvent) => {
   }
 }
 
+const createElementFromTemplate = (data, dropEvent) => {
+  const pos = getWorldCoordinatesFromPointer(dropEvent)
+  const newId = buffer.pasteFromSerialized(data.payload, pos)
+  if (!newId) {
+    showToast('No se pudo insertar la plantilla', 'error')
+  }
+}
+
 // === NUEVO: Estado SpeedDial & modos ===
 const speedDialOpen = ref(false)
 // Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
@@ -2571,7 +2793,9 @@ const toggleSnapping = () => {
 
 const canDragElement = (id) => {
   // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
-  if (isElementLocked(id)) return false
+  // Y si no hay cambios sin aplicar de otro elemento
+  const isNotCurrentElement = canvasStore.elementoSeleccionado != id;
+  if (isElementLocked(id) || (canvasStore.cambiosNoAplicados && isNotCurrentElement)) return false
   return dragModeGlobal.value
 }
 
@@ -3221,6 +3445,9 @@ const onShapeContextMenu = (evt, elemento) => {
   if (isElementDragging.value || (typeof window !== 'undefined' && window.__dvCanvasDragActive)) {
     return
   }
+  // No abrir si hay cambios pendientes
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elemento.id;
+  if (canvasStore.cambiosNoAplicados && isNotCurrentElement) return;
   // Asegurar selección del shape antes de abrir
   if (canvasStore.elementoSeleccionado !== elemento.id) {
     canvasStore.seleccionarElemento(elemento.id)

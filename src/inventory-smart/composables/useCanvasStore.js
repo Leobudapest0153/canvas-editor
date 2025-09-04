@@ -26,10 +26,15 @@ import {
   validateZStacking,
   errorsPlacement,
 } from '@/inventory-smart/validation/placementOrchestrator'
+// Importar store de catálogo para sincronizar selección al abrir detalle
+import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 
 export const useCanvasStore = defineStore('canvas', () => {
   const { showToast } = useToast()
   const { serialize: _serialize, deserialize: _deserialize, persist: _persist } = useStatePersistence()
+
+  // Instancia del catálogo
+  const catalogStore = useCatalogStore()
 
   // === INTEGRACIÓN CON HISTORIAL ===
   // Instancia del historial - se establece desde useCanvasWithHistory
@@ -84,6 +89,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   const etiquetasSeleccionadas = ref([])
 
   const elementoSeleccionado = ref(null)
+  const cambiosNoAplicados = ref(false);
+
   const vistaActiva = computed(() => {
     // Vista automática según el contexto
     if (estaEnPlanta.value) {
@@ -610,6 +617,10 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Actions
   const seleccionarElemento = (id) => {
     elementoSeleccionado.value = id
+    // Forzar catálogo de 'elementos' al abrir detalle si estaba en 'plantillas'
+    if (id && catalogStore.selectedCatalog === 'plantillas') {
+      catalogStore.setSelectedCatalog('elementos')
+    }
   }
 
   const actualizarPosicion = (id, x, y, saveHistory = false, description = null) => {
@@ -1352,6 +1363,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     console.log('💾 Instancia de autosave establecida en el store')
   }
 
+
+  // Marcar si existen cambios
+  const setCambiosNoAplicados = (value = false) => {
+    cambiosNoAplicados.value = value;
+  }
+
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
   watch(
     () => [contextoNavegacion.value.tipo, contextoNavegacion.value.id],
@@ -1400,6 +1417,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     idsElementosFiltrados,
     elementoAura,
     isDraggable,
+    cambiosNoAplicados,
 
     // Getters
     elementosVisibles,
@@ -1422,6 +1440,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Actions - Canvas
     seleccionarElemento,
+    setCambiosNoAplicados,
     actualizarPosicion,
     actualizarElemento,
     updateElementById,
@@ -1486,5 +1505,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     actualizarIdsFiltrados,
 
     setDraggableMode,
+
   }
 })

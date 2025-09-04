@@ -6,6 +6,8 @@ export const useCatalogStore = defineStore('catalog', () => {
   const items = ref(ELEMENTOS_PREDEFINIDOS)
   const searchText = ref('')
   const selectedCategory = ref(null)
+  const selectedCatalog = ref('elementos')
+  const templates = ref([])
 
   const catalogContext = ref({ mode: 'root', currentId: undefined, currentType: undefined })
 
@@ -50,12 +52,72 @@ export const useCatalogStore = defineStore('catalog', () => {
     catalogContext.value = ctx
   }
 
+  const setSelectedCatalog = (val) => {
+    selectedCatalog.value = val
+  }
+
+  const addTemplate = (template) => {
+    templates.value.push(template)
+    saveTemplatesToLocalStorage()
+  }
+
+  const removeTemplate = (id) => {
+    const idx = templates.value.findIndex((t) => t.id === id)
+    if (idx !== -1) {
+      templates.value.splice(idx, 1)
+      saveTemplatesToLocalStorage()
+    }
+  }
+
+  const loadTemplatesFromLocalStorage = () => {
+    try {
+      const raw = localStorage.getItem('inventory.templates')
+      templates.value = raw ? JSON.parse(raw) : []
+    } catch {
+      templates.value = []
+    }
+  }
+
+  const saveTemplatesToLocalStorage = () => {
+    try {
+      localStorage.setItem('inventory.templates', JSON.stringify(templates.value))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const getTemplateByName = (name) => {
+    const n = name?.toLowerCase?.() || ''
+    return templates.value.find((t) => t.name?.toLowerCase?.() === n)
+  }
+
+  const searchTemplates = (query) => {
+    const q = query?.toLowerCase?.() || ''
+    return templates.value
+      .slice()
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+      .filter(
+        (t) =>
+          t.name?.toLowerCase?.().includes(q) ||
+          t.notes?.toLowerCase?.().includes(q)
+      )
+  }
+
   return {
     items,
     searchText,
     selectedCategory,
+    selectedCatalog,
+    templates,
     catalogContext,
     setCatalogContext,
+    setSelectedCatalog,
+    addTemplate,
+    removeTemplate,
+    loadTemplatesFromLocalStorage,
+    saveTemplatesToLocalStorage,
+    getTemplateByName,
+    searchTemplates,
     allowedTypesForContext,
     baseSystemGuard,
     filteredCatalogItems,
