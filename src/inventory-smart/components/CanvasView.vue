@@ -627,7 +627,15 @@
       :isLocked="ctxIsLocked"
       @lockToggle="() => toggleLock(ctxElementId)"
       @delete="() => onDelete(ctxElementId)"
+      @saveTemplate="() => openSaveTemplate(ctxElementId)"
       @close="ctx.close()"
+    />
+
+    <SaveTemplateModal
+      :visible="showSaveTemplate"
+      :summary="currentSummary"
+      @close="closeSaveTemplate"
+      @save="handleSaveTemplate"
     />
 
   <!-- Información de zoom, vista y dimensiones -->
@@ -784,6 +792,9 @@ import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/inventory-smart/utils/simulateProducts'
 import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import SaveTemplateModal from '@/inventory-smart/components/templates/SaveTemplateModal.vue'
+import { useTemplatesStore } from '@/inventory-smart/stores/templates.js'
+import { serializeSubtree, summarize } from '@/inventory-smart/services/templates/serialize.js'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -909,6 +920,28 @@ const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId:
 const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
+const templatesStore = useTemplatesStore()
+const showSaveTemplate = ref(false)
+const currentSummary = ref(null)
+let serializedTemplate = null
+
+const openSaveTemplate = (elementId) => {
+  const data = serializeSubtree(elementId, { unitMode: 'px' })
+  if (!data) return
+  serializedTemplate = data
+  currentSummary.value = summarize(data)
+  showSaveTemplate.value = true
+}
+
+const closeSaveTemplate = () => {
+  showSaveTemplate.value = false
+}
+
+const handleSaveTemplate = async ({ name }) => {
+  if (!serializedTemplate) return
+  await templatesStore.createTemplate({ ...serializedTemplate, name, summary: currentSummary.value })
+  showSaveTemplate.value = false
+}
 
 // Object snapping
 const {

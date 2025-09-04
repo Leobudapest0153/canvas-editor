@@ -129,7 +129,7 @@ describe('Context menu', () => {
     // eliminar cuando no está bloqueado
     emitContextMenuOnFirstShape(wrapper, 20, 25)
     await nextTick()
-    const delBtn = document.querySelectorAll('.sdx-item')[1]
+    const delBtn = document.querySelectorAll('.sdx-item')[2]
     delBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await nextTick()
     expect(store.elementoPorId('el1')).toBeUndefined()
@@ -140,7 +140,7 @@ describe('Context menu', () => {
     await nextTick()
     emitContextMenuOnFirstShape(wrapper, 20, 25)
     await nextTick()
-    const delBtn2 = document.querySelectorAll('.sdx-item')[1]
+    const delBtn2 = document.querySelectorAll('.sdx-item')[2]
     delBtn2.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     await nextTick()
     expect(store.elementoPorId('el1')).toBeTruthy()

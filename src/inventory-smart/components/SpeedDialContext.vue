@@ -21,6 +21,15 @@
     </button>
     <button
       ref="itemRefs[1]"
+      class="sdx-item"
+      role="menuitem"
+      aria-label="Guardar plantilla"
+      @click="emitSave"
+    >
+      Guardar plantilla
+    </button>
+    <button
+      ref="itemRefs[2]"
       class="sdx-item sdx-danger"
       role="menuitem"
       aria-label="Eliminar"
@@ -42,10 +51,10 @@ const props = defineProps({
   y: { type: Number, default: 0 },
   isLocked: { type: Boolean, default: false },
 })
-const emit = defineEmits(['lockToggle', 'delete', 'close'])
+const emit = defineEmits(['lockToggle', 'saveTemplate', 'delete', 'close'])
 
 const menuRef = ref(null)
-const itemRefs = [ref(null), ref(null)]
+const itemRefs = [ref(null), ref(null), ref(null)]
 const focusedIndex = ref(0)
 
 const pos = ref({ left: 0, top: 0 })
@@ -111,6 +120,7 @@ const onKeydown = (e) => {
     itemRefs[focusedIndex.value].value?.focus?.()
   } else if (e.key === 'Enter' || e.key === ' ') {
     if (focusedIndex.value === 0) emitLock()
+    else if (focusedIndex.value === 1) emitSave()
     else emitDelete()
   } else if (e.key === 'Escape') {
     emit('close')
@@ -122,6 +132,9 @@ const emitLock = () => {
 }
 const emitDelete = () => {
   emit('delete')
+}
+const emitSave = () => {
+  emit('saveTemplate')
 }
 </script>
 
