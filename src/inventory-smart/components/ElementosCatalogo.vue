@@ -16,8 +16,8 @@
 <template>
   <div class="elementos-catalogo h-full flex flex-col bg-white border-r border-gray-200">
     <!-- Header del catálogo -->
-    <div class="catalogo-header p-4 border-b border-gray-200">
-      <div class="flex items-center justify-between mb-3">
+    <div class="catalogo-header p-1 border-b border-gray-200">
+      <div class="flex items-center justify-between">
         <h2 class="text-base font-semibold text-gray-800 m-0">{{ tituloContextual }}</h2>
         <button
           v-if="puedeCrearElementosPersonalizados"
