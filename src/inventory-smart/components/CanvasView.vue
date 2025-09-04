@@ -1005,6 +1005,14 @@ const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
       accDy += dy
     }
 
+    // Ignorar correcciones muy pequeñas (ruido/rounding) SOLO en vista frontal (XZ)
+    if (canvasStore.vistaActiva === 'XZ') {
+      const MIN_NUDGE_PX = 0.5
+      if (Math.abs(accDx) < MIN_NUDGE_PX && Math.abs(accDy) < MIN_NUDGE_PX) break
+      if (Math.abs(accDx) < MIN_NUDGE_PX) accDx = 0
+      if (Math.abs(accDy) < MIN_NUDGE_PX) accDy = 0
+    }
+
     // Proyección del MTD contra el contorno rectangular
     if (boundary.type === 'rect') {
       const proj = projectMTDAgainstBoundary(x, y, accDx, accDy, w, h, W, H)
@@ -1026,8 +1034,8 @@ const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
       y = c2.y
     }
 
-    // Si la corrección fue nula, detener
-    if (Math.abs(accDx) < 1e-6 && Math.abs(accDy) < 1e-6) break
+  // Si la corrección fue nula o insignificante, detener
+  if (Math.abs(accDx) < 1e-6 && Math.abs(accDy) < 1e-6) break
   }
 
   // Validaciones finales: si aún hay colisión bloqueante o quedó fuera, volver a última válida
@@ -1504,9 +1512,23 @@ const updateElementPosition = (e, elementId) => {
   // Aplicar object snapping solo si está habilitado y hay movimiento activo
   if (isSnappingEnabled.value && isElementDragging.value) {
     const otherElements = canvasStore.elementosVisibles.filter(el => el.id !== elementId)
-  const snapResult = performSnap(elemento, x, y, otherElements, { width: layerConfig.value.width, height: layerConfig.value.height })
+    // Evitar object-snapping en vista frontal (XZ) — causa "ajuste invisible"
+    let snapResult = { x, y }
+    if (canvasStore.vistaActiva !== 'XZ') {
+      snapResult = performSnap(elemento, x, y, otherElements, { width: layerConfig.value.width, height: layerConfig.value.height })
+    } else {
+      // En XZ mostrar guías pero no mover el elemento; usar snapDistance menor para mayor precisión visual
+      snapResult = performSnap(
+        elemento,
+        x,
+        y,
+        otherElements,
+        { width: layerConfig.value.width, height: layerConfig.value.height },
+        { allowSnap: false, snapDistance: 0.5 }
+      )
+    }
 
-    // Usar la posición ajustada por snapping
+    // Usar la posición ajustada por snapping (o la original si se omitió)
     x = snapResult.x
     y = snapResult.y
   } else {
@@ -1581,12 +1603,14 @@ const endElementDrag = async (elementId) => {
         asRect.__strokePx = strokePx
 
         // Ejecutar finalizePlacement primero
+        const effectiveGrid = canvasStore.vistaActiva === 'XZ' ? 0 : (canvasStore.gridSize ?? GRID_SIZE)
+
         const solved = finalizePlacement({
           candidate: { x: candX, y: candY },
           movingEl: asRect,
           neighbors,
           areaBounds,
-          grid: canvasStore.gridSize ?? GRID_SIZE,
+          grid: effectiveGrid,
           lastValidPos: lastPos,
           CM_TO_PX,
           strokePx,
@@ -1627,7 +1651,7 @@ const endElementDrag = async (elementId) => {
             movingEl: asRect,
             neighbors,
             areaBounds,
-            grid: canvasStore.gridSize ?? GRID_SIZE,
+            grid: effectiveGrid,
             lastValidPos: lastPos,
             CM_TO_PX,
             strokePx,
@@ -1969,8 +1993,9 @@ const createElementFromDrop = (data, dropEvent) => {
   let candX = worldCoords.x - finalWidth / 2
   let candY = worldCoords.y - finalHeight / 2
 
-  // 3. Aplicar snap a grilla ANTES de validar (usar valor runtime de canvasStore.gridSize: 0 desactiva)
-  const snapped = snapToGrid(candX, candY, canvasStore.gridSize ?? GRID_SIZE)
+  // 3. Aplicar snap a grilla ANTES de validar (usar effectiveGrid: 0 en XZ desactiva)
+  const effectiveGrid = canvasStore.vistaActiva === 'XZ' ? 0 : (canvasStore.gridSize ?? GRID_SIZE)
+  const snapped = snapToGrid(candX, candY, effectiveGrid)
   candX = snapped.x
   candY = snapped.y
 
@@ -2066,7 +2091,7 @@ const createElementFromDrop = (data, dropEvent) => {
       boundary,
       allElements,
       tempElement,
-      canvasStore.gridSize ?? GRID_SIZE,
+      effectiveGrid,
       16, // máximo 16 intentos
       detectConflictsFor, // Pasar la función como parámetro
     )
@@ -2226,16 +2251,25 @@ const onShapeDragMove = (e, el) => {
       const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
       const otherElements = siblings.filter(sibling => sibling.id !== el.id)
 
-      if (otherElements.length > 0) {
+        if (otherElements.length > 0) {
         // Convertir posición del shape a coordenadas de elemento
         const elementX = constrainedWorld.x
         const elementY = constrainedWorld.y
 
-        // Aplicar snapping
-        const snapResult = performSnap(el, elementX, elementY, otherElements, { width: layerConfig.value.width, height: layerConfig.value.height })
+          // Aplicar snapping: en XZ solo mostrar guías (allowSnap:false)
+          const snapResult = canvasStore.vistaActiva !== 'XZ'
+            ? performSnap(el, elementX, elementY, otherElements, { width: layerConfig.value.width, height: layerConfig.value.height })
+            : performSnap(
+                el,
+                elementX,
+                elementY,
+                otherElements,
+                { width: layerConfig.value.width, height: layerConfig.value.height },
+                { allowSnap: false, snapDistance: 0.5 }
+              )
 
-        // Convertir de vuelta a coordenadas del shape
-        finalWorld = { x: snapResult.x, y: snapResult.y }
+          // Convertir de vuelta a coordenadas del shape (si allowSnap:false, snapResult.x/y == elementX/elementY)
+          finalWorld = { x: snapResult.x, y: snapResult.y }
       }
     }
 const guardRes = onDragMoveGuard(el, { x: finalWorld.x, y: finalWorld.y })
