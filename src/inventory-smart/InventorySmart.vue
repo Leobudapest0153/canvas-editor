@@ -286,6 +286,29 @@ onUnmounted(() => {
     border-radius: 0.375rem;
   }
 }
+
+/* ====== INVENTORY: Estilos del modal 'Guardar como plantilla' ===========================
+   Contexto: Catálogo de Plantillas — creación desde elemento existente.
+   NOTA: mantener estos estilos aquí; no crear nuevos archivos de estilos.
+======================================================================================== */
+.template-modal__row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.template-modal__label { font-weight: 600; font-size: 0.95rem; }
+.template-modal__input,
+.template-modal__textarea {
+  width: 100%; border: 1px solid var(--border-color, #e3e6eb); border-radius: 8px;
+  padding: 8px 10px; background: #fff; font: inherit;
+}
+.template-modal__input:focus,
+.template-modal__textarea:focus {
+  outline: none; box-shadow: 0 0 0 3px rgba(38,132,255,.25);
+}
+.template-modal__summary {
+  font-size: 0.9rem; color: var(--text-muted, #5b6473);
+  background: var(--bg-muted, #f7f8fa); border: 1px solid var(--border-color, #e3e6eb);
+  border-radius: 8px; padding: 10px;
+}
+.template-modal__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.template-modal__error { color: #c62828; font-size: 0.85rem; }
 </style>
 
 <style scoped>

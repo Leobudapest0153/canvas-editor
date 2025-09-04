@@ -627,8 +627,66 @@
       :isLocked="ctxIsLocked"
       @lockToggle="() => toggleLock(ctxElementId)"
       @delete="() => onDelete(ctxElementId)"
+      @saveTemplate="() => openTemplateModal(ctxElementId)"
       @close="ctx.close()"
     />
+
+    <!-- Modal Guardar como plantilla -->
+    <div
+      v-if="templateModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center"
+    >
+      <div class="absolute inset-0 bg-black/50" @click="closeTemplateModal"></div>
+      <div
+        class="relative bg-white rounded-lg p-4 w-[90%] max-w-md"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="templateModalTitle"
+      >
+        <form @submit.prevent="saveTemplate">
+          <h2 id="templateModalTitle" class="text-lg font-semibold mb-4">
+            Guardar como plantilla
+          </h2>
+          <div class="template-modal__row">
+            <label for="templateName" class="template-modal__label">Nombre de la plantilla</label>
+            <input
+              id="templateName"
+              ref="templateNameInput"
+              v-model="templateName"
+              class="template-modal__input"
+              type="text"
+              maxlength="80"
+              required
+            />
+            <p v-if="templateError" class="template-modal__error">{{ templateError }}</p>
+          </div>
+          <div class="template-modal__row">
+            <div class="template-modal__summary" id="templateSummary">
+              <div>Tipo: {{ templateSummary.elementType }}</div>
+              <div>
+                Dimensiones: {{ templateSummary.width }}×{{ templateSummary.depth }}×{{
+                  templateSummary.height
+                }}
+              </div>
+              <div>Hijos: {{ templateSummary.childrenCount }}</div>
+            </div>
+          </div>
+          <div class="template-modal__row">
+            <label for="templateNotes" class="template-modal__label">Notas</label>
+            <textarea
+              id="templateNotes"
+              v-model="templateNotes"
+              class="template-modal__textarea"
+              rows="3"
+            ></textarea>
+          </div>
+          <div class="template-modal__actions">
+            <button type="button" @click="closeTemplateModal">Cancelar</button>
+            <button type="submit" :disabled="!templateName.trim()">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
   <!-- Información de zoom, vista y dimensiones -->
   <div ref="canvasInfoRef" class="canvas-info" :style="canvasInfoStyle">
@@ -773,6 +831,7 @@ import { useContextMenu } from '@/inventory-smart/composables/useContextMenu'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
+import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { applyEdgeConstraint } from '@/inventory-smart/utils/edgeConstraint'
 import { resetEdgeState } from '@/inventory-smart/composables/useEdgeState'
 import { finalizePlacement } from '@/inventory-smart/utils/finalizeDrag'
@@ -909,6 +968,85 @@ const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId:
 const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
+const catalogStore = useCatalogStore()
+
+const templateModalOpen = ref(false)
+const templateName = ref('')
+const templateNotes = ref('')
+const templateError = ref('')
+const templateSummary = ref({ elementType: '', width: 0, height: 0, depth: 0, childrenCount: 0 })
+const templatePayload = ref(null)
+const templateNameInput = ref(null)
+
+const openTemplateModal = (elementId) => {
+  const el = canvasStore.elementoPorId(elementId)
+  if (!el) return
+  const serialized = buffer.serializeElementForTemplate(elementId)
+  if (!serialized) return
+  const elementsArr = Array.from(serialized.allElements.values())
+  templatePayload.value = {
+    rootId: serialized.rootElement.id,
+    elements: elementsArr,
+  }
+  templateSummary.value = {
+    elementType: serialized.rootElement.tipo || '',
+    width: serialized.rootElement.dimensiones?.ancho || 0,
+    depth: serialized.rootElement.dimensiones?.largo || 0,
+    height: serialized.rootElement.dimensiones?.alto || 0,
+    childrenCount: elementsArr.length - 1,
+  }
+  templateName.value = el.nombre || ''
+  templateNotes.value = ''
+  templateError.value = ''
+  templateModalOpen.value = true
+  nextTick(() => templateNameInput.value?.focus?.())
+  ctx.close()
+}
+
+const closeTemplateModal = () => {
+  templateModalOpen.value = false
+}
+
+const saveTemplate = () => {
+  const name = templateName.value.trim()
+  if (!name) {
+    templateError.value = 'El nombre es obligatorio'
+    return
+  }
+  if (catalogStore.getTemplateByName(name)) {
+    templateError.value = 'Ya existe una plantilla con ese nombre'
+    return
+  }
+  const now = new Date().toISOString()
+  const template = {
+    id: `tpl_${Date.now().toString(36)}`,
+    name,
+    createdAt: now,
+    updatedAt: now,
+    meta: {
+      elementType: templateSummary.value.elementType,
+      width: templateSummary.value.width,
+      height: templateSummary.value.height,
+      depth: templateSummary.value.depth,
+      childrenCount: templateSummary.value.childrenCount,
+    },
+    payload: templatePayload.value,
+    notes: templateNotes.value.trim() || undefined,
+    tags: [],
+  }
+  catalogStore.addTemplate(template)
+  showToast('Plantilla guardada', 'success')
+  templateModalOpen.value = false
+}
+
+const onTemplateKeydown = (e) => {
+  if (e.key === 'Escape') closeTemplateModal()
+}
+
+watch(templateModalOpen, (val) => {
+  if (val) window.addEventListener('keydown', onTemplateKeydown)
+  else window.removeEventListener('keydown', onTemplateKeydown)
+})
 
 // Object snapping
 const {
@@ -1832,6 +1970,8 @@ const handleDrop = (e) => {
       createElementFromDrop(data, e)
     } else if (data.tipo === 'buffer-element') {
       createElementFromBuffer(data, e)
+    } else if (data.tipo === 'plantilla-catalogo') {
+      createElementFromTemplate(data, e)
     }
   } catch (error) {
     console.error('Error procesando drop:', error)
@@ -2520,6 +2660,14 @@ const createElementFromBuffer = (data, dropEvent) => {
     )
     // Seleccionar el elemento recién pegado
     canvasStore.seleccionarElemento(newElementId)
+  }
+}
+
+const createElementFromTemplate = (data, dropEvent) => {
+  const pos = getWorldCoordinatesFromPointer(dropEvent)
+  const newId = buffer.pasteFromSerialized(data.payload, pos)
+  if (!newId) {
+    showToast('No se pudo insertar la plantilla', 'error')
   }
 }
 

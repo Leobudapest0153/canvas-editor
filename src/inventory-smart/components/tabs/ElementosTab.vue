@@ -72,23 +72,48 @@
     </div>
     <div
       v-else
-      class="flex-1 overflow-hidden"
+      class="flex-1 overflow-hidden flex flex-col"
     >
-      <div class="h-full flex items-center justify-center text-slate-500 text-sm">
-        No hay plantillas aún
+      <div class="p-4 border-b">
+        <input
+          v-model="searchText"
+          type="text"
+          placeholder="Buscar plantillas..."
+          class="w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100"
+        />
+      </div>
+      <div class="flex-1 overflow-y-auto p-4">
+        <div
+          v-if="filteredTemplates.length === 0"
+          class="h-full flex items-center justify-center text-slate-500 text-sm"
+        >
+          No hay plantillas aún
+        </div>
+        <ul v-else class="grid grid-cols-1 gap-3">
+          <li
+            v-for="tpl in filteredTemplates"
+            :key="tpl.id"
+            class="border border-gray-200 rounded-lg p-3 cursor-grab hover:shadow-md transition-all duration-200"
+            draggable="true"
+            @dragstart="onTemplateDragStart(tpl, $event)"
+            @dragend="onTemplateDragEnd"
+          >
+            {{ tpl.name }}
+          </li>
+        </ul>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
 
 const catalogStore = useCatalogStore()
-const { selectedCatalog } = storeToRefs(catalogStore)
+const { selectedCatalog, searchText, templates } = storeToRefs(catalogStore)
 
 const focusedTab = ref(null)
 const tabElementos = ref(null)
@@ -120,11 +145,33 @@ onMounted(() => {
     catalogStore.setSelectedCatalog(saved)
   }
   localStorage.setItem('inventory.selectedCatalog', selectedCatalog.value)
+  catalogStore.loadTemplatesFromLocalStorage()
 })
 
 watch(selectedCatalog, (val) => {
   localStorage.setItem('inventory.selectedCatalog', val)
 })
+
+const filteredTemplates = computed(() =>
+  catalogStore.searchTemplates(searchText.value)
+)
+
+const onTemplateDragStart = (tpl, event) => {
+  const dragData = {
+    tipo: 'plantilla-catalogo',
+    plantillaId: tpl.id,
+    payload: tpl.payload,
+  }
+  event.dataTransfer.setData('application/json', JSON.stringify(dragData))
+  event.dataTransfer.effectAllowed = 'copy'
+  const card = event.currentTarget
+  if (card && card.classList) card.classList.add('opacity-50', 'scale-95')
+}
+
+const onTemplateDragEnd = (event) => {
+  const card = event.currentTarget
+  if (card && card.classList) card.classList.remove('opacity-50', 'scale-95')
+}
 </script>
 
 <style scoped>
