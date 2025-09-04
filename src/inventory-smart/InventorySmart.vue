@@ -230,6 +230,59 @@ onUnmounted(() => {
   background: var(--ui-bg-dark);
   border: 1px solid var(--ui-border-dark);
 }
+
+/* ====== INVENTORY: Estilos para el conmutador de Catálogo (Elementos | Plantillas) ======
+   Contexto: pestaña Elementos — controla catálogo visible.
+   NOTA: no mover ni duplicar en otros archivos. Mantener aquí.
+======================================================================================== */
+.catalog-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.catalog-tab {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-bg);
+  color: var(--muted);
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.catalog-tab + .catalog-tab {
+  margin-left: 0.5rem;
+}
+
+.catalog-tab:hover {
+  background: #f1f5f9;
+}
+
+.catalog-tab.is-active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.catalog-tab.kb-focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.catalog-switch select {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-bg);
+  color: var(--muted);
+  border-radius: 9999px;
+  font-size: 0.875rem;
+}
+
+.catalog-switch--compact select {
+  width: 100%;
+}
 </style>
 
 <style scoped>
