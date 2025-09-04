@@ -634,19 +634,18 @@
     <!-- Modal Guardar como plantilla -->
     <div
       v-if="templateModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center"
+      class="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="templateModalTitle"
+      @click.self="closeTemplateModal"
     >
-      <div class="absolute inset-0 bg-black/50" @click="closeTemplateModal"></div>
-      <div
-        class="relative bg-white rounded-lg p-4 w-[90%] max-w-md"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="templateModalTitle"
-      >
-        <form @submit.prevent="saveTemplate">
-          <h2 id="templateModalTitle" class="text-lg font-semibold mb-4">
-            Guardar como plantilla
-          </h2>
+      <form class="modal" @submit.prevent="saveTemplate">
+        <header class="modal-header">
+          <h3 id="templateModalTitle" class="title">Guardar como plantilla</h3>
+          <button type="button" class="close" @click="closeTemplateModal" aria-label="Cerrar">×</button>
+        </header>
+        <section class="modal-body">
           <div class="template-modal__row">
             <label for="templateName" class="template-modal__label">Nombre de la plantilla</label>
             <input
@@ -680,12 +679,14 @@
               rows="3"
             ></textarea>
           </div>
-          <div class="template-modal__actions">
-            <button type="button" @click="closeTemplateModal">Cancelar</button>
-            <button type="submit" :disabled="!templateName.trim()">Guardar</button>
-          </div>
-        </form>
-      </div>
+        </section>
+        <footer class="modal-footer">
+          <button type="button" class="btn" @click="closeTemplateModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" :disabled="!templateName.trim() || isSaving">
+            Guardar
+          </button>
+        </footer>
+      </form>
     </div>
 
   <!-- Información de zoom, vista y dimensiones -->
@@ -977,6 +978,7 @@ const templateError = ref('')
 const templateSummary = ref({ elementType: '', width: 0, height: 0, depth: 0, childrenCount: 0 })
 const templatePayload = ref(null)
 const templateNameInput = ref(null)
+const isSaving = ref(false)
 
 const openTemplateModal = (elementId) => {
   const el = canvasStore.elementoPorId(elementId)
@@ -1008,6 +1010,7 @@ const closeTemplateModal = () => {
 }
 
 const saveTemplate = () => {
+  if (isSaving.value) return
   const name = templateName.value.trim()
   if (!name) {
     templateError.value = 'El nombre es obligatorio'
@@ -1017,6 +1020,7 @@ const saveTemplate = () => {
     templateError.value = 'Ya existe una plantilla con ese nombre'
     return
   }
+  isSaving.value = true
   const now = new Date().toISOString()
   const template = {
     id: `tpl_${Date.now().toString(36)}`,
@@ -1037,6 +1041,7 @@ const saveTemplate = () => {
   catalogStore.addTemplate(template)
   showToast('Plantilla guardada', 'success')
   templateModalOpen.value = false
+  isSaving.value = false
 }
 
 const onTemplateKeydown = (e) => {

@@ -287,10 +287,21 @@ onUnmounted(() => {
   }
 }
 
-/* ====== INVENTORY: Estilos del modal 'Guardar como plantilla' ===========================
-   Contexto: Catálogo de Plantillas — creación desde elemento existente.
-   NOTA: mantener estos estilos aquí; no crear nuevos archivos de estilos.
-======================================================================================== */
+/* ====== INVENTORY: Ajustes visuales para equiparar modal 'Guardar como plantilla' con 'Eliminar' ======
+   NOTA: Reusar las mismas clases de botones y layout. Solo correcciones menores aquí.
+======================================================================================================= */
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1100}
+.modal{width:420px;max-width:92vw;background:#fff;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e5e7eb}
+.modal-header .title{font-size:16px;font-weight:600;color:#111827}
+.modal-header .close{background:transparent;border:none;font-size:20px;cursor:pointer;color:#6b7280}
+.modal-body{padding:16px;color:#374151}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid #e5e7eb}
+.btn{border:1px solid #e5e7eb;background:#fff;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer}
+.btn-primary{background:#2563eb;color:#fff;border-color:#2563eb}
+.btn-primary:hover{background:#1d4ed8}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.btn:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
 .template-modal__row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .template-modal__label { font-weight: 600; font-size: 0.95rem; }
 .template-modal__input,
@@ -307,7 +318,6 @@ onUnmounted(() => {
   background: var(--bg-muted, #f7f8fa); border: 1px solid var(--border-color, #e3e6eb);
   border-radius: 8px; padding: 10px;
 }
-.template-modal__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .template-modal__error { color: #c62828; font-size: 0.85rem; }
 </style>
 
