@@ -384,16 +384,33 @@ const cerrarModal = () => {
   // El formulario se resetea automáticamente al abrir el modal
 }
 
-// Cargar elementos personalizados del localStorage
+// Cargar elementos personalizados del localStorage solo una vez y sin duplicados
+let customElementsLoaded = false
 onMounted(() => {
+  if (customElementsLoaded) return
   const elementosGuardados = localStorage.getItem('elementos-personalizados')
   if (elementosGuardados) {
     try {
-      JSON.parse(elementosGuardados).forEach((el) => items.value.push(el))
+      const existentes = new Set()
+      // Eliminar posibles duplicados previos
+      items.value = items.value.filter((el) => {
+        if (existentes.has(el.id)) return false
+        existentes.add(el.id)
+        return true
+      })
+
+      const guardados = JSON.parse(elementosGuardados)
+      guardados.forEach((el) => {
+        if (!existentes.has(el.id)) {
+          items.value.push(el)
+          existentes.add(el.id)
+        }
+      })
     } catch (error) {
       console.error('Error cargando elementos personalizados:', error)
     }
   }
+  customElementsLoaded = true
 })
 
 // Guardar elementos personalizados en localStorage
