@@ -2737,9 +2737,6 @@ const transformerRef = ref(null)
 const isInteractingWithTransformer = ref(false);
 // Estado para guardar dimensiones/pos antes de transformar (para poder revertir)
 const transformInitialState = new Map()
-
-const toggleSpeedDial = () => { speedDialOpen.value = !speedDialOpen.value }
-
 const isDragModeActive = computed(() => dragModeGlobal.value)
 const isEditingSelected = computed(() => editingElementId.value === canvasStore.elementoSeleccionado)
 const selectedElementLocked = computed(() => {

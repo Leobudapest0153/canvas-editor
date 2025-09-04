@@ -113,7 +113,6 @@
             <ul v-if="dimensionSugerencias && dimensionSugerencias.length" class="list-disc ml-5 text-xs text-gray-600">
               <li v-for="(s,i) in dimensionSugerencias" :key="i">{{ s }}</li>
             </ul>
-            <p v-if="posicionAjustadaBadge" class="text-xs text-emerald-700">Se ajustó posición para evitar desbordamiento/colisión.</p>
           </div>
         </details>
 
@@ -269,7 +268,6 @@ const edited = ref(null)
 const isSaving = ref(false)
 const dimensionError = ref(null)
 const dimensionSugerencias = ref([])
-const posicionAjustadaBadge = ref(false)
 
 // Forzar el catálogo de elementos cuando se abre el detalle (monta el panel)
 onMounted(() => {
@@ -343,7 +341,6 @@ const revertir = () => {
   edited.value = deepClone(snapshotOriginal.value)
   dimensionError.value = null
   dimensionSugerencias.value = []
-  posicionAjustadaBadge.value = false
 }
 
 const guardar = async () => {
@@ -353,7 +350,6 @@ const guardar = async () => {
   // Reset UI de validación
   dimensionError.value = null
   dimensionSugerencias.value = []
-  posicionAjustadaBadge.value = false
 
   // 1) Validación de dimensiones (cm)
   let anchoCm, largoCm, altoCm
@@ -390,8 +386,7 @@ const guardar = async () => {
     return
   }
   if (resultadoDims?.accion === 'aplicar') {
-    const res = aplicarResultadoValidacion(elementoSeleccionado.value.id, resultadoDims)
-    posicionAjustadaBadge.value = !!res?.posicionAjustada
+    aplicarResultadoValidacion(elementoSeleccionado.value.id, resultadoDims)
   }
   const patch = makePatch(snapshotOriginal.value, edited.value)
 
