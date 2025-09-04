@@ -220,6 +220,7 @@ import {
   TODAS_LAS_CATEGORIAS,
   TIPOS_ENTIDAD,
   getColorPorTipo,
+  getColorCategoria,
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
 } from '@/inventory-smart/utils/constants'
@@ -259,7 +260,7 @@ const nuevoElemento = ref({
 // Computed: título dinámico según el contexto
 const tituloContextual = computed(() => {
   if (catalogContext.value.mode === 'root') {
-    return 'Catálogo de Elementos'
+    return ''
   } else if (catalogContext.value.mode === 'detail-element') {
     return 'Catálogo de Contenedores'
   } else if (catalogContext.value.mode === 'detail-container') {
@@ -389,7 +390,11 @@ onMounted(() => {
   const elementosGuardados = localStorage.getItem('elementos-personalizados')
   if (elementosGuardados) {
     try {
-      JSON.parse(elementosGuardados).forEach((el) => items.value.push(el))
+      JSON.parse(elementosGuardados).forEach((el) => {
+        if (!items.value.some((existing) => existing.id === el.id)) {
+          items.value.push(el)
+        }
+      })
     } catch (error) {
       console.error('Error cargando elementos personalizados:', error)
     }

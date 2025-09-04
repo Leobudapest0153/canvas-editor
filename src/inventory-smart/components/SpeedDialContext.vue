@@ -8,7 +8,7 @@
     role="menu"
     aria-label="Menú contextual"
     @keydown.stop.prevent="onKeydown"
-    @contextmenu.prevent
+  @contextmenu.prevent
   >
     <button
       ref="itemRefs[0]"
@@ -21,6 +21,15 @@
     </button>
     <button
       ref="itemRefs[1]"
+      class="sdx-item"
+      role="menuitem"
+      aria-label="Guardar como plantilla"
+      @click="emitSaveTemplate"
+    >
+      Guardar como plantilla
+    </button>
+    <button
+      ref="itemRefs[2]"
       class="sdx-item sdx-danger"
       role="menuitem"
       aria-label="Eliminar"
@@ -42,10 +51,10 @@ const props = defineProps({
   y: { type: Number, default: 0 },
   isLocked: { type: Boolean, default: false },
 })
-const emit = defineEmits(['lockToggle', 'delete', 'close'])
+const emit = defineEmits(['lockToggle', 'delete', 'saveTemplate', 'close'])
 
 const menuRef = ref(null)
-const itemRefs = [ref(null), ref(null)]
+const itemRefs = [ref(null), ref(null), ref(null)]
 const focusedIndex = ref(0)
 
 const pos = ref({ left: 0, top: 0 })
@@ -111,6 +120,7 @@ const onKeydown = (e) => {
     itemRefs[focusedIndex.value].value?.focus?.()
   } else if (e.key === 'Enter' || e.key === ' ') {
     if (focusedIndex.value === 0) emitLock()
+    else if (focusedIndex.value === 1) emitSaveTemplate()
     else emitDelete()
   } else if (e.key === 'Escape') {
     emit('close')
@@ -119,6 +129,9 @@ const onKeydown = (e) => {
 
 const emitLock = () => {
   emit('lockToggle')
+}
+const emitSaveTemplate = () => {
+  emit('saveTemplate')
 }
 const emitDelete = () => {
   emit('delete')

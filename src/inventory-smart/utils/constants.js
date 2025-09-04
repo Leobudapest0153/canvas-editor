@@ -204,6 +204,14 @@ export const getIconoPorTipo = (tipo) => {
   return tipoInfo?.icono || '📦'
 }
 
+/**
+ * Obtiene el color asociado a una categoría del catálogo
+ */
+export const getColorCategoria = (categoriaId) => {
+  const cat = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
+  return cat?.color || '#3b82f6'
+}
+
 export const COLORES_DISPONIBLES = [
   '#3b82f6',
   '#10b981',
