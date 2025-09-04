@@ -252,12 +252,15 @@ import { EPSILON } from '@/inventory-smart/utils/geometry.js'
 import { t } from '@/inventory-smart/utils/i18n.js'
 import TagFilter from '@/inventory-smart/components/TagFilter.vue'
 import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
+import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
 const confirmDialog = useConfirmDialog()
 const { validarPesoElemento, calcularPesoDisponible, contextoActualTieneLimiteDePeso, infoPesoContextoActual } = useWeightValidation()
 const { validarDimensiones, aplicarResultadoValidacion } = useDimensionValidation()
+
+const catalogStore = useCatalogStore()
 
 const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoCompleto)
 
@@ -267,6 +270,13 @@ const isSaving = ref(false)
 const dimensionError = ref(null)
 const dimensionSugerencias = ref([])
 const posicionAjustadaBadge = ref(false)
+
+// Forzar el catálogo de elementos cuando se abre el detalle (monta el panel)
+onMounted(() => {
+  if (catalogStore.selectedCatalog === 'plantillas') {
+    catalogStore.setSelectedCatalog('elementos')
+  }
+})
 
 const cargarDesdeStore = (el) => deepClone({
   nombre: el.nombre || '',
