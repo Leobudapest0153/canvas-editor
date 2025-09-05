@@ -1,6 +1,8 @@
 // /inventory-smart/utils/collision.js
 // Detección de conflictos: broad-phase (AABB), narrow-phase (2D) y chequeo Z
 
+import { detectCircleCircleCollision, areBothCircular } from './circleCollisions'
+
 // Pequeño throttle (16-32ms)
 export function throttle(fn, wait = 16) {
   let last = 0
@@ -65,6 +67,23 @@ function inflateRectForWall(el) {
 }
 
 export function narrowPhase2D(a, b) {
+  // Corrección tangencia círculos: verificar si ambos elementos son circulares
+  if (areBothCircular(a, b)) {
+    const circleResult = detectCircleCircleCollision(a, b);
+    if (circleResult) {
+      // Para círculos, solo reportar intersección si hay solapamiento real
+      // Los estados 'tangent' y 'separate' se consideran válidos (no intersectan)
+      const intersectXY = circleResult.hasOverlap;
+      return {
+        intersectXY,
+        ra: { x: a.x, y: a.y, w: a.width, h: a.height },
+        rb: { x: b.x, y: b.y, w: b.width, h: b.height },
+        circleCollision: circleResult
+      };
+    }
+  }
+
+  // Lógica existente para elementos no circulares o casos de respaldo
   const tipoA = a.ubicacion || 'suelo'
   const tipoB = b.ubicacion || 'suelo'
 
