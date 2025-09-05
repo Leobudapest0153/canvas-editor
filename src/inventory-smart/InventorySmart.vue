@@ -319,6 +319,12 @@ onUnmounted(() => {
   border-radius: 8px; padding: 10px;
 }
 .template-modal__error { color: #c62828; font-size: 0.85rem; }
+
+/* === Estilos para validaciones: arrastre desde Catálogo de Plantillas === */
+/* No crear archivos nuevos; mantener consistencia con el resto del proyecto */
+.template-drag--invalid {
+  outline: 2px dashed red;
+}
 </style>
 
 <style scoped>
