@@ -98,6 +98,11 @@ const handleKeydown = (e) => {
     return
   }
 
+  // Bloquear si hay texto seleccionado
+  if (window.getSelection().toString()) {
+    return
+  }
+
   // Bloquear si hay drag global activo
   if (typeof window !== 'undefined' && window.__dvCanvasDragActive) {
     return
