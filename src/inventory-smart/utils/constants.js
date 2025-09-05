@@ -4,6 +4,10 @@
  * Constantes y elementos predefinidos para el catálogo del editor.
  */
 
+// Versionado de formato de exportación e importación
+export const EXPORT_FORMAT_VERSION = '1.1.0'
+export const SCHEMA_VERSION_PLANTILLAS = 1
+
 export const TIPOS_ENTIDAD = [
   { id: 'plantas', nombre: 'Plantas', color: '#10b981', icono: '🏢' },
   { id: 'elementos', nombre: 'Elementos', color: '#3b82f6', icono: '📦' },

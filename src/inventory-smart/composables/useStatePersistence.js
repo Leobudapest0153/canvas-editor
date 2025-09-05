@@ -11,6 +11,13 @@
  * - Manejo de errores en operaciones de persistencia
  */
 
+import { EXPORT_FORMAT_VERSION } from '@/inventory-smart/utils/constants'
+import {
+  exportTemplatesToDTO,
+  importTemplatesFromDTO,
+} from '@/inventory-smart/modules/templates/templates.serializer'
+import { assertValidTemplatesDTO } from '@/inventory-smart/modules/templates/templates.validator'
+
 export const useStatePersistence = () => {
   /**
    * Serializa el estado completo del canvas a JSON
@@ -33,14 +40,20 @@ export const useStatePersistence = () => {
       }
     }
 
+    const templatesDTO = exportTemplatesToDTO(state.plantillasCatalogo || [])
+    const metrics = includeMetrics ? calculateStateMetrics(state) : null
+    if (metrics) {
+      metrics.totalPlantillas = templatesDTO.length
+    }
+
     const serializedState = {
       // Información básica del canvas
       meta: {
-        version: '1.0.0',
+        version: EXPORT_FORMAT_VERSION,
         timestamp: new Date().toISOString(),
         app: 'inventory-smart',
-        ...(includeMetrics && {
-          metrics: calculateStateMetrics(state)
+        ...(metrics && {
+          metrics
         })
       },
 
@@ -230,23 +243,21 @@ export const useStatePersistence = () => {
       elementosHuerfanos: 0,
       relacionesPadreHijo: 0,
       plantasConElementos: 0,
-      promedioElementosPorPlanta: 0
+      promedioElementosPorPlanta: 0,
+      totalPlantillas: state.plantillasCatalogo?.length || 0,
     }
 
     // Analizar elementos
     if (Array.isArray(state.elementos)) {
-      state.elementos.forEach(elemento => {
-        // Contar por tipo
+      state.elementos.forEach((elemento) => {
         const tipo = elemento.tipo || 'sin_tipo'
         metrics.elementosPorTipo[tipo] = (metrics.elementosPorTipo[tipo] || 0) + 1
 
-        // Contar elementos con hijos
         if (elemento.hijos && elemento.hijos.length > 0) {
           metrics.elementosConHijos++
           metrics.relacionesPadreHijo += elemento.hijos.length
         }
 
-        // Contar elementos huérfanos
         if (!elemento.padre) {
           metrics.elementosHuerfanos++
         }
@@ -255,16 +266,15 @@ export const useStatePersistence = () => {
 
     // Analizar plantas
     if (Array.isArray(state.plantas)) {
-      state.plantas.forEach(planta => {
+      state.plantas.forEach((planta) => {
         if (planta.elementos && planta.elementos.length > 0) {
           metrics.plantasConElementos++
         }
       })
 
       if (metrics.totalPlantas > 0) {
-        metrics.promedioElementosPorPlanta = Math.round(
-          metrics.totalElementos / metrics.totalPlantas * 100
-        ) / 100
+        metrics.promedioElementosPorPlanta =
+          Math.round((metrics.totalElementos / metrics.totalPlantas) * 100) / 100
       }
     }
 
@@ -304,6 +314,27 @@ export const useStatePersistence = () => {
       }
 
       const state = validation.data || JSON.parse(jsonString)
+
+      // Validar versión de esquema
+      const version = state.meta?.version
+      if (version) {
+        const [a1, a2, a3] = String(version).split('.').map(Number)
+        const [b1, b2, b3] = EXPORT_FORMAT_VERSION.split('.').map(Number)
+        if (a1 > b1 || (a1 === b1 && (a2 > b2 || (a2 === b2 && a3 > b3)))) {
+          console.warn(
+            `⚠️ Archivo con versión ${version} mayor a soportada ${EXPORT_FORMAT_VERSION}`
+          )
+        }
+      }
+
+      if (state.plantillasCatalogo) {
+        try {
+          const tpl = assertValidTemplatesDTO(state.plantillasCatalogo)
+          importTemplatesFromDTO(tpl)
+        } catch (err) {
+          console.warn('Plantillas inválidas omitidas:', err?.message || err)
+        }
+      }
 
       // === LIMPIEZA Y PREPARACIÓN ===
       storeActions.clearState()
