@@ -281,3 +281,7 @@ export const WEIGHT = {
   enableDefaultShareFromParent: false,
   defaultShare: 0.2,
 }
+
+// === VERSIONADO DE EXPORT / SCHEMAS ===
+export const EXPORT_FORMAT_VERSION = '1.1.0'
+export const SCHEMA_VERSION_PLANTILLAS = 1

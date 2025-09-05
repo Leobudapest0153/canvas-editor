@@ -36,7 +36,7 @@ export const useStatePersistence = () => {
     const serializedState = {
       // Información básica del canvas
       meta: {
-        version: '1.0.0',
+        version: '1.1.0',
         timestamp: new Date().toISOString(),
         app: 'inventory-smart',
         ...(includeMetrics && {
@@ -135,6 +135,11 @@ export const useStatePersistence = () => {
       }),
     }
 
+    // Añadir métrica de plantillas (retrocompatible)
+    if (serializedState.meta?.metrics) {
+      serializedState.meta.metrics.totalPlantillas = state.templates?.length || 0
+    }
+
     return JSON.stringify(serializedState, null, 2)
   }
 
@@ -230,7 +235,8 @@ export const useStatePersistence = () => {
       elementosHuerfanos: 0,
       relacionesPadreHijo: 0,
       plantasConElementos: 0,
-      promedioElementosPorPlanta: 0
+      promedioElementosPorPlanta: 0,
+      totalPlantillas: state.templates?.length || 0,
     }
 
     // Analizar elementos
