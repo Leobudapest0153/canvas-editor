@@ -323,17 +323,15 @@ export function useDimensionValidation() {
     try {
       // Determinar el contexto y la vista
       const contextoActual = canvasStore.contextoNavegacion
-      let vistaActual = 'XY' // Por defecto vista planta
+      const vistaActual = canvasStore.vistaActiva
       let contenedor = null
+      let planta = null
+      const { width: anchoCanvasActual, height: largoCanvasActual } = canvasStore.canvasAdaptativo
+      const { estaEnPlanta } = canvasStore
 
-      // Si el elemento tiene un padre, estamos en vista frontal XZ
-      if (elemento.parentId || elemento.padre) {
-        vistaActual = 'XZ'
-        const parentId = elemento.parentId || elemento.padre
-        contenedor = canvasStore.elementoPorId(parentId)
-      } else if (contextoActual && contextoActual.tipo === 'elementos') {
-        // Si estamos navegando dentro de un elemento, vista frontal XZ
-        vistaActual = 'XZ'
+      if (estaEnPlanta) {
+        planta = canvasStore.plantaPorId(contextoActual.id)
+      } else {
         contenedor = canvasStore.elementoPorId(contextoActual.id)
       }
 
@@ -344,38 +342,21 @@ export function useDimensionValidation() {
         contextoNavegacion: contextoActual
       })
 
-      if (vistaActual === 'XZ' && contenedor && contenedor.dimensiones) {
+      if (!estaEnPlanta) {
         // Vista frontal XZ: validar contra ancho × alto del contenedor
         return {
-          ancho: contenedor.dimensiones.ancho * CM_TO_PX,
-          largo: contenedor.dimensiones.alto * CM_TO_PX, // En vista XZ, Y representa el alto
-          vista: 'XZ',
+          ancho: anchoCanvasActual,
+          largo: largoCanvasActual, // En vista XZ, Y representa el alto
+          vista: vistaActual,
           contenedorId: contenedor.id
         }
       } else {
         // Vista planta XY: usar dimensiones de la planta activa
-        let planta = null
-
-        if (contextoActual && contextoActual.tipo === 'planta') {
-          planta = canvasStore.elementoPorId(contextoActual.id)
-        }
-
-        if (planta && planta.dimensiones) {
-          return {
-            ancho: planta.dimensiones.ancho * CM_TO_PX,
-            largo: planta.dimensiones.largo * CM_TO_PX,
-            vista: 'XY',
-            plantaId: planta.id
-          }
-        }
-
-        // Fallback por defecto: 5m x 5m en vista XY
-        console.warn('No se pudo determinar el área contenedora, usando 5m x 5m por defecto en vista XY')
         return {
-          ancho: 500 * CM_TO_PX, // 5m = 500cm
-          largo: 500 * CM_TO_PX,  // 5m = 500cm
-          vista: 'XY',
-          esDefault: true
+          ancho: anchoCanvasActual,
+          largo: largoCanvasActual,
+          vista: vistaActual,
+          plantaId: planta.id
         }
       }
     } catch (error) {

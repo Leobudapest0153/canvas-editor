@@ -8,9 +8,11 @@ const {
 } = orchestrator
 import { mtdAgainstSet } from '@/inventory-smart/utils/collision'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { useToast } from './useToast'
 
 export function usePlacementGuards({ useTopeClamp = true } = {}) {
   const store = useCanvasStore()
+  const { showToast } = useToast()
   const validators = [
     validateWallZBaseRequired,
     validateHeightWithinWarehouse,
