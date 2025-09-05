@@ -697,11 +697,15 @@
 
   <!-- Botones flotantes de Undo/Redo y Bloqueo -->
   <div ref="floatingControlsRef" class="floating-controls" :style="{ right: `${floatingRight}px` }">
+    <UiTooltip 
+      label="Deshacer (Ctrl+Z)" 
+      :delay="200"
+      position="bottom"
+    >
       <button
         @click="undo()"
         :disabled="!canUndo"
         class="floating-btn btn-undo"
-        title="Deshacer (Ctrl+Z)"
       >
         <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -712,11 +716,16 @@
           />
         </svg>
       </button>
+    </UiTooltip>
+    <UiTooltip
+      label="Rehacer (Ctrl+Y)"
+      :delay="200"
+      position="bottom"
+    >
       <button
         @click="redo()"
         :disabled="!canRedo"
         class="floating-btn btn-redo"
-        title="Rehacer (Ctrl+Y)"
       >
         <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -727,8 +736,14 @@
           />
         </svg>
       </button>
+    </UiTooltip>
 
-      <!-- Botones de Zoom: ubicados junto a 'fit' pero después de redo para mantener undo+redo juntos -->
+    <!-- Botones de Zoom: ubicados junto a 'fit' pero después de redo para mantener undo+redo juntos -->
+    <UiTooltip
+      label="Alejar (Ctrl+ -)"
+      :delay="200"
+      position="bottom"
+    >
       <button
         @click="zoomOut()"
         :disabled="!canZoomOut"
@@ -739,7 +754,12 @@
           <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
-
+    </UiTooltip>
+    <UiTooltip
+      label="Acercar (Ctrl+ +)"
+      :delay="200"
+      position="bottom"
+    >
       <button
         @click="zoomIn()"
         :disabled="!canZoomIn"
@@ -751,14 +771,18 @@
           <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
-
-      <!-- Botón ajustar a planta activa -->
+    </UiTooltip>
+    <!-- Botón ajustar a planta activa -->
+    <UiTooltip
+      label="Ajustar vista a la plata activa"
+      position="bottom"
+      :delay="200"
+    >
       <button
         @click="fitToPlanta"
         @mouseenter="speedDialOpen = false"
         :disabled="!canvasStore.plantaActivaData"
         class="floating-btn btn-fit"
-        title="Ajustar vista a la planta activa"
       >
         <!-- Icono de ajustar/fit: flechas hacia las esquinas -->
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -768,6 +792,7 @@
           <line x1="20" y1="20" x2="14" y2="14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
+    </UiTooltip>
 
     </div>
   </div>
@@ -821,6 +846,7 @@ import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/inventory-smart/composables/useSimulateProducts'
 import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import UiTooltip from './ui/UiTooltip.vue'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({

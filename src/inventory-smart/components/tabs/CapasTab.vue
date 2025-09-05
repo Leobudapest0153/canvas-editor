@@ -4,6 +4,12 @@
     <div class="relative border-b border-gray-200">
       <!-- Botón para mostrar/ocultar filtros -->
       <div class="p-4 bg-white" ref="filtrosBotonRef">
+        <UiTooltip
+          label="Desplegar filtros"
+          position="bottom"
+          :delay="200"
+          class="w-full"
+        >
         <button
           @click="toggleFiltros"
           class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -19,6 +25,7 @@
           <span>Filtros</span>
           <span v-if="hayFiltrosActivos" class="w-2 h-2 bg-blue-500 rounded-full"></span>
         </button>
+        </UiTooltip>
         <span class="text-center w-full pt-2 block -mb-2 text-gray-700 text-sm"> 
           Elementos en la capa: {{ canvasStore.elementosVisibles?.length ?? 0 }}
         </span>
@@ -83,10 +90,15 @@
             />
 
             <!-- Botón para limpiar filtros -->
+            <UiTooltip
+              position="right"
+              label="Limpiar filtros"
+              :delay="200"
+            >
             <button
               v-if="hayFiltrosActivos"
               @click="limpiarFiltros"
-              class="flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-xs text-gray-600 cursor-pointer mt-2 hover:bg-gray-200 hover:text-gray-700 transition-colors"
+              class="w-full flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-xs text-gray-600 cursor-pointer mt-2 hover:bg-gray-200 hover:text-gray-700 transition-colors"
               title="Limpiar filtros"
             >
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,6 +111,7 @@
               </svg>
               Limpiar
             </button>
+            </UiTooltip>
           </div>
         </div>
       </transition>
@@ -147,19 +160,27 @@
           </div>
           <!-- Controles -->
           <div class="flex items-center gap-2">
+            <UiTooltip
+              position="left"
+              label="Buscar elemento"
+              :delay="200"
+            >
             <button
               @click.stop="() => {canvasStore.seleccionarElemento(elemento.id);  canvasStore.destacarElemento(elemento.id);}"
               class="p-0 text-gray-400 hover:text-blue-600 cursor-pointer"
-              title="Encontrar en el canvas"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
               </svg>
             </button>
+            </UiTooltip>
+            <UiTooltip
+              position="left"
+              :label="elemento.visible === false ? 'Mostrar' : 'Ocultar'"
+            >
             <button
               @click.stop="canvasStore.toggleElementoVisibilidad(elemento.id)"
               class="p-0 text-gray-400 hover:text-gray-600 cursor-pointer"
-              :title="elemento.visible === false ? 'Mostrar' : 'Ocultar'"
             >
               <svg
                 v-if="elemento.visible !== false"
@@ -206,6 +227,11 @@
                 </g>
               </svg>
             </button>
+            </UiTooltip>
+            <UiTooltip
+              position="left"
+              label="Eliminar elemento"
+            >
             <button
               @click.stop="onDelete(elemento.id)"
               class="p-0 text-gray-400 hover:text-red-700 cursor-pointer"
@@ -213,6 +239,7 @@
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 1024 1024"><path fill="currentColor" d="M360 184h-8c4.4 0 8-3.6 8-8zh304v-8c0 4.4 3.6 8 8 8h-8v72h72v-80c0-35.3-28.7-64-64-64H352c-35.3 0-64 28.7-64 64v80h72zm504 72H160c-17.7 0-32 14.3-32 32v32c0 4.4 3.6 8 8 8h60.4l24.7 523c1.6 34.1 29.8 61 63.9 61h454c34.2 0 62.3-26.8 63.9-61l24.7-523H888c4.4 0 8-3.6 8-8v-32c0-17.7-14.3-32-32-32M731.3 840H292.7l-24.2-512h487z"/></svg>
             </button>
+            </UiTooltip>
 
           </div>
         </div>
@@ -235,6 +262,7 @@ import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { CATEGORIAS } from '@/inventory-smart/utils/constants'
 import TagFilter from '@/inventory-smart/components/TagFilter.vue'
 import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
+import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import {useDeleteElement} from '@/inventory-smart/composables/useDeleteElement'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 
