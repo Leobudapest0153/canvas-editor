@@ -11,6 +11,16 @@
  * - Manejo de errores en operaciones de persistencia
  */
 
+import { EXPORT_FORMAT_VERSION } from '@/inventory-smart/utils/constants'
+import {
+  exportTemplatesToDTO,
+  importTemplatesFromDTO,
+} from '@/inventory-smart/modules/templates/templates.serializer'
+import {
+  assertValidTemplatesDTO,
+  validateMetaVersion,
+} from '@/inventory-smart/modules/templates/templates.validator'
+
 export const useStatePersistence = () => {
   /**
    * Serializa el estado completo del canvas a JSON
@@ -36,7 +46,7 @@ export const useStatePersistence = () => {
     const serializedState = {
       // Información básica del canvas
       meta: {
-        version: '1.0.0',
+        version: EXPORT_FORMAT_VERSION,
         timestamp: new Date().toISOString(),
         app: 'inventory-smart',
         ...(includeMetrics && {
@@ -133,6 +143,9 @@ export const useStatePersistence = () => {
           propiedadesPersonalizadas: elemento.propiedadesPersonalizadas || {},
         }
       }),
+
+      // Catálogo de plantillas
+      plantillasCatalogo: exportTemplatesToDTO(state.plantillasCatalogo || [])
     }
 
     return JSON.stringify(serializedState, null, 2)
@@ -230,7 +243,8 @@ export const useStatePersistence = () => {
       elementosHuerfanos: 0,
       relacionesPadreHijo: 0,
       plantasConElementos: 0,
-      promedioElementosPorPlanta: 0
+      promedioElementosPorPlanta: 0,
+      totalPlantillas: state.plantillasCatalogo?.length || 0
     }
 
     // Analizar elementos
@@ -304,6 +318,15 @@ export const useStatePersistence = () => {
       }
 
       const state = validation.data || JSON.parse(jsonString)
+
+      if (Array.isArray(state.plantillasCatalogo)) {
+        try {
+          assertValidTemplatesDTO(state.plantillasCatalogo)
+          importTemplatesFromDTO(state.plantillasCatalogo)
+        } catch (e) {
+          console.warn('⚠️ Error al importar plantillasCatalogo:', e.message)
+        }
+      }
 
       // === LIMPIEZA Y PREPARACIÓN ===
       storeActions.clearState()
@@ -567,6 +590,10 @@ export const useStatePersistence = () => {
         validationResult.errors.push('Falta la propiedad "elementos"')
       }
 
+      if (data.plantillasCatalogo && !Array.isArray(data.plantillasCatalogo)) {
+        validationResult.errors.push('"plantillasCatalogo" debe ser un array')
+      }
+
       if (validationResult.errors.length > 0) {
         return {
           valid: false,
@@ -757,7 +784,10 @@ export const useStatePersistence = () => {
         app: data.meta?.app || 'desconocida',
         elementosPorTipo: {},
         elementosConHijos: 0,
-        elementosHuerfanos: 0
+        elementosHuerfanos: 0,
+        totalPlantillas: Array.isArray(data.plantillasCatalogo)
+          ? data.plantillasCatalogo.length
+          : 0
       }
 
       // Estadísticas de elementos
@@ -779,6 +809,9 @@ export const useStatePersistence = () => {
           }
         })
       }
+
+      // Validar versión meta
+      validateMetaVersion(data.meta?.version, validationResult.warnings)
 
       // Determinar si es válido
       validationResult.valid = validationResult.errors.length === 0

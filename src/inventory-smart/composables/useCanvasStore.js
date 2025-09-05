@@ -1136,7 +1136,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   const serialize = () => {
     const state = {
       plantas: plantas.value,
-      elementos: elementos.value
+      elementos: elementos.value,
+      plantillasCatalogo: catalogStore.templates.value
     }
     return _serialize(state)
   }
