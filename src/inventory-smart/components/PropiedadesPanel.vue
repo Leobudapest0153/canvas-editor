@@ -256,7 +256,7 @@ import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
 const confirmDialog = useConfirmDialog()
-const { validarPesoElemento, validarPesoMaximoVsUsoReal, calcularPesoDisponible, contextoActualTieneLimiteDePeso, infoPesoContextoActual } = useWeightValidation()
+const { validarPesoElemento, validarPesoMaximoVsUsoReal, validarCapacidadVsHijos, calcularPesoDisponible } = useWeightValidation()
 const { validarDimensiones, aplicarResultadoValidacion } = useDimensionValidation()
 
 const catalogStore = useCatalogStore()
@@ -484,17 +484,8 @@ const validarPeso = () => {
     return
   }
 
-  // Validar que el peso máximo no sea menor al uso real actual
-  if (elementoSeleccionado.value) {
-    const resultadoValidacion = validarPesoMaximoVsUsoReal(elementoSeleccionado.value, val)
-    if (!resultadoValidacion.valido) {
-      showWarning(resultadoValidacion.mensaje)
-      edited.value.pesoMaximo = snapshotOriginal.value.pesoMaximo
-      return
-    }
-  }
-
-  // Mantener input; la validación de límite se refleja con advertenciaPeso y bloqueo de Guardar
+  // La validación completa (teórica + real) se maneja en advertenciaPeso
+  // que bloquea el botón Guardar y muestra el mensaje apropiado
 }
 
 const getTipoNombre = (tipo) => {
@@ -692,18 +683,38 @@ const advertenciaAltura = computed(() => {
 
 // Advertencia de peso por límite del contexto padre (bloquea Guardar)
 const advertenciaPeso = computed(() => {
-  const info = infoPesoPadre.value
-  if (!info.limiteDePeso) return null
-  const oldVal = Number(elementoSeleccionado.value?.pesoMaximo || 0)
+  if (!elementoSeleccionado.value || !edited.value) return null
+
   const newVal = Number(edited.value?.pesoMaximo || 0)
   if (!Number.isFinite(newVal) || newVal < 0) return 'La capacidad debe ser un número válido.'
-  const delta = newVal - oldVal
-  if (delta <= 0) return null
-  const disponible = Number.isFinite(info.disponible) ? info.disponible : Infinity
-  if (delta > disponible + EPSILON) {
-    const pesoTotalFinal = info.usado - oldVal + newVal
-    return `Se excede el límite de peso del contenedor. Exceso: ${(delta - disponible).toFixed(2)} kg (Usado: ${pesoTotalFinal.toFixed(2)}/${info.maximo} kg).`
+
+  // 1. VALIDACIÓN DE USO REAL: capacidad ≥ uso actual del elemento
+  const validacionReal = validarPesoMaximoVsUsoReal(elementoSeleccionado.value, newVal)
+  if (!validacionReal.valido) {
+    return validacionReal.mensaje
   }
+
+  // 2. VALIDACIÓN DE HIJOS: capacidad ≥ suma de capacidades de hijos
+  const validacionHijos = validarCapacidadVsHijos(elementoSeleccionado.value, newVal)
+  if (!validacionHijos.valido) {
+    return validacionHijos.mensaje
+  }
+
+  // 3. VALIDACIÓN TEÓRICA: no exceder capacidad del contenedor padre
+  const { padreId, padreType } = padreContext.value
+  if (padreId && padreType) {
+    const elementoSimulado = {
+      ...elementoSeleccionado.value,
+      pesoMaximo: newVal
+    }
+
+    const validacionTeorica = validarPesoElemento(elementoSimulado, padreId, padreType, { validacionTeorica: true, esEdicion: true })
+
+    if (!validacionTeorica.valido && validacionTeorica.limiteDePeso) {
+      return `Se excede el límite de peso del contenedor padre. Exceso: ${validacionTeorica.exceso.toFixed(2)} kg (Total: ${validacionTeorica.pesoTotal.toFixed(2)}/${validacionTeorica.pesoMaximo} kg).`
+    }
+  }
+
   return null
 })
 
