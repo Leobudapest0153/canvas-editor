@@ -526,8 +526,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       nombre: elemento.nombre,
       tipo: elemento.tipo,
       dimensiones: elemento.dimensiones,
-      widthLegacy: elemento.width,
-      heightLegacy: elemento.height,
     })
 
     // Calcular tamaño del canvas basado en las dimensiones del elemento

@@ -473,8 +473,9 @@ function onSave(){
   }
 
   if (plantaData.id) {
+    console.log('Editando planta');
     canvasStore.editarPlanta(plantaData.id, plantaData);
-    canvasStore.calcularCanvasAdaptativo(plantaData);
+    canvasStore.calcularCanvasAdaptativoPlanta(plantaData);
   } else {
     delete plantaData.id;
     canvasStore.agregarPlanta(plantaData);
