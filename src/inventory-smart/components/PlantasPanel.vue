@@ -57,7 +57,12 @@
             </div>
 
             <!-- Menú desplegable de acciones -->
-            <div class="relative ml-2">
+            <UiTooltip
+              class="relative ml-2"
+              label="Opciones de planta"
+              :delay="200"
+              position="left"
+            >
               <button
                 @click.stop="toggleMenuPlanta(planta.id, $event)"
                 class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
@@ -69,8 +74,7 @@
                   />
                 </svg>
               </button>
-            </div>
-
+            </UiTooltip>
             <!-- Indicador de planta activa -->
             <div
               v-if="planta.id === canvasStore.plantaActiva"
@@ -80,10 +84,15 @@
         </div>
 
         <!-- Botón de agregar planta - siempre visible -->
+        <UiTooltip
+          label="Agregar nueva planta"
+          :delay="200"
+          position="left"
+        >
+
         <button
           @click="canvasStore.abrirEditor()"
           class="flex-shrink-0 inline-flex items-center justify-center w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-md hover:shadow-lg cursor-pointer transition-colors"
-          title="Agregar nueva planta"
           type="button"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,6 +104,7 @@
             />
           </svg>
         </button>
+        </UiTooltip>
       </div>
 
       <!-- Separador visual -->
@@ -104,10 +114,14 @@
       <div class="flex items-center gap-3">
         <!-- -- -- -->
         <!-- ACCIONES PARA PRUEBAS -- NO BORRAR -- -->
+        <UiTooltip
+          label="Ver historial completo"
+          position="bottom"
+          :delay="200"
+        >
         <button
           type="button"
           class="inline-flex items-center gap-2 p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
-          title="Ver historial completo"
           @click="openHistorialModal"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,10 +133,15 @@
             />
           </svg>
         </button>
+        </UiTooltip>
+        <UiTooltip
+          label="Importar / Exportar Canvas"
+          position="bottom"
+          :delay="200"
+        >
         <button
           type="button"
           class="inline-flex items-center gap-2 p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
-          title="Importar / Exportar Canvas"
           @click="openImportExportModal"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -134,13 +153,18 @@
             />
           </svg>
         </button>
+        </UiTooltip>
         <!-- -- -- -->
 
         <!-- Icono de Backups (gris) -->
+        <UiTooltip
+          label="Gestionar copias de seguridad automáticas"
+          position="bottom"
+          :delay="200"
+        >
         <button
           type="button"
           class="inline-flex items-center justify-center w-10 h-10 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-          title="Gestionar copias de seguridad automáticas"
           @click="openBackupModal"
         >
           <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -150,12 +174,17 @@
             />
           </svg>
         </button>
+        </UiTooltip>
 
         <!-- Botón Guardar Cambios -->
+        <UiTooltip
+          label="Guardar cambios actuales"
+          position="bottom"
+          :delay="200"
+        >
         <button
           type="button"
           class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
-          title="Guardar cambios actuales"
           @click="guardarCambios"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -168,6 +197,7 @@
           </svg>
           <span>Guardar Cambios</span>
         </button>
+        </UiTooltip>
       </div>
     </div>
 
@@ -392,9 +422,13 @@
     <div
       v-if="menuAbiertoPlanta"
       ref="menuEl"
-      class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-32"
+      class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-32 flex flex-col"
       :style="{ top: menuPosY + 'px', left: menuPosX + 'px' }"
       v-click-outside="() => cerrarMenuPlanta()"
+    >
+    <UiTooltip
+      label="Editar planta"
+      position="right"
     >
       <button
         @click="editarPlanta(menuAbiertoPlanta)"
@@ -410,6 +444,11 @@
         </svg>
         <span>Editar</span>
       </button>
+    </UiTooltip>
+    <UiTooltip
+      label="Eliminar planta"
+      position="right"
+    >
       <button
         @click="confirmarEliminarPlantaMenu(menuAbiertoPlanta)"
         :disabled="canvasStore.plantas.length <= 1"
@@ -425,6 +464,7 @@
         </svg>
         <span>Eliminar</span>
       </button>
+    </UiTooltip>
     </div>
   </teleport>
 
@@ -451,6 +491,7 @@ import ImportExportModal from './ImportExportModal.vue'
 import BackupModal from './BackupModal.vue'
 import { usePlantResizeGuard, pack as packShelf } from '@/inventory-smart/composables/usePlantResizeGuard'
 import { CM_TO_PX, MARGIN_CM, FACTOR_UTILIZACION } from '@/inventory-smart/utils/constants'
+import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue';
 
 // Store
 const canvasStore = useCanvasStore()
