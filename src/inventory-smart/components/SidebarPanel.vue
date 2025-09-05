@@ -120,7 +120,7 @@ const activeTab = ref('elementos')
 const tabs = [
   {
     id: 'elementos',
-    label: 'Elementos',
+    label: 'Catálogos',
     tooltip: 'Catálogo de elementos para agregar al canvas',
   },
   {
