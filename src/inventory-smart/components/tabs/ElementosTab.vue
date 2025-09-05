@@ -106,13 +106,13 @@
             @dragstart="onTemplateDragStart(tpl, $event)"
             @dragend="onTemplateDragEnd"
             @contextmenu.prevent="openTemplateContextMenu($event, tpl)"
-            class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]"
+            class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md border-l-4 hover:scale-[1.02] hover:bg-gray-50 transition duration-200"
             :style="{ borderLeftColor: getTemplateColor(tpl) }"
           >
             <!-- Botón de acciones (tres puntos) -->
             <button
               type="button"
-              class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               aria-haspopup="menu"
               :aria-expanded="ctxMenu.visible && ctxMenu.template?.id === tpl.id ? 'true' : 'false'"
               :aria-controls="`tpl-menu-${tpl.id}`"
@@ -172,24 +172,6 @@
                   {{ tag }}
                 </span>
               </div>
-            </div>
-
-            <div
-              class="drag-indicator absolute top-2 right-8 opacity-0 transition-opacity group-hover:opacity-100"
-            >
-              <svg
-                class="w-4 h-4 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                />
-              </svg>
             </div>
           </div>
         </div>

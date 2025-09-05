@@ -17,26 +17,6 @@
   <div class="elementos-catalogo h-full flex flex-col bg-white border-r border-gray-200">
     <!-- Header del catálogo -->
     <div class="catalogo-header p-1 border-b border-gray-200">
-      <div class="flex items-center justify-between">
-        <h2 class="text-base font-semibold text-gray-800 m-0">{{ tituloContextual }}</h2>
-        <button
-          v-if="puedeCrearElementosPersonalizados"
-          @click="mostrarModalCrear = true"
-          type="button"
-          class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-          title="Crear nuevo elemento"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-        </button>
-      </div>
-
       <!-- Búsqueda y filtro de categoría en una sola fila -->
       <div class="grid grid-cols-1 gap-3">
         <!-- Barra de búsqueda -->
@@ -154,25 +134,6 @@
                 {{ getCategoriaName(elemento.categoria) }}
               </span>
             </div>
-          </div>
-
-          <!-- Indicador de arrastre -->
-          <div
-            class="drag-indicator absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
-          >
-            <svg
-              class="w-4 h-4 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-              />
-            </svg>
           </div>
         </div>
       </div>
