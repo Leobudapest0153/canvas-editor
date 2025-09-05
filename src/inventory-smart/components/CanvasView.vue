@@ -1429,7 +1429,7 @@ const handleStageClick = (e) => {
   // Resaltar sección de guardados
   if (canvasStore.cambiosNoAplicados && e.target === e.target.getStage() && canvasStore.elementoSeleccionado) {
     const msg = "Tienes cambios pendientes de guardar";
-    window?.__toasts?.show?.(msg, { type: 'warn' })
+    showToast(msg, 'warn');
   }
 }
 
@@ -1439,7 +1439,7 @@ const selectElement = (elementId) => {
   const isNotCurrentElement = canvasStore.elementoSeleccionado !== elementId;
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado && isNotCurrentElement) {
     const msg = "No puedes seleccionar un nuevo elemento con cambios pendientes de guardar";
-    window?.__toasts?.show?.(msg, { type: 'warn' });
+    showToast(msg, 'warn');
     return;
   }
   canvasStore.seleccionarElemento(elementId)
@@ -1460,7 +1460,7 @@ const handleElementDoubleClick = (elemento) => {
 
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
     const msg = "No puedes entrar a un elemento si tienes cambios pendientes de guardar";
-    window?.__toasts?.show?.(msg, { type: 'warn' })
+    showToast(msg, 'warn');
     return;
   }
   if (tiposContenedor.includes(elemento.tipo)) {
@@ -1533,7 +1533,7 @@ const startElementDrag = (elementId) => {
     stageDragEnabled.value = false;
 
     const msg = "No puedes arrastrar un elemento con cambios pendientes de guardar";
-    window?.__toasts?.show?.(msg, { type: 'warn' });
+    showToast(msg, 'warn');
     return
   }
   console.log('Iniciando arrastre del elemento:', elementId)
@@ -3136,6 +3136,10 @@ const handleKeyDown = (e) => {
   if (!e) return
   const key = e.key.toLowerCase()
   if (key === 'escape' || key === 'esc') {
+    if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
+      showToast('Tienes cambios pendientes de guardar', 'warn')
+      return;
+    }
     canvasStore.seleccionarElemento(null)
     // Asegurar que el transformer/edición se cierre
     editingElementId.value = null

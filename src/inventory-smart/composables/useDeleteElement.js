@@ -205,6 +205,11 @@ export function useDeleteElement() {
       return false
     }
 
+    // Limpia por eliminación
+    if (store.cambiosNoAplicados) {
+      store.setCambiosNoAplicados(false);
+    }
+
     // Protección: impedir borrar elementos protegidos
     if (isProtected(selected)) {
       await confirmDialog.confirm({
