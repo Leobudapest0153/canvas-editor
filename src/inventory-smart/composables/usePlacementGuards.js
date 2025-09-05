@@ -85,7 +85,7 @@ export function usePlacementGuards({ useTopeClamp = true } = {}) {
     if (!res.valid) {
       opts.revert?.()
       const msg = errorsPlacement[res.code] || 'Posición inválida'
-      window?.__toasts?.show?.(msg, { type: 'error' })
+      showToast(msg, 'error');
     }
     return res
   }
