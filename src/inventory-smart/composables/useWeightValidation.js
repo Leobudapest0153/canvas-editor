@@ -1,16 +1,29 @@
 /**
  * useWeightValidation.js
  *
- * Composable para validaciones de peso máximo teórico soportado en la jerarquía planta > elemento > contenedor.
+ * Composable para validaciones de peso en la jerarquía planta > elemento > contenedor.
+ * Soporta dos tipos de validación:
  *
- * IMPORTANTE: Este sistema trabaja con pesos máximos teóricos, no con pesos físicos reales.
+ * 1. VALIDACIÓN TEÓRICA (por defecto):
+ *    - Basada en capacidades máximas (pesoMaximo)
+ *    - Útil para planificación y límites estructurales
+ *    - Evita configuraciones físicamente imposibles
+ *
+ * 2. VALIDACIÓN REAL:
+ *    - Basada en uso actual (uso.peso)
+ *    - Útil para operaciones diarias y consistencia de datos
+ *    - Refleja el estado actual del sistema
+ *
+ * IMPORTANTE:
  * - Para plantas: 'pesoMaximoSoportado' es el peso máximo que puede soportar.
  * - Para elementos: 'pesoMaximo' es la capacidad de carga teórica, no su peso físico real.
+ * - Para uso real: 'uso.peso' representa el peso actual utilizado en kg.
  *
  * Responsabilidades:
- * - Calcular el peso máximo teórico total de elementos hijos dentro de un contenedor
- * - Validar si un nuevo elemento puede ser agregado sin exceder el peso máximo soportado
- * - Verificar si una colección de elementos excede el peso máximo teórico
+ * - Calcular pesos teóricos y reales de elementos hijos
+ * - Validar si nuevos elementos pueden ser agregados
+ * - Verificar consistencia entre capacidad y uso
+ * - Proporcionar información de capacidad disponible
  */
 
 import { computed } from 'vue'
@@ -30,9 +43,10 @@ export function useWeightValidation() {
    * @param {string} padreType - Tipo del padre ('plantas', 'elementos', 'contenedores')
    * @param {Object} options - Opciones adicionales
    * @param {boolean} options.recursive - Si es true, calcula recursivamente el peso de todos los descendientes
+   * @param {string} options.excluirElementoId - ID del elemento a excluir del cálculo (útil al editar)
    * @returns {number} Peso máximo teórico total en kg
    */
-  const calcularPesoTotal = (padreId, padreType, { recursive = false } = {}) => {
+  const calcularPesoTotal = (padreId, padreType, { recursive = false, excluirElementoId = null } = {}) => {
     let pesoTotal = 0
 
     // Obtener todos los elementos hijos directos
@@ -55,6 +69,11 @@ export function useWeightValidation() {
 
     // Sumar el peso máximo de cada elemento hijo directo
     elementosHijos.forEach(elemento => {
+      // Excluir el elemento especificado si se proporciona
+      if (excluirElementoId && elemento.id === excluirElementoId) {
+        return // Saltar este elemento
+      }
+
       const pesoElemento = Number(elemento.pesoMaximo || 0)
 
       if (!isNaN(pesoElemento)) {
@@ -62,7 +81,7 @@ export function useWeightValidation() {
 
         // Si es recursivo, agregar también el peso de sus hijos
         if (recursive && elemento.hijos && elemento.hijos.length > 0) {
-          pesoTotal += calcularPesoTotal(elemento.id, elemento.tipo, { recursive })
+          pesoTotal += calcularPesoTotal(elemento.id, elemento.tipo, { recursive, excluirElementoId })
         }
       }
     })
@@ -71,22 +90,114 @@ export function useWeightValidation() {
   }
 
   /**
-   * Verifica si un elemento puede ser agregado sin exceder el peso máximo soportado
+   * Calcula el peso real total (uso actual) de todos los elementos hijos directos de un contenedor/elemento/planta
    *
-   * NOTA: Esta validación se basa en el peso máximo teórico (pesoMaximo) de cada elemento,
-   * que representa su capacidad de carga, no el peso físico real del elemento.
+   * NOTA: Este método suma solo los pesos reales usados (uso.peso) de cada elemento hijo directo,
+   * SIN recursión, ya que se asume que el uso.peso de cada elemento ya incluye el peso de sus hijos.
    *
-   * @param {Object} nuevoElemento - Elemento que se intenta agregar
    * @param {string} padreId - ID del elemento/planta padre
    * @param {string} padreType - Tipo del padre ('plantas', 'elementos', 'contenedores')
+   * @param {Object} options - Opciones adicionales (recursive se ignora para peso real)
+   * @param {boolean} options.recursive - IGNORADO: El peso real no necesita recursión
+   * @param {string} options.excluirElementoId - ID del elemento a excluir del cálculo (útil al editar)
+   * @returns {number} Peso real total en kg
+   */
+  const calcularPesoRealTotal = (padreId, padreType, { recursive = false, excluirElementoId = null } = {}) => {
+    let pesoTotal = 0
+
+    // Obtener todos los elementos hijos directos
+    let elementosHijos = []
+
+    if (padreType === 'plantas') {
+      // Obtener elementos directos de la planta (sin padre)
+      elementosHijos = canvasStore.elementos.filter(
+        el => el.plantaId === padreId && !el.padre
+      )
+    } else {
+      // Obtener elementos que tienen como padre este elemento/contenedor
+      const padre = canvasStore.elementoPorId(padreId)
+      if (padre && padre.hijos) {
+        elementosHijos = padre.hijos
+          .map(hijoId => canvasStore.elementoPorId(hijoId))
+          .filter(hijo => hijo !== undefined) // Filtrar elementos indefinidos
+      }
+    }
+
+    // Sumar SOLO el peso real usado de cada elemento hijo directo
+    // NO sumamos recursivamente porque uso.peso ya incluye el peso de los hijos
+    elementosHijos.forEach(elemento => {
+      // Excluir el elemento especificado si se proporciona
+      if (excluirElementoId && elemento.id === excluirElementoId) {
+        return // Saltar este elemento
+      }
+
+      const pesoElemento = Number(elemento.uso?.peso || 0)
+
+      if (!isNaN(pesoElemento)) {
+        pesoTotal += pesoElemento
+        // NO agregamos recursión aquí porque uso.peso ya considera los hijos
+      }
+    })
+
+    return pesoTotal
+  }
+
+  /**
+   * Valida que el peso máximo teórico de un elemento no sea menor a su uso real actual
+   *
+   * @param {Object} elemento - Elemento a validar
+   * @param {number} nuevoPesoMaximo - Nuevo peso máximo propuesto
+   * @returns {Object} { valido: boolean, pesoUsoReal: number, pesoMaximoPropuesto: number, diferencia: number }
+   */
+  const validarPesoMaximoVsUsoReal = (elemento, nuevoPesoMaximo) => {
+    // Obtener el peso real usado del elemento
+    const pesoUsoReal = Number(elemento.uso?.peso || 0)
+    const pesoMaximoPropuesto = Number(nuevoPesoMaximo || 0)
+
+    // El peso máximo no puede ser menor al uso real actual
+    const esValido = pesoMaximoPropuesto >= pesoUsoReal
+
+    return {
+      valido: esValido,
+      pesoUsoReal,
+      pesoMaximoPropuesto,
+      diferencia: pesoUsoReal - pesoMaximoPropuesto,
+      mensaje: esValido
+        ? 'El peso máximo es válido'
+        : `El peso máximo (${pesoMaximoPropuesto}kg) no puede ser menor al uso real actual (${pesoUsoReal}kg)`
+    }
+  }
+
+  /**
+   * Verifica si un elemento puede ser agregado sin exceder el peso máximo soportado
+   *
+   * NOTA: Esta validación puede ser teórica (capacidad máxima) o real (uso actual) según configuración.
+   *
+   * @param {Object} nuevoElemento - Elemento que se intenta agregar o editar
+   * @param {string} padreId - ID del elemento/planta padre
+   * @param {string} padreType - Tipo del padre ('plantas', 'elementos', 'contenedores')
+   * @param {Object} options - Opciones de validación
+   * @param {boolean} options.validacionTeorica - Si true, valida capacidad teórica máxima. Si false, valida solo uso real
+   * @param {boolean} options.strict - Alias para validacionTeorica (mantiene compatibilidad)
+   * @param {boolean} options.esEdicion - Si true, excluye el elemento actual del cálculo (para evitar doble conteo al editar)
    * @returns {Object} { valido: boolean, pesoActual: number, pesoMaximo: number, exceso: number }
    */
-  const validarPesoElemento = (nuevoElemento, padreId, padreType) => {
-    // Obtener el peso del nuevo elemento
-    const pesoNuevoElemento = Number(nuevoElemento.pesoMaximo || 0)
+  const validarPesoElemento = (nuevoElemento, padreId, padreType, options = {}) => {
+    // Normalizar opciones (permitir tanto 'strict' como 'validacionTeorica' por compatibilidad)
+    const { validacionTeorica = options.strict ?? true, esEdicion = false } = options
 
-    // Calcular el peso actual total
-    const pesoActualTotal = calcularPesoTotal(padreId, padreType)
+    // Obtener el peso del nuevo elemento
+    const pesoNuevoElemento = validacionTeorica
+      ? Number(nuevoElemento.pesoMaximo || 0)  // Capacidad teórica
+      : Number(nuevoElemento.uso?.peso || 0)   // Uso real
+
+    // Calcular el peso actual total según el tipo de validación
+    // Si es edición, excluir el elemento actual para evitar doble conteo
+    const excluirElementoId = esEdicion ? nuevoElemento.id : null
+
+    const pesoActualTotal = validacionTeorica
+      ? calcularPesoTotal(padreId, padreType, { excluirElementoId })              // Suma capacidades teóricas
+      : calcularPesoRealTotal(padreId, padreType, { excluirElementoId })          // Suma usos reales
 
     // Peso total después de agregar el nuevo elemento
     const pesoTotalFinal = pesoActualTotal + pesoNuevoElemento
@@ -131,46 +242,18 @@ export function useWeightValidation() {
   }
 
   /**
-   * Verifica si el elemento actual seleccionado puede ser movido a un nuevo padre
-   * sin exceder el peso máximo soportado
-   *
-   * @param {string} destinoPadreId - ID del elemento/planta destino
-   * @param {string} destinoTipo - Tipo del destino ('plantas', 'elementos', 'contenedores')
-   * @returns {Object} { valido: boolean, pesoActual: number, pesoMaximo: number, exceso: number }
-   */
-  const validarMovimientoElemento = (destinoPadreId, destinoTipo) => {
-    // Obtener el elemento seleccionado
-    const elementoMovido = canvasStore.elementoSeleccionadoCompleto
-
-    if (!elementoMovido) {
-      return { valido: true, limiteDePeso: false }
-    }
-
-    // Verificar si el elemento ya está en este padre (en ese caso no habría cambio de peso)
-    if (
-      (destinoTipo === 'plantas' && elementoMovido.plantaId === destinoPadreId && !elementoMovido.padre) ||
-      (elementoMovido.padre === destinoPadreId)
-    ) {
-      return { valido: true, limiteDePeso: false }
-    }
-
-    // Validar el peso como si se agregara un nuevo elemento
-    return validarPesoElemento(elementoMovido, destinoPadreId, destinoTipo)
-  }
-
-  /**
    * Calcula el peso máximo teórico soportado disponible que queda en un contenedor/elemento/planta
    *
-   * NOTA: Este cálculo se basa en la capacidad de carga teórica (pesoMaximo) de cada elemento,
-   * no en el peso físico real de los elementos. La capacidad disponible representa cuánto peso teórico
-   * adicional puede soportar el contenedor según la suma de las capacidades de carga de los elementos
-   * que ya contiene.
+   * NOTA: Este cálculo puede ser teórico (capacidad máxima) o real (uso actual) según configuración.
    *
    * @param {string} padreId - ID del elemento/planta padre
    * @param {string} padreType - Tipo del padre ('plantas', 'elementos', 'contenedores')
+   * @param {Object} options - Opciones de cálculo
+   * @param {boolean} options.validacionTeorica - Si true, calcula basado en capacidad teórica. Si false, en uso real
    * @returns {Object} { disponible: number, usado: number, maximo: number, porcentajeUsado: number }
    */
-  const calcularPesoDisponible = (padreId, padreType) => {
+  const calcularPesoDisponible = (padreId, padreType, options = {}) => {
+    const { validacionTeorica = true } = options
     // Obtener el peso máximo soportado del padre
     let pesoMaximoSoportado = 0
 
@@ -194,7 +277,9 @@ export function useWeightValidation() {
     }
 
     // Calcular el peso actual usado
-    const pesoUsado = calcularPesoTotal(padreId, padreType)
+    const pesoUsado = validacionTeorica
+      ? calcularPesoTotal(padreId, padreType)
+      : calcularPesoRealTotal(padreId, padreType)
 
     // Calcular el peso disponible
     const pesoDisponible = Math.max(0, pesoMaximoSoportado - pesoUsado)
@@ -210,6 +295,76 @@ export function useWeightValidation() {
       maximo: pesoMaximoSoportado,
       porcentajeUsado,
       limiteDePeso: true,
+    }
+  }
+
+  /**
+   * Valida que la capacidad máxima de un elemento sea suficiente para soportar a todos sus hijos
+   *
+   * @param {Object} elemento - Elemento a validar
+   * @param {number} nuevoPesoMaximo - Nueva capacidad máxima propuesta
+   * @returns {Object} { valido: boolean, pesoHijos: number, pesoMaximoPropuesto: number, deficit: number }
+   */
+  const validarCapacidadVsHijos = (elemento, nuevoPesoMaximo) => {
+    const pesoMaximoPropuesto = Number(nuevoPesoMaximo || 0)
+
+    // Si no hay límite de peso, siempre es válido
+    if (pesoMaximoPropuesto === 0) {
+      return {
+        valido: true,
+        pesoHijos: 0,
+        pesoMaximoPropuesto,
+        deficit: 0,
+        sinLimite: true
+      }
+    }
+
+    // Calcular peso total de hijos
+    const pesoHijos = elemento.hijos && elemento.hijos.length > 0
+      ? calcularPesoTotal(elemento.id, elemento.tipo)
+      : 0
+
+    // Verificar si la capacidad es suficiente
+    const esValido = pesoHijos <= pesoMaximoPropuesto
+    const deficit = Math.max(0, pesoHijos - pesoMaximoPropuesto)
+
+    return {
+      valido: esValido,
+      pesoHijos,
+      pesoMaximoPropuesto,
+      deficit,
+      sinLimite: false,
+      mensaje: esValido
+        ? 'La capacidad es suficiente para los elementos que contiene'
+        : `La capacidad máxima (${pesoMaximoPropuesto}kg) es insuficiente para el máximo que pueden soportar los hijos (${pesoHijos}kg). Falta: ${deficit.toFixed(2)}kg.`
+    }
+  }
+
+  /**
+   * Función helper que valida tanto el peso teórico como el uso real
+   * Útil para casos donde necesitas ambas validaciones
+   *
+   * @param {Object} elemento - Elemento a validar
+   * @param {string} padreId - ID del elemento/planta padre
+   * @param {string} padreType - Tipo del padre
+   * @param {Object} options - Opciones adicionales
+   * @param {boolean} options.esEdicion - Si true, indica que se está editando el elemento (excluye del cálculo)
+   * @returns {Object} { validacionTeorica: Object, validacionReal: Object, ambasValidas: boolean }
+   */
+  const validarPesoCompleto = (elemento, padreId, padreType, options = {}) => {
+    const { esEdicion = false } = options
+
+    const validacionTeorica = validarPesoElemento(elemento, padreId, padreType, { validacionTeorica: true, esEdicion })
+    const validacionReal = validarPesoElemento(elemento, padreId, padreType, { validacionTeorica: false, esEdicion })
+
+    return {
+      validacionTeorica,
+      validacionReal,
+      ambasValidas: validacionTeorica.valido && validacionReal.valido,
+      tipoValidacion: {
+        teorica: validacionTeorica.valido,
+        real: validacionReal.valido
+      }
     }
   }
 
@@ -238,9 +393,12 @@ export function useWeightValidation() {
 
   return {
     calcularPesoTotal,
+    calcularPesoRealTotal,
     validarPesoElemento,
-    validarMovimientoElemento,
+    validarPesoCompleto,
+    validarCapacidadVsHijos,
     calcularPesoDisponible,
+    validarPesoMaximoVsUsoReal,
     contextoActualTieneLimiteDePeso,
     infoPesoContextoActual
   }

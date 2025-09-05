@@ -114,7 +114,7 @@
       <div class="flex items-center gap-3">
         <!-- -- -- -->
         <!-- ACCIONES PARA PRUEBAS -- NO BORRAR -- -->
-        <UiTooltip
+        <!-- <UiTooltip
           label="Ver historial completo"
           position="bottom"
           :delay="200"
@@ -153,7 +153,7 @@
             />
           </svg>
         </button>
-        </UiTooltip>
+        </UiTooltip> -->
         <!-- -- -- -->
 
         <!-- Icono de Backups (gris) -->

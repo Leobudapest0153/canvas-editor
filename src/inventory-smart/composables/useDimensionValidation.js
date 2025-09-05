@@ -54,7 +54,6 @@ export function useDimensionValidation() {
 
     const vista = areaTotal.vista || 'XY'
     const esVistaFrontal = vista === 'XZ'
-    const dimension2Nombre = esVistaFrontal ? 'alto' : 'largo'
 
     console.log(`🔍 VALIDACIÓN DE DIMENSIONES - INICIO EN VISTA ${vista}:`, {
       elementoId: elementoId,
@@ -99,20 +98,16 @@ export function useDimensionValidation() {
         { ancho: elementoTemporal.width / CM_TO_PX, largo: elementoTemporal.height / CM_TO_PX }
     })
 
-    // PASO 2: Verificar si necesitamos reposicionar el elemento
-    let posicionAjustada = false
-    let nuevaPosicion = { x: elementoTemporal.x / CM_TO_PX, y: elementoTemporal.y / CM_TO_PX }
-
-    const areaAnchoCm = areaTotal.ancho / CM_TO_PX
-    const areaLargoCm = areaTotal.largo / CM_TO_PX
+    // PASO 2: Verificar validez de dimensiones en la posición actual
     const posXActual = elementoTemporal.x / CM_TO_PX
     const posYActual = elementoTemporal.y / CM_TO_PX
 
     // En vista frontal XZ: Y representa alto, en vista planta XY: Y representa largo
     const dimension2Final = esVistaFrontal ? dimensionesFinal.alto : dimensionesFinal.largo
+    const areaAnchoCm = areaTotal.ancho / CM_TO_PX
     const areaDimension2Cm = areaTotal.largo / CM_TO_PX // largo en XY, alto en XZ
 
-    console.log(`🔍 VERIFICANDO SI NECESITA REPOSICIONAMIENTO EN VISTA ${vista}:`, {
+    console.log(`🔍 VERIFICANDO VALIDEZ EN POSICIÓN ACTUAL EN VISTA ${vista}:`, {
       posicionActual: { x: posXActual, y: posYActual },
       dimensionesDeseadas: esVistaFrontal ?
         { ancho: dimensionesFinal.ancho, alto: dimension2Final } :
@@ -124,214 +119,63 @@ export function useDimensionValidation() {
       seSaleEnDimension2: posYActual + dimension2Final > areaDimension2Cm,
       posicionFinalX: posXActual + dimensionesFinal.ancho,
       posicionFinalDimension2: posYActual + dimension2Final,
-      espacioDisponible: areaDimension2Cm - posYActual,
       vista: vista
     })
 
-    // Verificar si se sale del área O si hay colisiones en posición actual
+    // Verificar si se sale del área
     const seSaleDelArea = (posXActual + dimensionesFinal.ancho > areaAnchoCm || posYActual + dimension2Final > areaDimension2Cm)
+
+    if (seSaleDelArea) {
+      console.log('❌ ELEMENTO SE SALE DEL ÁREA PERMITIDA')
+
+      if (!toastMostrado && !silencioso) {
+        const excesosTexto = []
+        if (posXActual + dimensionesFinal.ancho > areaAnchoCm) {
+          const excesoAncho = (posXActual + dimensionesFinal.ancho) - areaAnchoCm
+          excesosTexto.push(`${excesoAncho.toFixed(1)}cm en ancho`)
+        }
+        if (posYActual + dimension2Final > areaDimension2Cm) {
+          const excesoDimension2 = (posYActual + dimension2Final) - areaDimension2Cm
+          const nombreDimension2 = esVistaFrontal ? 'alto' : 'largo'
+          excesosTexto.push(`${excesoDimension2.toFixed(1)}cm en ${nombreDimension2}`)
+        }
+
+        toast.showError(`Las nuevas dimensiones se salen del área por: ${excesosTexto.join(' y ')}. Reduce el tamaño del elemento.`)
+        toastMostrado = true
+      }
+
+      return {
+        valida: false,
+        razon: 'Las nuevas dimensiones exceden el área disponible en la posición actual',
+        accion: 'error'
+      }
+    }
 
     // Verificar colisiones en posición actual
     const elementosExistentes = canvasStore.elementosVisibles.filter(el => el.id !== elementoId)
-    const elementoEnPosicionActual = {
-      ...elementoTemporal,
-      x: posXActual * CM_TO_PX,
-      y: posYActual * CM_TO_PX
-    }
-
-    const hayColisiones = verificarColisionesEnPosicion(elementoEnPosicionActual, elementosExistentes)
+    const hayColisiones = verificarColisionesEnPosicion(elementoTemporal, elementosExistentes)
 
     console.log('🔍 ANÁLISIS INICIAL:', {
       seSaleDelArea,
-      hayColisiones: hayColisiones,
-      necesitaReposicionamiento: seSaleDelArea || hayColisiones
+      hayColisiones: hayColisiones
     })
 
-    if (seSaleDelArea || hayColisiones) {
-      console.log('🔄 ELEMENTO NECESITA REPOSICIONAMIENTO - EVALUANDO OPCIONES')
+    if (hayColisiones) {
+      console.log('❌ ELEMENTO TIENE COLISIONES 3D EN POSICIÓN ACTUAL')
 
-      let reposicionExitoso = false
-      let nuevaX = posXActual
-      let nuevaY = posYActual
-
-      // OPCIÓN 1: Intentar expandir desde posición actual (crecimiento natural)
-      if (!seSaleDelArea) {
-        console.log('🔄 OPCIÓN 1: VERIFICANDO CRECIMIENTO DESDE POSICIÓN ACTUAL')
-        // Si no se sale del área, el problema son solo las colisiones
-        // Verificar si puede crecer hacia derecha (ancho) o hacia abajo (largo)
-
-        const elementoEnPosicionOriginal = {
-          ...elementoTemporal,
-          x: posXActual * CM_TO_PX,
-          y: posYActual * CM_TO_PX
-        }
-
-        const hayColisionesEnOriginal = verificarColisionesEnPosicion(elementoEnPosicionOriginal, elementosExistentes)
-
-        if (!hayColisionesEnOriginal) {
-          console.log('✅ PUEDE CRECER DESDE POSICIÓN ACTUAL')
-          nuevaX = posXActual
-          nuevaY = posYActual
-          reposicionExitoso = true
-        }
-      } else {
-        // OPCIÓN 1.5: Si se sale SOLO hacia abajo Y tiene espacio suficiente, permitir crecimiento
-        const soloSeSaleEnY = (posYActual + dimensionesFinal.largo > areaLargoCm) &&
-                             (posXActual + dimensionesFinal.ancho <= areaAnchoCm)
-        const soloSeSaleEnX = (posXActual + dimensionesFinal.ancho > areaAnchoCm) &&
-                             (posYActual + dimensionesFinal.largo <= areaLargoCm)
-        const espacioTotalAbajo = areaLargoCm
-        const espacioTotalDerecha = areaAnchoCm
-        const margenDesbordamiento = 1 // Tolerancia de 1cm para errores de redondeo
-
-        console.log('🔍 ANÁLISIS DE DESBORDAMIENTO:', {
-          soloSeSaleEnY,
-          soloSeSaleEnX,
-          desbordamientoY: (posYActual + dimensionesFinal.largo) - areaLargoCm,
-          desbordamientoX: (posXActual + dimensionesFinal.ancho) - areaAnchoCm,
-          espacioTotalAbajo,
-          espacioTotalDerecha
-        })
-
-        if (soloSeSaleEnY && dimensionesFinal.largo <= espacioTotalAbajo &&
-            ((posYActual + dimensionesFinal.largo) - areaLargoCm) <= margenDesbordamiento) {
-          console.log('🔄 OPCIÓN 1.5Y: ELEMENTO SE SALE SOLO HACIA ABAJO CON MARGEN MÍNIMO')
-
-          // Calcular nueva posición Y para que quepa exactamente
-          const nuevaYCalculada = Math.max(0, areaLargoCm - dimensionesFinal.largo)
-
-          const elementoReajustado = {
-            ...elementoTemporal,
-            x: posXActual * CM_TO_PX,
-            y: nuevaYCalculada * CM_TO_PX
-          }
-
-          const hayColisionesReajustado = verificarColisionesEnPosicion(elementoReajustado, elementosExistentes)
-
-          console.log('🔍 VERIFICACIÓN REAJUSTE Y:', {
-            posicionOriginal: posYActual,
-            nuevaYCalculada,
-            diferencia: posYActual - nuevaYCalculada,
-            hayColisiones: hayColisionesReajustado
-          })
-
-          if (!hayColisionesReajustado) {
-            console.log('✅ PUEDE CRECER CON REAJUSTE MÍNIMO EN Y')
-            nuevaX = posXActual
-            nuevaY = nuevaYCalculada
-            reposicionExitoso = true
-          }
-        } else if (soloSeSaleEnX && dimensionesFinal.ancho <= espacioTotalDerecha &&
-                   ((posXActual + dimensionesFinal.ancho) - areaAnchoCm) <= margenDesbordamiento) {
-          console.log('🔄 OPCIÓN 1.5X: ELEMENTO SE SALE SOLO HACIA DERECHA CON MARGEN MÍNIMO')
-
-          // Calcular nueva posición X para que quepa exactamente
-          const nuevaXCalculada = Math.max(0, areaAnchoCm - dimensionesFinal.ancho)
-
-          const elementoReajustado = {
-            ...elementoTemporal,
-            x: nuevaXCalculada * CM_TO_PX,
-            y: posYActual * CM_TO_PX
-          }
-
-          const hayColisionesReajustado = verificarColisionesEnPosicion(elementoReajustado, elementosExistentes)
-
-          if (!hayColisionesReajustado) {
-            console.log('✅ PUEDE CRECER CON REAJUSTE MÍNIMO EN X')
-            nuevaX = nuevaXCalculada
-            nuevaY = posYActual
-            reposicionExitoso = true
-          }
-        }
+      if (!toastMostrado && !silencioso) {
+        toast.showError('Las nuevas dimensiones generan colisiones con otros elementos. Reduce el tamaño o mueve el elemento.')
+        toastMostrado = true
       }
 
-      // OPCIÓN 2: Si no puede crecer desde posición actual, probar esquina superior izquierda
-      if (!reposicionExitoso) {
-        console.log('🔄 OPCIÓN 2: REPOSICIONANDO EN ESQUINA SUPERIOR IZQUIERDA')
-        nuevaX = 0
-        nuevaY = 0
-
-        console.log('🔄 REPOSICIONANDO EN ESQUINA SUPERIOR IZQUIERDA:', {
-          posicionOriginal: { x: posXActual, y: posYActual },
-          nuevaPosicion: { x: nuevaX, y: nuevaY },
-          razonamiento: 'Permite crecimiento natural: ancho→derecha, largo→abajo'
-        })
+      return {
+        valida: false,
+        razon: 'Las nuevas dimensiones generan colisiones con elementos existentes',
+        accion: 'error'
       }
-
-      // Verificar si cabe en el área desde la nueva posición
-      if (nuevaX + dimensionesFinal.ancho <= areaAnchoCm && nuevaY + dimensionesFinal.largo <= areaLargoCm) {
-        // Crear elemento temporal en la nueva posición
-        const elementoReposicionado = {
-          ...elementoTemporal,
-          x: nuevaX * CM_TO_PX,
-          y: nuevaY * CM_TO_PX
-        }
-
-        // Verificar colisiones en la nueva posición
-        const hayColisionesEnNuevaPosicion = verificarColisionesEnPosicion(elementoReposicionado, elementosExistentes)
-
-        console.log('🔍 VERIFICACIÓN EN NUEVA POSICIÓN:', {
-          nuevaPosicion: { x: nuevaX, y: nuevaY },
-          hayColisiones: hayColisionesEnNuevaPosicion,
-          elementosAVerificar: elementosExistentes.length,
-          opcionUsada: reposicionExitoso ? 'Crecimiento desde posición actual' : 'Reposición en esquina'
-        })
-
-        if (!hayColisionesEnNuevaPosicion) {
-          nuevaPosicion = { x: nuevaX, y: nuevaY }
-          posicionAjustada = (nuevaX !== posXActual || nuevaY !== posYActual)
-          elementoTemporal.x = nuevaX * CM_TO_PX
-          elementoTemporal.y = nuevaY * CM_TO_PX
-
-          console.log('✅ REPOSICIONAMIENTO EXITOSO')
-
-          // Notificar al usuario sobre el reposicionamiento solo si cambió la posición
-          if (posicionAjustada && !toastMostrado && !silencioso) {
-            const tiposCambio = []
-            if (nuevasDimensiones.ancho && nuevasDimensiones.ancho !== dimensionesActuales.ancho) {
-              tiposCambio.push('ancho (crece →)')
-            }
-            if (nuevasDimensiones.largo && nuevasDimensiones.largo !== dimensionesActuales.largo) {
-              tiposCambio.push('largo (crece ↓)')
-            }
-
-            toast.showWarning(`El elemento se reposicionó automáticamente para permitir el crecimiento de ${tiposCambio.join(' y ')}.`)
-            toastMostrado = true
-          }
-        } else {
-          console.log('❌ NO HAY ESPACIO DISPONIBLE EN NINGUNA POSICIÓN')
-
-          if (!toastMostrado && !silencioso) {
-            toast.showError('No hay espacio suficiente para las nuevas dimensiones. Reduce el tamaño o libera espacio en el área.')
-            toastMostrado = true
-          }
-
-          return {
-            valida: false,
-            razon: 'No hay espacio suficiente para las nuevas dimensiones',
-            accion: 'error'
-          }
-        }
-      } else {
-        console.log('❌ ELEMENTO NO CABE EN EL ÁREA TOTAL:', {
-          dimensionesDeseadas: { ancho: dimensionesFinal.ancho, largo: dimensionesFinal.largo },
-          areaDisponible: { ancho: areaAnchoCm, largo: areaLargoCm }
-        })
-
-        if (!toastMostrado && !silencioso) {
-          toast.showError('Las nuevas dimensiones son demasiado grandes para el área disponible. Ajusta el tamaño o mueve otros elementos.')
-          toastMostrado = true
-        }
-
-        return {
-          valida: false,
-          razon: 'Las nuevas dimensiones exceden el área disponible',
-          accion: 'error'
-        }
-      }
-    } else {
-      console.log('✅ ELEMENTO CABE EN POSICIÓN ACTUAL - NO NECESITA REPOSICIONAMIENTO')
     }
+
+    console.log('✅ ELEMENTO CABE EN POSICIÓN ACTUAL - CONTINUANDO VALIDACIONES')
 
     // PASO 3: VALIDACIÓN FINAL - Verificar que todo esté correcto
     console.log('🚨 VALIDACIÓN FINAL - VERIFICANDO LÍMITES Y COLISIONES')
@@ -417,7 +261,7 @@ export function useDimensionValidation() {
 
     // PASO 4: NUEVAS VALIDACIONES ESPECÍFICAS
 
-    // VALIDACIÓN 4: Verificar que las nuevas dimensiones contengan a los elementos hijos
+    // VALIDACIÓN 4: Verificar que las nuevas dimensiones contengan a los elementos hijos (3D)
     const validacionHijos = validarContencionHijos(elementoTemporal);
     if (!validacionHijos.valida) {
       console.log('❌ VALIDACIÓN DE HIJOS FALLIDA:', validacionHijos.razon);
@@ -429,7 +273,19 @@ export function useDimensionValidation() {
       };
     }
 
-    // VALIDACIÓN 5: Verificar que el nuevo volumen no sea menor al volumen usado
+    // VALIDACIÓN 5: Verificar que el elemento quepa dentro de su contenedor padre (3D)
+    const validacionPadre = validarContencionEnPadre(elementoTemporal);
+    if (!validacionPadre.valida) {
+      console.log('❌ VALIDACIÓN DE CONTENCIÓN EN PADRE FALLIDA:', validacionPadre.razon);
+      return {
+        valida: false,
+        razon: validacionPadre.razon,
+        accion: 'rechazar',
+        sugerencias: validacionPadre.sugerencias || ['Reducir las dimensiones para caber dentro del contenedor padre']
+      };
+    }
+
+    // VALIDACIÓN 6: Verificar que el nuevo volumen no sea menor al volumen usado
     const validacionVolumen = validarVolumenMinimo(elementoTemporal);
     if (!validacionVolumen.valida) {
       console.log('❌ VALIDACIÓN DE VOLUMEN FALLIDA:', validacionVolumen.razon);
@@ -443,22 +299,18 @@ export function useDimensionValidation() {
 
     console.log('✅ TODAS LAS VALIDACIONES EXITOSAS');
 
-    // PASO 5: Si llegamos aquí, las dimensiones son válidas
+    // PASO 4: Si llegamos aquí, las dimensiones son válidas
 
     // Mostrar toast de éxito si no se ha mostrado otro toast
-    if (!toastMostrado && !silencioso && !posicionAjustada) {
+    if (!toastMostrado && !silencioso) {
       toast.showSuccess('Dimensiones aplicadas correctamente.')
     }
 
     return {
       valida: true,
-      razon: posicionAjustada
-        ? 'Dimensiones aplicadas con ajuste automático de posición para evitar desbordamiento'
-        : 'Dimensiones aplicadas correctamente',
+      razon: 'Dimensiones aplicadas correctamente',
       accion: 'aplicar',
-      elementoFinal: elementoTemporal,
-      posicionAjustada: posicionAjustada,
-      nuevaPosicion: posicionAjustada ? nuevaPosicion : undefined
+      elementoFinal: elementoTemporal
     }
   }
 
@@ -539,28 +391,151 @@ export function useDimensionValidation() {
   }
 
   /**
-   * Verifica si hay colisiones en una posición específica
+   * Calcula el solapamiento 3D entre dos elementos considerando sus dimensiones y alturas
+   * @param {Object} elemento1 - Primer elemento (temporal)
+   * @param {Object} elemento2 - Segundo elemento (existente)
+   * @returns {Object} Información del solapamiento en las 3 dimensiones
    */
-  function verificarColisionesEnPosicion(elementoTemporal, elementosExistentes) {
+  function calcularSolapamiento3D(elemento1, elemento2) {
     const tolerancia = 0.1 // 1mm de tolerancia
 
+    // Calcular posiciones y dimensiones en X e Y (ancho y largo/profundidad)
+    const el1PosX = elemento1.x / CM_TO_PX
+    const el1PosY = elemento1.y / CM_TO_PX
+    const el1Ancho = elemento1.width / CM_TO_PX
+    const el1Largo = elemento1.height / CM_TO_PX
+
+    const el2PosX = (elemento2.x || 0) / CM_TO_PX
+    const el2PosY = (elemento2.y || 0) / CM_TO_PX
+    const el2Ancho = (elemento2.width || 0) / CM_TO_PX
+    const el2Largo = (elemento2.height || 0) / CM_TO_PX
+
+    // Obtener dimensiones de ambos elementos
+    const el1Dimensiones = elemento1.dimensiones || {}
+    const el2Dimensiones = elemento2.dimensiones || {}
+
+    // Verificar solapamiento en X e Y (ancho y largo/profundidad)
+    const solapamientoX = Math.min(el1PosX + el1Ancho, el2PosX + el2Ancho) - Math.max(el1PosX, el2PosX)
+    const solapamientoY = Math.min(el1PosY + el1Largo, el2PosY + el2Largo) - Math.max(el1PosY, el2PosY)
+
+    // Si no hay solapamiento en X o Y, no hay colisión en esta proyección
+    if (solapamientoX <= tolerancia || solapamientoY <= tolerancia) {
+      return {
+        hayColision: false,
+        solapamientos: { x: solapamientoX, y: solapamientoY, z: 0 },
+        elemento1Info: {
+          posicion: { x: el1PosX, y: el1PosY },
+          dimensiones: { ancho: el1Ancho, largo: el1Largo, alto: el1Dimensiones.alto || 0 },
+          alturaDesdesuelo: 0,
+          limiteAlto: el1Dimensiones.alto || 0
+        },
+        elemento2Info: {
+          id: elemento2.id,
+          ubicacion: elemento2.ubicacion,
+          posicion: { x: el2PosX, y: el2PosY },
+          dimensiones: { ancho: el2Ancho, largo: el2Largo, alto: el2Dimensiones.alto || 0 },
+          alturaDesdesuelo: elemento2.ubicacion === 'pared' && elemento2.alturaRespectoAlSuelo !== undefined ? elemento2.alturaRespectoAlSuelo : 0,
+          limiteAlto: (elemento2.ubicacion === 'pared' && elemento2.alturaRespectoAlSuelo !== undefined ? elemento2.alturaRespectoAlSuelo : 0) + (el2Dimensiones.alto || 0),
+          esElementoPared: elemento2.ubicacion === 'pared'
+        },
+        razon: solapamientoX <= tolerancia ? 'No hay solapamiento en X (ancho)' : 'No hay solapamiento en Y (largo/profundidad)'
+      }
+    }
+
+    // Si hay solapamiento en X e Y, verificar también la altura (dimensión Z)
+    // Altura del elemento1 (temporal) - siempre desde el suelo
+    const el1AltoDesdesuelo = 0
+    const el1AltoTotal = el1Dimensiones.alto || 0
+    const el1LimiteAlto = el1AltoDesdesuelo + el1AltoTotal
+
+    // Altura del elemento2 (existente) - considerar elementos de pared
+    let el2AltoDesdesuelo = 0
+    let el2AltoTotal = el2Dimensiones.alto || 0
+
+    // Para elementos tipo "pared", considerar su alturaRespectoAlSuelo
+    if (elemento2.ubicacion === 'pared' && elemento2.alturaRespectoAlSuelo !== undefined) {
+      el2AltoDesdesuelo = elemento2.alturaRespectoAlSuelo
+    }
+    const el2LimiteAlto = el2AltoDesdesuelo + el2AltoTotal
+
+    // Verificar solapamiento en altura (dimensión Z)
+    const solapamientoZ = Math.min(el1LimiteAlto, el2LimiteAlto) - Math.max(el1AltoDesdesuelo, el2AltoDesdesuelo)
+
+    // Determinar si hay colisión 3D
+    const hayColision3D = solapamientoX > tolerancia && solapamientoY > tolerancia && solapamientoZ > tolerancia
+
+    return {
+      hayColision: hayColision3D,
+      solapamientos: { x: solapamientoX, y: solapamientoY, z: solapamientoZ },
+      elemento1Info: {
+        posicion: { x: el1PosX, y: el1PosY },
+        dimensiones: { ancho: el1Ancho, largo: el1Largo, alto: el1AltoTotal },
+        alturaDesdesuelo: el1AltoDesdesuelo,
+        limiteAlto: el1LimiteAlto
+      },
+      elemento2Info: {
+        id: elemento2.id,
+        ubicacion: elemento2.ubicacion,
+        posicion: { x: el2PosX, y: el2PosY },
+        dimensiones: { ancho: el2Ancho, largo: el2Largo, alto: el2AltoTotal },
+        alturaDesdesuelo: el2AltoDesdesuelo,
+        limiteAlto: el2LimiteAlto,
+        esElementoPared: elemento2.ubicacion === 'pared'
+      },
+      razon: hayColision3D
+        ? 'Los elementos se solapan en las 3 dimensiones (X, Y y Z) - COLISIÓN REAL'
+        : solapamientoZ <= tolerancia
+          ? 'Elementos están a diferentes alturas - NO HAY COLISIÓN'
+          : 'Solapamiento insuficiente - NO HAY COLISIÓN'
+    }
+  }
+
+  /**
+   * Verifica si hay colisiones en una posición específica
+   * Incluye validación de altura para elementos tipo "pared" con alturaRespectoAlSuelo
+   */
+  function verificarColisionesEnPosicion(elementoTemporal, elementosExistentes) {
     for (const elemento of elementosExistentes) {
-      const elPosX = (elemento.x || 0) / CM_TO_PX
-      const elPosY = (elemento.y || 0) / CM_TO_PX
-      const elAncho = (elemento.width || 0) / CM_TO_PX
-      const elLargo = (elemento.height || 0) / CM_TO_PX
+      // Usar la función reutilizable para calcular solapamiento 3D
+      const resultadoSolapamiento = calcularSolapamiento3D(elementoTemporal, elemento)
 
-      const tempPosX = elementoTemporal.x / CM_TO_PX
-      const tempPosY = elementoTemporal.y / CM_TO_PX
-      const tempAncho = elementoTemporal.width / CM_TO_PX
-      const tempLargo = elementoTemporal.height / CM_TO_PX
+      console.log(`🔍 Verificando colisión 3D con elemento ${elemento.id}:`, {
+        elementoExistente: resultadoSolapamiento.elemento2Info,
+        elementoTemporal: resultadoSolapamiento.elemento1Info,
+        solapamientos: {
+          x: resultadoSolapamiento.solapamientos.x.toFixed(2),
+          y: resultadoSolapamiento.solapamientos.y.toFixed(2),
+          z: resultadoSolapamiento.solapamientos.z.toFixed(2)
+        },
+        criteriosColision: {
+          solapamientoX_mayor_tolerancia: resultadoSolapamiento.solapamientos.x > 0.1,
+          solapamientoY_mayor_tolerancia: resultadoSolapamiento.solapamientos.y > 0.1,
+          solapamientoZ_mayor_tolerancia: resultadoSolapamiento.solapamientos.z > 0.1,
+          todas_dimensiones_solapan: resultadoSolapamiento.hayColision
+        },
+        hayColision3D: resultadoSolapamiento.hayColision
+      })
 
-      // Verificar solapamiento
-      const solapamientoX = Math.min(tempPosX + tempAncho, elPosX + elAncho) - Math.max(tempPosX, elPosX)
-      const solapamientoY = Math.min(tempPosY + tempLargo, elPosY + elLargo) - Math.max(tempPosY, elPosY)
-
-      if (solapamientoX > tolerancia && solapamientoY > tolerancia) {
+      if (resultadoSolapamiento.hayColision) {
+        console.log(`❌ COLISIÓN 3D DETECTADA con elemento ${elemento.id}:`, {
+          solapamientoTotal: {
+            x: resultadoSolapamiento.solapamientos.x.toFixed(2) + 'cm',
+            y: resultadoSolapamiento.solapamientos.y.toFixed(2) + 'cm',
+            z: resultadoSolapamiento.solapamientos.z.toFixed(2) + 'cm'
+          },
+          tipoElemento: elemento.ubicacion === 'pared' ? 'Elemento de pared' : 'Elemento normal',
+          explicacion: resultadoSolapamiento.razon
+        })
         return true // Hay colisión
+      } else {
+        console.log(`✅ NO HAY COLISIÓN con elemento ${elemento.id}: ${resultadoSolapamiento.razon}`, {
+          detalleAlturas: {
+            elementoTemporal: `${resultadoSolapamiento.elemento1Info.alturaDesdesuelo}cm - ${resultadoSolapamiento.elemento1Info.limiteAlto}cm`,
+            elementoExistente: `${resultadoSolapamiento.elemento2Info.alturaDesdesuelo}cm - ${resultadoSolapamiento.elemento2Info.limiteAlto}cm`,
+            esElementoPared: resultadoSolapamiento.elemento2Info.esElementoPared,
+            explicacion: resultadoSolapamiento.razon
+          }
+        })
       }
     }
 
@@ -598,7 +573,7 @@ export function useDimensionValidation() {
       const exceso = (posXCm + anchoCm) - areaAnchoCm
       return {
         cabe: false,
-        razon: `El elemento se sale del área por ${exceso.toFixed(1)}cm en el ancho (posición: ${posXCm.toFixed(1)}cm + ancho: ${anchoCm}cm = ${(posXCm + anchoCm).toFixed(1)}cm > área: ${areaAnchoCm}cm) en vista ${vista}`,
+        razon: `El elemento se sale del área por ${exceso.toFixed(1)}cm en su ancho`,
         sugerencias: [`Reducir ancho en ${exceso.toFixed(1)}cm`],
         vista: vista
       }
@@ -608,42 +583,61 @@ export function useDimensionValidation() {
       const exceso = (posYCm + dimension2Cm) - areaDimension2Cm
       return {
         cabe: false,
-        razon: `El elemento se sale del área por ${exceso.toFixed(1)}cm en el ${dimension2Nombre} (posición: ${posYCm.toFixed(1)}cm + ${dimension2Nombre}: ${dimension2Cm}cm = ${(posYCm + dimension2Cm).toFixed(1)}cm > área: ${areaDimension2Cm}cm) en vista ${vista}`,
+        razon: `El elemento se sale del área por ${exceso.toFixed(1)}cm en su ${dimension2Nombre}`,
         sugerencias: [`Reducir ${dimension2Nombre} en ${exceso.toFixed(1)}cm`],
         vista: vista
       }
     }
 
-    // Verificar si hay elementos que obstruyen el espacio
+    // Verificar si hay elementos que obstruyen el espacio usando validación 3D
     for (const elemento of elementosExistentes) {
-      const elPosX = (elemento.x || 0) / CM_TO_PX
-      const elPosY = (elemento.y || 0) / CM_TO_PX
-      const elAncho = (elemento.width || 0) / CM_TO_PX
-      const elDimension2 = (elemento.height || 0) / CM_TO_PX // largo en XY, alto en XZ
+      // Usar la función reutilizable para calcular solapamiento 3D
+      const resultadoSolapamiento = calcularSolapamiento3D(elementoTemporal, elemento)
 
-      // Verificar si hay solapamiento real (no solo adyacencia)
-      const solapamientoX = Math.min(posXCm + anchoCm, elPosX + elAncho) - Math.max(posXCm, elPosX)
-      const solapamientoY = Math.min(posYCm + dimension2Cm, elPosY + elDimension2) - Math.max(posYCm, elPosY)
-
-      console.log(`🔍 Verificando solapamiento con elemento ${elemento.id} en vista ${vista}:`, {
+      console.log(`🔍 Verificando solapamiento 3D con elemento ${elemento.id} en vista ${vista}:`, {
         elementoActual: esVistaFrontal ?
           { x: posXCm, y: posYCm, ancho: anchoCm, alto: dimension2Cm } :
           { x: posXCm, y: posYCm, ancho: anchoCm, largo: dimension2Cm },
         elementoExistente: esVistaFrontal ?
-          { x: elPosX, y: elPosY, ancho: elAncho, alto: elDimension2 } :
-          { x: elPosX, y: elPosY, ancho: elAncho, largo: elDimension2 },
-        solapamiento: { x: solapamientoX, y: solapamientoY }
+          { x: resultadoSolapamiento.elemento2Info.posicion.x, y: resultadoSolapamiento.elemento2Info.posicion.y, ancho: resultadoSolapamiento.elemento2Info.dimensiones.ancho, alto: resultadoSolapamiento.elemento2Info.dimensiones.largo } :
+          { x: resultadoSolapamiento.elemento2Info.posicion.x, y: resultadoSolapamiento.elemento2Info.posicion.y, ancho: resultadoSolapamiento.elemento2Info.dimensiones.ancho, largo: resultadoSolapamiento.elemento2Info.dimensiones.largo },
+        solapamiento3D: {
+          x: resultadoSolapamiento.solapamientos.x,
+          y: resultadoSolapamiento.solapamientos.y,
+          z: resultadoSolapamiento.solapamientos.z
+        },
+        alturas: {
+          elementoActual: `${resultadoSolapamiento.elemento1Info.alturaDesdesuelo}cm - ${resultadoSolapamiento.elemento1Info.limiteAlto}cm`,
+          elementoExistente: `${resultadoSolapamiento.elemento2Info.alturaDesdesuelo}cm - ${resultadoSolapamiento.elemento2Info.limiteAlto}cm`,
+          esElementoPared: resultadoSolapamiento.elemento2Info.esElementoPared
+        }
       })
 
-      // Si hay solapamiento real (mayor a una tolerancia mínima)
-      const tolerancia = 0.1 // 1mm de tolerancia
-      if (solapamientoX > tolerancia && solapamientoY > tolerancia) {
+      // Si hay colisión 3D real (solapamiento en las tres dimensiones)
+      if (resultadoSolapamiento.hayColision) {
         return {
           cabe: false,
-          razon: `El elemento se solaparía ${solapamientoX.toFixed(1)}cm x ${solapamientoY.toFixed(1)}cm con el elemento ${elemento.id} en vista ${vista}`,
-          sugerencias: ['Reducir las dimensiones para evitar solapamiento', 'Cambiar la posición del elemento'],
-          vista: vista
+          razon: `El elemento se solaparía en 3D con el elemento ${elemento.id} en vista ${vista}. Solapamiento: ${resultadoSolapamiento.solapamientos.x.toFixed(1)}cm(X) × ${resultadoSolapamiento.solapamientos.y.toFixed(1)}cm(Y) × ${resultadoSolapamiento.solapamientos.z.toFixed(1)}cm(Z)`,
+          sugerencias: [
+            'Reducir las dimensiones para evitar solapamiento 3D',
+            'Cambiar la posición del elemento',
+            resultadoSolapamiento.elemento2Info.esElementoPared ?
+              'Considerar ajustar la altura respecto al suelo del elemento de pared' :
+              'Verificar la altura de los elementos'
+          ],
+          vista: vista,
+          tipoColision: '3D',
+          detalleColision: {
+            solapamientos: resultadoSolapamiento.solapamientos,
+            alturas: {
+              elementoActual: `${resultadoSolapamiento.elemento1Info.alturaDesdesuelo}cm - ${resultadoSolapamiento.elemento1Info.limiteAlto}cm`,
+              elementoExistente: `${resultadoSolapamiento.elemento2Info.alturaDesdesuelo}cm - ${resultadoSolapamiento.elemento2Info.limiteAlto}cm`
+            }
+          }
         }
+      } else {
+        // Log informativo de por qué NO hay colisión
+        console.log(`✅ NO HAY COLISIÓN 3D con elemento ${elemento.id}: ${resultadoSolapamiento.razon}`)
       }
     }
 
@@ -718,13 +712,13 @@ export function useDimensionValidation() {
 
       if (!validacion.dentroEnX) {
         const exceso = calculo.elementoFinal.x - calculo.area.ancho
-        problemas.push(`se sale ${exceso.toFixed(1)}cm en el ancho`)
+        problemas.push(`se sale ${exceso.toFixed(1)}cm en su ancho`)
         sugerencias.push(`Reducir ancho en ${exceso.toFixed(1)}cm o mover hacia la izquierda`)
       }
 
       if (!validacion.dentroEnDimension2) {
         const exceso = calculo.elementoFinal.y - calculo.area.dimension2
-        problemas.push(`se sale ${exceso.toFixed(1)}cm en el ${dimension2Nombre}`)
+        problemas.push(`se sale ${exceso.toFixed(1)}cm en su ${dimension2Nombre}`)
         sugerencias.push(`El ${dimension2Nombre} máximo posible es de ${calculo.area.dimension2.toFixed(1)}cm. También puedes moverlo hacia ${direccion2}`)
       }
 
@@ -745,7 +739,7 @@ export function useDimensionValidation() {
 
   /**
    * Valida que las nuevas dimensiones del elemento sean suficientes para contener a sus elementos hijos
-   * Considera la vista frontal (XZ) usando coordenadas Konva: x = ancho, y = alto
+   * Valida las 3 dimensiones: ancho (X), largo (profundidad), alto (Y en frontal)
    * IMPORTANTE: Valida posición + dimensión para verificar que el hijo no se salga del área del padre
    * @param {Object} elemento - Elemento con las nuevas dimensiones a validar
    * @returns {Object} Resultado de la validación
@@ -757,7 +751,7 @@ export function useDimensionValidation() {
       return { valida: true, razon: 'No tiene elementos hijos' };
     }
 
-    console.log('🔍 VALIDANDO CONTENCIÓN DE HIJOS:', {
+    console.log('🔍 VALIDANDO CONTENCIÓN DE HIJOS EN 3D:', {
       elementoPadre: elemento.id,
       cantidadHijos: hijos.length,
       dimensionesPadre: elemento.dimensiones
@@ -768,27 +762,41 @@ export function useDimensionValidation() {
 
     for (const hijo of hijos) {
       // Obtener posición del hijo dentro del padre (en cm)
-      // En vista frontal XZ usando coordenadas Konva: x = ancho, y = alto
+      // X = ancho, Y = alto (en vista frontal), largo siempre empieza en 0 (profundidad)
       const posHijoX = (hijo.x || 0) / CM_TO_PX; // Posición en ancho
-      const posHijoY = (hijo.y || 0) / CM_TO_PX; // Posición en alto (no z!)
+      const posHijoY = (hijo.y || 0) / CM_TO_PX; // Posición en alto (coordenada Konva Y)
+      const posHijoLargo = 0; // El largo siempre empieza en 0 (profundidad)
 
       // Obtener dimensiones del hijo (en cm)
       const dimHijo = hijo.dimensiones || {};
       const anchoHijo = dimHijo.ancho || 0;
+      const largoHijo = dimHijo.largo || 0;
       const altoHijo = dimHijo.alto || 0;
 
-      // Calcular límites del hijo en vista frontal (XZ)
+      // Calcular límites del hijo en las 3 dimensiones
       // IMPORTANTE: posición + dimensión = límite final
-      const limiteDerechoHijo = posHijoX + anchoHijo;
-      const limiteAltoHijo = posHijoY + altoHijo;
+      const limiteDerechoHijo = posHijoX + anchoHijo;        // Límite en X (ancho)
+      const limiteProfundidadHijo = posHijoLargo + largoHijo; // Límite en largo (profundidad)
+      const limiteAltoHijo = posHijoY + altoHijo;           // Límite en Y/Z (alto)
 
-      console.log(`🔍 Analizando hijo ${hijo.id}:`, {
-        posicion: { x: posHijoX, y: posHijoY },
-        dimensiones: { ancho: anchoHijo, alto: altoHijo },
-        limites: { derecho: limiteDerechoHijo, alto: limiteAltoHijo },
-        padreDisponible: { ancho: dimensionesPadre.ancho, alto: dimensionesPadre.alto },
-        validacionAncho: limiteDerechoHijo <= dimensionesPadre.ancho,
-        validacionAlto: limiteAltoHijo <= dimensionesPadre.alto
+      console.log(`🔍 Analizando hijo ${hijo.id} en 3D:`, {
+        posicion: { x: posHijoX, y: posHijoY, largo: posHijoLargo },
+        dimensiones: { ancho: anchoHijo, largo: largoHijo, alto: altoHijo },
+        limites: {
+          derecho: limiteDerechoHijo,
+          profundidad: limiteProfundidadHijo,
+          alto: limiteAltoHijo
+        },
+        padreDisponible: {
+          ancho: dimensionesPadre.ancho,
+          largo: dimensionesPadre.largo,
+          alto: dimensionesPadre.alto
+        },
+        validaciones: {
+          ancho: limiteDerechoHijo <= dimensionesPadre.ancho,
+          largo: limiteProfundidadHijo <= dimensionesPadre.largo,
+          alto: limiteAltoHijo <= dimensionesPadre.alto
+        }
       });
 
       // Verificar si el hijo se sale en ancho (X)
@@ -801,7 +809,21 @@ export function useDimensionValidation() {
           posicion: posHijoX,
           dimension: anchoHijo,
           limite: limiteDerechoHijo,
-          mensaje: `El elemento ${hijo.nombre || hijo.id} se sale ${exceso.toFixed(1)}cm en ancho`
+          mensaje: `El elemento ${hijo.nombre || hijo.id} se sale ${exceso.toFixed(1)}cm en su ancho`
+        });
+      }
+
+      // Verificar si el hijo se sale en largo (profundidad)
+      if (limiteProfundidadHijo > dimensionesPadre.largo) {
+        const exceso = limiteProfundidadHijo - dimensionesPadre.largo;
+        problemasContención.push({
+          hijo: hijo.id,
+          tipo: 'largo',
+          exceso: exceso,
+          posicion: posHijoLargo,
+          dimension: largoHijo,
+          limite: limiteProfundidadHijo,
+          mensaje: `El elemento ${hijo.nombre || hijo.id} se sale ${exceso.toFixed(1)}cm en su largo`
         });
       }
 
@@ -815,7 +837,7 @@ export function useDimensionValidation() {
           posicion: posHijoY,
           dimension: altoHijo,
           limite: limiteAltoHijo,
-          mensaje: `El elemento ${hijo.nombre || hijo.id} se sale ${exceso.toFixed(1)}cm en alto`
+          mensaje: `El elemento ${hijo.nombre || hijo.id} se sale ${exceso.toFixed(1)}cm en su alto`
         });
       }
     }
@@ -823,14 +845,18 @@ export function useDimensionValidation() {
     if (problemasContención.length > 0) {
       const mensajesProblemas = problemasContención.map(p => p.mensaje);
       const excesoAncho = Math.max(0, ...problemasContención.filter(p => p.tipo === 'ancho').map(p => p.exceso));
+      const excesoLargo = Math.max(0, ...problemasContención.filter(p => p.tipo === 'largo').map(p => p.exceso));
       const excesoAlto = Math.max(0, ...problemasContención.filter(p => p.tipo === 'alto').map(p => p.exceso));
 
       const sugerencias = [];
       if (excesoAncho > 0) {
-        sugerencias.push(`Aumentar ancho en ${excesoAncho.toFixed(1)}cm`);
+        sugerencias.push(`Aumentar ancho ${excesoAncho.toFixed(1)}cm más`);
+      }
+      if (excesoLargo > 0) {
+        sugerencias.push(`Aumentar largo ${excesoLargo.toFixed(1)}cm más`);
       }
       if (excesoAlto > 0) {
-        sugerencias.push(`Aumentar alto en ${excesoAlto.toFixed(1)}cm`);
+        sugerencias.push(`Aumentar alto ${excesoAlto.toFixed(1)}cm más`);
       }
 
       return {
@@ -842,6 +868,126 @@ export function useDimensionValidation() {
     }
 
     return { valida: true, razon: 'Todos los elementos hijos caben dentro de las nuevas dimensiones' };
+  }
+
+  /**
+   * Valida que el elemento con sus nuevas dimensiones quepa dentro de su contenedor padre
+   * Valida las 3 dimensiones: ancho, largo y alto
+   * @param {Object} elemento - Elemento con las nuevas dimensiones a validar
+   * @returns {Object} Resultado de la validación
+   */
+  function validarContencionEnPadre(elemento) {
+    // Si no tiene padre, no hay restricción de contención
+    if (!elemento.padre && !elemento.parentId) {
+      return { valida: true, razon: 'El elemento no tiene contenedor padre' };
+    }
+
+    const parentId = elemento.padre || elemento.parentId;
+    const padre = canvasStore.elementoPorId(parentId);
+
+    if (!padre || !padre.dimensiones) {
+      return { valida: true, razon: 'No se encontró el contenedor padre o no tiene dimensiones' };
+    }
+
+    console.log('🔍 VALIDANDO CONTENCIÓN EN PADRE 3D:', {
+      elemento: elemento.id,
+      padre: padre.id,
+      dimensionesElemento: elemento.dimensiones,
+      dimensionesPadre: padre.dimensiones
+    });
+
+    const dimElemento = elemento.dimensiones;
+    const dimPadre = padre.dimensiones;
+
+    // Obtener posición del elemento dentro del padre (en cm)
+    const posElementoX = (elemento.x || 0) / CM_TO_PX; // Posición en ancho
+    const posElementoY = (elemento.y || 0) / CM_TO_PX; // Posición en alto
+    const posElementoLargo = 0; // El largo siempre empieza en 0 (profundidad)
+
+    // Calcular límites del elemento en las 3 dimensiones
+    const limiteDerechoElemento = posElementoX + dimElemento.ancho;
+    const limiteProfundidadElemento = posElementoLargo + dimElemento.largo;
+    const limiteAltoElemento = posElementoY + dimElemento.alto;
+
+    const problemas = [];
+
+    console.log(`🔍 Verificando elemento ${elemento.id} en padre ${padre.id}:`, {
+      posicion: { x: posElementoX, y: posElementoY, largo: posElementoLargo },
+      dimensiones: { ancho: dimElemento.ancho, largo: dimElemento.largo, alto: dimElemento.alto },
+      limites: {
+        derecho: limiteDerechoElemento,
+        profundidad: limiteProfundidadElemento,
+        alto: limiteAltoElemento
+      },
+      padreDisponible: {
+        ancho: dimPadre.ancho,
+        largo: dimPadre.largo,
+        alto: dimPadre.alto
+      },
+      validaciones: {
+        ancho: limiteDerechoElemento <= dimPadre.ancho,
+        largo: limiteProfundidadElemento <= dimPadre.largo,
+        alto: limiteAltoElemento <= dimPadre.alto
+      }
+    });
+
+    // Verificar ancho
+    if (limiteDerechoElemento > dimPadre.ancho) {
+      const exceso = limiteDerechoElemento - dimPadre.ancho;
+      problemas.push({
+        tipo: 'ancho',
+        exceso: exceso,
+        mensaje: `El elemento se sale ${exceso.toFixed(1)}cm en su ancho`
+      });
+    }
+
+    // Verificar largo
+    if (limiteProfundidadElemento > dimPadre.largo) {
+      const exceso = limiteProfundidadElemento - dimPadre.largo;
+      problemas.push({
+        tipo: 'largo',
+        exceso: exceso,
+        mensaje: `El elemento se sale ${exceso.toFixed(1)}cm en su largo`
+      });
+    }
+
+    // Verificar alto
+    if (limiteAltoElemento > dimPadre.alto) {
+      const exceso = limiteAltoElemento - dimPadre.alto;
+      problemas.push({
+        tipo: 'alto',
+        exceso: exceso,
+        mensaje: `El elemento se sale ${exceso.toFixed(1)}cm en su alto`
+      });
+    }
+
+    if (problemas.length > 0) {
+      const mensajesProblemas = problemas.map(p => p.mensaje);
+      const sugerencias = [];
+
+      problemas.forEach(p => {
+        switch(p.tipo) {
+          case 'ancho':
+            sugerencias.push(`Reducir ancho ${p.exceso.toFixed(1)}cm menos`);
+            break;
+          case 'largo':
+            sugerencias.push(`Reducir largo ${p.exceso.toFixed(1)}cm menos`);
+            break;
+          case 'alto':
+            sugerencias.push(`Reducir alto ${p.exceso.toFixed(1)}cm menos`);
+            break;
+        }
+      });
+
+      return {
+        valida: false,
+        razon: `El elemento no cabe dentro de su contenedor padre: ${mensajesProblemas.join(', ')}`,
+        sugerencias: sugerencias,
+        problemasDetallados: problemas
+      };
+    }
+
+    return { valida: true, razon: 'El elemento cabe correctamente dentro de su contenedor padre en las 3 dimensiones' };
   }
 
   /**
@@ -1022,11 +1168,11 @@ export function useDimensionValidation() {
           })
         }
 
-        // Aplicar posición ajustada si la hubo
-        if (resultado.posicionAjustada || (resultado.elementoFinal.x !== elemento.x || resultado.elementoFinal.y !== elemento.y)) {
+        // Aplicar cambios de posición si los hay
+        if (resultado.elementoFinal.x !== elemento.x || resultado.elementoFinal.y !== elemento.y) {
           actualizaciones.x = resultado.elementoFinal.x
           actualizaciones.y = resultado.elementoFinal.y
-          console.log('Aplicando posición ajustada:', { x: resultado.elementoFinal.x, y: resultado.elementoFinal.y })
+          console.log('Aplicando cambios de posición:', { x: resultado.elementoFinal.x, y: resultado.elementoFinal.y })
         }
         break
 
@@ -1063,8 +1209,7 @@ export function useDimensionValidation() {
       exito: true,
       mensaje: resultado.razon,
       accion: resultado.accion,
-      dimensionesAplicadas: resultado.dimensionesAplicadas || resultado.elementoFinal?.dimensiones,
-      posicionAjustada: actualizaciones.x !== undefined || actualizaciones.y !== undefined
+      dimensionesAplicadas: resultado.dimensionesAplicadas || resultado.elementoFinal?.dimensiones
     }
   }
 

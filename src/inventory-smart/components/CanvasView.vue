@@ -697,8 +697,8 @@
 
   <!-- Botones flotantes de Undo/Redo y Bloqueo -->
   <div ref="floatingControlsRef" class="floating-controls" :style="{ right: `${floatingRight}px` }">
-    <UiTooltip 
-      label="Deshacer (Ctrl+Z)" 
+    <UiTooltip
+      label="Deshacer (Ctrl+Z)"
       :delay="200"
       position="bottom"
     >
@@ -785,11 +785,9 @@
         class="floating-btn btn-fit"
       >
         <!-- Icono de ajustar/fit: flechas hacia las esquinas -->
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <polyline points="4 9 4 4 9 4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <polyline points="20 15 20 20 15 20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="4" y1="4" x2="10" y2="10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="20" y1="20" x2="14" y2="14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <svg class="icon-xl" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path fill="currentColor"
+            d="M18.25 4A3.75 3.75 0 0 1 22 7.75v8.5A3.75 3.75 0 0 1 18.25 20H5.75A3.75 3.75 0 0 1 2 16.25v-8.5A3.75 3.75 0 0 1 5.75 4zm0 1.5H5.75A2.25 2.25 0 0 0 3.5 7.75v8.5a2.25 2.25 0 0 0 2.25 2.25h12.5a2.25 2.25 0 0 0 2.25-2.25v-8.5a2.25 2.25 0 0 0-2.25-2.25m0 7.5a.75.75 0 0 1 .75.75V15a2 2 0 0 1-2 2h-1.25a.75.75 0 0 1 0-1.5H17a.5.5 0 0 0 .5-.5v-1.25a.75.75 0 0 1 .75-.75m-12.5 0a.75.75 0 0 1 .75.75V15a.5.5 0 0 0 .5.5h1.25a.75.75 0 0 1 0 1.5H7a2 2 0 0 1-2-2v-1.25a.75.75 0 0 1 .75-.75M7 7h1.25a.75.75 0 0 1 .102 1.493L8.25 8.5H7a.5.5 0 0 0-.492.41L6.5 9v1.25a.75.75 0 0 1-1.493.102L5 10.25V9a2 2 0 0 1 1.85-1.995zm10 0a2 2 0 0 1 2 2v1.25a.75.75 0 0 1-1.5 0V9a.5.5 0 0 0-.5-.5h-1.25a.75.75 0 0 1 0-1.5z" />
         </svg>
       </button>
     </UiTooltip>
@@ -2101,14 +2099,24 @@ const runPreDropValidations = (elemento, dropEvent) => {
     return { ok: false, reason: 'hierarchy' }
   }
 
-  const peso = weightValidation.validarPesoElemento(
+  const resultadoValidacionPeso = weightValidation.validarPesoElemento(
     elemento,
     canvasStore.contextoActual.id,
     canvasStore.contextoActual.tipo
   )
-  if (!peso.valido) {
+
+  if (!resultadoValidacionPeso.valido) {
+    let tipoPadre = ""
+    if (canvasStore.estaEnPlanta) {
+      tipoPadre = "la planta"
+    } else if (canvasStore.estaEnContenedor) {
+      tipoPadre = "el contenedor"
+    } else if (canvasStore.estaEnElemento) {
+      tipoPadre = "el elemento"
+    }
+    // El elemento excedería el peso máximo permitido
     showToast(
-      `No se puede agregar: excedería el peso máximo soportado por ${peso.exceso} kg`,
+      `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`,
       'error'
     )
     return { ok: false, reason: 'weight' }
@@ -2712,9 +2720,6 @@ const transformerRef = ref(null)
 const isInteractingWithTransformer = ref(false);
 // Estado para guardar dimensiones/pos antes de transformar (para poder revertir)
 const transformInitialState = new Map()
-
-const toggleSpeedDial = () => { speedDialOpen.value = !speedDialOpen.value }
-
 const isDragModeActive = computed(() => dragModeGlobal.value)
 const isEditingSelected = computed(() => editingElementId.value === canvasStore.elementoSeleccionado)
 const selectedElementLocked = computed(() => {
@@ -3633,6 +3638,11 @@ const onDelete = async (id) => {
 .floating-btn .icon {
   width: 20px;
   height: 20px;
+}
+
+.floating-btn .icon-xl {
+  width: 24px;
+  height: 24px;
 }
 
 .fade-scale-enter-active, .fade-scale-leave-active { transition: all 0.15s ease; }
