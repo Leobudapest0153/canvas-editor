@@ -774,7 +774,7 @@
     </UiTooltip>
     <!-- Botón ajustar a planta activa -->
     <UiTooltip
-      label="Ajustar vista a la plata activa"
+      label="Ajustar vista"
       position="bottom"
       :delay="200"
     >
