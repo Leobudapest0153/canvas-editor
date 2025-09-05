@@ -77,7 +77,7 @@
     >
       <div class="catalogo-header border-b border-gray-200">
         <div class="relative">
-          <div class="px-4 mb-1 bg-white" ref="filtrosBotonRef">
+          <!-- <div class="px-4 mb-1 bg-white" ref="filtrosBotonRef">
             <UiTooltip label="Desplegar filtros" position="bottom" :delay="200" class="w-full">
               <button
                 @click="toggleFiltros"
@@ -90,7 +90,7 @@
                 <span v-if="hayFiltrosActivos" class="w-2 h-2 bg-blue-500 rounded-full"></span>
               </button>
             </UiTooltip>
-          </div>
+          </div> -->
 
         <transition name="unroll">
           <div v-if="filtrosVisibles" class="absolute top-full left-0 w-full bg-gray-50 shadow-lg z-10" ref="filtrosPanelRef">
