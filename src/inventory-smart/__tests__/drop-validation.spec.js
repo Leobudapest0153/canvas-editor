@@ -54,8 +54,14 @@ vi.mock('@/inventory-smart/composables/useCanvasWithHistory', () => ({
 vi.mock('@/inventory-smart/composables/useCanvasBuffer', () => ({
   useCanvasBuffer: () => ({
     getBufferItem: vi.fn(),
-    pasteFromBuffer: vi.fn()
+    pasteFromBuffer: vi.fn(),
+    pasteFromSerialized: vi.fn()
   })
+}))
+
+const weightValidationMock = { validarPesoElemento: vi.fn(() => ({ valido: true })) }
+vi.mock('@/inventory-smart/composables/useWeightValidation', () => ({
+  useWeightValidation: () => weightValidationMock
 }))
 
 vi.mock('@/inventory-smart/composables/useConflicts', () => ({
@@ -455,6 +461,44 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
       const elementoCreado = wrapper.vm.canvasStore.agregarElemento.mock.calls[0][0]
       expect(elementoCreado.x).toBe(100)
       expect(elementoCreado.y).toBe(100)
+    })
+  })
+
+  describe('Template pre-drop validation', () => {
+    it('allows valid template drop', () => {
+      weightValidationMock.validarPesoElemento.mockReturnValue({ valido: true })
+      vi.mocked(detectConflictsFor).mockReturnValue([])
+      wrapper.vm.canvasStore.contextoActual = { tipo: 'plantas', id: 'p1' }
+      const tpl = { id: 't1', tipo: 'elementos', dimensiones: { ancho: 100, largo: 60, alto: 20 }, width: 100, height: 60 }
+      const res = wrapper.vm.runPreDropValidations(tpl, { clientX: 50, clientY: 50 })
+      expect(res.ok).toBe(true)
+    })
+
+    it('rejects invalid hierarchy', () => {
+      wrapper.vm.canvasStore.contextoActual = { tipo: 'elementos', id: 'e1' }
+      const tpl = { id: 't1', tipo: 'elementos', dimensiones: { ancho: 100, largo: 60, alto: 20 }, width: 100, height: 60 }
+      const res = wrapper.vm.runPreDropValidations(tpl, { clientX: 50, clientY: 50 })
+      expect(res.ok).toBe(false)
+    })
+
+    it('rejects weight limit', () => {
+      weightValidationMock.validarPesoElemento.mockReturnValueOnce({ valido: false, exceso: 5 })
+      const tpl = { id: 't1', tipo: 'elementos', dimensiones: { ancho: 100, largo: 60, alto: 20 }, width: 100, height: 60 }
+      const res = wrapper.vm.runPreDropValidations(tpl, { clientX: 50, clientY: 50 })
+      expect(res.ok).toBe(false)
+    })
+
+    it('rejects collision', () => {
+      vi.mocked(detectConflictsFor).mockReturnValueOnce([{ bloqueante: true }])
+      const tpl = { id: 't1', tipo: 'elementos', dimensiones: { ancho: 100, largo: 60, alto: 20 }, width: 100, height: 60 }
+      const res = wrapper.vm.runPreDropValidations(tpl, { clientX: 50, clientY: 50 })
+      expect(res.ok).toBe(false)
+    })
+
+    it('rejects when outside bounds', () => {
+      const tpl = { id: 't1', tipo: 'elementos', dimensiones: { ancho: 500, largo: 500, alto: 20 }, width: 500, height: 500 }
+      const res = wrapper.vm.runPreDropValidations(tpl, { clientX: 10, clientY: 10 })
+      expect(res.ok).toBe(false)
     })
   })
 })
