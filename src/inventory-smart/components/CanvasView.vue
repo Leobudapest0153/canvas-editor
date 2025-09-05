@@ -3131,6 +3131,10 @@ const handleKeyDown = (e) => {
   if (!e) return
   const key = e.key.toLowerCase()
   if (key === 'escape' || key === 'esc') {
+    if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
+      showToast('Tienes cambios pendientes de guardar', 'warn')
+      return;
+    }
     canvasStore.seleccionarElemento(null)
     // Asegurar que el transformer/edición se cierre
     editingElementId.value = null
