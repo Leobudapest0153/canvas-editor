@@ -697,11 +697,15 @@
 
   <!-- Botones flotantes de Undo/Redo y Bloqueo -->
   <div ref="floatingControlsRef" class="floating-controls" :style="{ right: `${floatingRight}px` }">
+    <UiTooltip
+      label="Deshacer (Ctrl+Z)"
+      :delay="200"
+      position="bottom"
+    >
       <button
         @click="undo()"
         :disabled="!canUndo"
         class="floating-btn btn-undo"
-        title="Deshacer (Ctrl+Z)"
       >
         <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -712,11 +716,16 @@
           />
         </svg>
       </button>
+    </UiTooltip>
+    <UiTooltip
+      label="Rehacer (Ctrl+Y)"
+      :delay="200"
+      position="bottom"
+    >
       <button
         @click="redo()"
         :disabled="!canRedo"
         class="floating-btn btn-redo"
-        title="Rehacer (Ctrl+Y)"
       >
         <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -727,8 +736,14 @@
           />
         </svg>
       </button>
+    </UiTooltip>
 
-      <!-- Botones de Zoom: ubicados junto a 'fit' pero después de redo para mantener undo+redo juntos -->
+    <!-- Botones de Zoom: ubicados junto a 'fit' pero después de redo para mantener undo+redo juntos -->
+    <UiTooltip
+      label="Alejar (Ctrl+ -)"
+      :delay="200"
+      position="bottom"
+    >
       <button
         @click="zoomOut()"
         :disabled="!canZoomOut"
@@ -739,7 +754,12 @@
           <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
-
+    </UiTooltip>
+    <UiTooltip
+      label="Acercar (Ctrl+ +)"
+      :delay="200"
+      position="bottom"
+    >
       <button
         @click="zoomIn()"
         :disabled="!canZoomIn"
@@ -751,14 +771,18 @@
           <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
-
-      <!-- Botón ajustar a planta activa -->
+    </UiTooltip>
+    <!-- Botón ajustar a planta activa -->
+    <UiTooltip
+      label="Ajustar vista a la plata activa"
+      position="bottom"
+      :delay="200"
+    >
       <button
         @click="fitToPlanta"
         @mouseenter="speedDialOpen = false"
         :disabled="!canvasStore.plantaActivaData"
         class="floating-btn btn-fit"
-        title="Ajustar vista a la planta activa"
       >
         <!-- Icono de ajustar/fit: flechas hacia las esquinas -->
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -768,6 +792,7 @@
           <line x1="20" y1="20" x2="14" y2="14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
+    </UiTooltip>
 
     </div>
   </div>
@@ -822,6 +847,7 @@ import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/inventory-smart/composables/useSimulateProducts'
 import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import UiTooltip from './ui/UiTooltip.vue'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -2049,22 +2075,21 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   return { x: worldX, y: worldY }
 }
 
-const createElementFromDrop = (data, dropEvent) => {
-  const elemento = data.elemento
+// Pipeline unificado de validaciones previas al drop
+const runPreDropValidations = (elemento, dropEvent) => {
+  if (!elemento) return { ok: false, reason: 'invalid' }
 
-  // ===== VALIDACIÓN DE JERARQUÍA =====
   const contextoActual = canvasStore.contextoActual.tipo
   const tipoElemento = elemento.tipo
 
-  // Verificar si el tipo puede ser creado en el contexto actual
   if (contextoActual === 'plantas' && tipoElemento !== 'elementos') {
     showToast('No puedes agregar este tipo aquí. En la vista de plantas solo se permiten elementos.', 'error')
-    return
+    return { ok: false, reason: 'hierarchy' }
   }
 
   if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
     showToast('No puedes agregar ese tipo aquí. Dentro de elementos solo se permiten contenedores.', 'error')
-    return
+    return { ok: false, reason: 'hierarchy' }
   }
 
   if (
@@ -2073,10 +2098,9 @@ const createElementFromDrop = (data, dropEvent) => {
     tipoElemento !== 'contenedores'
   ) {
     showToast('En contenedores solo se pueden agregar elementos u otros contenedores', 'error')
-    return
+    return { ok: false, reason: 'hierarchy' }
   }
 
-  // ===== VALIDACIÓN DE PESO MÁXIMO =====
   const resultadoValidacionPeso = weightValidation.validarPesoElemento(
     elemento,
     canvasStore.contextoActual.id,
@@ -2097,21 +2121,14 @@ const createElementFromDrop = (data, dropEvent) => {
       `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`,
       'error'
     )
-    console.log('Validación de peso fallida:', resultadoValidacionPeso)
-    return
+    return { ok: false, reason: 'weight' }
   }
 
-  // ===== CONTINUAR CON LA LÓGICA EXISTENTE =====
-
-  // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
   let { width, height } = getElementPixelDimensions(elemento)
-
-  // Obtener dimensiones originales en cm para guardar (preservar todas las dimensiones)
   let anchoCm = elemento.dimensiones?.ancho || 100
   let largoCm = elemento.dimensiones?.largo || 60
   let altoCm = elemento.dimensiones?.alto || 20
 
-  // Política de dimensiones para elementos de sistema por defecto
   const isSystemDefault = !!(elemento?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(elemento.id))
   if (isSystemDefault && elemento?.dimensionLock !== true) {
     const planta = canvasStore.plantaActivaData
@@ -2130,31 +2147,23 @@ const createElementFromDrop = (data, dropEvent) => {
         width = sizePx.width
         height = sizePx.height
       }
-      // Offset vertical para estante de pared (altura desde el suelo)
       const off = OFFSETS?.offsetByType?.[elemento.id]?.zOffsetShare
       if (typeof off === 'number' && isFinite(off)) {
-        // Redondear a cm enteros
         const zBase = Math.round((planta.dimensiones.alto || 0) * off)
-        // Usar en la instancia recién creada
         elemento.alturaRespectoAlSuelo = zBase
       }
     }
   }
 
-  // Aplicar dimensiones mínimas para mejorar la interacción
   const MIN_WIDTH = 40
   const MIN_HEIGHT = 30
   let finalWidth = Math.max(width, MIN_WIDTH)
   let finalHeight = Math.max(height, MIN_HEIGHT)
 
-  // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
-  const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
+  const world = getWorldCoordinatesFromPointer(dropEvent)
+  let candX = world.x - finalWidth / 2
+  let candY = world.y - finalHeight / 2
 
-  // 2. Calcular posición candidata centrada en el puntero
-  let candX = worldCoords.x - finalWidth / 2
-  let candY = worldCoords.y - finalHeight / 2
-
-  // 3. Aplicar snap a grilla ANTES de validar (usar effectiveGrid: 0 en XZ desactiva)
   const effectiveGrid = canvasStore.vistaActiva === 'XZ' ? 0 : (canvasStore.gridSize ?? GRID_SIZE)
   const snapped = snapToGrid(candX, candY, effectiveGrid)
   candX = snapped.x
@@ -2169,57 +2178,39 @@ const createElementFromDrop = (data, dropEvent) => {
         dimensiones: { ancho: anchoCm, largo: largoCm, alto: altoCm },
         posicion: { x: candX, y: candY },
       }
-      const sess = makeInnerSession({
-        parentEl: parent,
-        movingEl: temp,
-        siblings,
-        vista: canvasStore.vistaActiva,
-      })
+      const sess = makeInnerSession({ parentEl: parent, movingEl: temp, siblings, vista: canvasStore.vistaActiva })
       let local = sess.toLocal({ x: candX, y: candY }, parent)
       local = sess.finalizeLocal(local)
       if (!sess.isValidLocal(local)) {
         showToast('No hay espacio suficiente aquí para colocar el elemento.', 'error')
-        return
+        return { ok: false, reason: 'bounds' }
       }
-      const world = sess.toWorld(local, parent)
-      candX = world.x
-      candY = world.y
+      const worldPos = sess.toWorld(local, parent)
+      candX = worldPos.x
+      candY = worldPos.y
     }
   }
 
-  // 4. Calcular bbox candidato y verificar área
   const boundary = computeBoundary()
-
-  // 5. Verificar que esté dentro del área (clampToArea)
-  let isInsideArea = true
+  let isInside = true
   if (boundary.type === 'rect') {
-    isInsideArea =
-      candX >= 0 &&
-      candY >= 0 &&
-      candX + finalWidth <= boundary.W &&
-      candY + finalHeight <= boundary.H
-
-    // Si está fuera, intentar clamp
-    if (!isInsideArea) {
+    isInside = candX >= 0 && candY >= 0 && candX + finalWidth <= boundary.W && candY + finalHeight <= boundary.H
+    if (!isInside) {
       const clamped = clampRectToRect(candX, candY, finalWidth, finalHeight, boundary.W, boundary.H)
       candX = clamped.x
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInsideArea = pointInPolygon({
-      x: candX + finalWidth / 2,
-      y: candY + finalHeight / 2,
-    }, boundary.inset)
-    if (!isInsideArea) {
+    isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
+    if (!isInside) {
       const clamped = clampRectToPolygon({ x: candX, y: candY, width: finalWidth, height: finalHeight }, boundary.inset)
       candX = clamped.x
       candY = clamped.y
-      isInsideArea = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
+      isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
     }
   }
 
-  // 6. Crear elemento temporal para detectar conflictos
-  const tempElement = {
+  const tempEl = {
     id: '__temp_drop__',
     x: candX,
     y: candY,
@@ -2230,107 +2221,89 @@ const createElementFromDrop = (data, dropEvent) => {
     forma: elemento.forma || 'rectangular',
   }
 
-  // 7. Ejecutar detectConflictsFor contra elementos existentes
-  const allElements = canvasStore.elementosVisibles
-  const conflicts = detectConflictsFor(tempElement, allElements)
-  const blockingConflicts = conflicts.filter((c) => c.bloqueante)
+  const all = canvasStore.elementosVisibles
+  const conflicts = detectConflictsFor(tempEl, all)
+  const blocking = conflicts.filter((c) => c.bloqueante)
 
-  // 8. Si hay conflicto BLOQUEANTE o queda fuera de área, intentar nudgePlace
-  let finalPosition = { x: candX, y: candY }
-  let placementSuccessful = blockingConflicts.length === 0 && isInsideArea
+  let finalPos = { x: candX, y: candY }
+  let ok = blocking.length === 0 && isInside
 
-  if (!placementSuccessful) {
-    console.log(
-      '🔍 Posición inicial tiene conflictos o está fuera de área, intentando nudgePlace...',
-    )
-
-    const nudgeResult = nudgePlace(
+  if (!ok) {
+    const nudge = nudgePlace(
       candX,
       candY,
       finalWidth,
       finalHeight,
       boundary,
-      allElements,
-      tempElement,
+      all,
+      tempEl,
       effectiveGrid,
-      16, // máximo 16 intentos
-      detectConflictsFor, // Pasar la función como parámetro
+      16,
+      detectConflictsFor,
     )
-
-    if (nudgeResult.found) {
-      finalPosition = { x: nudgeResult.x, y: nudgeResult.y }
-      placementSuccessful = true
-      console.log('✅ nudgePlace encontró posición válida:', finalPosition)
-    } else {
-      console.log('❌ nudgePlace no encontró posición válida')
+    if (nudge.found) {
+      finalPos = { x: nudge.x, y: nudge.y }
+      ok = true
     }
   }
 
-  // 9. Si aún no hay posición válida, rechazar y mostrar toast
-  if (!placementSuccessful) {
+  if (!ok) {
     showToast('No fue posible colocar el elemento dentro de los límites de la planta.', 'error')
-    return // NO crear la instancia, NO comprometer historial
+    return { ok: false, reason: 'bounds' }
   }
 
   if (boundary.type === 'polygon') {
     const c = clampRectToPolygon(
-      { x: finalPosition.x, y: finalPosition.y, width: finalWidth, height: finalHeight },
+      { x: finalPos.x, y: finalPos.y, width: finalWidth, height: finalHeight },
       boundary.inset,
     )
-    finalPosition = { x: c.x, y: c.y }
+    finalPos = { x: c.x, y: c.y }
   }
 
-  // 10. Crear el elemento solo si la validación fue exitosa
+  return {
+    ok: true,
+    position: finalPos,
+    width: finalWidth,
+    height: finalHeight,
+    dimsCm: { ancho: anchoCm, largo: largoCm, alto: altoCm },
+  }
+}
+
+const createElementFromDrop = (data, dropEvent) => {
+  const elemento = data.elemento
+  const res = runPreDropValidations(elemento, dropEvent)
+  if (!res.ok) return
+
+  let { ancho: anchoCm, largo: largoCm, alto: altoCm } = res.dimsCm
+  let finalWidth = res.width
+  let finalHeight = res.height
+  let finalPosition = res.position
+
   const color = elemento.color || elemento.colorBase || '#3B82F6'
 
-  // Comprobar si estamos en un contexto de elementos y agregando un contenedor
-  // En ese caso, debemos tomar el largo del elemento padre
-  let largoCmFinal = largoCm;
-  let finalHeightFinal = finalHeight;
-
+  let largoCmFinal = largoCm
+  let finalHeightFinal = finalHeight
   if (canvasStore.contextoActual.tipo === 'elementos' && elemento.tipo === 'contenedores') {
-    // Obtener el elemento padre (el elemento actual donde estamos)
-    const elementoPadre = canvasStore.elementoContenedorActual;
+    const elementoPadre = canvasStore.elementoContenedorActual
     if (elementoPadre && elementoPadre.dimensiones) {
-      // Usar el largo del elemento padre para el contenedor
-      largoCmFinal = elementoPadre.dimensiones.largo;
-
-      // La altura en píxeles para el renderizado depende de la vista
+      largoCmFinal = elementoPadre.dimensiones.largo
       if (canvasStore.vistaActiva === 'XY') {
-        // En vista aérea (XY), la altura visual corresponde al largo
-        finalHeightFinal = largoCmFinal * CM_TO_PX;
-      } else if (canvasStore.vistaActiva === 'XZ') {
-        // En vista de frente (XZ), la altura visual corresponde al alto, no al largo
-        // No modificamos finalHeightFinal en este caso
+        finalHeightFinal = largoCmFinal * CM_TO_PX
       }
-
-      console.log('Contenedor ajustado al largo del elemento padre:', {
-        largoPadre: largoCmFinal,
-        altoPxFinal: finalHeightFinal,
-        vista: canvasStore.vistaActiva
-      });
+      console.log('Contenedor ajustado al largo del elemento padre:', { largoPadre: largoCmFinal, altoPxFinal: finalHeightFinal, vista: canvasStore.vistaActiva })
     }
   }
 
   const nuevoElemento = {
     id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
-    tipo: elemento.tipo || (elemento.categoria === 'contenedores' ? 'contenedores' : 'elementos'), // Asegurar que siempre tenga tipo
-    categoria: elemento.categoria, // Mantener también la categoría
+    tipo: elemento.tipo || (elemento.categoria === 'contenedores' ? 'contenedores' : 'elementos'),
+    categoria: elemento.categoria,
     nombre: elemento.nombre || 'Nuevo elemento',
-
-    // Estructura correcta para dimensiones (preservar todas las dimensiones independientemente de la vista)
-    dimensiones: {
-      ancho: anchoCm,
-      largo: largoCmFinal, // Usamos el largo ajustado si corresponde
-      alto: altoCm,
-    },
-
-    // Propiedades legacy para compatibilidad con Konva (en px para renderizado)
+    dimensiones: { ancho: anchoCm, largo: largoCmFinal, alto: altoCm },
     x: finalPosition.x,
     y: finalPosition.y,
     width: finalWidth,
-    height: finalHeightFinal, // Usamos la altura ajustada si corresponde
-
+    height: finalHeightFinal,
     color: color,
     colorBase: color,
     forma: elemento.forma || 'rectangular',
@@ -2338,25 +2311,15 @@ const createElementFromDrop = (data, dropEvent) => {
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
     volumenMaximo: (anchoCm * largoCmFinal * altoCm) / 100,
-    // Política de dimensiones
     dimensionLock: false,
     systemTypeKey: elemento.id,
-    uso: {
-      volumen: 0,
-      peso: 0
-    },
+    uso: { volumen: 0, peso: 0 },
     descripcion: elemento.descripcion || '',
-
-    // Copiar contenedores del elemento original si los tiene
     contenedores: elemento.contenedores ? [...elemento.contenedores] : [],
-
     hijos: []
   }
-
   console.log('✅ Creando elemento desde drop en posición válida:', nuevoElemento)
   canvasStore.agregarElemento(nuevoElemento)
-
-  // Seleccionar el elemento recién creado
   canvasStore.seleccionarElemento(nuevoElemento.id)
 }
 
@@ -2727,10 +2690,24 @@ const createElementFromBuffer = (data, dropEvent) => {
 }
 
 const createElementFromTemplate = (data, dropEvent) => {
-  const pos = getWorldCoordinatesFromPointer(dropEvent)
-  const newId = buffer.pasteFromSerialized(data.payload, pos)
+  console.log('[templates-dd] intento de drop de plantilla')
+  const payload = data.payload || {}
+  const root = payload.elements?.find?.((e) => e.id === payload.rootId)
+  if (!root) {
+    console.warn('[templates-dd] payload sin root válido')
+    showToast('No se pudo insertar la plantilla', 'error')
+    return
+  }
+  const res = runPreDropValidations(root, dropEvent)
+  if (!res.ok) {
+    console.log('[templates-dd] drop cancelado por validación', res.reason)
+    return
+  }
+  const newId = buffer.pasteFromSerialized(payload, res.position)
   if (!newId) {
     showToast('No se pudo insertar la plantilla', 'error')
+  } else {
+    console.log('[templates-dd] plantilla insertada', newId)
   }
 }
 

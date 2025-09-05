@@ -15,11 +15,14 @@
         </div>
       </div>
       <div class="header-actions">
+        <UiTooltip
+          label="Limpiar portapapeles"
+          position="bottom"
+        >
         <button
           v-if="hasItems"
           @click="handleClearBuffer"
           class="btn btn-clear"
-          title="Limpiar buffer"
         >
           <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -31,6 +34,7 @@
           </svg>
           Limpiar
         </button>
+        </UiTooltip>
       </div>
     </div>
 
@@ -95,11 +99,14 @@
           </div>
 
           <!-- Acciones del elemento -->
-          <div class="item-actions">
+          <UiTooltip
+            label="Eliminar del portapapeles"
+            position="right"
+            class="items-actions"
+          >
             <button
               @click="handleRemove(item.id)"
               class="action-btn btn-remove"
-              title="Eliminar del portapapeles"
             >
               <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -110,7 +117,7 @@
                 />
               </svg>
             </button>
-          </div>
+          </UiTooltip>
         </div>
       </div>
     </div>
@@ -126,6 +133,7 @@
 import { ref, computed } from 'vue'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 
 // Composables
 const buffer = useCanvasBuffer()
