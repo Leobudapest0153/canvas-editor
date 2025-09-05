@@ -16,70 +16,56 @@
 <template>
   <div class="elementos-catalogo h-full flex flex-col bg-white border-r border-gray-200">
     <!-- Header del catálogo -->
-    <div class="catalogo-header p-1 border-b border-gray-200">
-      <div class="flex items-center justify-between">
-        <h2 class="text-base font-semibold text-gray-800 m-0">{{ tituloContextual }}</h2>
-        <button
-          v-if="puedeCrearElementosPersonalizados"
-          @click="mostrarModalCrear = true"
-          type="button"
-          class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-          title="Crear nuevo elemento"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-        </button>
-      </div>
-
-      <!-- Búsqueda y filtro de categoría en una sola fila -->
-      <div class="grid grid-cols-1 gap-3">
-        <!-- Barra de búsqueda -->
-        <div class="relative">
-          <input
-            v-model="filtroTexto"
-            type="text"
-            placeholder="Buscar elementos..."
-            class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100"
-          />
-          <svg
-            class="absolute left-3 top-2.5 h-5 w-5 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+    <div class="catalogo-header p-1 border-gray-200">
+      <div class="relative px-4 mb-1">
+        <div class="flex items-center justify-between" ref="filtrosBotonRef">
+          <UiTooltip label="Desplegar filtros" position="bottom" :delay="200" class="w-full">
+          <button
+            @click="toggleFiltros"
+            class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-        </div>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L16 11.414V16a1 1 0 01-.293.707l-2 2A1 1 0 0112 18v-1.586l-3.707-3.707A1 1 0 018 12V6.414L3.293 4.707A1 1 0 013 4z" />
+            </svg>
+            <span>Filtros</span>
+            <span v-if="hayFiltrosActivos" class="w-2 h-2 bg-blue-500 rounded-full"></span>
+          </button>
+          </UiTooltip>
 
-        <!-- Filtro por categoría (select) -->
-        <div v-if="catalogContext.mode !== 'root'">
-          <label for="filtroCategoria" class="sr-only">Categoría</label>
-          <select
-            id="filtroCategoria"
-            v-model="categoriaSeleccionada"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100"
-          >
-            <option :value="null">Todas las categorías</option>
-            <option
-              v-for="categoria in categoriasDisponibles"
-              :key="categoria.id"
-              :value="categoria.id"
-            >
-              {{ categoria.nombre }}
-            </option>
-          </select>
-        </div>
+    </div>
+        <transition name="unroll">
+          <div v-if="filtrosVisibles" class="absolute top-full left-0 w-full bg-gray-50 shadow-lg z-10" ref="filtrosPanelRef">
+            <div class="p-3 grid grid-cols-1 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
+                <input
+                  v-model="filtroTexto"
+                  @keyup.enter="() => (filtrosVisibles = false)"
+                  placeholder="Nombre..."
+                  class="w-full px-3 py-2 border rounded-md text-sm"
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Categoría</label>
+                <select v-model="categoriaSeleccionada" class="w-full px-3 py-2 border rounded-md text-sm bg-white">
+                  <option :value="null">Todas</option>
+                  <option v-for="c in categoriasDisponibles" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
+                <select v-model="ubicacionSeleccionada" class="w-full px-3 py-2 border rounded-md text-sm bg-white">
+                  <option value="">Todas</option>
+                  <option value="suelo">Suelo</option>
+                  <option value="pared">Pared</option>
+                </select>
+              </div>
+              <div class="pt-1">
+                <button v-if="hayFiltrosActivos" @click="limpiarFiltros" class="px-3 py-2 bg-gray-100 rounded-md text-xs">Limpiar filtros</button>
+              </div>
+            </div>
+          </div>
+        </transition>
       </div>
     </div>
 
@@ -87,7 +73,7 @@
     <div class="elementos-lista flex-1 overflow-y-auto p-4">
       <div class="grid grid-cols-1 gap-3">
         <div
-          v-for="elemento in filteredCatalogItems"
+          v-for="elemento in elementosFiltrados"
           :key="elemento.id"
           :draggable="true"
           @dragstart="iniciarArrastre(elemento, $event)"
@@ -155,30 +141,11 @@
               </span>
             </div>
           </div>
-
-          <!-- Indicador de arrastre -->
-          <div
-            class="drag-indicator absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
-          >
-            <svg
-              class="w-4 h-4 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-              />
-            </svg>
-          </div>
         </div>
       </div>
 
-      <!-- Mensaje cuando no hay elementos -->
-      <div v-if="filteredCatalogItems.length === 0" class="text-center py-12">
+  <!-- Mensaje cuando no hay elementos -->
+  <div v-if="elementosFiltrados.length === 0" class="text-center py-12">
         <svg
           class="w-12 h-12 text-gray-300 mx-auto mb-4"
           fill="none"
@@ -212,10 +179,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
+import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import {
   TODAS_LAS_CATEGORIAS,
   TIPOS_ENTIDAD,
@@ -238,6 +206,37 @@ const { filteredCatalogItems, catalogContext, searchText, selectedCategory, item
 // Estado local
 const filtroTexto = searchText
 const categoriaSeleccionada = selectedCategory
+// Filtros UI
+const filtrosVisibles = ref(false)
+const ubicacionSeleccionada = ref('')
+const filtrosBotonRef = ref(null)
+const filtrosPanelRef = ref(null)
+
+const hayFiltrosActivos = computed(() => {
+  return !!(filtroTexto.value || categoriaSeleccionada.value || ubicacionSeleccionada.value)
+})
+
+const toggleFiltros = () => {
+  filtrosVisibles.value = !filtrosVisibles.value
+}
+
+const limpiarFiltros = () => {
+  filtroTexto.value = ''
+  categoriaSeleccionada.value = null
+  ubicacionSeleccionada.value = ''
+}
+
+const handleClickOutside = (event) => {
+  if (
+    filtrosVisibles.value &&
+    filtrosBotonRef.value &&
+    !filtrosBotonRef.value.contains(event.target) &&
+    filtrosPanelRef.value &&
+    !filtrosPanelRef.value.contains(event.target)
+  ) {
+    filtrosVisibles.value = false
+  }
+}
 const mostrarModalCrear = ref(false)
 
 // Formulario para nuevo elemento
@@ -278,6 +277,40 @@ const puedeCrearElementosPersonalizados = computed(
 const categoriasDisponibles = computed(() => {
   const tipos = catalogStore.allowedTypesForContext(catalogContext.value)
   return TODAS_LAS_CATEGORIAS.filter((cat) => tipos.includes(cat.tipo))
+})
+
+// Computed local para filtrar los elementos del catálogo (igual que en CapasTab.vue)
+const elementosFiltrados = computed(() => {
+  // Partimos de lo que la store ya nos devuelve (filtrado por contexto y búsqueda global)
+  const base = Array.isArray(filteredCatalogItems.value)
+    ? filteredCatalogItems.value.slice()
+    : Array.isArray(items.value)
+    ? items.value.slice()
+    : []
+
+  let out = base
+
+  // Filtro por texto (nombre o descripción)
+  if (filtroTexto && filtroTexto.value) {
+    const q = String(filtroTexto.value).toLowerCase()
+    out = out.filter((el) => {
+      const nombre = String(el.nombre || '').toLowerCase()
+      const desc = String(el.descripcion || '').toLowerCase()
+      return nombre.includes(q) || desc.includes(q)
+    })
+  }
+
+  // Filtro por categoría
+  if (categoriaSeleccionada.value) {
+    out = out.filter((el) => el.categoria === categoriaSeleccionada.value)
+  }
+
+  // Filtro por ubicación
+  if (ubicacionSeleccionada.value) {
+    out = out.filter((el) => el.ubicacion === ubicacionSeleccionada.value)
+  }
+
+  return out
 })
 
 const onGuardarElemento = (elemento) => {
@@ -399,6 +432,7 @@ onMounted(() => {
       console.error('Error cargando elementos personalizados:', error)
     }
   }
+  document.addEventListener('mousedown', handleClickOutside)
 })
 
 // Guardar elementos personalizados en localStorage
@@ -415,6 +449,10 @@ watch(
   },
   { deep: true },
 )
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', handleClickOutside)
+})
 
 // Observar cambios en el contexto para verificar validez del filtro de categoría
 watch(
@@ -439,3 +477,20 @@ watch(
   { immediate: true },
 )
 </script>
+
+<style scoped>
+.unroll-enter-active,
+.unroll-leave-active {
+  transition: all 0.3s ease-in-out;
+  max-height: 500px;
+  opacity: 1;
+  transform: translateY(0);
+}
+.unroll-enter-from,
+.unroll-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-10px);
+  overflow: hidden;
+}
+</style>
