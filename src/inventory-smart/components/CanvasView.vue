@@ -2084,9 +2084,17 @@ const createElementFromDrop = (data, dropEvent) => {
   )
 
   if (!resultadoValidacionPeso.valido) {
+    let tipoPadre = ""
+    if (canvasStore.estaEnPlanta) {
+      tipoPadre = "la planta"
+    } else if (canvasStore.estaEnContenedor) {
+      tipoPadre = "el contenedor"
+    } else if (canvasStore.estaEnElemento) {
+      tipoPadre = "el elemento"
+    }
     // El elemento excedería el peso máximo permitido
     showToast(
-      `No se puede agregar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
+      `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`,
       'error'
     )
     console.log('Validación de peso fallida:', resultadoValidacionPeso)

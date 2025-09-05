@@ -256,7 +256,7 @@ import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
 const confirmDialog = useConfirmDialog()
-const { validarPesoElemento, calcularPesoDisponible, contextoActualTieneLimiteDePeso, infoPesoContextoActual } = useWeightValidation()
+const { validarPesoElemento, validarPesoMaximoVsUsoReal, calcularPesoDisponible, contextoActualTieneLimiteDePeso, infoPesoContextoActual } = useWeightValidation()
 const { validarDimensiones, aplicarResultadoValidacion } = useDimensionValidation()
 
 const catalogStore = useCatalogStore()
@@ -483,6 +483,17 @@ const validarPeso = () => {
     edited.value.pesoMaximo = snapshotOriginal.value.pesoMaximo
     return
   }
+
+  // Validar que el peso máximo no sea menor al uso real actual
+  if (elementoSeleccionado.value) {
+    const resultadoValidacion = validarPesoMaximoVsUsoReal(elementoSeleccionado.value, val)
+    if (!resultadoValidacion.valido) {
+      showWarning(resultadoValidacion.mensaje)
+      edited.value.pesoMaximo = snapshotOriginal.value.pesoMaximo
+      return
+    }
+  }
+
   // Mantener input; la validación de límite se refleja con advertenciaPeso y bloqueo de Guardar
 }
 
