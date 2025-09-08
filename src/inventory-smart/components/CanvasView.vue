@@ -634,7 +634,6 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
@@ -1158,10 +1157,6 @@ const dragBoundForElement = (pos, elemento) => {
   }
 }
 
-// RAF + Perf mode state per element (algunos se obtienen del composable)
-const perfContexts = new Map()
-const throttle2 = throttleEveryNFrames(2)
-
 // === FUNCIONES DE DROP DESDE CATÁLOGO ===
 const handleDragOver = (e) => {
   e.preventDefault()
@@ -1208,7 +1203,7 @@ const { simularLlenadoElemento } = useProductSimulation({
   forceRedraw
 });
 
-// Composable de drag de elementos - debe ir antes que useTransformer
+// Composable de drag de elementos
 const {
   isElementDragging,
   stageDragEnabled,
@@ -1240,7 +1235,7 @@ const {
   setLiveConflictsThrottled
 })
 
-// Composable de transformación - debe ir después del drag para usar dragLastValidPositions
+// Composable de transformación
 const {
   transformerRef,
   editingElementId,
