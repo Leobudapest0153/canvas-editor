@@ -305,6 +305,56 @@ watch(() => elementoSeleccionado.value?.id, (id) => {
   }
 }, { immediate: true })
 
+// Watch para actualizar automáticamente cuando cambian las dimensiones desde el transformer
+// Esto permite que el panel de propiedades refleje inmediatamente los cambios hechos con el transformer
+watch(() => elementoSeleccionado.value?.dimensiones, (newDimensiones) => {
+  if (!elementoSeleccionado.value || !edited.value || !newDimensiones) return
+
+  // Solo actualizar si las dimensiones cambiaron realmente
+  const currentDims = edited.value.dimensiones || {}
+  const hasChanged =
+    currentDims.ancho !== newDimensiones.ancho ||
+    currentDims.largo !== newDimensiones.largo ||
+    currentDims.alto !== newDimensiones.alto
+
+  if (hasChanged) {
+    console.debug('[PropiedadesPanel] Actualizando dimensiones desde transformer:', newDimensiones)
+
+    // Actualizar las dimensiones en el estado editado
+    edited.value.dimensiones = { ...newDimensiones }
+
+    // Si es circular, también actualizar el diámetro
+    if (esCircular.value) {
+      edited.value.diametroCm = newDimensiones.ancho || 0
+    }
+
+    // Actualizar el snapshot original para evitar mostrar cambios no aplicados
+    // cuando los cambios vienen del transformer (ya están aplicados en el store)
+    if (elementoSeleccionado.value.dimensionLock) {
+      snapshotOriginal.value.dimensiones = { ...newDimensiones }
+      if (esCircular.value) {
+        snapshotOriginal.value.diametroCm = newDimensiones.ancho || 0
+      }
+    }
+  }
+}, { deep: true, immediate: false })
+
+// Watch para actualizar automáticamente las propiedades cuando se usen transformaciones
+watch([
+  () => elementoSeleccionado.value?.width,
+  () => elementoSeleccionado.value?.height,
+  () => elementoSeleccionado.value?.x,
+  () => elementoSeleccionado.value?.y
+], ([newWidth, newHeight, newX, newY]) => {
+  if (!elementoSeleccionado.value || !edited.value) return
+
+  // Solo sincronizar si el elemento tiene dimensionLock (indica que fue transformado)
+  if (elementoSeleccionado.value.dimensionLock) {
+    // Las dimensiones en píxeles ya se reflejarán automáticamente en el watch de dimensiones
+    // Este watch principalmente maneja cambios de posición si es necesario en el futuro
+  }
+}, { immediate: false })
+
 // Comparación order-insensitive solo para tags
 const normalizeForCompare = (obj) => {
   const c = deepClone(obj || {})
@@ -324,7 +374,21 @@ watch([() => edited.value, () => snapshotOriginal.value], () => {
     return;
   }
 
-  isDirty.value = !deepEqual(normalizeForCompare(edited.value), normalizeForCompare(snapshotOriginal.value));
+  // No marcar como dirty si los cambios vienen del transformer (dimensionLock = true)
+  // ya que estos cambios ya están aplicados en el store
+  if (elementoSeleccionado.value?.dimensionLock) {
+    const currentNormalized = normalizeForCompare(edited.value)
+    const originalNormalized = normalizeForCompare(snapshotOriginal.value)
+
+    // Solo comparar campos que no sean dimensiones si hay dimensionLock
+    const { dimensiones: currentDims, diametroCm: currentDiam, ...currentWithoutDims } = currentNormalized
+    const { dimensiones: originalDims, diametroCm: originalDiam, ...originalWithoutDims } = originalNormalized
+
+    isDirty.value = !deepEqual(currentWithoutDims, originalWithoutDims)
+  } else {
+    isDirty.value = !deepEqual(normalizeForCompare(edited.value), normalizeForCompare(snapshotOriginal.value))
+  }
+
   canvasStore.setCambiosNoAplicados(isDirty.value);
 }, { deep: true });
 
@@ -449,6 +513,12 @@ const validarDimension = (prop) => {
   if (isNaN(val) || val < 0) {
     showWarning('El valor debe ser mayor o igual a 0')
     edited.value.dimensiones[prop] = snapshotOriginal.value.dimensiones[prop]
+  } else {
+    // Si el usuario modifica manualmente las dimensiones, resetear dimensionLock
+    // para permitir validaciones normales
+    if (elementoSeleccionado.value?.dimensionLock) {
+      canvasStore.actualizarElemento(elementoSeleccionado.value.id, { dimensionLock: false })
+    }
   }
 }
 
@@ -757,6 +827,11 @@ const validarDiametro = () => {
   if (!Number.isFinite(d) || d < 1) {
     showWarning('El diámetro debe ser mayor o igual a 1 cm')
     edited.value.diametroCm = snapshotOriginal.value.diametroCm
+  } else {
+    // Si el usuario modifica manualmente el diámetro, resetear dimensionLock
+    if (elementoSeleccionado.value?.dimensionLock) {
+      canvasStore.actualizarElemento(elementoSeleccionado.value.id, { dimensionLock: false })
+    }
   }
 }
 
