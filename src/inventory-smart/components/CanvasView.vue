@@ -1256,7 +1256,11 @@ const {
   onTransformEndGuard,
   dimensionValidation,
   showToast,
-  isElementLocked
+  isElementLocked,
+  // Snapping helpers
+  performSnap,
+  clearGuides,
+  isSnappingEnabled
 })
 
 // Función auxiliar para convertir coordenadas del puntero a coordenadas de mundo
