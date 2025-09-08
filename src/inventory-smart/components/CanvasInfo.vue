@@ -23,9 +23,6 @@ import { useViewportStore } from '@/inventory-smart/stores/viewport'
 import { pxToCm, fmtCm } from '@/inventory-smart/utils/units'
 import { t } from '@/inventory-smart/i18n'
 
-const props = defineProps({
-  recomputeRight: { type: Function, default: null }
-})
 const { store } = useCanvasWithHistory()
 const viewport = useViewportStore()
 const infoRef = ref(null)
@@ -52,7 +49,6 @@ function recompute() {
       infoEl.classList.add('should-wrap')
     }
   } catch { styleObject.value = {} }
-  props.recomputeRight && props.recomputeRight()
 }
 
 let resizeObs

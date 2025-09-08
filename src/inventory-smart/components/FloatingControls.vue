@@ -100,8 +100,6 @@ onUnmounted(() => {
 
 watch(() => props.safeRight, recomputeFloatingRight)
 
-// Exponer para padres si necesitan recalcular
-// (por ejemplo CanvasInfo puede llamar a $parent?.$refs)
 </script>
 
 
