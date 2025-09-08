@@ -608,197 +608,33 @@
       @close="ctx.close()"
     />
 
-    <!-- Modal Guardar como plantilla -->
-    <div
-      v-if="templateModalOpen"
-      class="modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="templateModalTitle"
-      @click.self="closeTemplateModal"
-    >
-      <form class="modal" @submit.prevent="saveTemplate">
-        <header class="modal-header">
-          <h3 id="templateModalTitle" class="title">Guardar como plantilla</h3>
-          <button type="button" class="close" @click="closeTemplateModal" aria-label="Cerrar">×</button>
-        </header>
-        <section class="modal-body">
-          <div class="template-modal__row">
-            <label for="templateName" class="template-modal__label">Nombre de la plantilla</label>
-            <input
-              id="templateName"
-              ref="templateNameInput"
-              v-model="templateName"
-              class="template-modal__input"
-              type="text"
-              maxlength="80"
-              required
-            />
-            <p v-if="templateError" class="template-modal__error">{{ templateError }}</p>
-          </div>
-          <div class="template-modal__row">
-            <div class="template-modal__summary" id="templateSummary">
-              <div>Tipo: {{ templateSummary.elementType }}</div>
-              <div>
-                Dimensiones: {{ templateSummary.width }}×{{ templateSummary.depth }}×{{
-                  templateSummary.height
-                }}
-              </div>
-              <div>Hijos: {{ templateSummary.childrenCount }}</div>
-            </div>
-          </div>
-          <div class="template-modal__row">
-            <label for="templateNotes" class="template-modal__label">Notas</label>
-            <textarea
-              id="templateNotes"
-              v-model="templateNotes"
-              class="template-modal__textarea"
-              rows="3"
-            ></textarea>
-          </div>
-        </section>
-        <footer class="modal-footer">
-          <button type="button" class="btn" @click="closeTemplateModal">Cancelar</button>
-          <button type="submit" class="btn btn-primary" :disabled="!templateName.trim() || isSaving">
-            Guardar
-          </button>
-        </footer>
-      </form>
-    </div>
+    <TemplateSaveModal
+      :open="templateModalOpen"
+      :element-id="canvasStore.elementoSeleccionado"
+      @close="closeTemplateModal"
+      @saved="onTemplateSaved"
+    />
 
-  <!-- Información de zoom, vista y dimensiones -->
-  <div ref="canvasInfoRef" class="canvas-info" :style="canvasInfoStyle">
-      <span>Zoom: {{ Math.round(canvasStore.zoom * 100) }}%</span>
-      <span>{{ t('views.label') }}: {{ t(`views.${canvasStore.vistaActiva}`) }}</span>
-      <span v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData">
-        Planta: {{ fmtCm(canvasStore.plantaActivaData.dimensiones.ancho) }} x {{
-          fmtCm(canvasStore.plantaActivaData.dimensiones.largo)
-        }}
-      </span>
-      <span
-        v-if="
-          (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) &&
-          canvasStore.elementoContenedorActual
-        "
-      >
-        {{ canvasStore.estaEnElemento ? 'Elemento' : 'Contenedor' }}:
-        {{ canvasStore.elementoContenedorActual.nombre }}
-        <template v-if="canvasStore.vistaActiva === 'XZ' && canvasStore.elementoContenedorActual.dimensiones">
-          ({{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.ancho) }} x {{ fmtCm(canvasStore.elementoContenedorActual.dimensiones.alto) }})
-        </template>
-        <template v-else>
-          ({{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.width, viewport.cmPerPx)) }} x {{ fmtCm(pxToCm(canvasStore.canvasAdaptativo.height, viewport.cmPerPx)) }})
-        </template>
-      </span>
-      <!-- <span v-if="canvasStore.elementoSeleccionado">
-        Seleccionado: {{ canvasStore.elementoSeleccionado }}
-      </span> -->
-    </div>
+  <CanvasInfo :recompute-right="recomputeFloatingRight" />
 
-  <!-- Botones flotantes de Undo/Redo y Bloqueo -->
-  <div ref="floatingControlsRef" class="floating-controls" :style="{ right: `${floatingRight}px` }">
-    <UiTooltip
-      label="Deshacer (Ctrl+Z)"
-      :delay="200"
-      position="bottom"
-    >
-      <button
-        @click="undo()"
-        :disabled="!canUndo"
-        class="floating-btn btn-undo"
-      >
-        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-          />
-        </svg>
-      </button>
-    </UiTooltip>
-    <UiTooltip
-      label="Rehacer (Ctrl+Y)"
-      :delay="200"
-      position="bottom"
-    >
-      <button
-        @click="redo()"
-        :disabled="!canRedo"
-        class="floating-btn btn-redo"
-      >
-        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6"
-          />
-        </svg>
-      </button>
-    </UiTooltip>
-
-    <!-- Botones de Zoom: ubicados junto a 'fit' pero después de redo para mantener undo+redo juntos -->
-    <UiTooltip
-      label="Alejar (Ctrl+ -)"
-      :delay="200"
-      position="bottom"
-    >
-      <button
-        @click="zoomOut()"
-        :disabled="!canZoomOut"
-        class="floating-btn btn-zoom btn-zoom-out"
-        title="Alejar (Ctrl+ -)"
-      >
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-    </UiTooltip>
-    <UiTooltip
-      label="Acercar (Ctrl+ +)"
-      :delay="200"
-      position="bottom"
-    >
-      <button
-        @click="zoomIn()"
-        :disabled="!canZoomIn"
-        class="floating-btn btn-zoom btn-zoom-in"
-        title="Acercar (Ctrl+ +)"
-      >
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-          <line x1="12" y1="5" x2="12" y2="19" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-    </UiTooltip>
-    <!-- Botón ajustar a planta activa -->
-    <UiTooltip
-      label="Ajustar vista"
-      position="bottom"
-      :delay="200"
-    >
-      <button
-        @click="fitToPlanta"
-        @mouseenter="speedDialOpen = false"
-        :disabled="!canvasStore.plantaActivaData"
-        class="floating-btn btn-fit"
-      >
-        <!-- Icono de ajustar/fit: flechas hacia las esquinas -->
-        <svg class="icon-xl" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-          <path fill="currentColor"
-            d="M18.25 4A3.75 3.75 0 0 1 22 7.75v8.5A3.75 3.75 0 0 1 18.25 20H5.75A3.75 3.75 0 0 1 2 16.25v-8.5A3.75 3.75 0 0 1 5.75 4zm0 1.5H5.75A2.25 2.25 0 0 0 3.5 7.75v8.5a2.25 2.25 0 0 0 2.25 2.25h12.5a2.25 2.25 0 0 0 2.25-2.25v-8.5a2.25 2.25 0 0 0-2.25-2.25m0 7.5a.75.75 0 0 1 .75.75V15a2 2 0 0 1-2 2h-1.25a.75.75 0 0 1 0-1.5H17a.5.5 0 0 0 .5-.5v-1.25a.75.75 0 0 1 .75-.75m-12.5 0a.75.75 0 0 1 .75.75V15a.5.5 0 0 0 .5.5h1.25a.75.75 0 0 1 0 1.5H7a2 2 0 0 1-2-2v-1.25a.75.75 0 0 1 .75-.75M7 7h1.25a.75.75 0 0 1 .102 1.493L8.25 8.5H7a.5.5 0 0 0-.492.41L6.5 9v1.25a.75.75 0 0 1-1.493.102L5 10.25V9a2 2 0 0 1 1.85-1.995zm10 0a2 2 0 0 1 2 2v1.25a.75.75 0 0 1-1.5 0V9a.5.5 0 0 0-.5-.5h-1.25a.75.75 0 0 1 0-1.5z" />
-        </svg>
-      </button>
-    </UiTooltip>
-
-    </div>
+  <FloatingControls
+    :safe-right="safeRight"
+    :can-undo="canUndo"
+    :can-redo="canRedo"
+    :can-zoom-in="canZoomIn"
+    :can-zoom-out="canZoomOut"
+    :can-fit="!!canvasStore.plantaActivaData"
+    @undo="undo()"
+    @redo="redo()"
+    @zoom-in="zoomIn()"
+    @zoom-out="zoomOut()"
+    @fit="fitToPlanta"
+  />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { t } from '@/inventory-smart/i18n'
 import { useCacheOnDrag } from '@/inventory-smart/composables/useCacheOnDrag'
 import { setupRafDrag } from '@/inventory-smart/composables/useRafDrag'
 import { enablePerfMode } from '@/inventory-smart/composables/usePerfMode'
@@ -845,7 +681,11 @@ import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
 import { getUsoInfo, useProductSimulation } from '@/inventory-smart/composables/useSimulateProducts'
 import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import { useTransformer } from '@/inventory-smart/composables/useTransformer'
 import UiTooltip from './ui/UiTooltip.vue'
+import TemplateSaveModal from '@/inventory-smart/components/TemplateSaveModal.vue'
+import CanvasInfo from '@/inventory-smart/components/CanvasInfo.vue'
+import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -854,69 +694,7 @@ const props = defineProps({
 
 // Refs para evitar solapamientos entre canvas-info y
 
-const canvasInfoRef = ref(null)
-const floatingControlsRef = ref(null)
-const floatingRight = ref(props.safeRight)
-
-let panelObserver = null
-let panelResizeObserver = null
-
-// Estilo reactivo aplicado en línea a .canvas-info (max-width para evitar solapamiento)
-const canvasInfoStyle = ref({})
-
-function recomputeCanvasInfoMaxWidth() {
-  try {
-    const container = containerRef.value
-    const infoEl = canvasInfoRef.value
-    const controlsEl = floatingControlsRef.value
-    if (!container || !infoEl || !controlsEl) {
-      canvasInfoStyle.value = {}
-      return
-    }
-
-    const containerRect = container.getBoundingClientRect()
-    const controlsRect = controlsEl.getBoundingClientRect()
-    const margin = 12 // espacio mínimo entre info y controles
-
-    // calcular espacio disponible a la derecha del info antes de llegar a los controls
-    const availableToRight = controlsRect.left - containerRect.left - margin
-
-    // medir el ancho natural del elemento info (sin restricciones)
-    const infoElRect = infoEl.getBoundingClientRect()
-    // preferir scrollWidth si está disponible para medir contenido interno
-    const naturalWidth = infoEl.scrollWidth || Math.ceil(infoElRect.width)
-
-    // Si el contenido natural cabe en el espacio disponible, quitar cualquier limitación
-    if (naturalWidth + 24 <= availableToRight) {
-      canvasInfoStyle.value = { maxWidth: 'none' }
-      infoEl.classList.remove('should-wrap')
-    } else {
-      // aplicar max-width y activar wrap para evitar solapamiento
-      const maxW = Math.max(120, availableToRight - 24) // mínimo 120px
-      canvasInfoStyle.value = { maxWidth: `${maxW}px` }
-      infoEl.classList.add('should-wrap')
-    }
-  } catch (e) {
-    canvasInfoStyle.value = {}
-  }
-  // también recalcular el desplazamiento de los controles cuando cambia el layout
-  recomputeFloatingRight()
-}
-
-function recomputeFloatingRight() {
-  try {
-    const panel = document.querySelector('[data-properties-panel]')
-    const margin = 12
-    if (panel && panel.offsetParent !== null) {
-      const rect = panel.getBoundingClientRect()
-      floatingRight.value = Math.ceil(props.safeRight + rect.width + margin)
-    } else {
-      floatingRight.value = props.safeRight
-    }
-  } catch (e) {
-    floatingRight.value = props.safeRight
-  }
-}
+function recomputeFloatingRight() { /* delegada al componente FloatingControls */ }
 
 
 // Referencia segura a Konva (cuando está disponible globalmente via vue-konva)
@@ -974,92 +752,9 @@ const weightValidation = useWeightValidation()
 const catalogStore = useCatalogStore()
 
 const templateModalOpen = ref(false)
-const templateName = ref('')
-const templateNotes = ref('')
-const templateError = ref('')
-const templateSummary = ref({ elementType: '', width: 0, height: 0, depth: 0, childrenCount: 0 })
-const templatePayload = ref(null)
-const templateNameInput = ref(null)
-const isSaving = ref(false)
-
-const openTemplateModal = (elementId) => {
-  const el = canvasStore.elementoPorId(elementId)
-  if (!el) return
-  const serialized = buffer.serializeElementForTemplate(elementId)
-  if (!serialized) return
-  const elementsArr = Array.from(serialized.allElements.values())
-  templatePayload.value = {
-    rootId: serialized.rootElement.id,
-    elements: elementsArr,
-  }
-  templateSummary.value = {
-    elementType: serialized.rootElement.tipo || '',
-    width: serialized.rootElement.dimensiones?.ancho || 0,
-    depth: serialized.rootElement.dimensiones?.largo || 0,
-    height: serialized.rootElement.dimensiones?.alto || 0,
-    childrenCount: elementsArr.length - 1,
-  }
-  templateName.value = el.nombre || ''
-  templateNotes.value = ''
-  templateError.value = ''
-  templateModalOpen.value = true
-  nextTick(() => templateNameInput.value?.focus?.())
-  ctx.close()
-}
-
-const closeTemplateModal = () => {
-  templateModalOpen.value = false
-}
-
-const saveTemplate = () => {
-  if (isSaving.value) return
-  const name = templateName.value.trim()
-  if (!name) {
-    templateError.value = 'El nombre es obligatorio'
-    return
-  }
-  if (catalogStore.getTemplateByName(name)) {
-    templateError.value = 'Ya existe una plantilla con ese nombre'
-    return
-  }
-  isSaving.value = true
-  const now = new Date().toISOString()
-  const root =
-    templatePayload.value?.elements?.find(
-      (e) => e.id === templatePayload.value?.rootId,
-    ) || {}
-  const template = {
-    id: `tpl_${Date.now().toString(36)}`,
-    name,
-    createdAt: now,
-    updatedAt: now,
-    meta: {
-      elementType: templateSummary.value.elementType,
-      width: templateSummary.value.width,
-      height: templateSummary.value.height,
-      depth: templateSummary.value.depth,
-      childrenCount: templateSummary.value.childrenCount,
-      weight: root.pesoMaximo,
-      location: root.ubicacion,
-    },
-    payload: templatePayload.value,
-    notes: templateNotes.value.trim() || undefined,
-    tags: [],
-  }
-  catalogStore.addTemplate(template)
-  showToast('Plantilla guardada', 'success')
-  templateModalOpen.value = false
-  isSaving.value = false
-}
-
-const onTemplateKeydown = (e) => {
-  if (e.key === 'Escape') closeTemplateModal()
-}
-
-watch(templateModalOpen, (val) => {
-  if (val) window.addEventListener('keydown', onTemplateKeydown)
-  else window.removeEventListener('keydown', onTemplateKeydown)
-})
+const openTemplateModal = (elementId) => { templateModalOpen.value = true; ctx.close() }
+const closeTemplateModal = () => { templateModalOpen.value = false }
+function onTemplateSaved() { /* hook post-guardar si se requiere */ }
 const dimensionValidation = useDimensionValidation()
 
 // Object snapping
@@ -1419,7 +1114,6 @@ const handleStageClick = (e) => {
   if (e.target === e.target.getStage() && !canvasStore.cambiosNoAplicados) {
   canvasStore.seleccionarElemento(null)
   // Cerrar controles y edición cuando se hace click en el stage vacío
-  speedDialOpen.value = false
   editingElementId.value = null
   // Limpiar guías de snapping
   clearGuides()
@@ -2054,6 +1748,30 @@ const { simularLlenadoElemento } = useProductSimulation({
   showToast,
   forceRedraw
 });
+
+// Composable de transformación
+const {
+  transformerRef,
+  editingElementId,
+  isInteractingWithTransformer,
+  isEditingSelected,
+  selectedElementLocked,
+  setupTransformer,
+  handleTransformStart,
+  handleTransformMove,
+  handleTransformEnd,
+  toggleEditingMode
+} = useTransformer({
+  canvasStore,
+  stageRef,
+  layerRef,
+  layerConfig,
+  lastValidPositions,
+  onTransformEndGuard,
+  dimensionValidation,
+  showToast,
+  isElementLocked
+})
 
 // Función auxiliar para convertir coordenadas del puntero a coordenadas de mundo
 const getWorldCoordinatesFromPointer = (dropEvent) => {
@@ -2709,23 +2427,10 @@ const createElementFromTemplate = (data, dropEvent) => {
   }
 }
 
-// === NUEVO: Estado SpeedDial & modos ===
-const speedDialOpen = ref(false)
 // Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
 // Por defecto activado (true) para que el modo edición esté disponible al iniciar
 const dragModeGlobal = ref(true)
-// Id del elemento actualmente en modo edición (transformer). Se activa al seleccionar un elemento cuando dragModeGlobal está ON
-const editingElementId = ref(null)
-const transformerRef = ref(null)
-const isInteractingWithTransformer = ref(false);
-// Estado para guardar dimensiones/pos antes de transformar (para poder revertir)
-const transformInitialState = new Map()
 const isDragModeActive = computed(() => dragModeGlobal.value)
-const isEditingSelected = computed(() => editingElementId.value === canvasStore.elementoSeleccionado)
-const selectedElementLocked = computed(() => {
-  const id = canvasStore.elementoSeleccionado
-  return id ? isElementLocked(id) : false
-})
 
 // Limpiar modos si se bloquea el elemento
 watch(selectedElementLocked, (locked) => {
@@ -2779,326 +2484,14 @@ const canDragElement = (id) => {
   return dragModeGlobal.value
 }
 
-const setupTransformer = () => {
-  if (!isEditingSelected.value || selectedElementLocked.value) return
-  const trComp = transformerRef.value?.getNode?.()
-  const stage = stageRef.value?.getNode?.()
-  if (!trComp || !stage) return
-  const node = stage.findOne(`#${canvasStore.elementoSeleccionado}`)
-  if (node) {
-    trComp.nodes([node])
-    const elemento = canvasStore.elementosVisibles.find(e => e.id === canvasStore.elementoSeleccionado)
-    trComp.setAttrs({
-      flipEnabled: false,
-      boundBoxFunc: (oldBox, newBox) => {
-        const MINW = 10
-        const MINH = 10
-        if (newBox.width <= 0 || newBox.height <= 0) return oldBox
-        if (newBox.width < MINW || newBox.height < MINH) return oldBox
-        if (elemento?.forma === 'circular') {
-          const size = Math.max(newBox.width, newBox.height)
-          return { ...newBox, width: size, height: size }
-        }
-        return newBox
-      },
-    })
-    trComp.getLayer()?.batchDraw?.()
-  }
-}
 
 
-// Guardar estado inicial de la transformación para posible revert
-const handleTransformStart = (e, elementId) => {
-  isInteractingWithTransformer.value = true;
-  try {
-    const node = e.target
-    if (!node) return
-    const x = node.x()
-    const y = node.y()
-    const width = node.width() * node.scaleX()
-    const height = node.height() * node.scaleY()
-    const state = { x, y, width, height, rotation: node.rotation?.() || 0 }
-    transformInitialState.set(elementId, state)
-    console.debug('[transform-debug] start', elementId, state)
-  } catch { /* ignore */ }
-}
 
-// Manejar fin de transformación - CONCENTRA TODA LA VALIDACIÓN Y PERSISTENCIA
-const handleTransformEnd = (e, elementId) => {
-  isInteractingWithTransformer.value = false;
-  try {
-    const node = e.target
-    let width = node.width() * node.scaleX()
-    let height = node.height() * node.scaleY()
-    let x = node.x()
-    let y = node.y()
-    const bounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    x = Math.max(bounds.minX, Math.min(x, bounds.maxX - width))
-    y = Math.max(bounds.minY, Math.min(y, bounds.maxY - height))
-    const rotation = node.rotation?.() || 0
 
-    const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
-    if (!elemento) return
 
-    // Limpiar estado de transformación
-    transformState.delete(elementId)
 
-    // Helper para revert visual y lógico
-    const revertTransform = (reason = '') => {
-      const prev = transformInitialState.get(elementId) ||
-        { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation || 0 }
 
-      try {
-        node.x(prev.x)
-        node.y(prev.y)
-        node.width && node.width(prev.width)
-        node.height && node.height(prev.height)
-        node.scaleX && node.scaleX(1)
-        node.scaleY && node.scaleY(1)
-        node.rotation && node.rotation(prev.rotation || 0)
 
-        // Limpiar feedback visual
-        const stage = stageRef.value.getNode()
-        const shape = stage.findOne(`#${elementId}`)
-        if (shape) {
-          const bbox = shape.findOne('.bbox')
-          const circle = elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'
-            ? shape.findOne('Circle') : null
-
-          if (circle) {
-            circle.stroke(undefined)
-            circle.strokeWidth(0)
-          } else {
-            bbox?.stroke(undefined)
-            bbox?.strokeWidth(0)
-          }
-        }
-
-        const layer = layerRef.value?.getNode?.()
-        layer?.batchDraw?.()
-      } catch { /* ignore */ }
-
-      // Persistir reversión en el store
-      try {
-        canvasStore.actualizarElemento(elementId, {
-          x: prev.x, y: prev.y, width: prev.width, height: prev.height, rotation: prev.rotation
-        })
-        lastValidPositions.value.set(elementId, { x: prev.x, y: prev.y })
-      } catch (err) {
-        console.warn('Error persisting transform revert', err)
-      }
-
-      console.debug('[transform-debug] reverted', elementId, { reason, prev })
-    }
-
-    // VALIDACIÓN 1: Guards del sistema
-    const guardRes = onTransformEndGuard(
-      elemento,
-      { x, y, width, height, rotation },
-      { revert: () => revertTransform('guard validation failed') }
-    )
-    if (!guardRes.valid) return
-
-    // VALIDACIÓN 2: Placement validation (colisiones, área)
-    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
-    const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-    const isValidNow = isPlacementValid({
-      pos: { x, y },
-      movingEl: { ...elemento, width, height },
-      neighbors,
-      areaBounds,
-      CM_TO_PX,
-      epsPx: 0.5
-    })
-
-    console.debug('[transform-debug] end', elementId, {
-      prev: transformInitialState.get(elementId),
-      new: { x, y, width, height, rotation },
-      isValidNow
-    })
-
-    if (!isValidNow) {
-      revertTransform('placement validation failed')
-      nextTick(() => setupTransformer())
-      return
-    }
-
-    // VALIDACIÓN 3: Dimension validation (contención de hijos, volumen mínimo, límites de área)
-    // Calcular las nuevas dimensiones primero para validar
-    let tempDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
-    if (tempDimensiones) {
-      const widthCm = Math.round(width / CM_TO_PX)
-      const heightCm = Math.round(height / CM_TO_PX)
-      if (canvasStore.vistaActiva === 'XY') {
-        tempDimensiones.ancho = widthCm
-        tempDimensiones.largo = heightCm
-      } else if (canvasStore.vistaActiva === 'XZ') {
-        tempDimensiones.ancho = widthCm
-        tempDimensiones.alto = heightCm
-        if (tempDimensiones.largo === undefined) tempDimensiones.largo = elemento.dimensiones?.largo || 60
-      }
-    }
-
-    // Crear elemento temporal con las nuevas dimensiones para validación
-    const elementoTemporal = {
-      ...elemento,
-      x,
-      y,
-      width,
-      height,
-      dimensiones: tempDimensiones
-    }
-
-    console.debug('[dimension-debug] validating dimensions', elementId, {
-      elementoTemporal: {
-        id: elementoTemporal.id,
-        posicion: { x: x / CM_TO_PX, y: y / CM_TO_PX },
-        dimensiones: tempDimensiones,
-        vista: canvasStore.vistaActiva
-      }
-    })
-
-    // Ejecutar validación de dimensiones (silenciosa para manejar mensajes nosotros)
-    const resultadoValidacionDimensiones = dimensionValidation.validarDimensiones(
-      elementId,
-      {
-        ancho: tempDimensiones?.ancho,
-        largo: tempDimensiones?.largo,
-        alto: tempDimensiones?.alto
-      },
-      { silencioso: true }
-    )
-
-    console.debug('[dimension-debug] validation result', elementId, resultadoValidacionDimensiones)
-
-    if (!resultadoValidacionDimensiones.valida) {
-      // Mostrar mensaje de error específico al usuario
-      showToast(
-        resultadoValidacionDimensiones.razon,
-        'error',
-        {
-          timeout: 5000
-        }
-      )
-
-      // Mostrar sugerencias si están disponibles
-      // if (resultadoValidacionDimensiones.sugerencias && resultadoValidacionDimensiones.sugerencias.length > 0) {
-      //   setTimeout(() => {
-      //     showToast(
-      //       `Sugerencias: ${resultadoValidacionDimensiones.sugerencias.join(', ')}`,
-      //       'warning',
-      //       {
-      //         timeout: 7000
-      //       }
-      //     )
-      //   }, 1000)
-      // }
-
-      revertTransform(`dimension validation failed: ${resultadoValidacionDimensiones.razon}`)
-      nextTick(() => setupTransformer())
-      return
-    }
-
-    // APLICACIÓN EXITOSA: Usar las dimensiones ya calculadas
-    const newDimensiones = tempDimensiones
-
-    // Aplicar transformación final
-    node.width(width)
-    node.height(height)
-    node.scaleX(1)
-    node.scaleY(1)
-    node.x(x)
-    node.y(y)
-
-    // Limpiar feedback visual
-    try {
-      const stage = stageRef.value.getNode()
-      const shape = stage.findOne(`#${elementId}`)
-      if (shape) {
-        const bbox = shape.findOne('.bbox')
-        const circle = elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'
-          ? shape.findOne('Circle') : null
-
-        if (circle) {
-          circle.stroke(undefined)
-          circle.strokeWidth(0)
-        } else {
-          bbox?.stroke(undefined)
-          bbox?.strokeWidth(0)
-        }
-      }
-    } catch { /* ignore */ }
-
-    // Persistir en el store con descripción
-    canvasStore.actualizarElemento(
-      elementId,
-      { x, y, width, height, rotation, dimensiones: newDimensiones, dimensionLock: true },
-      true,
-      `Elemento redimensionado: ${elemento?.nombre || elemento?.tipo || elementId}`
-    )
-
-    lastValidPositions.value.set(elementId, { x, y })
-    nextTick(() => setupTransformer())
-
-  } catch (err) {
-    console.warn('Error en handleTransformEnd:', err)
-  }
-}
-
-const transformState = new Map() // Cache de estado de transform por elemento
-const throttleTransform = throttleEveryNFrames(3) // Solo cada 3 frames (~50ms)
-
-// Función ligera de feedback visual sin validación pesada
-const updateTransformVisualFeedback = (node, elementId) => {
-  try {
-    const stage = stageRef.value.getNode()
-    const shape = stage.findOne(`#${elementId}`)
-    if (!shape) return
-
-    // Solo feedback visual básico: mostrar que está transformándose
-    const bbox = shape.findOne('.bbox')
-    const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
-
-    if (elemento?.forma === 'circular' && canvasStore.vistaActiva === 'XY') {
-      const circle = shape.findOne('Circle')
-      // Stroke azul durante transformación (sin validación)
-      circle?.stroke('#3b82f6')
-      circle?.strokeWidth(1)
-    } else {
-      // Stroke azul durante transformación (sin validación)
-      bbox?.stroke('#3b82f6')
-      bbox?.strokeWidth(1)
-    }
-
-    // Un solo batchDraw optimizado
-    shape.getLayer()?.batchDraw?.()
-  } catch { /* ignore */ }
-}
-
-// Mientras se transforma (resize/rotate) - OPTIMIZADO para performance
-const handleTransformMove = (e, elementId) => {
-  try {
-    const node = e.target
-    if (!node) return
-
-    // Guardar estado actual para el final
-    const width = node.width() * node.scaleX()
-    const height = node.height() * node.scaleY()
-    const x = node.x()
-    const y = node.y()
-
-    // Actualizar cache de estado sin tocar el store
-    transformState.set(elementId, { x, y, width, height })
-
-    // Feedback visual ligero throttleado (cada 3 frames)
-    throttleTransform(() => {
-      updateTransformVisualFeedback(node, elementId)
-    })()
-
-  } catch (err) {
-    console.warn('Error en handleTransformMove:', err)
-  }
-}
 
 
 // === UTILIDADES DE TAMAÑO Y CENTRADO (restauradas) ===
@@ -3126,7 +2519,6 @@ const handleGlobalClick = (e) => {
   const isInPropertiesPanel = e.target.closest('[data-properties-panel]')
   if (!containerRef.value?.contains(e.target) && !isFormElement && !isInPropertiesPanel) {
   canvasStore.seleccionarElemento(null)
-  speedDialOpen.value = false
   editingElementId.value = null
   }
 }
@@ -3143,7 +2535,6 @@ const handleKeyDown = (e) => {
     canvasStore.seleccionarElemento(null)
     // Asegurar que el transformer/edición se cierre
     editingElementId.value = null
-    speedDialOpen.value = false
     // Limpiar guías de snapping
     clearGuides()
   } else {
@@ -3156,7 +2547,6 @@ const handleKeyDown = (e) => {
   }
 }
 let sizeResizeObserver = null
-let infoResizeObserver = null
 onMounted(async () => {
   await nextTick()
   updateStageSize()
@@ -3171,36 +2561,12 @@ onMounted(async () => {
   fitToPlanta()
   window.addEventListener('click', handleGlobalClick)
   window.addEventListener('keydown', handleKeyDown)
-  // Recompute canvas-info max width on mount and on resize
-  await nextTick()
-  recomputeCanvasInfoMaxWidth()
-  window.addEventListener('resize', recomputeCanvasInfoMaxWidth)
-  try {
-    if (containerRef.value) {
-      infoResizeObserver = new ResizeObserver(recomputeCanvasInfoMaxWidth)
-      infoResizeObserver.observe(containerRef.value)
-    }
-  } catch (e) { /* ignore */ }
-  // Observar aparición/desaparición del panel de propiedades y su resize
-  try {
-    panelObserver = new MutationObserver(() => {
-      recomputeFloatingRight()
-      // si el panel existe, observar su tamaño
-      const panel = document.querySelector('[data-properties-panel]')
-      if (panel) {
-        if (!panelResizeObserver) panelResizeObserver = new ResizeObserver(recomputeFloatingRight)
-        try { panelResizeObserver.observe(panel) } catch { /* ignore */ }
-      }
-    })
-    panelObserver.observe(document.body, { childList: true, subtree: true, attributes: true })
-  } catch (e) { /* ignore */ }
+  // (CanvasInfo y FloatingControls manejan sus propios observers ahora)
 })
 onUnmounted(() => {
   if (sizeResizeObserver) sizeResizeObserver.disconnect()
-  if (infoResizeObserver) infoResizeObserver.disconnect()
   window.removeEventListener('click', handleGlobalClick)
   window.removeEventListener('keydown', handleKeyDown)
-  window.removeEventListener('resize', recomputeCanvasInfoMaxWidth)
 })
 
 // Helper: enfoca el primer input dentro del panel de propiedades si existe
@@ -3532,176 +2898,7 @@ const onDelete = async (id) => {
 }
 
 .canvas-info.should-wrap { flex-wrap: wrap; gap: 10px }
-
-/* Botones flotantes para undo/redo */
-.floating-controls {
-  position: absolute;
-  top: 36px;
-  right: 36px; /* valor por defecto, será sobrescrito por :style */
-  display: flex;
-  gap: 8px;
-  z-index: 10;
-}
-
-.floating-btn {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: 1px solid #e2e8f0;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Botones de zoom: heredan tamaño de .floating-btn y comparten color/hover con btn-undo */
-.btn-zoom:not(:disabled) {
-  color: #3b82f6;
-}
-.btn-zoom:hover:not(:disabled) {
-  background: #eff6ff;
-  border-color: #3b82f6;
-}
-
-/* Si el espacio horizontal es reducido, desplazar .canvas-info hacia la izquierda y reducir su padding */
-@media (max-width: 900px) {
-  .canvas-info { left: 16px; top: 24px; padding: 6px 8px; font-size: 11px }
-  .floating-controls { top: 24px; right: 12px }
-  .floating-btn { width: 40px; height: 40px }
-}
-
-/* Si todavía hay conflicto visual, forzar que .canvas-info tome dos líneas y tenga menor gap */
-@media (max-width: 640px) {
-  .canvas-info { gap: 8px; font-size: 11px }
-  .floating-controls { gap: 6px }
-  .floating-btn { width: 36px; height: 36px }
-}
-
-.floating-btn:hover:not(:disabled) {
-  background: white;
-  border-color: #cbd5e1;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
-}
-
-.floating-btn:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.floating-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.btn-undo:not(:disabled) {
-  color: #3b82f6;
-}
-
-.btn-undo:hover:not(:disabled) {
-  background: #eff6ff;
-  border-color: #3b82f6;
-}
-
-.btn-redo:not(:disabled) {
-  color: #059669;
-}
-
-.btn-redo:hover:not(:disabled) {
-  background: #ecfdf5;
-  border-color: #059669;
-}
-
-/* Ajuste visual del botón de 'fit' para que coincida con el botón Deshacer */
-.btn-fit:not(:disabled) {
-  color: #3b82f6;
-}
-.btn-fit:hover:not(:disabled) {
-  background: #eff6ff;
-  border-color: #3b82f6;
-}
-
-/* Gear button style to match Undo */
-.btn-gear {
-  color: #3b82f6;
-}
-.btn-gear:hover:not(:disabled) {
-  background: #eff6ff;
-  border-color: #3b82f6;
-}
-
-.floating-btn .icon {
-  width: 20px;
-  height: 20px;
-}
-
-.floating-btn .icon-xl {
-  width: 24px;
-  height: 24px;
-}
-
 .fade-scale-enter-active, .fade-scale-leave-active { transition: all 0.15s ease; }
 .fade-scale-enter-from, .fade-scale-leave-to { opacity: 0; transform: translateY(8px) scale(0.9); }
 
-.speed-action { position:absolute; right:0; width:48px; height:48px; margin-top:8px; border:1px solid #d1d5db; border-radius:9999px; display:flex; align-items:center; justify-content:center; box-shadow:0 4px  12px rgba(0,0,0,.15); transition:all .15s ease; }
-.speed-action:hover { transform: translateY(-4px); box-shadow:0 6px 16px rgba(0,0,0,.2); }
-
-.btn-fit { position: relative; z-index: 30; }
-
-/* Indicador de peso máximo */
-.weight-indicator {
-  position: absolute;
-  bottom: 16px;
-  left: 16px;
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 6px;
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  z-index: 100;
-  max-width: 200px;
-  font-size: 12px;
-  border: 1px solid #e2e8f0;
-}
-
-.weight-icon {
-  font-size: 16px;
-}
-
-.weight-bar {
-  flex: 1;
-  height: 8px;
-  background-color: #e2e8f0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.weight-progress {
-  height: 100%;
-  background-color: #3b82f6;
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-
-.weight-text {
-  font-weight: 500;
-  color: #475569;
-  white-space: nowrap;
-}
-
-/* Estados de advertencia */
-.weight-warning .weight-progress {
-  background-color: #f59e0b;
-}
-
-.weight-danger .weight-progress {
-  background-color: #dc2626;
-}
 </style>
