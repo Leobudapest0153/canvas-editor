@@ -577,7 +577,7 @@
       :stage-x="canvasStore.panX"
       :stage-y="canvasStore.panY"
       :pixels-per-unit="10 * 100"
-      unit="m"
+      :unit="'m'"
     />
 
     <FloatingToolbar
@@ -586,7 +586,6 @@
       :is-snapping-enabled="isSnappingEnabled"
       :is-snapping="isSnapping"
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
-
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
@@ -615,7 +614,7 @@
       @saved="onTemplateSaved"
     />
 
-  <CanvasInfo :recompute-right="recomputeFloatingRight" />
+  <CanvasInfo />
 
   <FloatingControls
     :safe-right="safeRight"
@@ -635,9 +634,6 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { useCacheOnDrag } from '@/inventory-smart/composables/useCacheOnDrag'
-import { setupRafDrag } from '@/inventory-smart/composables/useRafDrag'
-import { enablePerfMode } from '@/inventory-smart/composables/usePerfMode'
 import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
@@ -668,12 +664,7 @@ import { useContextMenu } from '@/inventory-smart/composables/useContextMenu'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
-import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation'
-import { applyEdgeConstraint } from '@/inventory-smart/utils/edgeConstraint'
-import { resetEdgeState } from '@/inventory-smart/composables/useEdgeState'
-import { finalizePlacement } from '@/inventory-smart/utils/finalizeDrag'
-import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
 import { useObjectSnapping } from '@/inventory-smart/composables/useObjectSnapping'
 import { usePlacementGuards } from '@/inventory-smart/composables/usePlacementGuards'
@@ -683,7 +674,6 @@ import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useTransformer } from '@/inventory-smart/composables/useTransformer'
 import { useElementDrag } from '@/inventory-smart/composables/useElementDrag'
-import UiTooltip from './ui/UiTooltip.vue'
 import TemplateSaveModal from '@/inventory-smart/components/TemplateSaveModal.vue'
 import CanvasInfo from '@/inventory-smart/components/CanvasInfo.vue'
 import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
@@ -692,11 +682,6 @@ import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
 const props = defineProps({
   safeRight: { type: Number, default: 20 },
 })
-
-// Refs para evitar solapamientos entre canvas-info y
-
-function recomputeFloatingRight() { /* delegada al componente FloatingControls */ }
-
 
 // Referencia segura a Konva (cuando está disponible globalmente via vue-konva)
 const Konva = typeof globalThis !== 'undefined' ? globalThis.Konva || (typeof window !== 'undefined' ? window.Konva : null) : null
@@ -707,12 +692,6 @@ const stageRef = ref(null)
 const layerRef = ref(null)
 const backgroundLayerRef = ref(null)
 const overlaysLayerRef = ref(null)
-
-// Map of template refs for draggable nodes, keyed by element id
-// (Ahora se obtiene del composable useElementDrag)
-
-const innerSessions = new Map()
-// needsDraw y scheduleDraw ahora se obtienen del composable useElementDrag
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -728,7 +707,6 @@ const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId:
 const { deleteSelected } = useDeleteElement()
 const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
-const catalogStore = useCatalogStore()
 
 const templateModalOpen = ref(false)
 const openTemplateModal = (elementId) => { templateModalOpen.value = true; ctx.close() }
@@ -1146,9 +1124,6 @@ const handleElementDoubleClick = (elemento) => {
 // (Ahora se obtienen del composable useElementDrag)
 // Marca de borde para feedback visual
 const atEdgeMap = ref(new Map())
-// Nuevos: tracking de última pos deseada y última velocidad en rAF
-const lastDesiredPosMap = ref(new Map())
-const lastVelocityMap = ref(new Map())
 
 // Convierte posición stage->layer considerando zoom/pan
 
@@ -1866,16 +1841,6 @@ const canDragElement = (id) => {
   return dragModeGlobal.value
 }
 
-
-
-
-
-
-
-
-
-
-
 // === UTILIDADES DE TAMAÑO Y CENTRADO (restauradas) ===
 const updateStageSize = () => {
   if (!containerRef.value) return
@@ -1883,6 +1848,7 @@ const updateStageSize = () => {
   stageSize.value = { width: container.offsetWidth, height: container.offsetHeight }
   centrarPlantaEnCanvas()
 }
+
 function centrarPlantaEnCanvas() {
   try {
     const stage = stageRef.value?.getNode?.()
@@ -1896,6 +1862,7 @@ function centrarPlantaEnCanvas() {
     canvasStore.configurarPan(centerX, centerY)
   } catch { /* ignore */ }
 }
+
 const handleGlobalClick = (e) => {
   const isFormElement = e.target.matches('input, button, select, textarea, [contenteditable]')
   const isInPropertiesPanel = e.target.closest('[data-properties-panel]')
@@ -1928,7 +1895,9 @@ const handleKeyDown = (e) => {
     })
   }
 }
+
 let sizeResizeObserver = null
+
 onMounted(async () => {
   await nextTick()
   updateStageSize()
@@ -1938,32 +1907,17 @@ onMounted(async () => {
   }
   await nextTick()
   centrarPlantaEnCanvas()
-  // Aplicar fitToPlanta automáticamente al cargar la vista
   await nextTick()
   fitToPlanta()
   window.addEventListener('click', handleGlobalClick)
   window.addEventListener('keydown', handleKeyDown)
-  // (CanvasInfo y FloatingControls manejan sus propios observers ahora)
 })
+
 onUnmounted(() => {
   if (sizeResizeObserver) sizeResizeObserver.disconnect()
   window.removeEventListener('click', handleGlobalClick)
   window.removeEventListener('keydown', handleKeyDown)
 })
-
-// Helper: enfoca el primer input dentro del panel de propiedades si existe
-function focusPrimerCampo() {
-  try {
-    const panel = document.querySelector('[data-properties-panel]')
-    if (!panel) return
-    const input = panel.querySelector('input, textarea, select, [contenteditable]')
-    if (input && typeof input.focus === 'function') input.focus()
-  } catch (e) {
-    console.warn('focusPrimerCampo error', e)
-  }
-}
-
-// Eliminar referencia originalStartElementDrag no usada
 
 function recomputeBoundsAndIndex() {
   try {
@@ -1986,6 +1940,7 @@ function forceRedraw() {
     stage.batchDraw?.()
   } catch { /* ignore */ }
 }
+
 function resetVolatileState() {
   try {
     dragLastValidPositions.value.clear()
@@ -1995,9 +1950,11 @@ function resetVolatileState() {
     stageDragEnabled.value = true
   } catch (e) { console.error('Error reseteando estado volátil:', e) }
 }
+
 if (typeof window !== 'undefined') {
   window.__canvasApi = { recomputeBoundsAndIndex, forceRedraw, resetVolatileState }
 }
+
 watch(
   () => [layerConfig.value.width, layerConfig.value.height],
   async () => {
@@ -2207,6 +2164,7 @@ const onShapePointerDown = (evt, elemento) => {
     }
   }, 600)
 }
+
 const onShapePointerUp = () => {
   clearTimeout(longPressTimer)
 }
