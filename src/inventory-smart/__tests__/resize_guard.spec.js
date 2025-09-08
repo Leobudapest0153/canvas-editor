@@ -5,7 +5,7 @@ import { shallowMount } from '@vue/test-utils'
 import PlantasPanel from '@/inventory-smart/components/PlantasPanel.vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 
-const el = (id: string, w: number, h: number, x = 0, y = 0, rot = 0) => ({
+const el = (id, w, h, x = 0, y = 0, rot = 0) => ({
   id,
   plantaId: 'planta_1',
   width: w,
@@ -14,20 +14,20 @@ const el = (id: string, w: number, h: number, x = 0, y = 0, rot = 0) => ({
   y,
   rotation: rot,
   visible: true,
-  ubicacion: 'suelo' as const,
+  ubicacion: 'suelo',
 })
 
 describe('usePlantResizeGuard - helpers', () => {
   it('(a) elemento mas ancho que newW -> block (via fitsIndividually)', () => {
     const e = el('e1', 120, 50)
-    const ok = fitsIndividually(e as any, 100, 200, true, 0)
+    const ok = fitsIndividually(e, 100, 200, true, 0)
     expect(ok).toBe(false)
   })
 
   it('(b) dispo actual se sale pero pack cabe -> auto_adjust con N>0', () => {
     const elements = [el('a', 60, 60, 0, 0), el('b', 60, 60, 60, 0)]
     const guard = usePlantResizeGuard(() => ({
-      elements: elements as any,
+      elements,
       gridSizePx: 0,
       cmToPx: 2,
       rotPerm: true,
@@ -35,7 +35,6 @@ describe('usePlantResizeGuard - helpers', () => {
       utilizationFactor: 0.95,
     }))
     const res = guard.simulateResize(100, 200)
-    // current layout overflows width (60+60 > 100), but packing should place second on next shelf
     expect(res.status === 'auto_adjust' || res.status === 'ok').toBe(true)
     if (res.status === 'auto_adjust') {
       expect(res.placements.length).toBeGreaterThan(0)
@@ -45,7 +44,7 @@ describe('usePlantResizeGuard - helpers', () => {
   it('(c) todo cabe sin cambios -> ok', () => {
     const elements = [el('a', 80, 50, 0, 0), el('b', 80, 50, 100, 0)]
     const guard = usePlantResizeGuard(() => ({
-      elements: elements as any,
+      elements,
       gridSizePx: 0,
       cmToPx: 2,
       rotPerm: true,
@@ -59,7 +58,7 @@ describe('usePlantResizeGuard - helpers', () => {
   it('(d) respeta grilla y margenes al colocar', () => {
     const elements = [el('a', 30, 30), el('b', 30, 30)]
     const guard = usePlantResizeGuard(() => ({
-      elements: elements as any,
+      elements,
       gridSizePx: 20, // 20 px grid
       cmToPx: 2, // 2 px per cm => grid = 10 cm
       rotPerm: true,
@@ -87,8 +86,8 @@ describe('usePlantResizeGuard - helpers', () => {
 describe('PlantasPanel - snapshot solo en confirmaciones', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    ;(globalThis as any).window = (globalThis as any).window || {}
-    ;(window as any).__toasts = { show: vi.fn() }
+    globalThis.window = globalThis.window || {}
+    window.__toasts = { show: vi.fn() }
   })
 
   it('(e) no guarda snapshot en cambios inline; sí al confirmar', () => {
@@ -102,14 +101,14 @@ describe('PlantasPanel - snapshot solo en confirmaciones', () => {
         activa: true,
         dimensiones: { ancho: 200, largo: 200, alto: 280 },
         pesoMaximoSoportado: 3000,
-      } as any,
-    ] as any
-    store.plantaActiva = 'planta_1' as any
+      },
+    ]
+    store.plantaActiva = 'planta_1'
 
     store.elementos = [
       { ...el('a', 120, 60, 0, 0), plantaId: 'planta_1' },
       { ...el('b', 120, 60, 120, 0), plantaId: 'planta_1' },
-    ] as any
+    ]
 
     const spySave = vi.spyOn(store, 'saveToHistory')
 
@@ -123,19 +122,20 @@ describe('PlantasPanel - snapshot solo en confirmaciones', () => {
       },
     })
 
-    ;(wrapper.vm as any).mostrarModalEditar = true
-    ;(wrapper.vm as any).formularioPlanta = {
+    wrapper.vm.mostrarModalEditar = true
+    wrapper.vm.formularioPlanta = {
       nombre: 'Planta Baja',
       descripcion: '',
       dimensiones: { ancho: 180, largo: 200, alto: 280 },
       pesoMaximoSoportado: 3000,
     }
 
-    ;(wrapper.vm as any).onDimChange()
+    wrapper.vm.onDimChange()
     expect(spySave).not.toHaveBeenCalled()
 
-    ;(wrapper.vm as any).guardarPlanta()
+    wrapper.vm.guardarPlanta()
 
     expect(spySave).toHaveBeenCalledTimes(1)
   })
 })
+
