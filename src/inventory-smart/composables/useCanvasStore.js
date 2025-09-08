@@ -28,6 +28,7 @@ import {
 } from '@/inventory-smart/validation/placementOrchestrator'
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
+import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'
 
 export const useCanvasStore = defineStore('canvas', () => {
   const { showToast } = useToast()
@@ -1087,10 +1088,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const toggleElementoVisibilidad = (elementoId) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (elemento) {
-      // Si no tiene propiedad visible, por defecto está visible (true)
-      elemento.visible = elemento.visible === false ? true : false
-
-      // Guardar estado en historial
+      elemento.visible = elemento.visible === false
       const estado = elemento.visible ? 'mostrado' : 'ocultado'
       saveToHistory(`Elemento ${estado}: ${elemento.nombre || elemento.tipo}`)
     }
@@ -1133,10 +1131,26 @@ export const useCanvasStore = defineStore('canvas', () => {
    */
   const serialize = () => {
     const state = {
-      plantas: plantas.value,
-      elementos: elementos.value
+      plantas: plantas.value.map(p => p?._custom?.value || p),
+      elementos: elementos.value.map(e => e?._custom?.value || e),
+      templates: catalogStore.templates?.map?.(t => t?._custom?.value || t) || [],
     }
-    return _serialize(state)
+    const jsonStr = _serialize(state)
+    try {
+      const parsed = JSON.parse(jsonStr)
+      if (state.templates.length > 0) {
+        parsed.plantillasCatalogo = exportTemplatesToDTO(state.templates)
+        if (parsed.meta) {
+          parsed.meta.version = '1.1.0'
+          if (!parsed.meta.metrics) parsed.meta.metrics = {}
+          parsed.meta.metrics.totalPlantillas = state.templates.length
+        }
+      } // si no hay plantillas mantenemos formato legacy (sin campo y version 1.0.0)
+      return JSON.stringify(parsed, null, 2)
+    } catch (e) {
+      console.warn('No se pudo post-procesar JSON para plantillasCatalogo', e)
+      return jsonStr
+    }
   }
 
   /**
@@ -1183,7 +1197,19 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }
 
-    return _deserialize(jsonString, storeActions)
+    const ok = _deserialize(jsonString, storeActions)
+
+    // Importar plantillasCatalogo si existen (retrocompatible)
+    try {
+      const parsed = JSON.parse(jsonString)
+      if (Array.isArray(parsed.plantillasCatalogo) && parsed.plantillasCatalogo.length > 0) {
+        importTemplatesFromDTO(parsed.plantillasCatalogo)
+      }
+    } catch (e) {
+      console.warn('No se pudieron importar plantillasCatalogo', e)
+    }
+
+    return ok
   }
 
   // === FIN FUNCIONES DE SERIALIZACIÓN ===
