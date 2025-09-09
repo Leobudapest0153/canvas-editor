@@ -27,9 +27,6 @@
       @wheel="handleWheel"
       @mousedown="handleStageMouseDown"
       @click="handleStageClick"
-      @dragstart="handleStageDragStart"
-      @dragmove="handleStageDragMove"
-      @dragend="handleStageDragEnd"
     >
 
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
@@ -403,90 +400,8 @@
               listening: false,
             }"
           />
-
-          <v-group
-            v-if="getUsoInfo(elemento)"
-            :config="{
-              listening: false
-            }"
-          >
-            <template v-for="(info, index) in getUsoInfo(elemento)" :key="info.tipo">
-              <template v-if="((
-        barHeight = 12,
-        barMargin = 12,
-        totalHeight = (barHeight + barMargin) * 2,
-        barWidth = elemento.width * 0.8 > 200 ? 200 : elemento.width * 0.8,
-        offsetX = (elemento.width - barWidth) / 2,
-        offsetY = elemento.height - totalHeight + (barHeight + barMargin) * index
-      ))">
-        <!-- 1. Texto del Título (Volumen / Peso) -->
-        <v-text
-          :config="{
-            x: elemento.x,
-            y: elemento.y + offsetY - 7,
-            width: elemento.width,
-            height: barHeight,
-            text: info.tipo,
-            fontSize: 9,
-            fontFamily: 'Arial',
-            fill: '#4b5563',
-            align: 'center',
-            verticalAlign: 'middle',
-          }"
-        />
-
-        <!-- 2. Barra de fondo (gris) -->
-        <v-rect
-          :config="{
-            x: elemento.x + offsetX,
-            y: elemento.y + offsetY + 4,
-            width: barWidth,
-            height: barHeight,
-            fill: '#FFF',
-            cornerRadius: 4,
-            stroke: '#242930',
-            strokeWidth: 0.5,
-          }"
-        />
-
-        <!-- 3. Barra de progreso (color dinámico) -->
-        <v-rect
-          :config="{
-            x: elemento.x + offsetX,
-            y: elemento.y + offsetY + 4,
-            width: barWidth * (info.porcentaje / 100),
-            height: barHeight,
-            fill: info.color,
-            cornerRadius: 4,
-          }"
-        />
-
-        <!-- 4. Texto del Porcentaje -->
-        <v-text
-          :config="{
-            x: elemento.x + offsetX,
-            y: elemento.y + offsetY + 5,
-            height: barHeight,
-            width: barWidth,
-            align: 'center',
-            text: `${info.porcentaje}%`,
-            fontSize: 9,
-            fontFamily: 'Arial',
-            fontStyle: 'bold',
-            fill: '#242930',
-            verticalAlign: 'middle',
-          }"
-        />
-      </template>
-            </template>
-          </v-group>
-
         </template>
-
-        <!-- Los contenedores se renderizan junto con los elementos en la sección principal -->
-
       </v-layer>
-
       <v-layer ref="uiLayerRef" :config="{ listening: false }">
 
         <!-- Debug: mostrar información según el contexto -->
@@ -668,7 +583,7 @@ import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverla
 import { useObjectSnapping } from '@/inventory-smart/composables/useObjectSnapping'
 import { usePlacementGuards } from '@/inventory-smart/composables/usePlacementGuards'
 import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
-import { getUsoInfo, useProductSimulation } from '@/inventory-smart/composables/useSimulateProducts'
+import { useProductSimulation } from '@/inventory-smart/composables/useSimulateProducts'
 import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useTransformer } from '@/inventory-smart/composables/useTransformer'
@@ -2107,12 +2022,6 @@ watch(
   },
   { immediate: false },
 )
-
-// === CONTEXT MENU HANDLERS ===
-// Stubs de stage drag para evitar warnings
-const handleStageDragStart = () => {}
-const handleStageDragMove = () => {}
-const handleStageDragEnd = () => {}
 
 // Normaliza coordenadas de evento (Konva: e.evt; nativo: e)
 const getClientXY = (e) => {
