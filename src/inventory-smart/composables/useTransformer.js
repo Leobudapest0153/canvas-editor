@@ -25,6 +25,70 @@ export function useTransformer({
   const transformInitialState = new Map()
   const transformState = new Map()
 
+  // Cache de nodos para evitar múltiples findOne() calls
+  const nodeCache = new Map()
+  const MAX_CACHE_SIZE = 50
+
+  // Cleanup automático para prevenir memory leaks
+  const cleanupStaleStates = () => {
+    const activeIds = new Set(canvasStore.elementosVisibles.map(e => e.id))
+
+    // Limpiar estados de elementos que ya no existen
+    for (const id of transformInitialState.keys()) {
+      if (!activeIds.has(id)) {
+        transformInitialState.delete(id)
+        transformState.delete(id)
+        nodeCache.delete(id)
+      }
+    }
+
+    // Limpiar cache si excede el tamaño máximo
+    if (nodeCache.size > MAX_CACHE_SIZE) {
+      const oldestEntries = Array.from(nodeCache.entries()).slice(0, nodeCache.size - MAX_CACHE_SIZE)
+      oldestEntries.forEach(([id]) => nodeCache.delete(id))
+    }
+  }
+
+  // Helper para obtener nodos con cache para evitar múltiples findOne() calls
+  const getCachedNode = (elementId) => {
+    // Verificar cache primero
+    if (nodeCache.has(elementId)) {
+      const cachedNode = nodeCache.get(elementId)
+      // Verificar que el nodo sigue siendo válido
+      if (cachedNode && cachedNode.getParent()) {
+        return cachedNode
+      } else {
+        // Nodo inválido, remover del cache
+        nodeCache.delete(elementId)
+      }
+    }
+
+    // Buscar nodo y agregarlo al cache
+    const stage = stageRef.value?.getNode?.()
+    if (!stage) return null
+
+    const node = stage.findOne(`#${elementId}`)
+    if (node) {
+      nodeCache.set(elementId, node)
+
+      // Cleanup preventivo si el cache crece mucho
+      if (nodeCache.size > MAX_CACHE_SIZE) {
+        cleanupStaleStates()
+      }
+    }
+
+    return node
+  }
+
+  // Invalidar cache cuando sea necesario
+  const invalidateNodeCache = (elementId = null) => {
+    if (elementId) {
+      nodeCache.delete(elementId)
+    } else {
+      nodeCache.clear()
+    }
+  }
+
   // Computeds
   const isEditingSelected = computed(() =>
     editingElementId.value === canvasStore.elementoSeleccionado
@@ -42,13 +106,17 @@ export function useTransformer({
   const setupTransformer = () => {
     if (!isEditingSelected.value || selectedElementLocked.value) return
     const trComp = transformerRef.value?.getNode?.()
-    const stage = stageRef.value?.getNode?.()
-    if (!trComp || !stage) return
+    if (!trComp) return
 
-    const node = stage.findOne(`#${canvasStore.elementoSeleccionado}`)
+    const node = getCachedNode(canvasStore.elementoSeleccionado)
     if (node) {
       trComp.nodes([node])
       const elemento = canvasStore.elementosVisibles.find(e => e.id === canvasStore.elementoSeleccionado)
+      if (!elemento) {
+        console.error('[transform-error] Elemento no encontrado en elementosVisibles:', canvasStore.elementoSeleccionado)
+        return
+      }
+
       trComp.setAttrs({
         flipEnabled: false,
         boundBoxFunc: (oldBox, newBox) => {
@@ -64,15 +132,19 @@ export function useTransformer({
         },
       })
       trComp.getLayer()?.batchDraw?.()
+    } else {
+      console.warn('[transform-warning] No se pudo encontrar el nodo para elemento:', canvasStore.elementoSeleccionado)
     }
   }
 
   // Feedback visual ligero durante transformación
   const updateTransformVisualFeedback = (node, elementId) => {
     try {
-      const stage = stageRef.value.getNode()
-      const shape = stage.findOne(`#${elementId}`)
-      if (!shape) return
+      const shape = getCachedNode(elementId)
+      if (!shape) {
+        console.warn('[transform-feedback] No se pudo encontrar el nodo para feedback:', elementId)
+        return
+      }
 
       const bbox = shape.findOne('.bbox')
       const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
@@ -87,15 +159,19 @@ export function useTransformer({
       }
 
       shape.getLayer()?.batchDraw?.()
-    } catch { /* ignore */ }
+    } catch (error) {
+      console.error('[transform-feedback-error] Error aplicando feedback visual:', error)
+    }
   }
 
   // Limpiar feedback visual
   const clearTransformVisualFeedback = (elementId) => {
     try {
-      const stage = stageRef.value.getNode()
-      const shape = stage.findOne(`#${elementId}`)
-      if (!shape) return
+      const shape = getCachedNode(elementId)
+      if (!shape) {
+        console.warn('[transform-clear-feedback] No se pudo encontrar el nodo para limpiar feedback:', elementId)
+        return
+      }
 
       const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
       const bbox = shape.findOne('.bbox')
@@ -112,20 +188,24 @@ export function useTransformer({
 
       const layer = layerRef.value?.getNode?.()
       layer?.batchDraw?.()
-    } catch { /* ignore */ }
+    } catch (error) {
+      console.error('[transform-clear-feedback-error] Error limpiando feedback visual:', error)
+    }
   }
 
   // Revertir transformación visual y en el store
   const revertTransform = (elementId, reason = '') => {
     const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
-    if (!elemento) return
+    if (!elemento) {
+      console.warn('[transform-revert] Elemento no encontrado para revertir:', elementId)
+      return
+    }
 
     const prev = transformInitialState.get(elementId) ||
       { x: elemento.x, y: elemento.y, width: elemento.width, height: elemento.height, rotation: elemento.rotation || 0 }
 
     try {
-      const stage = stageRef.value.getNode()
-      const node = stage.findOne(`#${elementId}`)
+      const node = getCachedNode(elementId)
       if (node) {
         node.x(prev.x)
         node.y(prev.y)
@@ -134,10 +214,14 @@ export function useTransformer({
         node.scaleX && node.scaleX(1)
         node.scaleY && node.scaleY(1)
         node.rotation && node.rotation(prev.rotation || 0)
+      } else {
+        console.warn('[transform-revert] No se pudo encontrar el nodo para revertir:', elementId)
       }
 
       clearTransformVisualFeedback(elementId)
-    } catch { /* ignore */ }
+    } catch (error) {
+      console.error('[transform-revert-error] Error revirtiendo transformación visual:', error)
+    }
 
     // Persistir reversión en el store
     try {
@@ -146,7 +230,7 @@ export function useTransformer({
       })
       lastValidPositions.value.set(elementId, { x: prev.x, y: prev.y })
     } catch (err) {
-      console.warn('Error persisting transform revert', err)
+      console.error('[transform-revert-store-error] Error persisting transform revert:', err)
     }
 
     console.debug('[transform-debug] reverted', elementId, { reason, prev })
@@ -157,7 +241,10 @@ export function useTransformer({
     isInteractingWithTransformer.value = true
     try {
       const node = e.target
-      if (!node) return
+      if (!node) {
+        console.warn('[transform-start] No se encontró el nodo target en el evento')
+        return
+      }
       const x = node.x()
       const y = node.y()
       const width = node.width() * node.scaleX()
@@ -165,14 +252,20 @@ export function useTransformer({
       const state = { x, y, width, height, rotation: node.rotation?.() || 0 }
       transformInitialState.set(elementId, state)
       console.debug('[transform-debug] start', elementId, state)
-    } catch { /* ignore */ }
+    } catch (error) {
+      console.error('[transform-start-error] Error guardando estado inicial:', error)
+      isInteractingWithTransformer.value = false
+    }
   }
 
   // Durante transformación - feedback visual optimizado
   const handleTransformMove = (e, elementId) => {
     try {
       const node = e.target
-      if (!node) return
+      if (!node) {
+        console.warn('[transform-move] No se encontró el nodo target en el evento')
+        return
+      }
 
       const width = node.width() * node.scaleX()
       const height = node.height() * node.scaleY()
@@ -188,7 +281,7 @@ export function useTransformer({
       })()
 
     } catch (err) {
-      console.warn('Error en handleTransformMove:', err)
+      console.error('[transform-move-error] Error en handleTransformMove:', err)
     }
   }
 
@@ -198,6 +291,21 @@ export function useTransformer({
 
     try {
       const node = e.target
+      if (!node) {
+        console.warn('[transform-end] No se encontró el nodo target en el evento')
+        return
+      }
+
+      // Snapshot del elemento al inicio para evitar race conditions
+      const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
+      if (!elemento) {
+        console.warn('[transform-end] Elemento no encontrado en elementosVisibles:', elementId)
+        return
+      }
+
+      // Congelar el snapshot para evitar modificaciones durante el proceso
+      const elementoSnapshot = Object.freeze({ ...elemento })
+
       let width = node.width() * node.scaleX()
       let height = node.height() * node.scaleY()
       let x = node.x()
@@ -207,15 +315,12 @@ export function useTransformer({
       y = Math.max(bounds.minY, Math.min(y, bounds.maxY - height))
       const rotation = node.rotation?.() || 0
 
-      const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
-      if (!elemento) return
-
       // Limpiar estado de transformación
       transformState.delete(elementId)
 
       // VALIDACIÓN 1: Guards del sistema
       const guardRes = onTransformEndGuard(
-        elemento,
+        elementoSnapshot,
         { x, y, width, height, rotation },
         { revert: () => revertTransform(elementId, 'guard validation failed') }
       )
@@ -226,7 +331,7 @@ export function useTransformer({
       const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
       const isValidNow = isPlacementValid({
         pos: { x, y },
-        movingEl: { ...elemento, width, height },
+        movingEl: { ...elementoSnapshot, width, height },
         neighbors,
         areaBounds,
         CM_TO_PX,
@@ -246,7 +351,7 @@ export function useTransformer({
       }
 
       // VALIDACIÓN 3: Dimension validation
-      let tempDimensiones = elemento?.dimensiones ? { ...elemento.dimensiones } : undefined
+      let tempDimensiones = elementoSnapshot?.dimensiones ? { ...elementoSnapshot.dimensiones } : undefined
       if (tempDimensiones) {
         const widthCm = Math.round(width / CM_TO_PX)
         const heightCm = Math.round(height / CM_TO_PX)
@@ -256,13 +361,13 @@ export function useTransformer({
         } else if (canvasStore.vistaActiva === 'XZ') {
           tempDimensiones.ancho = widthCm
           tempDimensiones.alto = heightCm
-          if (tempDimensiones.largo === undefined) tempDimensiones.largo = elemento.dimensiones?.largo || 60
+          if (tempDimensiones.largo === undefined) tempDimensiones.largo = elementoSnapshot.dimensiones?.largo || 60
         }
       }
 
       // Crear elemento temporal con las nuevas dimensiones para validación
       const elementoTemporal = {
-        ...elemento,
+        ...elementoSnapshot,
         x,
         y,
         width,
@@ -323,14 +428,20 @@ export function useTransformer({
         elementId,
         { x, y, width, height, rotation, dimensiones: newDimensiones, dimensionLock: true },
         true,
-        `Elemento redimensionado: ${elemento?.nombre || elemento?.tipo || elementId}`
+        `Elemento redimensionado: ${elementoSnapshot?.nombre || elementoSnapshot?.tipo || elementId}`
       )
 
       lastValidPositions.value.set(elementId, { x, y })
+
+      // Invalidar cache para este elemento ya que cambió
+      invalidateNodeCache(elementId)
+
       nextTick(() => setupTransformer())
 
     } catch (err) {
-      console.warn('Error en handleTransformEnd:', err)
+      console.error('[transform-end-error] Error en handleTransformEnd:', err)
+      // En caso de error, revertir la transformación como medida de seguridad
+      revertTransform(elementId, `unexpected error: ${err.message}`)
     }
   }
 
@@ -364,6 +475,19 @@ export function useTransformer({
     }
   }, { deep: true })
 
+  // Cleanup automático periódico para prevenir memory leaks
+  const cleanupInterval = setInterval(() => {
+    cleanupStaleStates()
+  }, 30000) // Cada 30 segundos
+
+  // Cleanup al desmontar
+  const cleanup = () => {
+    clearInterval(cleanupInterval)
+    transformInitialState.clear()
+    transformState.clear()
+    nodeCache.clear()
+  }
+
   return {
     // Refs
     transformerRef,
@@ -381,6 +505,13 @@ export function useTransformer({
     handleTransformEnd,
     toggleEditingMode,
     revertTransform,
-    clearTransformVisualFeedback
+    clearTransformVisualFeedback,
+
+    // Cache management
+    invalidateNodeCache,
+    cleanupStaleStates,
+
+    // Cleanup
+    cleanup
   }
 }

@@ -257,7 +257,7 @@ const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
 const confirmDialog = useConfirmDialog()
 const { validarPesoElemento, validarPesoMaximoVsUsoReal, validarCapacidadVsHijos, calcularPesoDisponible } = useWeightValidation()
-const { validarDimensiones, aplicarResultadoValidacion } = useDimensionValidation()
+const { validarDimensiones } = useDimensionValidation()
 
 const catalogStore = useCatalogStore()
 
@@ -385,9 +385,8 @@ const guardar = async () => {
     isSaving.value = false
     return
   }
-  if (resultadoDims?.accion === 'aplicar') {
-    aplicarResultadoValidacion(elementoSeleccionado.value.id, resultadoDims)
-  }
+
+  // Las dimensiones son válidas, proceder con el guardado normal
   const patch = makePatch(snapshotOriginal.value, edited.value)
 
   // Mapear buffer local de tags -> propiedad real del store 'etiquetas' si cambió (orden-insensible)
