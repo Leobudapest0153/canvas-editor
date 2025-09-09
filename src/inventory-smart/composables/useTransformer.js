@@ -306,17 +306,45 @@ export function useTransformer({
       // Congelar el snapshot para evitar modificaciones durante el proceso
       const elementoSnapshot = Object.freeze({ ...elemento })
 
+      // Extraer valores de Konva con corrección de precisión
       let width = node.width() * node.scaleX()
       let height = node.height() * node.scaleY()
       let x = node.x()
       let y = node.y()
-      const bounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
-      x = Math.max(bounds.minX, Math.min(x, bounds.maxX - width))
-      y = Math.max(bounds.minY, Math.min(y, bounds.maxY - height))
       const rotation = node.rotation?.() || 0
+
+      // CORRECCIÓN DE PRECISIÓN: Redondear a precisión de píxel para evitar errores de punto flotante
+      const PRECISION_PIXELS = 1000000 // 6 decimales de precisión (suficiente para píxeles)
+      x = Math.round(x * PRECISION_PIXELS) / PRECISION_PIXELS
+      y = Math.round(y * PRECISION_PIXELS) / PRECISION_PIXELS
+      width = Math.round(width * PRECISION_PIXELS) / PRECISION_PIXELS
+      height = Math.round(height * PRECISION_PIXELS) / PRECISION_PIXELS
+
+      console.debug('[transform-debug] valores corregidos por precisión', elementId, {
+        valoresOriginales: {
+          x: node.x(),
+          y: node.y(),
+          width: node.width() * node.scaleX(),
+          height: node.height() * node.scaleY()
+        },
+        valoresCorregidos: { x, y, width, height },
+        diferencias: {
+          deltaX: Math.abs(x - node.x()),
+          deltaY: Math.abs(y - node.y()),
+          deltaWidth: Math.abs(width - (node.width() * node.scaleX())),
+          deltaHeight: Math.abs(height - (node.height() * node.scaleY()))
+        }
+      })
 
       // Limpiar estado de transformación
       transformState.delete(elementId)
+
+      console.debug('[transform-debug] valores sin clamp inicial', elementId, {
+        posicionOriginal: { x, y },
+        dimensionesFinal: { width, height },
+        areaBounds: { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height },
+        rotation
+      })
 
       // VALIDACIÓN 1: Guards del sistema
       const guardRes = onTransformEndGuard(
@@ -329,18 +357,56 @@ export function useTransformer({
       // VALIDACIÓN 2: Placement validation (colisiones, área)
       const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
       const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+
+      // Crear elemento temporal con las dimensiones correctas para validación
+      const elementoParaValidacion = {
+        ...elementoSnapshot,
+        x,
+        y,
+        width,
+        height
+      }
+
       const isValidNow = isPlacementValid({
         pos: { x, y },
-        movingEl: { ...elementoSnapshot, width, height },
+        movingEl: elementoParaValidacion,
         neighbors,
         areaBounds,
         CM_TO_PX,
         epsPx: 0.5
       })
 
-      console.debug('[transform-debug] end', elementId, {
+      console.debug('[transform-debug] validación de posicionamiento', elementId, {
         prev: transformInitialState.get(elementId),
         new: { x, y, width, height, rotation },
+        areaBounds,
+        elementoParaValidacion: {
+          id: elementoParaValidacion.id,
+          x: elementoParaValidacion.x,
+          y: elementoParaValidacion.y,
+          width: elementoParaValidacion.width,
+          height: elementoParaValidacion.height
+        },
+        validationDetails: {
+          positionToValidate: { x, y },
+          elementBounds: {
+            left: x,
+            top: y,
+            right: x + width,
+            right_cm: (x + width) / CM_TO_PX,
+            bottom: y + height,
+            bottom_cm: (y + height) / CM_TO_PX
+          },
+          areaBounds_cm: {
+            maxX_cm: areaBounds.maxX / CM_TO_PX,
+            maxY_cm: areaBounds.maxY / CM_TO_PX
+          },
+          checks: {
+            insideAreaX: x >= areaBounds.minX && (x + width) <= areaBounds.maxX,
+            insideAreaY: y >= areaBounds.minY && (y + height) <= areaBounds.maxY,
+            insideArea: x >= areaBounds.minX && y >= areaBounds.minY && (x + width) <= areaBounds.maxX && (y + height) <= areaBounds.maxY
+          }
+        },
         isValidNow
       })
 
@@ -368,19 +434,26 @@ export function useTransformer({
       // Crear elemento temporal con las nuevas dimensiones para validación
       const elementoTemporal = {
         ...elementoSnapshot,
-        x,
-        y,
-        width,
-        height,
+        x,  // Usar las coordenadas de Konva directamente
+        y,  // Usar las coordenadas de Konva directamente
+        width,  // Usar las dimensiones de Konva directamente
+        height, // Usar las dimensiones de Konva directamente
         dimensiones: tempDimensiones
       }
 
       console.debug('[dimension-debug] validating dimensions', elementId, {
         elementoTemporal: {
           id: elementoTemporal.id,
-          posicion: { x: x / CM_TO_PX, y: y / CM_TO_PX },
+          posicionKonva: { x, y },
+          posicionCm: { x: x / CM_TO_PX, y: y / CM_TO_PX },
+          dimensionesKonva: { width, height },
           dimensiones: tempDimensiones,
           vista: canvasStore.vistaActiva
+        },
+        elementoOriginal: {
+          id: elementoSnapshot.id,
+          posicionOriginal: { x: elementoSnapshot.x, y: elementoSnapshot.y },
+          dimensionesOriginales: { width: elementoSnapshot.width, height: elementoSnapshot.height }
         }
       })
 
@@ -392,7 +465,10 @@ export function useTransformer({
           largo: tempDimensiones?.largo,
           alto: tempDimensiones?.alto
         },
-        { silencioso: true }
+        {
+          silencioso: true,
+          elementoTemporal: elementoTemporal  // Pasar el elemento con coordenadas de transformación
+        }
       )
 
       console.debug('[dimension-debug] validation result', elementId, resultadoValidacionDimensiones)
@@ -412,26 +488,89 @@ export function useTransformer({
       // APLICACIÓN EXITOSA
       const newDimensiones = tempDimensiones
 
+      // Si las validaciones pasaron, NO deberíamos necesitar clamp
+      // Solo verificamos para detectar inconsistencias en las validaciones
+      const bounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
+
+      // Aplicar la misma tolerancia que usamos en las validaciones (0.1 cm ≈ 3.77 px)
+      const TOLERANCIA_PX = 0.1 * 37.7953 // 0.1 cm en píxeles
+      const estaFueraDeLimites =
+        x < (bounds.minX - TOLERANCIA_PX) ||
+        y < (bounds.minY - TOLERANCIA_PX) ||
+        (x + width) > (bounds.maxX + TOLERANCIA_PX) ||
+        (y + height) > (bounds.maxY + TOLERANCIA_PX)
+
+      let finalX = x
+      let finalY = y
+
+      if (estaFueraDeLimites) {
+        // ESTO NO DEBERÍA SUCEDER si las validaciones están bien implementadas
+        console.error('[transform-inconsistencia] ¡Las validaciones pasaron pero el elemento está fuera de límites!', {
+          elementId,
+          posicion: { x, y, width, height },
+          bounds,
+          tolerancia: TOLERANCIA_PX,
+          validacionesPasaron: true,
+          detalles: {
+            fueraIzquierda: x < (bounds.minX - TOLERANCIA_PX),
+            fueraArriba: y < (bounds.minY - TOLERANCIA_PX),
+            fueraDerecha: (x + width) > (bounds.maxX + TOLERANCIA_PX),
+            fueraAbajo: (y + height) > (bounds.maxY + TOLERANCIA_PX),
+            // Información adicional para debug
+            deltaIzquierda: bounds.minX - x,
+            deltaArriba: bounds.minY - y,
+            deltaDerecha: (x + width) - bounds.maxX,
+            deltaAbajo: (y + height) - bounds.maxY
+          }
+        })
+
+        // Como medida de emergencia, aplicar clamp mínimo
+        finalX = Math.max(bounds.minX, Math.min(x, bounds.maxX - width))
+        finalY = Math.max(bounds.minY, Math.min(y, bounds.maxY - height))
+
+        console.warn('[transform-emergency-clamp] Aplicado clamp de emergencia:', {
+          elementId,
+          original: { x, y },
+          clamped: { x: finalX, y: finalY },
+          razon: 'Inconsistencia entre validaciones y límites'
+        })
+      } else {
+        console.debug('[transform-success] Elemento dentro de límites, sin clamp necesario:', {
+          elementId,
+          posicion: { x, y, width, height },
+          bounds
+        })
+      }
+
+      console.debug('[transform-debug] verificación final', elementId, {
+        coordenadasOriginales: { x, y, width, height },
+        coordenadasFinales: { x: finalX, y: finalY, width, height },
+        bounds,
+        estabaFueraDeLimites: estaFueraDeLimites,
+        seAplicoClampEmergencia: finalX !== x || finalY !== y,
+        validacionesPasaron: true
+      })
+
       // Aplicar transformación final
       node.width(width)
       node.height(height)
       node.scaleX(1)
       node.scaleY(1)
-      node.x(x)
-      node.y(y)
+      node.x(finalX)
+      node.y(finalY)
 
       // Limpiar feedback visual
       clearTransformVisualFeedback(elementId)
 
-      // Persistir en el store
+      // Persistir en el store con coordenadas finales
       canvasStore.actualizarElemento(
         elementId,
-        { x, y, width, height, rotation, dimensiones: newDimensiones, dimensionLock: true },
+        { x: finalX, y: finalY, width, height, rotation, dimensiones: newDimensiones, dimensionLock: true },
         true,
         `Elemento redimensionado: ${elementoSnapshot?.nombre || elementoSnapshot?.tipo || elementId}`
       )
 
-      lastValidPositions.value.set(elementId, { x, y })
+      lastValidPositions.value.set(elementId, { x: finalX, y: finalY })
 
       // Invalidar cache para este elemento ya que cambió
       invalidateNodeCache(elementId)

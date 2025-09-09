@@ -16,8 +16,10 @@ import { detectConflictsFor } from '@/inventory-smart/utils/collision'
  * @returns {boolean}
  */
 export function insideAreaModel(pos, movingEl, areaBounds, epsPx = 0.5) {
+  // Usar las dimensiones de Konva directamente (ya están en píxeles)
   const w = movingEl?.width || 0
   const h = movingEl?.height || 0
+
   // Para circulares, usar su AABB del modelo (diámetro mínimo)
   const isCirc = movingEl?.forma === 'circular'
   const ww = isCirc ? Math.min(w, h) : w
@@ -25,11 +27,12 @@ export function insideAreaModel(pos, movingEl, areaBounds, epsPx = 0.5) {
 
   const { minX, minY, maxX, maxY } = areaBounds || { minX: 0, minY: 0, maxX: 0, maxY: 0 }
 
-  // Permitir pequeña tolerancia epsPx
+  // Verificar que la posición esté dentro del área con tolerancia
   const leftOk = pos.x >= (minX - epsPx)
   const topOk = pos.y >= (minY - epsPx)
   const rightOk = pos.x + ww <= (maxX + epsPx)
   const bottomOk = pos.y + hh <= (maxY + epsPx)
+
   return leftOk && topOk && rightOk && bottomOk
 }
 

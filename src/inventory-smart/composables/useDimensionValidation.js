@@ -16,13 +16,18 @@ export function useDimensionValidation() {
    * @param {number} nuevasDimensiones.ancho - Nuevo ancho en cm
    * @param {number} nuevasDimensiones.largo - Nuevo largo en cm (opcional)
    * @param {number} nuevasDimensiones.alto - Nuevo alto en cm (opcional)
+   * @param {Object} opciones - Opciones de validación
+   * @param {Object} opciones.elementoTemporal - Elemento temporal con coordenadas de transformación (opcional)
    * @returns {Object} Resultado de la validación
    */
   function validarDimensiones(elementoId, nuevasDimensiones, opciones = {}) {
     const toast = useToast()
     const silencioso = opciones.silencioso || false
+    const elementoConTransformacion = opciones.elementoTemporal
 
-    const elemento = canvasStore.elementoPorId(elementoId)
+    // Si se proporciona elementoConTransformacion (para transformaciones), usarlo
+    // Si no, buscar en el store (para validaciones normales)
+    const elemento = elementoConTransformacion || canvasStore.elementoPorId(elementoId)
     if (!elemento) {
       return {
         valida: false,
@@ -40,14 +45,6 @@ export function useDimensionValidation() {
       alto: nuevasDimensiones.alto ?? dimensionesActuales.alto ?? 100
     }
 
-    console.log('🔍 VALIDACIÓN DE DIMENSIONES FÍSICAS - INICIO:', {
-      elementoId: elementoId,
-      dimensionesActuales: dimensionesActuales,
-      dimensionesNuevas: nuevasDimensiones,
-      dimensionesFinal: dimensionesFinal
-    })
-
-    // PASO 2: Crear elemento temporal con las nuevas dimensiones
     const vista = canvasStore.vistaActiva || 'XY'
     const esVistaFrontal = vista === 'XZ'
 
@@ -63,15 +60,7 @@ export function useDimensionValidation() {
       dimensiones: dimensionesFinal
     }
 
-    console.log('🔍 ELEMENTO TEMPORAL CREADO:', {
-      id: elementoTemporal.id,
-      vista: vista,
-      dimensionesOriginales: elemento.dimensiones,
-      dimensionesNuevas: dimensionesFinal,
-      pixelesNuevos: { width: widthPx, height: heightPx }
-    })
-
-    // PASO 3: Validar contención de elementos hijos
+    // Validar contención de elementos hijos
     const validacionHijos = validarContencionHijos(elementoTemporal)
     if (!validacionHijos.valida) {
       console.log('❌ VALIDACIÓN DE HIJOS FALLIDA:', validacionHijos.razon)
@@ -81,7 +70,7 @@ export function useDimensionValidation() {
       return validacionHijos
     }
 
-    // PASO 4: Validar contención en contenedor padre
+    // Validar contención en contenedor padre
     const validacionPadre = validarContencionEnPadre(elementoTemporal)
     if (!validacionPadre.valida) {
       console.log('❌ VALIDACIÓN DE CONTENCIÓN EN PADRE FALLIDA:', validacionPadre.razon)
@@ -91,7 +80,7 @@ export function useDimensionValidation() {
       return validacionPadre
     }
 
-    // PASO 5: Validar volumen mínimo
+    // Validar volumen mínimo
     const validacionVolumen = validarVolumenMinimo(elementoTemporal)
     if (!validacionVolumen.valida) {
       console.log('❌ VALIDACIÓN DE VOLUMEN FALLIDA:', validacionVolumen.razon)
@@ -118,7 +107,6 @@ export function useDimensionValidation() {
 
   /**
    * Valida que las nuevas dimensiones del elemento sean suficientes para contener a sus elementos hijos
-   * Considera la vista actual para mapear correctamente posiciones 2D a dimensiones 3D
    * @param {Object} elemento - Elemento con las nuevas dimensiones a validar
    * @returns {Object} Resultado de la validación
    */
@@ -132,19 +120,9 @@ export function useDimensionValidation() {
     const vista = canvasStore.vistaActiva || 'XY'
     const esVistaFrontal = vista === 'XZ'
 
-    console.log('🔍 VALIDANDO CONTENCIÓN DE HIJOS:', {
-      elementoPadre: elemento.id,
-      cantidadHijos: hijos.length,
-      vista: vista,
-      esVistaFrontal: esVistaFrontal,
-      dimensionesPadre: elemento.dimensiones
-    });
-
     const dimensionesPadre = elemento.dimensiones;
     const problemasContención = [];
 
-    // Obtener dimensiones del área disponible del padre según la vista
-    // Para validar hijos, usamos las dimensiones 3D del elemento que está siendo redimensionado
     let anchoPadreCanvas, altoPadreCanvas;
     if (esVistaFrontal) {
       // Vista XZ: área disponible es ancho × alto
@@ -178,17 +156,6 @@ export function useDimensionValidation() {
       // Calcular límites del hijo en el canvas
       const limiteDerechoHijo = posHijoX + anchoHijoCanvas;
       const limiteAbajoHijo = posHijoY + altoHijoCanvas;
-
-      console.log(`🔍 Analizando hijo ${hijo.id} en vista ${vista}:`, {
-        posicionCanvas: { x: posHijoX, y: posHijoY },
-        dimensionesCanvas: { ancho: anchoHijoCanvas, alto: altoHijoCanvas },
-        limitesCanvas: { derecho: limiteDerechoHijo, abajo: limiteAbajoHijo },
-        areaDisponiblePadre: { ancho: anchoPadreCanvas, alto: altoPadreCanvas },
-        validaciones: {
-          cabeEnAncho: limiteDerechoHijo <= anchoPadreCanvas,
-          cabeEnAlto: limiteAbajoHijo <= altoPadreCanvas
-        }
-      });
 
       // Verificar si el hijo se sale en ancho (eje X)
       if (limiteDerechoHijo > anchoPadreCanvas) {
@@ -249,7 +216,6 @@ export function useDimensionValidation() {
 
   /**
    * Valida que el elemento con sus nuevas dimensiones quepa dentro de su contenedor padre
-   * Considera la vista actual para mapear correctamente posiciones 2D a dimensiones 3D
    * @param {Object} elemento - Elemento con las nuevas dimensiones a validar
    * @returns {Object} Resultado de la validación
    */
@@ -283,16 +249,24 @@ export function useDimensionValidation() {
       dimensionesPadre: padre.dimensiones,
       areaRealDisponible: { ancho: anchoAreaDisponible, alto: altoAreaDisponible },
       canvasAdaptativo: { widthPx: widthCanvasPx, heightPx: heightCanvasPx },
-      posicionKonva: { x: elemento.x, y: elemento.y }
+      posicionKonva: { x: elemento.x, y: elemento.y },
+      dimensionesKonva: { width: elemento.width, height: elemento.height }
     });
 
     const dimElemento = elemento.dimensiones;
 
-    // Obtener posición del elemento en el canvas (en cm)
-    const posCanvasX = (elemento.x || 0) / CM_TO_PX; // Posición X en canvas
-    const posCanvasY = (elemento.y || 0) / CM_TO_PX; // Posición Y en canvas
+    const posKonvaX = elemento.x || 0;
+    const posKonvaY = elemento.y || 0;
+    const widthKonva = elemento.width || 0;
+    const heightKonva = elemento.height || 0;
 
-    // Obtener dimensiones del elemento en el canvas según la vista
+    // Calcular límites del elemento usando dimensiones reales de Konva (en cm)
+    const limiteDerecho = (posKonvaX + widthKonva) / CM_TO_PX;
+    const limiteAbajo = (posKonvaY + heightKonva) / CM_TO_PX;
+    const posCanvasX = posKonvaX / CM_TO_PX;
+    const posCanvasY = posKonvaY / CM_TO_PX;
+
+    // Obtener dimensiones del elemento en cm para logging
     let anchoCanvas, altoCanvas;
     if (esVistaFrontal) {
       // Vista XZ: canvas muestra ancho × alto
@@ -304,42 +278,49 @@ export function useDimensionValidation() {
       altoCanvas = dimElemento.largo;
     }
 
-    // Calcular límites del elemento en el canvas
-    const limiteDerecho = posCanvasX + anchoCanvas;
-    const limiteAbajo = posCanvasY + altoCanvas;
-
     const problemas = [];
 
-    console.log(`🔍 Verificando elemento ${elemento.id} en padre ${padre.id} (Vista ${vista}):`, {
-      posicionCanvas: { x: posCanvasX, y: posCanvasY },
-      dimensionesCanvas: { ancho: anchoCanvas, alto: altoCanvas },
-      limitesCanvas: { derecho: limiteDerecho, abajo: limiteAbajo },
-      areaRealDisponible: { ancho: anchoAreaDisponible, alto: altoAreaDisponible },
-      validaciones: {
-        cabeEnAncho: limiteDerecho <= anchoAreaDisponible,
-        cabeEnAlto: limiteAbajo <= altoAreaDisponible
-      },
-      vista: vista
-    });
+    // Tolerancia para errores de precisión de punto flotante (0.1 cm = 1mm)
+    const TOLERANCIA_CM = 0.1;
 
-    // Verificar si se sale en ancho (eje X)
-    if (limiteDerecho > anchoAreaDisponible) {
+    // Verificar si la posición es negativa (se sale por la izquierda o arriba) con tolerancia
+    if (posCanvasX < -TOLERANCIA_CM) {
+      const exceso = Math.abs(posCanvasX);
+      problemas.push({
+        tipo: 'ancho',
+        exceso: exceso,
+        mensaje: `El elemento se sale ${exceso.toFixed(1)}cm hacia la izquierda`
+      });
+    }
+
+    if (posCanvasY < -TOLERANCIA_CM) {
+      const exceso = Math.abs(posCanvasY);
+      const nombreDimension = esVistaFrontal ? 'alto' : 'largo';
+      problemas.push({
+        tipo: nombreDimension,
+        exceso: exceso,
+        mensaje: `El elemento se sale ${exceso.toFixed(1)}cm hacia arriba`
+      });
+    }
+
+    // Verificar si se sale en ancho (eje X) hacia la derecha con tolerancia
+    if (limiteDerecho > (anchoAreaDisponible + TOLERANCIA_CM)) {
       const exceso = limiteDerecho - anchoAreaDisponible;
       problemas.push({
         tipo: 'ancho',
         exceso: exceso,
-        mensaje: `El elemento se sale ${exceso.toFixed(1)}cm en ancho`
+        mensaje: `El elemento se sale ${exceso.toFixed(1)}cm hacia la derecha`
       });
     }
 
-    // Verificar si se sale en la segunda dimensión (eje Y)
-    if (limiteAbajo > altoAreaDisponible) {
+    // Verificar si se sale en la segunda dimensión (eje Y) hacia abajo con tolerancia
+    if (limiteAbajo > (altoAreaDisponible + TOLERANCIA_CM)) {
       const exceso = limiteAbajo - altoAreaDisponible;
       const nombreDimension = esVistaFrontal ? 'alto' : 'largo';
       problemas.push({
         tipo: nombreDimension,
         exceso: exceso,
-        mensaje: `El elemento se sale ${exceso.toFixed(1)}cm en ${nombreDimension}`
+        mensaje: `El elemento se sale ${exceso.toFixed(1)}cm hacia abajo`
       });
     }
 
@@ -349,17 +330,35 @@ export function useDimensionValidation() {
 
       problemas.forEach(p => {
         if (p.tipo === 'ancho') {
-          sugerencias.push(`Reducir ancho ${p.exceso.toFixed(1)}cm o mover hacia la izquierda`);
+          if (p.mensaje.includes('izquierda')) {
+            sugerencias.push(`Mover ${p.exceso.toFixed(1)}cm hacia la derecha o reducir ancho`);
+          } else if (p.mensaje.includes('derecha')) {
+            sugerencias.push(`Mover ${p.exceso.toFixed(1)}cm hacia la izquierda o reducir ancho`);
+          } else {
+            sugerencias.push(`Reducir ancho ${p.exceso.toFixed(1)}cm o reposicionar`);
+          }
         } else if (p.tipo === 'alto') {
-          sugerencias.push(`Reducir alto ${p.exceso.toFixed(1)}cm o mover hacia arriba`);
+          if (p.mensaje.includes('arriba')) {
+            sugerencias.push(`Mover ${p.exceso.toFixed(1)}cm hacia abajo o reducir alto`);
+          } else if (p.mensaje.includes('abajo')) {
+            sugerencias.push(`Mover ${p.exceso.toFixed(1)}cm hacia arriba o reducir alto`);
+          } else {
+            sugerencias.push(`Reducir alto ${p.exceso.toFixed(1)}cm o reposicionar`);
+          }
         } else if (p.tipo === 'largo') {
-          sugerencias.push(`Reducir largo ${p.exceso.toFixed(1)}cm o mover hacia arriba`);
+          if (p.mensaje.includes('arriba')) {
+            sugerencias.push(`Mover ${p.exceso.toFixed(1)}cm hacia abajo o reducir largo`);
+          } else if (p.mensaje.includes('abajo')) {
+            sugerencias.push(`Mover ${p.exceso.toFixed(1)}cm hacia arriba o reducir largo`);
+          } else {
+            sugerencias.push(`Reducir largo ${p.exceso.toFixed(1)}cm o reposicionar`);
+          }
         }
       });
 
       return {
         valida: false,
-        razon: `El elemento no cabe dentro del área real disponible: ${mensajesProblemas.join(', ')}`,
+        razon: `El elemento no cabe dentro del área disponible: ${mensajesProblemas.join(', ')}`,
         sugerencias: sugerencias,
         problemasDetallados: problemas
       };
@@ -426,19 +425,6 @@ export function useDimensionValidation() {
       }, 0);
     }
 
-    console.log('🔍 VALIDANDO VOLUMEN MÍNIMO:', {
-      elemento: elemento.id,
-      tipo: elemento.tipo,
-      volumenUsado: volumenUsado,
-      nuevoVolumenTeorico: nuevoVolumenTeorico,
-      dimensiones: dimensiones,
-      forma: elemento.forma,
-      esContenedor: elemento.tipo === 'contenedores',
-      contenedoresHijos: elemento.tipo !== 'contenedores' ?
-        canvasStore.elementos.filter(el => el.padre === elemento.id && el.tipo === 'contenedores').length :
-        'N/A'
-    });
-
     // Verificar si el nuevo volumen es suficiente
     if (nuevoVolumenTeorico < volumenUsado) {
       const deficit = volumenUsado - nuevoVolumenTeorico;
@@ -447,17 +433,10 @@ export function useDimensionValidation() {
       const sugerencias = [];
 
       if (elemento.tipo === 'contenedores') {
-        // Para contenedores: sugerir cambio de dimensiones propias
-        // const factorEscala = Math.cbrt(volumenUsado / nuevoVolumenTeorico); // Raíz cúbica para escalar proporcionalmente
 
         if (elemento.forma === 'circular') {
-          // const nuevoDiametro = dimensiones.ancho * factorEscala;
-          // const nuevoAlto = dimensiones.alto * factorEscala;
           sugerencias.push(`Verificar las dimensiones necesarias`);
         } else {
-          // const nuevoAncho = dimensiones.ancho * factorEscala;
-          // const nuevoLargo = dimensiones.largo * factorEscala;
-          // const nuevoAlto = dimensiones.alto * factorEscala;
           sugerencias.push(`Verificar las dimensiones necesarias`);
         }
       } else {

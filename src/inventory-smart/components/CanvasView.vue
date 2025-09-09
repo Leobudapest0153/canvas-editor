@@ -555,9 +555,7 @@ import { useConflicts } from '@/inventory-smart/composables/useConflicts'
 import RulersOverlay from '@/inventory-smart/components/RulersOverlay.vue'
 import {
   detectConflictsFor,
-  throttle,
-  computeMTD,
-  projectMTDAgainstBoundary,
+  throttle
 } from '@/inventory-smart/utils/collision'
 import {
   clampRectToRect,
@@ -703,102 +701,6 @@ const setLiveConflictsThrottled = throttle((movingEl) => {
   } catch { /* ignore */ }
 }, 32)
 
-// Resolver posición contra obstáculos bloqueantes (suelo–suelo) usando MTD AABB
-const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
-  const all = canvasStore.elementosVisibles
-  const w = elemento.width
-  const h = elemento.height
-  let x = candidateX
-  let y = candidateY
-
-  // Iterar para resolver múltiples colisiones respetando contorno
-  const MAX_ITERS = 3
-  const boundary = computeBoundary()
-  const W = boundary.type === 'rect' ? boundary.W : Infinity
-  const H = boundary.type === 'rect' ? boundary.H : Infinity
-
-  // Paso (1): clamp al área primero
-  if (boundary.type === 'rect') {
-    const c = clampRectToRect(x, y, w, h, W, H)
-    x = c.x
-    y = c.y
-  } else if (boundary.type === 'polygon') {
-    const c = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
-    x = c.x
-    y = c.y
-  }
-
-  for (let iter = 0; iter < MAX_ITERS; iter++) {
-    const moving = { ...elemento, x, y }
-    const conflicts = detectConflictsFor(moving, all)
-    const blocking = conflicts.filter((c) => c.bloqueante)
-    if (blocking.length === 0) break
-
-    // (3) MTD agregado sobre AABB
-    let accDx = 0
-    let accDy = 0
-    for (const c of blocking) {
-      const otherId = c.aId === elemento.id ? c.bId : c.aId
-      const other = all.find((el) => el.id === otherId)
-      if (!other) continue
-      const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height)
-      accDx += dx
-      accDy += dy
-    }
-
-    // Ignorar correcciones muy pequeñas (ruido/rounding) SOLO en vista frontal (XZ)
-    if (canvasStore.vistaActiva === 'XZ') {
-      const MIN_NUDGE_PX = 0.5
-      if (Math.abs(accDx) < MIN_NUDGE_PX && Math.abs(accDy) < MIN_NUDGE_PX) break
-      if (Math.abs(accDx) < MIN_NUDGE_PX) accDx = 0
-      if (Math.abs(accDy) < MIN_NUDGE_PX) accDy = 0
-    }
-
-    // Proyección del MTD contra el contorno rectangular
-    if (boundary.type === 'rect') {
-      const proj = projectMTDAgainstBoundary(x, y, accDx, accDy, w, h, W, H)
-      accDx = proj.dx
-      accDy = proj.dy
-    }
-
-    // Aplicar MTD y volver a clavar al área
-    x += accDx
-    y += accDy
-
-    if (boundary.type === 'rect') {
-      const c2 = clampRectToRect(x, y, w, h, W, H)
-      x = c2.x
-      y = c2.y
-    } else if (boundary.type === 'polygon') {
-      const c2 = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
-      x = c2.x
-      y = c2.y
-    }
-
-  // Si la corrección fue nula o insignificante, detener
-  if (Math.abs(accDx) < 1e-6 && Math.abs(accDy) < 1e-6) break
-  }
-
-  // Validaciones finales: si aún hay colisión bloqueante o quedó fuera, volver a última válida
-  const movingEnd = { ...elemento, x, y }
-  const endConf = detectConflictsFor(movingEnd, all).filter((c) => c.bloqueante)
-  const outsideArea =
-    boundary.type === 'rect'
-      ? x < -1e-6 || y < -1e-6 || x + w > W + 1e-6 || y + h > H + 1e-6
-      : !pointInPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.points)
-  if (outsideArea) {
-    const cp = clampPointToPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.inset)
-    x = cp.x - w / 2
-    y = cp.y - h / 2
-  }
-  if (endConf.length > 0 || outsideArea) {
-    const prev = dragLastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
-    return { x: prev.x, y: prev.y, fellBack: true }
-  }
-
-  // No hacer snap aquí para no cuantizar el arrastre
-  return { x, y, fellBack: false }
-}
 
 // Estado local del canvas (otros estados vienen del composable useElementDrag)
 const stageSize = ref({ width: 800, height: 600 })
@@ -1122,16 +1024,11 @@ const { simularLlenadoElemento } = useProductSimulation({
 const {
   isElementDragging,
   stageDragEnabled,
-  dragStartPositions,
   lastValidPositions: dragLastValidPositions,
-  startElementDrag,
-  updateElementPosition,
-  endElementDrag,
   onShapeDragStart,
   onShapeDragMove,
   onShapeDragEnd,
   registerDraggableRef,
-  scheduleDraw
 } = useElementDrag({
   canvasStore,
   stageRef,
@@ -1143,11 +1040,11 @@ const {
   isSnappingEnabled,
   performSnap,
   clearGuides,
-  resolveAgainstBlockingObstacles,
   onDragStartGuard,
   onDragMoveGuard,
   onDragEndGuard,
-  setLiveConflictsThrottled
+  setLiveConflictsThrottled,
+  computeBoundary,
 })
 
 // Composable de transformación
