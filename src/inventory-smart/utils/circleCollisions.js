@@ -96,3 +96,41 @@ export function detectCircleCircleCollision(elementA, elementB, tolerance = EPSI
 export function areBothCircular(elementA, elementB) {
   return elementA?.forma === 'circular' && elementB?.forma === 'circular';
 }
+
+/**
+ * Detecta colisión entre un círculo y un rectángulo (AABB).
+ * Permite tangencia dentro de una tolerancia (tolerance).
+ * @param {Object} circleElem - elemento circular
+ * @param {Object} rectElem - elemento rectangular (no circular)
+ * @param {number} tolerance
+ * @returns {Object|null} { hasOverlap, contact, geometry, nearest, rect } o null
+ */
+export function detectCircleRectCollision(circleElem, rectElem, tolerance = EPSILON * 10) {
+  const geom = getCircleGeometry(circleElem)
+  if (!geom) return null
+
+  const rx = rectElem.x || 0
+  const ry = rectElem.y || 0
+  const rw = rectElem.width || 0
+  const rh = rectElem.height || 0
+
+  // punto más cercano del rect al centro del círculo
+  const nx = Math.max(rx, Math.min(geom.center.x, rx + rw))
+  const ny = Math.max(ry, Math.min(geom.center.y, ry + rh))
+  const dx = geom.center.x - nx
+  const dy = geom.center.y - ny
+  const dist = Math.hypot(dx, dy)
+
+  let contact
+  if (dist < geom.radius - tolerance) contact = 'overlap'
+  else if (Math.abs(dist - geom.radius) <= tolerance) contact = 'tangent'
+  else contact = 'separate'
+
+  return {
+    hasOverlap: contact === 'overlap',
+    contact,
+    geometry: geom,
+    nearest: { x: nx, y: ny },
+    rect: { x: rx, y: ry, w: rw, h: rh }
+  }
+}

@@ -74,3 +74,64 @@ export function clampRectToPolygon(rect, poly) {
   }
   return { x: rect.x + best.dx, y: rect.y + best.dy }
 }
+
+// --- Funciones para chequeo estricto de rect dentro de polígono ---
+function onSegment(a, b, c) {
+  return Math.min(a.x, c.x) <= b.x && b.x <= Math.max(a.x, c.x) && Math.min(a.y, c.y) <= b.y && b.y <= Math.max(a.y, c.y)
+}
+
+function segmentsIntersect(p1, p2, q1, q2) {
+  const orient = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+  const o1 = orient(p1, p2, q1)
+  const o2 = orient(p1, p2, q2)
+  const o3 = orient(q1, q2, p1)
+  const o4 = orient(q1, q2, p2)
+  if (o1 === 0 && onSegment(p1, q1, p2)) return true
+  if (o2 === 0 && onSegment(p1, q2, p2)) return true
+  if (o3 === 0 && onSegment(q1, p1, q2)) return true
+  if (o4 === 0 && onSegment(q1, p2, q2)) return true
+  return (o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0)
+}
+
+/**
+ * Comprueba de forma estricta si un rect (AABB) está completamente dentro de un polígono.
+ * Requisitos:
+ *  - todas las esquinas dentro (pointInPolygon)
+ *  - ninguna arista del polígono cruza el interior del rect (segment intersection)
+ */
+export function rectFullyInsidePolygon(rect, poly) {
+  if (!Array.isArray(poly) || poly.length < 3) return false
+  const w = rect.width || 0
+  const h = rect.height || 0
+  const corners = [
+    { x: rect.x, y: rect.y },
+    { x: rect.x + w, y: rect.y },
+    { x: rect.x + w, y: rect.y + h },
+    { x: rect.x, y: rect.y + h }
+  ]
+
+  for (const c of corners) {
+    if (!pointInPolygon(c, poly)) return false
+  }
+
+  const rectEdges = [
+    [corners[0], corners[1]],
+    [corners[1], corners[2]],
+    [corners[2], corners[3]],
+    [corners[3], corners[0]],
+  ]
+
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]
+    const b = poly[(i + 1) % poly.length]
+    // Si ambos extremos del segmento del polígono caen dentro del rect, la frontera pasa por el interior
+    const aInRect = a.x >= rect.x && a.x <= rect.x + w && a.y >= rect.y && a.y <= rect.y + h
+    const bInRect = b.x >= rect.x && b.x <= rect.x + w && b.y >= rect.y && b.y <= rect.y + h
+    if (aInRect && bInRect) return false
+    for (const [r1, r2] of rectEdges) {
+      if (segmentsIntersect(a, b, r1, r2)) return false
+    }
+  }
+
+  return true
+}

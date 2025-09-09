@@ -1,7 +1,7 @@
 // /inventory-smart/utils/collision.js
 // Detección de conflictos: broad-phase (AABB), narrow-phase (2D) y chequeo Z
 
-import { detectCircleCircleCollision, areBothCircular } from './circleCollisions'
+import { detectCircleCircleCollision, areBothCircular, detectCircleRectCollision } from './circleCollisions'
 
 // Pequeño throttle (16-32ms)
 export function throttle(fn, wait = 16) {
@@ -67,12 +67,11 @@ function inflateRectForWall(el) {
 }
 
 export function narrowPhase2D(a, b) {
-  // Corrección tangencia círculos: verificar si ambos elementos son circulares
+  // Manejo especial de círculos:
+  // - círculo vs círculo: usar detectCircleCircleCollision (ya acepta tangencia)
   if (areBothCircular(a, b)) {
     const circleResult = detectCircleCircleCollision(a, b);
     if (circleResult) {
-      // Para círculos, solo reportar intersección si hay solapamiento real
-      // Los estados 'tangent' y 'separate' se consideran válidos (no intersectan)
       const intersectXY = circleResult.hasOverlap;
       return {
         intersectXY,
@@ -80,6 +79,32 @@ export function narrowPhase2D(a, b) {
         rb: { x: b.x, y: b.y, w: b.width, h: b.height },
         circleCollision: circleResult
       };
+    }
+  }
+
+  // Si uno es circular y el otro no, usar la detección círculo-rect y permitir tangencia
+  const aIsCirc = a?.forma === 'circular'
+  const bIsCirc = b?.forma === 'circular'
+  if (aIsCirc && !bIsCirc) {
+    const cres = detectCircleRectCollision(a, b)
+    if (cres) {
+      return {
+        intersectXY: cres.hasOverlap,
+        ra: { x: a.x, y: a.y, w: a.width, h: a.height },
+        rb: { x: b.x, y: b.y, w: b.width, h: b.height },
+        circleCollision: cres
+      }
+    }
+  }
+  if (bIsCirc && !aIsCirc) {
+    const cres = detectCircleRectCollision(b, a)
+    if (cres) {
+      return {
+        intersectXY: cres.hasOverlap,
+        ra: { x: a.x, y: a.y, w: a.width, h: a.height },
+        rb: { x: b.x, y: b.y, w: b.width, h: b.height },
+        circleCollision: cres
+      }
     }
   }
 

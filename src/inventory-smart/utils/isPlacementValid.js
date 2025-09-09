@@ -5,6 +5,7 @@
 //  - Debe haber AUSENCIA de conflictos bloqueantes según detectConflictsFor.
 
 import { detectConflictsFor } from '@/inventory-smart/utils/collision'
+import { rectFullyInsidePolygon } from '@/inventory-smart/utils/polygonBounds'
 
 /**
  * Verifica si un rectángulo del modelo (top-left + ancho/alto) está completamente dentro del área.
@@ -18,19 +19,26 @@ import { detectConflictsFor } from '@/inventory-smart/utils/collision'
 export function insideAreaModel(pos, movingEl, areaBounds, epsPx = 0.5) {
   const w = movingEl?.width || 0
   const h = movingEl?.height || 0
-  // Para circulares, usar su AABB del modelo (diámetro mínimo)
+   // Para circulares, usar su AABB del modelo (diámetro mínimo)
   const isCirc = movingEl?.forma === 'circular'
   const ww = isCirc ? Math.min(w, h) : w
   const hh = isCirc ? Math.min(w, h) : h
 
   const { minX, minY, maxX, maxY } = areaBounds || { minX: 0, minY: 0, maxX: 0, maxY: 0 }
 
-  // Permitir pequeña tolerancia epsPx
-  const leftOk = pos.x >= (minX - epsPx)
-  const topOk = pos.y >= (minY - epsPx)
-  const rightOk = pos.x + ww <= (maxX + epsPx)
-  const bottomOk = pos.y + hh <= (maxY + epsPx)
-  return leftOk && topOk && rightOk && bottomOk
+   // Si se proporcionó un polígono, usar validación estricta de rect dentro del polígono
+   if (areaBounds && Array.isArray(areaBounds.polygon)) {
+     const poly = areaBounds.polygon
+     const rect = { x: pos.x, y: pos.y, width: ww, height: hh }
+     return rectFullyInsidePolygon(rect, poly)
+   }
+
+   // Permitir pequeña tolerancia epsPx para bounds rectangulares
+   const leftOk = pos.x >= (minX - epsPx)
+   const topOk = pos.y >= (minY - epsPx)
+   const rightOk = pos.x + ww <= (maxX + epsPx)
+   const bottomOk = pos.y + hh <= (maxY + epsPx)
+   return leftOk && topOk && rightOk && bottomOk
 }
 
 /**
