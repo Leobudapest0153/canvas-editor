@@ -2,6 +2,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { correctTransformValues, calculatePrecisionDifferences } from '@/inventory-smart/utils/precision'
 
 /**
  * Composable para manejar la lógica de transformación de elementos en el canvas
@@ -211,13 +212,16 @@ export function useTransformer({
     try {
       const node = getCachedNode(elementId)
       if (node) {
-        node.x(prev.x)
-        node.y(prev.y)
-        node.width && node.width(prev.width)
-        node.height && node.height(prev.height)
+        // Aplicar corrección de precisión a los valores de reversión
+        const prevCorregidos = correctTransformValues(prev)
+
+        node.x(prevCorregidos.x)
+        node.y(prevCorregidos.y)
+        node.width && node.width(prevCorregidos.width)
+        node.height && node.height(prevCorregidos.height)
         node.scaleX && node.scaleX(1)
         node.scaleY && node.scaleY(1)
-        node.rotation && node.rotation(prev.rotation || 0)
+        node.rotation && node.rotation(prevCorregidos.rotation || 0)
       } else {
         console.warn('[transform-revert] No se pudo encontrar el nodo para revertir:', elementId)
       }
@@ -227,12 +231,17 @@ export function useTransformer({
       console.error('[transform-revert-error] Error revirtiendo transformación visual:', error)
     }
 
-    // Persistir reversión en el store
+    // Persistir reversión en el store con valores corregidos
     try {
+      const prevCorregidos = correctTransformValues(prev)
       canvasStore.actualizarElemento(elementId, {
-        x: prev.x, y: prev.y, width: prev.width, height: prev.height, rotation: prev.rotation
+        x: prevCorregidos.x,
+        y: prevCorregidos.y,
+        width: prevCorregidos.width,
+        height: prevCorregidos.height,
+        rotation: prevCorregidos.rotation
       })
-      lastValidPositions.value.set(elementId, { x: prev.x, y: prev.y })
+      lastValidPositions.value.set(elementId, { x: prevCorregidos.x, y: prevCorregidos.y })
     } catch (err) {
       console.error('[transform-revert-store-error] Error persisting transform revert:', err)
     }
@@ -334,7 +343,7 @@ export function useTransformer({
   // Fin de transformación - validación completa y persistencia
   const handleTransformEnd = (e, elementId) => {
     isInteractingWithTransformer.value = false
-
+    console.debug('[transform-debug] end', elementId)
     try {
       const node = e.target
       if (!node) {
@@ -359,27 +368,24 @@ export function useTransformer({
       let y = node.y()
       const rotation = node.rotation?.() || 0
 
-      // CORRECCIÓN DE PRECISIÓN: Redondear a precisión de píxel para evitar errores de punto flotante
-      const PRECISION_PIXELS = 1000000 // 6 decimales de precisión (suficiente para píxeles)
-      x = Math.round(x * PRECISION_PIXELS) / PRECISION_PIXELS
-      y = Math.round(y * PRECISION_PIXELS) / PRECISION_PIXELS
-      width = Math.round(width * PRECISION_PIXELS) / PRECISION_PIXELS
-      height = Math.round(height * PRECISION_PIXELS) / PRECISION_PIXELS
+      // Guardar valores originales para debugging
+      const valoresOriginales = { x, y, width, height, rotation }
+
+      // CORRECCIÓN DE PRECISIÓN: Usar la nueva utilidad para corregir valores
+      const valoresCorregidos = correctTransformValues({
+        x, y, width, height, rotation
+      })
+
+      // Extraer valores corregidos
+      x = valoresCorregidos.x
+      y = valoresCorregidos.y
+      width = valoresCorregidos.width
+      height = valoresCorregidos.height
 
       console.debug('[transform-debug] valores corregidos por precisión', elementId, {
-        valoresOriginales: {
-          x: node.x(),
-          y: node.y(),
-          width: node.width() * node.scaleX(),
-          height: node.height() * node.scaleY()
-        },
-        valoresCorregidos: { x, y, width, height },
-        diferencias: {
-          deltaX: Math.abs(x - node.x()),
-          deltaY: Math.abs(y - node.y()),
-          deltaWidth: Math.abs(width - (node.width() * node.scaleX())),
-          deltaHeight: Math.abs(height - (node.height() * node.scaleY()))
-        }
+        valoresOriginales,
+        valoresCorregidos,
+        diferencias: calculatePrecisionDifferences(valoresOriginales, valoresCorregidos)
       })
 
       // Limpiar estado de transformación
@@ -591,28 +597,44 @@ export function useTransformer({
         validacionesPasaron: true
       })
 
-      // Aplicar transformación final
-      node.width(width)
-      node.height(height)
+      // Aplicar transformación final con corrección de precisión
+      const valoresFinales = correctTransformValues({
+        x: finalX,
+        y: finalY,
+        width,
+        height,
+        rotation
+      })
+
+      node.width(valoresFinales.width)
+      node.height(valoresFinales.height)
       node.scaleX(1)
       node.scaleY(1)
-      node.x(finalX)
-      node.y(finalY)
+      node.x(valoresFinales.x)
+      node.y(valoresFinales.y)
 
       // Limpiar feedback visual
       clearTransformVisualFeedback(elementId)
   // Limpiar gudas visibles
   try { if (typeof clearGuides === 'function') clearGuides() } catch (e) { /* ignore */ }
 
-      // Persistir en el store con coordenadas finales
+      // Persistir en el store con coordenadas finales corregidas por precisión
       canvasStore.actualizarElemento(
         elementId,
-        { x: finalX, y: finalY, width, height, rotation, dimensiones: newDimensiones, dimensionLock: true },
+        {
+          x: valoresFinales.x,
+          y: valoresFinales.y,
+          width: valoresFinales.width,
+          height: valoresFinales.height,
+          rotation: valoresFinales.rotation,
+          dimensiones: newDimensiones,
+          dimensionLock: true
+        },
         true,
         `Elemento redimensionado: ${elementoSnapshot?.nombre || elementoSnapshot?.tipo || elementId}`
       )
 
-      lastValidPositions.value.set(elementId, { x: finalX, y: finalY })
+      lastValidPositions.value.set(elementId, { x: valoresFinales.x, y: valoresFinales.y })
 
       // Invalidar cache para este elemento ya que cambió
       invalidateNodeCache(elementId)

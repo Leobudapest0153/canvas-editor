@@ -86,6 +86,7 @@ export function usePlacementGuards({ useTopeClamp = true } = {}) {
     const res = run(el, cand)
     if (!res.valid) {
       opts.revert?.()
+      console.warn('[placement-guard]', errorsPlacement[res.code] || 'Invalid position', { el, cand, code: res.code })
       const msg = errorsPlacement[res.code] || 'Posición inválida'
       showToast(msg, 'error');
     }
