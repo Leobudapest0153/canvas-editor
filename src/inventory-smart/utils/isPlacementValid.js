@@ -17,6 +17,7 @@ import { rectFullyInsidePolygon } from '@/inventory-smart/utils/polygonBounds'
  * @returns {boolean}
  */
 export function insideAreaModel(pos, movingEl, areaBounds, epsPx = 0.5) {
+  // Usar las dimensiones de Konva directamente (ya están en píxeles)
   const w = movingEl?.width || 0
   const h = movingEl?.height || 0
    // Para circulares, usar su AABB del modelo (diámetro mínimo)
