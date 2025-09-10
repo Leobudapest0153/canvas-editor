@@ -328,7 +328,7 @@ export const nudgePlace = (
       }
     } else if (boundary.type === 'polygon') {
       // Para elementos circulares, usar lógica circular
-      if (movingElement?.forma === 'circular') {
+      if (elementToPlace?.forma === 'circular') {
         const radius = Math.min(width, height) / 2
         const centerX = testX + radius
         const centerY = testY + radius
