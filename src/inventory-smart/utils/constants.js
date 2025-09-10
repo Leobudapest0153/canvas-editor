@@ -226,6 +226,7 @@ export const COLORES_DISPONIBLES = [
 ]
 
 // === Escalas y tolerancias de interacción ===
+export const TOLERANCE_CM = 0.1 // tolerancia en cm para colisiones y ajustes
 // Conversión de centímetros a pixeles en la visualización (usada para layer/planta)
 export const CM_TO_PX = 10
 // Tolerancia para aplicar "pegado" al borde en px

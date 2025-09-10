@@ -555,16 +555,14 @@ import { useConflicts } from '@/inventory-smart/composables/useConflicts'
 import RulersOverlay from '@/inventory-smart/components/RulersOverlay.vue'
 import {
   detectConflictsFor,
-  throttle,
-  computeMTD,
-  projectMTDAgainstBoundary,
+  throttle
 } from '@/inventory-smart/utils/collision'
 import {
   clampRectToRect,
   snapToGrid,
   nudgePlace,
 } from '@/inventory-smart/utils/geometry'
-import { clampRectToPolygon, pointInPolygon, clampPointToPolygon } from '@/inventory-smart/utils/polygonBounds'
+import { clampRectToPolygon, clampCircleToPolygon, circleInPolygon, pointInPolygon, clampPointToPolygon } from '@/inventory-smart/utils/polygonBounds'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
@@ -703,102 +701,6 @@ const setLiveConflictsThrottled = throttle((movingEl) => {
   } catch { /* ignore */ }
 }, 32)
 
-// Resolver posición contra obstáculos bloqueantes (suelo–suelo) usando MTD AABB
-const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
-  const all = canvasStore.elementosVisibles
-  const w = elemento.width
-  const h = elemento.height
-  let x = candidateX
-  let y = candidateY
-
-  // Iterar para resolver múltiples colisiones respetando contorno
-  const MAX_ITERS = 3
-  const boundary = computeBoundary()
-  const W = boundary.type === 'rect' ? boundary.W : Infinity
-  const H = boundary.type === 'rect' ? boundary.H : Infinity
-
-  // Paso (1): clamp al área primero
-  if (boundary.type === 'rect') {
-    const c = clampRectToRect(x, y, w, h, W, H)
-    x = c.x
-    y = c.y
-  } else if (boundary.type === 'polygon') {
-    const c = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
-    x = c.x
-    y = c.y
-  }
-
-  for (let iter = 0; iter < MAX_ITERS; iter++) {
-    const moving = { ...elemento, x, y }
-    const conflicts = detectConflictsFor(moving, all)
-    const blocking = conflicts.filter((c) => c.bloqueante)
-    if (blocking.length === 0) break
-
-    // (3) MTD agregado sobre AABB
-    let accDx = 0
-    let accDy = 0
-    for (const c of blocking) {
-      const otherId = c.aId === elemento.id ? c.bId : c.aId
-      const other = all.find((el) => el.id === otherId)
-      if (!other) continue
-      const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height)
-      accDx += dx
-      accDy += dy
-    }
-
-    // Ignorar correcciones muy pequeñas (ruido/rounding) SOLO en vista frontal (XZ)
-    if (canvasStore.vistaActiva === 'XZ') {
-      const MIN_NUDGE_PX = 0.5
-      if (Math.abs(accDx) < MIN_NUDGE_PX && Math.abs(accDy) < MIN_NUDGE_PX) break
-      if (Math.abs(accDx) < MIN_NUDGE_PX) accDx = 0
-      if (Math.abs(accDy) < MIN_NUDGE_PX) accDy = 0
-    }
-
-    // Proyección del MTD contra el contorno rectangular
-    if (boundary.type === 'rect') {
-      const proj = projectMTDAgainstBoundary(x, y, accDx, accDy, w, h, W, H)
-      accDx = proj.dx
-      accDy = proj.dy
-    }
-
-    // Aplicar MTD y volver a clavar al área
-    x += accDx
-    y += accDy
-
-    if (boundary.type === 'rect') {
-      const c2 = clampRectToRect(x, y, w, h, W, H)
-      x = c2.x
-      y = c2.y
-    } else if (boundary.type === 'polygon') {
-      const c2 = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
-      x = c2.x
-      y = c2.y
-    }
-
-  // Si la corrección fue nula o insignificante, detener
-  if (Math.abs(accDx) < 1e-6 && Math.abs(accDy) < 1e-6) break
-  }
-
-  // Validaciones finales: si aún hay colisión bloqueante o quedó fuera, volver a última válida
-  const movingEnd = { ...elemento, x, y }
-  const endConf = detectConflictsFor(movingEnd, all).filter((c) => c.bloqueante)
-  const outsideArea =
-    boundary.type === 'rect'
-      ? x < -1e-6 || y < -1e-6 || x + w > W + 1e-6 || y + h > H + 1e-6
-      : !pointInPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.points)
-  if (outsideArea) {
-    const cp = clampPointToPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.inset)
-    x = cp.x - w / 2
-    y = cp.y - h / 2
-  }
-  if (endConf.length > 0 || outsideArea) {
-    const prev = dragLastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
-    return { x: prev.x, y: prev.y, fellBack: true }
-  }
-
-  // No hacer snap aquí para no cuantizar el arrastre
-  return { x, y, fellBack: false }
-}
 
 // Estado local del canvas (otros estados vienen del composable useElementDrag)
 const stageSize = ref({ width: 800, height: 600 })
@@ -1062,10 +964,14 @@ const dragBoundForElement = (pos, elemento) => {
   try {
     const lp = toLayerCoords(pos)
     const boundary = computeBoundary()
-  const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
+    const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
     const w = w_cm * CM_TO_PX
     const h = h_cm * CM_TO_PX
-    const c = clampInsideArea(lp.x, lp.y, w, h, boundary)
+    
+    // Obtener posición previa para movimiento suave
+    const lastPos = dragLastValidPositions.value.get(elemento.id)
+    
+    const c = clampInsideArea(lp.x, lp.y, w, h, boundary, elemento, true, lastPos)
     return toStageCoords(c)
   } catch {
     return pos
@@ -1122,16 +1028,11 @@ const { simularLlenadoElemento } = useProductSimulation({
 const {
   isElementDragging,
   stageDragEnabled,
-  dragStartPositions,
   lastValidPositions: dragLastValidPositions,
-  startElementDrag,
-  updateElementPosition,
-  endElementDrag,
   onShapeDragStart,
   onShapeDragMove,
   onShapeDragEnd,
   registerDraggableRef,
-  scheduleDraw
 } = useElementDrag({
   canvasStore,
   stageRef,
@@ -1143,11 +1044,11 @@ const {
   isSnappingEnabled,
   performSnap,
   clearGuides,
-  resolveAgainstBlockingObstacles,
   onDragStartGuard,
   onDragMoveGuard,
   onDragEndGuard,
-  setLiveConflictsThrottled
+  setLiveConflictsThrottled,
+  computeBoundary,
 })
 
 // Composable de transformación
@@ -1171,7 +1072,11 @@ const {
   onTransformEndGuard,
   dimensionValidation,
   showToast,
-  isElementLocked
+  isElementLocked,
+  // Snapping helpers
+  performSnap,
+  clearGuides,
+  isSnappingEnabled
 })
 
 // Función auxiliar para convertir coordenadas del puntero a coordenadas de mundo
@@ -1318,12 +1223,26 @@ const runPreDropValidations = (elemento, dropEvent) => {
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
-    if (!isInside) {
-      const clamped = clampRectToPolygon({ x: candX, y: candY, width: finalWidth, height: finalHeight }, boundary.inset)
-      candX = clamped.x
-      candY = clamped.y
+    // Para elementos circulares, verificar si el círculo está dentro del polígono
+    if (elemento.forma === 'circular') {
+      const radius = Math.min(finalWidth, finalHeight) / 2
+      const centerX = candX + radius
+      const centerY = candY + radius
+      isInside = circleInPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+      if (!isInside) {
+        const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+        candX = clampedCenter.x - radius
+        candY = clampedCenter.y - radius
+        isInside = circleInPolygon({ x: clampedCenter.x, y: clampedCenter.y, radius }, boundary.inset)
+      }
+    } else {
       isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
+      if (!isInside) {
+        const clamped = clampRectToPolygon({ x: candX, y: candY, width: finalWidth, height: finalHeight }, boundary.inset)
+        candX = clamped.x
+        candY = clamped.y
+        isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
+      }
     }
   }
 
@@ -1370,11 +1289,19 @@ const runPreDropValidations = (elemento, dropEvent) => {
   }
 
   if (boundary.type === 'polygon') {
-    const c = clampRectToPolygon(
-      { x: finalPos.x, y: finalPos.y, width: finalWidth, height: finalHeight },
-      boundary.inset,
-    )
-    finalPos = { x: c.x, y: c.y }
+    if (elemento.forma === 'circular') {
+      const radius = Math.min(finalWidth, finalHeight) / 2
+      const centerX = finalPos.x + radius
+      const centerY = finalPos.y + radius
+      const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+      finalPos = { x: clampedCenter.x - radius, y: clampedCenter.y - radius }
+    } else {
+      const c = clampRectToPolygon(
+        { x: finalPos.x, y: finalPos.y, width: finalWidth, height: finalHeight },
+        boundary.inset,
+      )
+      finalPos = { x: c.x, y: c.y }
+    }
   }
 
   return {
@@ -1590,12 +1517,25 @@ const createElementFromBuffer = (data, dropEvent) => {
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
-    if (!isInsideArea) {
-      const clamped = clampRectToPolygon({ x: candX, y: candY, width, height }, boundary.inset)
-      candX = clamped.x
-      candY = clamped.y
+    if (elemento.forma === 'circular') {
+      const radius = Math.min(width, height) / 2
+      const centerX = candX + radius
+      const centerY = candY + radius
+      isInsideArea = circleInPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+      if (!isInsideArea) {
+        const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+        candX = clampedCenter.x - radius
+        candY = clampedCenter.y - radius
+        isInsideArea = circleInPolygon({ x: clampedCenter.x, y: clampedCenter.y, radius }, boundary.inset)
+      }
+    } else {
       isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
+      if (!isInsideArea) {
+        const clamped = clampRectToPolygon({ x: candX, y: candY, width, height }, boundary.inset)
+        candX = clamped.x
+        candY = clamped.y
+        isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
+      }
     }
   }
 
@@ -1651,11 +1591,19 @@ const createElementFromBuffer = (data, dropEvent) => {
   }
 
   if (boundary.type === 'polygon') {
-    const c = clampRectToPolygon(
-      { x: finalPosition.x, y: finalPosition.y, width, height },
-      boundary.inset,
-    )
-    finalPosition = { x: c.x, y: c.y }
+    if (elemento.forma === 'circular') {
+      const radius = Math.min(width, height) / 2
+      const centerX = finalPosition.x + radius
+      const centerY = finalPosition.y + radius
+      const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+      finalPosition = { x: clampedCenter.x - radius, y: clampedCenter.y - radius }
+    } else {
+      const c = clampRectToPolygon(
+        { x: finalPosition.x, y: finalPosition.y, width, height },
+        boundary.inset,
+      )
+      finalPosition = { x: c.x, y: c.y }
+    }
   }
 
   // 8. Pegar elemento desde buffer en posición válida

@@ -1,7 +1,7 @@
 // Geometry and containment helpers for 2D canvas (XY view)
 // Units: use canvas world units (same as layer coordinates, pixels tied to cm in UI)
 
-import { clampRectToPolygon, pointInPolygon } from './polygonBounds'
+import { clampRectToPolygon, clampCircleToPolygon, circleInPolygon, pointInPolygon } from './polygonBounds'
 
 export const EPSILON = 1e-6
 
@@ -327,14 +327,26 @@ export const nudgePlace = (
         return { valid: false, x: testX, y: testY }
       }
     } else if (boundary.type === 'polygon') {
-      const clamped = clampRectToPolygon({ x: testX, y: testY, width, height }, boundary.inset)
-      testX = clamped.x
-      testY = clamped.y
-      const centerInside = pointInPolygon(
-        { x: testX + width / 2, y: testY + height / 2 },
-        boundary.inset,
-      )
-      if (!centerInside) return { valid: false, x: testX, y: testY }
+      // Para elementos circulares, usar lógica circular
+      if (movingElement?.forma === 'circular') {
+        const radius = Math.min(width, height) / 2
+        const centerX = testX + radius
+        const centerY = testY + radius
+        const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+        testX = clampedCenter.x - radius
+        testY = clampedCenter.y - radius
+        const centerInside = circleInPolygon({ x: clampedCenter.x, y: clampedCenter.y, radius }, boundary.inset)
+        if (!centerInside) return { valid: false, x: testX, y: testY }
+      } else {
+        const clamped = clampRectToPolygon({ x: testX, y: testY, width, height }, boundary.inset)
+        testX = clamped.x
+        testY = clamped.y
+        const centerInside = pointInPolygon(
+          { x: testX + width / 2, y: testY + height / 2 },
+          boundary.inset,
+        )
+        if (!centerInside) return { valid: false, x: testX, y: testY }
+      }
     }
 
     if (detectConflictsFn) {

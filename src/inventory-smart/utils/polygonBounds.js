@@ -74,3 +74,361 @@ export function clampRectToPolygon(rect, poly) {
   }
   return { x: rect.x + best.dx, y: rect.y + best.dy }
 }
+
+// Nueva función para validar si un círculo está dentro de un polígono
+export function circleInPolygon(circle, poly) {
+  const { x, y, radius } = circle
+  
+  // Verificar que el centro del círculo esté dentro del polígono
+  if (!pointInPolygon({ x, y }, poly)) {
+    return false
+  }
+  
+  // Verificar que no haya intersección entre el círculo y ningún borde del polígono
+  // Usamos una tolerancia pequeña para evitar problemas de precisión flotante
+  const tolerance = 0.1
+  
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]
+    const b = poly[(i + 1) % poly.length]
+    
+    // Calcular la distancia del centro del círculo a la línea del borde
+    const distanceToSegment = distancePointToSegment({ x, y }, a, b)
+    
+    // Si la distancia es menor que el radio (menos tolerancia), el círculo intersecta con el borde
+    if (distanceToSegment < radius - tolerance) {
+      return false
+    }
+  }
+  
+  return true
+}
+
+// Función auxiliar para calcular la distancia de un punto a un segmento de línea
+function distancePointToSegment(point, segmentStart, segmentEnd) {
+  const px = point.x
+  const py = point.y
+  const ax = segmentStart.x ?? segmentStart[0]
+  const ay = segmentStart.y ?? segmentStart[1]
+  const bx = segmentEnd.x ?? segmentEnd[0]
+  const by = segmentEnd.y ?? segmentEnd[1]
+  
+  const abx = bx - ax
+  const aby = by - ay
+  const apx = px - ax
+  const apy = py - ay
+  
+  const ab2 = abx * abx + aby * aby
+  
+  if (ab2 === 0) {
+    // El segmento es un punto
+    return Math.hypot(px - ax, py - ay)
+  }
+  
+  const t = Math.max(0, Math.min(1, (apx * abx + apy * aby) / ab2))
+  const projectionX = ax + t * abx
+  const projectionY = ay + t * aby
+  
+  return Math.hypot(px - projectionX, py - projectionY)
+}
+
+// Versión suave de clamp que evita saltos bruscos durante el drag
+export function clampCircleToPolygonSmooth(circle, poly, previousPos = null) {
+  const { x, y, radius } = circle
+  
+  // Si el círculo ya está completamente dentro, no hacer nada
+  if (circleInPolygon(circle, poly)) {
+    return { x, y }
+  }
+  
+  // Si tenemos posición previa, intentar hacer movimiento incremental más suave
+  if (previousPos) {
+    const dx = x - previousPos.x
+    const dy = y - previousPos.y
+    const movementDistance = Math.hypot(dx, dy)
+    
+    // Si el movimiento es muy pequeño, permitir movimiento libre
+    if (movementDistance < radius * 0.1) {
+      // Para movimientos pequeños, usar corrección mínima
+      if (pointInPolygon({ x, y }, poly)) {
+        // Centro está dentro, solo verificar si el círculo se sale ligeramente
+        let minCorrection = { x: 0, y: 0 }
+        let needsCorrection = false
+        
+        for (let i = 0; i < poly.length; i++) {
+          const a = poly[i]
+          const b = poly[(i + 1) % poly.length]
+          const distance = distancePointToSegment({ x, y }, a, b)
+          
+          if (distance < radius) {
+            needsCorrection = true
+            // Calcular vector normal hacia adentro del segmento
+            const segmentLength = Math.hypot(b.x - a.x, b.y - a.y)
+            if (segmentLength > 0) {
+              const normalX = -(b.y - a.y) / segmentLength
+              const normalY = (b.x - a.x) / segmentLength
+              
+              // Mover solo lo mínimo necesario
+              const pushDistance = (radius - distance) + 0.5
+              minCorrection.x = normalX * pushDistance
+              minCorrection.y = normalY * pushDistance
+              break // Solo tomar la primera corrección
+            }
+          }
+        }
+        
+        if (needsCorrection) {
+          return { x: x + minCorrection.x, y: y + minCorrection.y }
+        }
+        return { x, y }
+      }
+    }
+    
+    // Para movimientos más grandes, hacer interpolación suave
+    const maxStep = radius * 0.3 // Reducir el paso máximo para más suavidad
+    if (movementDistance > maxStep) {
+      const steps = Math.ceil(movementDistance / maxStep)
+      const stepX = dx / steps
+      const stepY = dy / steps
+      
+      let currentX = previousPos.x
+      let currentY = previousPos.y
+      let lastValidX = currentX
+      let lastValidY = currentY
+      
+      for (let i = 1; i <= steps; i++) {
+        currentX = previousPos.x + stepX * i
+        currentY = previousPos.y + stepY * i
+        
+        const testCircle = { x: currentX, y: currentY, radius }
+        if (circleInPolygon(testCircle, poly)) {
+          lastValidX = currentX
+          lastValidY = currentY
+        } else {
+          // Se salió, retornar la última posición válida
+          return { x: lastValidX, y: lastValidY }
+        }
+      }
+      
+      return { x: currentX, y: currentY }
+    }
+  }
+  
+  // Si no hay posición previa o el movimiento es manejable, usar clamp regular pero con menos agresividad
+  return clampCircleToPolygon(circle, poly)
+}
+
+// Nueva función para ajustar (clamp) un círculo dentro de un polígono de forma fluida
+export function clampCircleToPolygon(circle, poly) {
+  const { x, y, radius } = circle
+  
+  // Si el círculo ya está completamente dentro, no hacer nada
+  if (circleInPolygon(circle, poly)) {
+    return { x, y }
+  }
+  
+  // Si el centro está dentro pero el círculo se sale, hacer un ajuste mínimo
+  if (pointInPolygon({ x, y }, poly)) {
+    // Encontrar la distancia mínima del centro a cualquier borde
+    let minDistance = Infinity
+    let bestOffset = { x: 0, y: 0 }
+    
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i]
+      const b = poly[(i + 1) % poly.length]
+      
+      const distance = distancePointToSegment({ x, y }, a, b)
+      
+      if (distance < radius && distance < minDistance) {
+        minDistance = distance
+        
+        // Calcular vector normal hacia adentro del polígono
+        const segmentLength = Math.hypot(b.x - a.x, b.y - a.y)
+        if (segmentLength > 0) {
+          const normalX = -(b.y - a.y) / segmentLength
+          const normalY = (b.x - a.x) / segmentLength
+          
+          // Mover solo lo necesario para que el círculo no se salga
+          const pushDistance = radius - distance + 1 // +1 para pequeño margen
+          bestOffset = {
+            x: normalX * pushDistance,
+            y: normalY * pushDistance
+          }
+        }
+      }
+    }
+    
+    return { x: x + bestOffset.x, y: y + bestOffset.y }
+  }
+  
+  // Si el centro está fuera, encontrar la posición más cercana válida
+  // pero limitando el movimiento para mantener fluidez
+  const maxMoveDistance = radius * 2 // Limitar cuánto puede moverse de una vez
+  
+  let bestPos = { x, y }
+  let bestDistance = Infinity
+  
+  // Intentar puntos alrededor del borde del polígono
+  const samplePoints = 16 // Reducir muestras para mejor rendimiento
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]
+    const b = poly[(i + 1) % poly.length]
+    
+    // Muestrear puntos a lo largo del segmento
+    for (let j = 0; j <= samplePoints; j++) {
+      const t = j / samplePoints
+      const segmentX = a.x + t * (b.x - a.x)
+      const segmentY = a.y + t * (b.y - a.y)
+      
+      // Calcular normal hacia adentro
+      const segmentLength = Math.hypot(b.x - a.x, b.y - a.y)
+      if (segmentLength === 0) continue
+      
+      const normalX = -(b.y - a.y) / segmentLength
+      const normalY = (b.x - a.x) / segmentLength
+      
+      // Posición candidata (centro del círculo)
+      const candidateX = segmentX + normalX * radius
+      const candidateY = segmentY + normalY * radius
+      
+      // Verificar si esta posición está dentro del polígono y es válida
+      if (pointInPolygon({ x: candidateX, y: candidateY }, poly)) {
+        const distance = Math.hypot(candidateX - x, candidateY - y)
+        
+        // Solo considerar si el movimiento no es demasiado brusco
+        if (distance <= maxMoveDistance && distance < bestDistance) {
+          bestDistance = distance
+          bestPos = { x: candidateX, y: candidateY }
+        }
+      }
+    }
+  }
+  
+  // Si no encontramos una buena posición cercana, hacer movimiento gradual
+  if (bestDistance === Infinity || bestDistance > maxMoveDistance) {
+    // Mover gradualmente hacia el centroide del polígono
+    const centroid = calculatePolygonCentroid(poly)
+    const directionX = centroid.x - x
+    const directionY = centroid.y - y
+    const directionLength = Math.hypot(directionX, directionY)
+    
+    if (directionLength > 0) {
+      const normalizedX = directionX / directionLength
+      const normalizedY = directionY / directionLength
+      
+      // Mover una distancia limitada hacia el centroide
+      const moveDistance = Math.min(maxMoveDistance, directionLength)
+      bestPos = {
+        x: x + normalizedX * moveDistance,
+        y: y + normalizedY * moveDistance
+      }
+    }
+  }
+  
+  return bestPos
+}
+
+// Función auxiliar para calcular el centroide de un polígono
+function calculatePolygonCentroid(poly) {
+  let area = 0
+  let centroidX = 0
+  let centroidY = 0
+  
+  for (let i = 0; i < poly.length; i++) {
+    const j = (i + 1) % poly.length
+    const xi = poly[i].x
+    const yi = poly[i].y
+    const xj = poly[j].x
+    const yj = poly[j].y
+    
+    const a = xi * yj - xj * yi
+    area += a
+    centroidX += (xi + xj) * a
+    centroidY += (yi + yj) * a
+  }
+  
+  area *= 0.5
+  if (Math.abs(area) < 1e-10) {
+    // Polígono degenerado, usar promedio simple
+    const sumX = poly.reduce((sum, p) => sum + p.x, 0)
+    const sumY = poly.reduce((sum, p) => sum + p.y, 0)
+    return { x: sumX / poly.length, y: sumY / poly.length }
+  }
+  
+  centroidX /= (6 * area)
+  centroidY /= (6 * area)
+  
+  return { x: centroidX, y: centroidY }
+}
+
+// --- Funciones para chequeo estricto de rect dentro de polígono ---
+function onSegment(a, b, c) {
+  return Math.min(a.x, c.x) <= b.x && b.x <= Math.max(a.x, c.x) && Math.min(a.y, c.y) <= b.y && b.y <= Math.max(a.y, c.y)
+}
+
+function segmentsIntersect(p1, p2, q1, q2) {
+  const orient = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+  const o1 = orient(p1, p2, q1)
+  const o2 = orient(p1, p2, q2)
+  const o3 = orient(q1, q2, p1)
+  const o4 = orient(q1, q2, p2)
+  if (o1 === 0 && onSegment(p1, q1, p2)) return true
+  if (o2 === 0 && onSegment(p1, q2, p2)) return true
+  if (o3 === 0 && onSegment(q1, p1, q2)) return true
+  if (o4 === 0 && onSegment(q1, p2, q2)) return true
+  return (o1 > 0) !== (o2 > 0) && (o3 > 0) !== (o4 > 0)
+}
+
+/**
+ * Comprueba de forma estricta si un rect (AABB) está completamente dentro de un polígono.
+ * Requisitos:
+ *  - todas las esquinas dentro (pointInPolygon)
+ *  - ninguna arista del polígono cruza el interior del rect (segment intersection)
+ * 
+ * Para elementos circulares, usa geometría circular en lugar de AABB.
+ */
+export function rectFullyInsidePolygon(rect, poly, isCircular = false) {
+  if (!Array.isArray(poly) || poly.length < 3) return false
+  
+  // Si es circular, usar validación circular
+  if (isCircular) {
+    const radius = Math.min(rect.width, rect.height) / 2
+    const centerX = rect.x + radius
+    const centerY = rect.y + radius
+    return circleInPolygon({ x: centerX, y: centerY, radius }, poly)
+  }
+  
+  const w = rect.width || 0
+  const h = rect.height || 0
+  const corners = [
+    { x: rect.x, y: rect.y },
+    { x: rect.x + w, y: rect.y },
+    { x: rect.x + w, y: rect.y + h },
+    { x: rect.x, y: rect.y + h }
+  ]
+
+  for (const c of corners) {
+    if (!pointInPolygon(c, poly)) return false
+  }
+
+  const rectEdges = [
+    [corners[0], corners[1]],
+    [corners[1], corners[2]],
+    [corners[2], corners[3]],
+    [corners[3], corners[0]],
+  ]
+
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]
+    const b = poly[(i + 1) % poly.length]
+    // Si ambos extremos del segmento del polígono caen dentro del rect, la frontera pasa por el interior
+    const aInRect = a.x >= rect.x && a.x <= rect.x + w && a.y >= rect.y && a.y <= rect.y + h
+    const bInRect = b.x >= rect.x && b.x <= rect.x + w && b.y >= rect.y && b.y <= rect.y + h
+    if (aInRect && bInRect) return false
+    for (const [r1, r2] of rectEdges) {
+      if (segmentsIntersect(a, b, r1, r2)) return false
+    }
+  }
+
+  return true
+}
