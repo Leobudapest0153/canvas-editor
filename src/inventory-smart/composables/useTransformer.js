@@ -247,7 +247,7 @@ export function useTransformer({
     }
 
     console.debug('[transform-debug] reverted', elementId, { reason, prev })
-  // Asegurar que las gudas de snapping se limpien al revertir
+  // Asegurar que las guías de snapping se limpien al revertir
   try { if (typeof clearGuides === 'function') clearGuides() } catch (e) { /* ignore */ }
   }
 
@@ -267,13 +267,13 @@ export function useTransformer({
       const state = { x, y, width, height, rotation: node.rotation?.() || 0 }
       transformInitialState.set(elementId, state)
       console.debug('[transform-debug] start', elementId, state)
-      // Mostrar gudas de snapping al iniciar transform si est  habilitado
+      // Mostrar guías de snapping al iniciar transform si está habilitado
       try {
         if (isSnappingEnabled && isSnappingEnabled.value && typeof performSnap === 'function') {
           const elemento = canvasStore.elementosVisibles.find(e => e.id === elementId)
           const neighbors = canvasStore.elementosVisibles.filter(el => el.id !== elementId)
           const pageBounds = layerConfig?.value ? { width: layerConfig.value.width, height: layerConfig.value.height } : null
-          // Usar un elemento temporal con las dimensiones actuales del nodo para que detectSnap calcule gudas correctamente
+          // Usar un elemento temporal con las dimensiones actuales del nodo para que detectSnap calcule guías correctamente
           // Preserve circular shape: if elemento is circular, pass a square diameter (min) and keep forma
           const movingForSnap = elemento
             ? (elemento.forma === 'circular'
@@ -615,7 +615,7 @@ export function useTransformer({
 
       // Limpiar feedback visual
       clearTransformVisualFeedback(elementId)
-  // Limpiar gudas visibles
+  // Limpiar guías visibles
   try { if (typeof clearGuides === 'function') clearGuides() } catch (e) { /* ignore */ }
 
       // Persistir en el store con coordenadas finales corregidas por precisión
