@@ -238,7 +238,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
 import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX } from '@/inventory-smart/utils/constants'
@@ -247,7 +247,7 @@ import { useToast } from '@/inventory-smart/composables/useToast.js'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation.js'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation.js'
-import { EPSILON } from '@/inventory-smart/utils/geometry.js'
+import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { t } from '@/inventory-smart/utils/i18n.js'
 import TagFilter from '@/inventory-smart/components/TagFilter.vue'
 import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
@@ -295,13 +295,46 @@ const cargarDesdeStore = (el) => deepClone({
   tags: Array.isArray(el.etiquetas) ? [...el.etiquetas] : [],
 })
 
+// Estado para trackear valores previos y evitar validaciones innecesarias
+const valorDimensionAnterior = ref({})
+const valorPesoAnterior = ref(0)
+const valorDiametroAnterior = ref(0)
+
 watch(() => elementoSeleccionado.value?.id, (id) => {
   if (id) {
     snapshotOriginal.value = cargarDesdeStore(elementoSeleccionado.value)
     edited.value = deepClone(snapshotOriginal.value)
+
+    // Inicializar valores anteriores para evitar validaciones innecesarias al cargar
+    valorDimensionAnterior.value = {
+      ancho: edited.value?.dimensiones?.ancho || 0,
+      largo: edited.value?.dimensiones?.largo || 0,
+      alto: edited.value?.dimensiones?.alto || 0
+    }
+    valorPesoAnterior.value = edited.value?.pesoMaximo || 0
+    valorDiametroAnterior.value = edited.value?.diametroCm || 0
+
+    // Limpiar errores al cargar nuevo elemento
+    dimensionError.value = null
+    dimensionSugerencias.value = []
+
+    // Ejecutar validación inicial para detectar errores existentes
+    // Esto se ejecuta en el siguiente tick para asegurar que el estado esté completamente inicializado
+    nextTick(() => {
+      ejecutarValidacionDimensiones()
+    })
   } else {
     snapshotOriginal.value = null
     edited.value = null
+
+    // Limpiar valores anteriores
+    valorDimensionAnterior.value = {}
+    valorPesoAnterior.value = 0
+    valorDiametroAnterior.value = 0
+
+    // Limpiar errores
+    dimensionError.value = null
+    dimensionSugerencias.value = []
   }
 }, { immediate: true })
 
@@ -398,11 +431,13 @@ const guardarDeshabilitado = computed(() =>
   !!advertenciaZBase.value ||
   !!advertenciaDiametroLimite.value ||
   !!advertenciaDiametroContencion.value ||
-  !!advertenciaPeso.value,
+  !!advertenciaPeso.value ||
+  !!dimensionError.value, // Bloquear si hay errores de dimensiones
 )
 
 const revertir = () => {
   edited.value = deepClone(snapshotOriginal.value)
+  // Limpiar todos los errores de validación
   dimensionError.value = null
   dimensionSugerencias.value = []
 }
@@ -411,6 +446,7 @@ const guardar = async () => {
   if (!elementoSeleccionado.value) return
   if (guardarDeshabilitado.value) return
   isSaving.value = true
+
   // Reset UI de validación
   dimensionError.value = null
   dimensionSugerencias.value = []
@@ -431,6 +467,7 @@ const guardar = async () => {
     largoCm = Number(edited.value?.dimensiones?.largo)
   }
   altoCm = Number(edited.value?.dimensiones?.alto)
+
   const isValidDimension = (value) => Number.isFinite(value) && value >= 0
   if (!isValidDimension(anchoCm) || !isValidDimension(largoCm) || !isValidDimension(altoCm)) {
     dimensionError.value = 'Las dimensiones deben ser números válidos y no negativos.'
@@ -438,16 +475,69 @@ const guardar = async () => {
     return
   }
 
-  const resultadoDims = validarDimensiones(
-    elementoSeleccionado.value.id,
-    { ancho: anchoCm, largo: largoCm, alto: altoCm },
-    { silencioso: false },
-  )
-  if (!resultadoDims?.valida) {
-    dimensionError.value = resultadoDims?.razon || 'Dimensiones inválidas'
-    dimensionSugerencias.value = resultadoDims?.sugerencias || []
-    isSaving.value = false
-    return
+  // Solo validar dimensiones si realmente cambiaron las dimensiones
+  const dimensionesCambiaron =
+    Math.abs((valorDimensionAnterior.value.ancho || 0) - anchoCm) > 0.01 ||
+    Math.abs((valorDimensionAnterior.value.largo || 0) - largoCm) > 0.01 ||
+    Math.abs((valorDimensionAnterior.value.alto || 0) - altoCm) > 0.01 ||
+    (esCircular.value && Math.abs((valorDiametroAnterior.value || 0) - anchoCm) > 0.01)
+
+  if (dimensionesCambiaron) {
+    // Crear elemento temporal con las nuevas dimensiones para validación completa
+    const vista = canvasStore.vistaActiva || 'XY'
+    const esVistaFrontal = vista === 'XZ'
+    const widthPx = anchoCm * CM_TO_PX
+    const heightPx = esVistaFrontal ? (altoCm * CM_TO_PX) : (largoCm * CM_TO_PX)
+
+    const elementoTemporal = {
+      ...elementoSeleccionado.value,
+      width: widthPx,
+      height: heightPx,
+      dimensiones: {
+        ancho: anchoCm,
+        largo: largoCm,
+        alto: altoCm
+      }
+    }
+
+    // VALIDACIÓN 1: Validación de posicionamiento (colisiones y área)
+    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementoSeleccionado.value.id)
+    const layerWidth = canvasStore.canvasAdaptativo?.width || 1000
+    const layerHeight = canvasStore.canvasAdaptativo?.height || 1000
+    const areaBounds = { minX: 0, minY: 0, maxX: layerWidth, maxY: layerHeight }
+
+    const isValidPosition = isPlacementValid({
+      pos: { x: elementoTemporal.x, y: elementoTemporal.y },
+      movingEl: elementoTemporal,
+      neighbors,
+      areaBounds,
+      CM_TO_PX,
+      epsPx: 0.5
+    })
+
+    if (!isValidPosition) {
+      dimensionError.value = 'Con estas dimensiones el elemento no cabe en su posición actual'
+      dimensionSugerencias.value = [
+        'Reducir las dimensiones',
+        'Mover el elemento a otra posición',
+        'Verificar que no haya colisiones con otros elementos'
+      ]
+      isSaving.value = false
+      return
+    }
+
+    // VALIDACIÓN 2: Validación de dimensiones físicas
+    const resultadoDims = validarDimensiones(
+      elementoSeleccionado.value.id,
+      { ancho: anchoCm, largo: largoCm, alto: altoCm },
+      { silencioso: false, elementoTemporal }
+    )
+    if (!resultadoDims?.valida) {
+      dimensionError.value = resultadoDims?.razon || 'Dimensiones inválidas'
+      dimensionSugerencias.value = resultadoDims?.sugerencias || []
+      isSaving.value = false
+      return
+    }
   }
 
   // Las dimensiones son válidas, proceder con el guardado normal
@@ -491,8 +581,9 @@ const guardar = async () => {
   }
   const diamChanged = esCircular.value && (snapshotOriginal.value?.diametroCm !== edited.value?.diametroCm)
 
-  // 3) Validación de peso después de dimensiones
-  if (advertenciaPeso.value) {
+  // 3) Validación de peso solo si cambió
+  const pesoCambio = Math.abs((valorPesoAnterior.value || 0) - (Number(edited.value?.pesoMaximo) || 0)) > 0.01
+  if (pesoCambio && advertenciaPeso.value) {
     showWarning(advertenciaPeso.value)
     isSaving.value = false
     return
@@ -502,23 +593,150 @@ const guardar = async () => {
   const ok = await canvasStore.updateElementById(elementoSeleccionado.value.id, patch)
   if (ok) {
     snapshotOriginal.value = deepClone(edited.value)
+    // Actualizar valores anteriores después de guardar exitosamente
+    valorDimensionAnterior.value = {
+      ancho: anchoCm,
+      largo: largoCm,
+      alto: altoCm
+    }
+    valorPesoAnterior.value = Number(edited.value?.pesoMaximo) || 0
+    valorDiametroAnterior.value = esCircular.value ? anchoCm : 0
+
     showSuccess(diamChanged ? 'Diámetro actualizado' : 'Cambios guardados')
   }
   isSaving.value = false
 }
 
+// Función para ejecutar validación completa de dimensiones y posicionamiento
+const ejecutarValidacionDimensiones = () => {
+  if (!elementoSeleccionado.value || !edited.value) return
+
+  // Reset UI de validación previa
+  dimensionError.value = null
+  dimensionSugerencias.value = []
+
+  // Obtener dimensiones actuales editadas
+  let anchoCm, largoCm, altoCm
+  if (esCircular.value) {
+    const diam = Number(edited.value?.diametroCm)
+    anchoCm = diam
+    largoCm = diam
+  } else {
+    anchoCm = Number(edited.value?.dimensiones?.ancho)
+    largoCm = Number(edited.value?.dimensiones?.largo)
+  }
+  altoCm = Number(edited.value?.dimensiones?.alto)
+
+  // Validar que las dimensiones sean válidas antes de proceder
+  const isValidDimension = (value) => Number.isFinite(value) && value >= 0
+  if (!isValidDimension(anchoCm) || !isValidDimension(largoCm) || !isValidDimension(altoCm)) {
+    return // No validar si las dimensiones no son válidas
+  }
+
+  // Calcular nuevas dimensiones en píxeles según la vista actual
+  const vista = canvasStore.vistaActiva || 'XY'
+  const esVistaFrontal = vista === 'XZ'
+  const widthPx = anchoCm * CM_TO_PX
+  const heightPx = esVistaFrontal ? (altoCm * CM_TO_PX) : (largoCm * CM_TO_PX)
+
+  // Crear elemento temporal con las nuevas dimensiones para validación (similar a useTransformer)
+  const elementoTemporal = {
+    ...elementoSeleccionado.value,
+    width: widthPx,
+    height: heightPx,
+    dimensiones: {
+      ancho: anchoCm,
+      largo: largoCm,
+      alto: altoCm
+    }
+  }
+
+  // VALIDACIÓN 1: Validación de posicionamiento (colisiones y área) - similar a useTransformer
+  const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementoSeleccionado.value.id)
+  const layerWidth = canvasStore.canvasAdaptativo?.width || 1000
+  const layerHeight = canvasStore.canvasAdaptativo?.height || 1000
+  const areaBounds = { minX: 0, minY: 0, maxX: layerWidth, maxY: layerHeight }
+
+  const isValidPosition = isPlacementValid({
+    pos: { x: elementoTemporal.x, y: elementoTemporal.y },
+    movingEl: elementoTemporal,
+    neighbors,
+    areaBounds,
+    CM_TO_PX,
+    epsPx: 0.5
+  })
+
+  console.debug('[PropiedadesPanel] validación de posicionamiento', elementoSeleccionado.value.id, {
+    elementoTemporal: {
+      id: elementoTemporal.id,
+      x: elementoTemporal.x,
+      y: elementoTemporal.y,
+      width: elementoTemporal.width,
+      height: elementoTemporal.height
+    },
+    areaBounds,
+    dimensionesCm: { anchoCm, largoCm, altoCm },
+    vista,
+    isValidPosition
+  })
+
+  if (!isValidPosition) {
+    dimensionError.value = 'Con estas dimensiones el elemento no cabe en su posición actual'
+    dimensionSugerencias.value = [
+      'Reducir las dimensiones',
+      'Mover el elemento a otra posición',
+      'Verificar que no haya colisiones con otros elementos'
+    ]
+    return
+  }
+
+  // VALIDACIÓN 2: Validación de dimensiones físicas (contención, volumen, etc.)
+  const resultadoDims = validarDimensiones(
+    elementoSeleccionado.value.id,
+    { ancho: anchoCm, largo: largoCm, alto: altoCm },
+    { silencioso: true, elementoTemporal }
+  )
+
+  // Actualizar UI con los resultados
+  if (!resultadoDims?.valida) {
+    dimensionError.value = resultadoDims?.razon || 'Dimensiones inválidas'
+    dimensionSugerencias.value = resultadoDims?.sugerencias || []
+  } else {
+    // Limpiar errores si todas las validaciones pasan
+    dimensionError.value = null
+    dimensionSugerencias.value = []
+  }
+}
+
 const validarDimension = (prop) => {
   const val = Number(edited.value.dimensiones[prop])
+  const valorAnterior = valorDimensionAnterior.value[prop]
+
   if (isNaN(val) || val < 0) {
     showWarning('El valor debe ser mayor o igual a 0')
     edited.value.dimensiones[prop] = snapshotOriginal.value.dimensiones[prop]
-  } else {
-    // Si el usuario modifica manualmente las dimensiones, resetear dimensionLock
-    // para permitir validaciones normales
-    if (elementoSeleccionado.value?.dimensionLock) {
-      canvasStore.actualizarElemento(elementoSeleccionado.value.id, { dimensionLock: false })
-    }
+    // Limpiar errores ya que revertimos a un valor válido
+    dimensionError.value = null
+    dimensionSugerencias.value = []
+    return
   }
+
+  // Solo ejecutar validaciones si el valor realmente cambió
+  if (valorAnterior !== undefined && Math.abs(valorAnterior - val) < 0.01) {
+    return
+  }
+
+  // Actualizar valor anterior
+  valorDimensionAnterior.value[prop] = val
+
+  // Si el usuario modifica manualmente las dimensiones, resetear dimensionLock
+  // para permitir validaciones normales
+  if (elementoSeleccionado.value?.dimensionLock) {
+    canvasStore.actualizarElemento(elementoSeleccionado.value.id, { dimensionLock: false })
+  }
+
+  // Ejecutar validación de dimensiones solo si cambió
+  ejecutarValidacionDimensiones()
 }
 
 // Contexto padre del elemento editado (planta o elemento/contenedor padre)
@@ -547,11 +765,21 @@ const capacidadContextoTexto = computed(() => {
 
 const validarPeso = () => {
   const val = Number(edited.value.pesoMaximo)
+  const valorAnterior = valorPesoAnterior.value
+
   if (isNaN(val) || val < 0) {
     showWarning('El valor debe ser mayor o igual a 0')
     edited.value.pesoMaximo = snapshotOriginal.value.pesoMaximo
     return
   }
+
+  // Solo ejecutar validaciones costosas si el valor realmente cambió
+  if (valorAnterior !== undefined && Math.abs(valorAnterior - val) < 0.01) {
+    return
+  }
+
+  // Actualizar valor anterior
+  valorPesoAnterior.value = val
 
   // La validación completa (teórica + real) se maneja en advertenciaPeso
   // que bloquea el botón Guardar y muestra el mensaje apropiado
@@ -757,6 +985,13 @@ const advertenciaPeso = computed(() => {
   const newVal = Number(edited.value?.pesoMaximo || 0)
   if (!Number.isFinite(newVal) || newVal < 0) return 'La capacidad debe ser un número válido.'
 
+  // Solo ejecutar validaciones costosas si el valor del peso realmente cambió
+  const valorAnterior = valorPesoAnterior.value
+  if (valorAnterior !== undefined && Math.abs(valorAnterior - newVal) < 0.01) {
+    // Si el valor no cambió, no hay advertencia (asumimos que ya se validó antes)
+    return null
+  }
+
   // 1. VALIDACIÓN DE USO REAL: capacidad ≥ uso actual del elemento
   const validacionReal = validarPesoMaximoVsUsoReal(elementoSeleccionado.value, newVal)
   if (!validacionReal.valido) {
@@ -822,16 +1057,34 @@ const advertenciaDiametroContencion = computed(() => {
 
 const validarDiametro = () => {
   if (!esCircular.value) return
+
   const d = Number(edited.value?.diametroCm)
+  const valorAnterior = valorDiametroAnterior.value
+
   if (!Number.isFinite(d) || d < 1) {
     showWarning('El diámetro debe ser mayor o igual a 1 cm')
     edited.value.diametroCm = snapshotOriginal.value.diametroCm
-  } else {
-    // Si el usuario modifica manualmente el diámetro, resetear dimensionLock
-    if (elementoSeleccionado.value?.dimensionLock) {
-      canvasStore.actualizarElemento(elementoSeleccionado.value.id, { dimensionLock: false })
-    }
+    // Limpiar errores ya que revertimos a un valor válido
+    dimensionError.value = null
+    dimensionSugerencias.value = []
+    return
   }
+
+  // Solo ejecutar validaciones si el valor realmente cambió
+  if (valorAnterior !== undefined && Math.abs(valorAnterior - d) < 0.01) {
+    return
+  }
+
+  // Actualizar valor anterior
+  valorDiametroAnterior.value = d
+
+  // Si el usuario modifica manualmente el diámetro, resetear dimensionLock
+  if (elementoSeleccionado.value?.dimensionLock) {
+    canvasStore.actualizarElemento(elementoSeleccionado.value.id, { dimensionLock: false })
+  }
+
+  // Ejecutar validación de dimensiones para círculos
+  ejecutarValidacionDimensiones()
 }
 
 const maxAlturaSobreSuelo = computed(() => {

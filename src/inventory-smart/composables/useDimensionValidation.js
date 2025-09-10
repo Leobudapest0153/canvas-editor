@@ -1,9 +1,18 @@
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, TOLERANCE_CM } from '@/inventory-smart/utils/constants'
 
 /**
  * Composable para validar dimensiones físicas de elementos
+ *
+ * OPTIMIZACIÓN DE RENDIMIENTO:
+ * - Usa la opción 'silencioso' para validaciones en tiempo real sin mostrar toasts
+ * - Permite validaciones completas solo cuando se guardan los cambios
+ * - Separa la validación de la presentación de errores al usuario
+ *
+ * CASOS DE USO:
+ * - Validación en tiempo real: usar silencioso=true para mostrar errores en UI sin toasts
+ * - Validación al guardar: usar silencioso=false para validación completa con feedback
  */
 export function useDimensionValidation() {
   const canvasStore = useCanvasStore()
@@ -240,19 +249,6 @@ export function useDimensionValidation() {
     const anchoAreaDisponible = widthCanvasPx / CM_TO_PX  // Convertir a cm
     const altoAreaDisponible = heightCanvasPx / CM_TO_PX   // Convertir a cm
 
-    console.log('🔍 VALIDANDO CONTENCIÓN EN PADRE (CANVAS REAL):', {
-      elemento: elemento.id,
-      padre: padre.id,
-      vista: vista,
-      esVistaFrontal: esVistaFrontal,
-      dimensionesElemento: elemento.dimensiones,
-      dimensionesPadre: padre.dimensiones,
-      areaRealDisponible: { ancho: anchoAreaDisponible, alto: altoAreaDisponible },
-      canvasAdaptativo: { widthPx: widthCanvasPx, heightPx: heightCanvasPx },
-      posicionKonva: { x: elemento.x, y: elemento.y },
-      dimensionesKonva: { width: elemento.width, height: elemento.height }
-    });
-
     const dimElemento = elemento.dimensiones;
 
     const posKonvaX = elemento.x || 0;
@@ -280,11 +276,8 @@ export function useDimensionValidation() {
 
     const problemas = [];
 
-    // Tolerancia para errores de precisión de punto flotante (0.1 cm = 1mm)
-    const TOLERANCIA_CM = 0.1;
-
     // Verificar si la posición es negativa (se sale por la izquierda o arriba) con tolerancia
-    if (posCanvasX < -TOLERANCIA_CM) {
+    if (posCanvasX < -TOLERANCE_CM) {
       const exceso = Math.abs(posCanvasX);
       problemas.push({
         tipo: 'ancho',
@@ -293,7 +286,7 @@ export function useDimensionValidation() {
       });
     }
 
-    if (posCanvasY < -TOLERANCIA_CM) {
+    if (posCanvasY < -TOLERANCE_CM) {
       const exceso = Math.abs(posCanvasY);
       const nombreDimension = esVistaFrontal ? 'alto' : 'largo';
       problemas.push({
@@ -304,7 +297,7 @@ export function useDimensionValidation() {
     }
 
     // Verificar si se sale en ancho (eje X) hacia la derecha con tolerancia
-    if (limiteDerecho > (anchoAreaDisponible + TOLERANCIA_CM)) {
+    if (limiteDerecho > (anchoAreaDisponible + TOLERANCE_CM)) {
       const exceso = limiteDerecho - anchoAreaDisponible;
       problemas.push({
         tipo: 'ancho',
@@ -314,7 +307,7 @@ export function useDimensionValidation() {
     }
 
     // Verificar si se sale en la segunda dimensión (eje Y) hacia abajo con tolerancia
-    if (limiteAbajo > (altoAreaDisponible + TOLERANCIA_CM)) {
+    if (limiteAbajo > (altoAreaDisponible + TOLERANCE_CM)) {
       const exceso = limiteAbajo - altoAreaDisponible;
       const nombreDimension = esVistaFrontal ? 'alto' : 'largo';
       problemas.push({
