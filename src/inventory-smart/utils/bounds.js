@@ -1,6 +1,6 @@
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
 import { clampRectToRect } from '@/inventory-smart/utils/geometry'
-import { clampRectToPolygon } from '@/inventory-smart/utils/polygonBounds'
+import { clampRectToPolygon, clampCircleToPolygon, clampCircleToPolygonSmooth } from '@/inventory-smart/utils/polygonBounds'
 
 // Returns width/height in centimeters for an element.
 // Rectangular elements use dimensiones.ancho × dimensiones.largo/prof.
@@ -28,10 +28,30 @@ export function dimsCmFor(el = {}, vista = 'XY') {
 }
 
 // Clamp rectangle (x,y,w,h) inside active area boundary.
-export function clampInsideArea(x, y, w, h, boundary) {
+// Para elementos circulares, el parámetro element debe incluir la información de forma.
+// useSmooth: true para usar clamp suave durante el drag (evita saltos)
+export function clampInsideArea(x, y, w, h, boundary, element = null, useSmooth = false, previousPos = null) {
   if (boundary?.type === 'polygon') {
-    const c = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
-    return { x: c.x, y: c.y }
+    // Para elementos circulares, usar clamp circular
+    if (element?.forma === 'circular') {
+      const radius = Math.min(w, h) / 2
+      const centerX = x + radius
+      const centerY = y + radius
+      
+      let clampedCenter
+      if (useSmooth && previousPos) {
+        const previousCenter = { x: previousPos.x + radius, y: previousPos.y + radius }
+        clampedCenter = clampCircleToPolygonSmooth({ x: centerX, y: centerY, radius }, boundary.inset, previousCenter)
+      } else {
+        clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+      }
+      
+      return { x: clampedCenter.x - radius, y: clampedCenter.y - radius }
+    } else {
+      // Para elementos rectangulares, usar clamp rectangular
+      const c = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
+      return { x: c.x, y: c.y }
+    }
   }
   const W = boundary?.width ?? boundary?.W ?? boundary?.maxX ?? 0
   const H = boundary?.height ?? boundary?.H ?? boundary?.maxY ?? 0

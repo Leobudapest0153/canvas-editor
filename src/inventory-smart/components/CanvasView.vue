@@ -562,7 +562,7 @@ import {
   snapToGrid,
   nudgePlace,
 } from '@/inventory-smart/utils/geometry'
-import { clampRectToPolygon, pointInPolygon, clampPointToPolygon } from '@/inventory-smart/utils/polygonBounds'
+import { clampRectToPolygon, clampCircleToPolygon, circleInPolygon, pointInPolygon, clampPointToPolygon } from '@/inventory-smart/utils/polygonBounds'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
@@ -964,10 +964,14 @@ const dragBoundForElement = (pos, elemento) => {
   try {
     const lp = toLayerCoords(pos)
     const boundary = computeBoundary()
-  const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
+    const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
     const w = w_cm * CM_TO_PX
     const h = h_cm * CM_TO_PX
-    const c = clampInsideArea(lp.x, lp.y, w, h, boundary)
+    
+    // Obtener posición previa para movimiento suave
+    const lastPos = dragLastValidPositions.value.get(elemento.id)
+    
+    const c = clampInsideArea(lp.x, lp.y, w, h, boundary, elemento, true, lastPos)
     return toStageCoords(c)
   } catch {
     return pos
@@ -1219,12 +1223,26 @@ const runPreDropValidations = (elemento, dropEvent) => {
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
-    if (!isInside) {
-      const clamped = clampRectToPolygon({ x: candX, y: candY, width: finalWidth, height: finalHeight }, boundary.inset)
-      candX = clamped.x
-      candY = clamped.y
+    // Para elementos circulares, verificar si el círculo está dentro del polígono
+    if (elemento.forma === 'circular') {
+      const radius = Math.min(finalWidth, finalHeight) / 2
+      const centerX = candX + radius
+      const centerY = candY + radius
+      isInside = circleInPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+      if (!isInside) {
+        const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+        candX = clampedCenter.x - radius
+        candY = clampedCenter.y - radius
+        isInside = circleInPolygon({ x: clampedCenter.x, y: clampedCenter.y, radius }, boundary.inset)
+      }
+    } else {
       isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
+      if (!isInside) {
+        const clamped = clampRectToPolygon({ x: candX, y: candY, width: finalWidth, height: finalHeight }, boundary.inset)
+        candX = clamped.x
+        candY = clamped.y
+        isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
+      }
     }
   }
 
@@ -1271,11 +1289,19 @@ const runPreDropValidations = (elemento, dropEvent) => {
   }
 
   if (boundary.type === 'polygon') {
-    const c = clampRectToPolygon(
-      { x: finalPos.x, y: finalPos.y, width: finalWidth, height: finalHeight },
-      boundary.inset,
-    )
-    finalPos = { x: c.x, y: c.y }
+    if (elemento.forma === 'circular') {
+      const radius = Math.min(finalWidth, finalHeight) / 2
+      const centerX = finalPos.x + radius
+      const centerY = finalPos.y + radius
+      const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+      finalPos = { x: clampedCenter.x - radius, y: clampedCenter.y - radius }
+    } else {
+      const c = clampRectToPolygon(
+        { x: finalPos.x, y: finalPos.y, width: finalWidth, height: finalHeight },
+        boundary.inset,
+      )
+      finalPos = { x: c.x, y: c.y }
+    }
   }
 
   return {
@@ -1491,12 +1517,25 @@ const createElementFromBuffer = (data, dropEvent) => {
       candY = clamped.y
     }
   } else if (boundary.type === 'polygon') {
-    isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
-    if (!isInsideArea) {
-      const clamped = clampRectToPolygon({ x: candX, y: candY, width, height }, boundary.inset)
-      candX = clamped.x
-      candY = clamped.y
+    if (elemento.forma === 'circular') {
+      const radius = Math.min(width, height) / 2
+      const centerX = candX + radius
+      const centerY = candY + radius
+      isInsideArea = circleInPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+      if (!isInsideArea) {
+        const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+        candX = clampedCenter.x - radius
+        candY = clampedCenter.y - radius
+        isInsideArea = circleInPolygon({ x: clampedCenter.x, y: clampedCenter.y, radius }, boundary.inset)
+      }
+    } else {
       isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
+      if (!isInsideArea) {
+        const clamped = clampRectToPolygon({ x: candX, y: candY, width, height }, boundary.inset)
+        candX = clamped.x
+        candY = clamped.y
+        isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
+      }
     }
   }
 
@@ -1552,11 +1591,19 @@ const createElementFromBuffer = (data, dropEvent) => {
   }
 
   if (boundary.type === 'polygon') {
-    const c = clampRectToPolygon(
-      { x: finalPosition.x, y: finalPosition.y, width, height },
-      boundary.inset,
-    )
-    finalPosition = { x: c.x, y: c.y }
+    if (elemento.forma === 'circular') {
+      const radius = Math.min(width, height) / 2
+      const centerX = finalPosition.x + radius
+      const centerY = finalPosition.y + radius
+      const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
+      finalPosition = { x: clampedCenter.x - radius, y: clampedCenter.y - radius }
+    } else {
+      const c = clampRectToPolygon(
+        { x: finalPosition.x, y: finalPosition.y, width, height },
+        boundary.inset,
+      )
+      finalPosition = { x: c.x, y: c.y }
+    }
   }
 
   // 8. Pegar elemento desde buffer en posición válida
