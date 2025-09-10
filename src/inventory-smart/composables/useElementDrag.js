@@ -22,6 +22,8 @@ import {
 } from '@/inventory-smart/utils/collision'
 import {
   clampRectToPolygon,
+  clampCircleToPolygon,
+  clampCircleToPolygonSmooth,
   pointInPolygon,
   clampPointToPolygon,
 } from '@/inventory-smart/utils/polygonBounds'
@@ -96,9 +98,28 @@ export function useElementDrag({
       x = c.x
       y = c.y
     } else if (boundary.type === 'polygon') {
-      const c = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
-      x = c.x
-      y = c.y
+      // Para elementos circulares, usar clamp circular con posición previa para movimiento suave
+      if (elemento.forma === 'circular') {
+        const radius = Math.min(w, h) / 2
+        const centerX = x + radius
+        const centerY = y + radius
+        
+        // Obtener posición previa para movimiento suave
+        const lastPos = lastValidPositions.value.get(elemento.id)
+        const previousCenter = lastPos ? { x: lastPos.x + radius, y: lastPos.y + radius } : null
+        
+        const clampedCenter = clampCircleToPolygonSmooth(
+          { x: centerX, y: centerY, radius }, 
+          boundary.inset,
+          previousCenter
+        )
+        x = clampedCenter.x - radius
+        y = clampedCenter.y - radius
+      } else {
+        const c = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
+        x = c.x
+        y = c.y
+      }
     }
 
     for (let iter = 0; iter < MAX_ITERS; iter++) {
@@ -143,9 +164,27 @@ export function useElementDrag({
         x = c2.x
         y = c2.y
       } else if (boundary.type === 'polygon') {
-        const c2 = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
-        x = c2.x
-        y = c2.y
+        if (elemento.forma === 'circular') {
+          const radius = Math.min(w, h) / 2
+          const centerX = x + radius
+          const centerY = y + radius
+          
+          // Obtener posición previa para movimiento suave
+          const lastPos = lastValidPositions.value.get(elemento.id)
+          const previousCenter = lastPos ? { x: lastPos.x + radius, y: lastPos.y + radius } : null
+          
+          const clampedCenter = clampCircleToPolygonSmooth(
+            { x: centerX, y: centerY, radius }, 
+            boundary.inset,
+            previousCenter
+          )
+          x = clampedCenter.x - radius
+          y = clampedCenter.y - radius
+        } else {
+          const c2 = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
+          x = c2.x
+          y = c2.y
+        }
       }
 
       // Si la corrección fue nula o insignificante, detener

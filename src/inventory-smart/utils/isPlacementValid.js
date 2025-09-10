@@ -20,19 +20,23 @@ export function insideAreaModel(pos, movingEl, areaBounds, epsPx = 0.5) {
   // Usar las dimensiones de Konva directamente (ya están en píxeles)
   const w = movingEl?.width || 0
   const h = movingEl?.height || 0
-   // Para circulares, usar su AABB del modelo (diámetro mínimo)
+  
+  // Para elementos circulares, usar geometría circular
   const isCirc = movingEl?.forma === 'circular'
-  const ww = isCirc ? Math.min(w, h) : w
-  const hh = isCirc ? Math.min(w, h) : h
 
   const { minX, minY, maxX, maxY } = areaBounds || { minX: 0, minY: 0, maxX: 0, maxY: 0 }
 
    // Si se proporcionó un polígono, usar validación estricta de rect dentro del polígono
    if (areaBounds && Array.isArray(areaBounds.polygon)) {
      const poly = areaBounds.polygon
-     const rect = { x: pos.x, y: pos.y, width: ww, height: hh }
-     return rectFullyInsidePolygon(rect, poly)
+     const rect = { x: pos.x, y: pos.y, width: w, height: h }
+     // Pasar información de si es circular a la función de validación
+     return rectFullyInsidePolygon(rect, poly, isCirc)
    }
+
+   // Para circulares en bounds rectangulares, usar su AABB del modelo (diámetro mínimo)
+   const ww = isCirc ? Math.min(w, h) : w
+   const hh = isCirc ? Math.min(w, h) : h
 
    // Permitir pequeña tolerancia epsPx para bounds rectangulares
    const leftOk = pos.x >= (minX - epsPx)
