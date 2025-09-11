@@ -1,6 +1,6 @@
 <template>
   <div ref="infoRef" class="canvas-info" :style="styleObject">
-    <span>Zoom: {{ Math.round(store.zoom * 100) }}%</span>
+    <span>Zoom: {{ (store.zoom * 100).toFixed(2) }}%</span>
     <span>{{ t('views.label') }}: {{ t(`views.${store.vistaActiva}`) }}</span>
     <span v-if="store.estaEnPlanta && store.plantaActivaData">
       Planta: {{ fmtCm(store.plantaActivaData.dimensiones.ancho) }} x {{ fmtCm(store.plantaActivaData.dimensiones.largo) }}
