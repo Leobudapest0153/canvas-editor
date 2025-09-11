@@ -2,6 +2,8 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { clampInsideArea } from '@/inventory-smart/utils/bounds'
+import { circleInPolygon, pointInPolygon } from '@/inventory-smart/utils/polygonBounds'
 
 /**
  * Composable para manejar la lógica de transformación de elementos en el canvas
@@ -20,7 +22,9 @@ export function useTransformer({
   // Snapping helpers (opcionales)
   performSnap,
   clearGuides,
-  isSnappingEnabled
+  isSnappingEnabled,
+  // Boundary provider para clamping
+  computeBoundary
 }) {
   // Estado del transformer
   const transformerRef = ref(null)
@@ -32,6 +36,140 @@ export function useTransformer({
   // Cache de nodos para evitar múltiples findOne() calls
   const nodeCache = new Map()
   const MAX_CACHE_SIZE = 50
+
+  // Helper para verificar si un rectángulo está completamente dentro del polígono
+  // Usa intersección de segmentos para detectar si algún borde del rectángulo cruza el polígono
+  const isRectCompletelyInPolygon = (x, y, width, height, polygon) => {
+    console.debug('[rect-validation-start]', { x, y, width, height, polygon: polygon?.length })
+
+    // 1. Verificar que todas las esquinas estén dentro
+    const corners = [
+      { x, y, label: 'top-left' },
+      { x: x + width, y, label: 'top-right' },
+      { x: x + width, y: y + height, label: 'bottom-right' },
+      { x, y: y + height, label: 'bottom-left' }
+    ]
+    
+    for (const corner of corners) {
+      const isInside = pointInPolygon(corner, polygon)
+      if (!isInside) {
+        console.error('[corner-failed]', corner)
+        return false
+      }
+    }
+
+    // 2. Verificar que ningún borde del rectángulo intersecte con los bordes del polígono
+    const rectEdges = [
+      { start: { x, y }, end: { x: x + width, y }, label: 'top' },
+      { start: { x: x + width, y }, end: { x: x + width, y: y + height }, label: 'right' },
+      { start: { x: x + width, y: y + height }, end: { x, y: y + height }, label: 'bottom' },
+      { start: { x, y: y + height }, end: { x, y }, label: 'left' }
+    ]
+
+    // Función para verificar intersección entre dos segmentos de línea
+    const doLinesIntersect = (line1Start, line1End, line2Start, line2End) => {
+      const x1 = line1Start.x, y1 = line1Start.y
+      const x2 = line1End.x, y2 = line1End.y
+      const x3 = line2Start.x, y3 = line2Start.y
+      const x4 = line2End.x, y4 = line2End.y
+
+      const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+      if (Math.abs(denom) < 1e-10) return false // Líneas paralelas
+
+      const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
+      const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom
+
+      return t >= 0 && t <= 1 && u >= 0 && u <= 1
+    }
+
+    // Verificar intersecciones con cada borde del polígono
+    for (let i = 0; i < polygon.length; i++) {
+      const polyStart = polygon[i]
+      const polyEnd = polygon[(i + 1) % polygon.length]
+      
+      for (const rectEdge of rectEdges) {
+        if (doLinesIntersect(rectEdge.start, rectEdge.end, polyStart, polyEnd)) {
+          console.error('[edge-intersection]', {
+            rectEdge: rectEdge.label,
+            rectStart: rectEdge.start,
+            rectEnd: rectEdge.end,
+            polyStart,
+            polyEnd
+          })
+          return false
+        }
+      }
+    }
+
+    // 3. Verificar puntos internos densos (especialmente cerca de ángulos)
+    const INTERNAL_SAMPLES = 20
+    for (let i = 1; i < INTERNAL_SAMPLES; i++) {
+      for (let j = 1; j < INTERNAL_SAMPLES; j++) {
+        const internalPoint = {
+          x: x + (width * i) / INTERNAL_SAMPLES,
+          y: y + (height * j) / INTERNAL_SAMPLES,
+          label: `internal-${i}-${j}`
+        }
+        const isInside = pointInPolygon(internalPoint, polygon)
+        if (!isInside) {
+          console.error('[internal-failed]', internalPoint)
+          return false
+        }
+      }
+    }
+
+    // 4. Verificar puntos adicionales muy cerca de los bordes (para capturar ángulos)
+    const EDGE_SAMPLES = 25
+    const EDGE_OFFSET = 2 // píxeles hacia adentro desde el borde
+    
+    // Puntos cerca del borde superior
+    for (let i = 0; i <= EDGE_SAMPLES; i++) {
+      const t = i / EDGE_SAMPLES
+      const point = { x: x + width * t, y: y + EDGE_OFFSET }
+      if (!pointInPolygon(point, polygon)) {
+        console.error('[near-edge-failed]', { point, edge: 'top' })
+        return false
+      }
+    }
+    
+    // Puntos cerca del borde inferior
+    for (let i = 0; i <= EDGE_SAMPLES; i++) {
+      const t = i / EDGE_SAMPLES
+      const point = { x: x + width * t, y: y + height - EDGE_OFFSET }
+      if (!pointInPolygon(point, polygon)) {
+        console.error('[near-edge-failed]', { point, edge: 'bottom' })
+        return false
+      }
+    }
+    
+    // Puntos cerca del borde izquierdo
+    for (let i = 0; i <= EDGE_SAMPLES; i++) {
+      const t = i / EDGE_SAMPLES
+      const point = { x: x + EDGE_OFFSET, y: y + height * t }
+      if (!pointInPolygon(point, polygon)) {
+        console.error('[near-edge-failed]', { point, edge: 'left' })
+        return false
+      }
+    }
+    
+    // Puntos cerca del borde derecho
+    for (let i = 0; i <= EDGE_SAMPLES; i++) {
+      const t = i / EDGE_SAMPLES
+      const point = { x: x + width - EDGE_OFFSET, y: y + height * t }
+      if (!pointInPolygon(point, polygon)) {
+        console.error('[near-edge-failed]', { point, edge: 'right' })
+        return false
+      }
+    }
+
+    console.debug('[rect-validation-passed]', { 
+      totalPointsChecked: corners.length + (INTERNAL_SAMPLES - 1) * (INTERNAL_SAMPLES - 1) + (EDGE_SAMPLES + 1) * 4,
+      rectBounds: { x, y, width, height, right: x + width, bottom: y + height }
+    })
+    return true
+  }
+
+  // Cache de nodos para evitar múltiples findOne() calls
 
   // Cleanup automático para prevenir memory leaks
   const cleanupStaleStates = () => {
@@ -128,10 +266,14 @@ export function useTransformer({
           const MINH = 10
           if (newBox.width <= 0 || newBox.height <= 0) return oldBox
           if (newBox.width < MINW || newBox.height < MINH) return oldBox
+          
+          // Para elementos circulares, mantener aspecto cuadrado
           if (elemento?.forma === 'circular') {
             const size = Math.max(newBox.width, newBox.height)
             return { ...newBox, width: size, height: size }
           }
+          
+          // NO aplicar clamping aquí - permitir transformación libre
           return newBox
         },
       })
@@ -400,7 +542,59 @@ export function useTransformer({
       )
       if (!guardRes.valid) return
 
-      // VALIDACIÓN 2: Placement validation (colisiones, área)
+      // VALIDACIÓN 2: Verificar que esté dentro del polígono de la planta
+      try {
+        if (typeof computeBoundary === 'function') {
+          const boundary = computeBoundary()
+          if (boundary && boundary.type === 'polygon') {
+            let isInsidePolygon = false
+            const polygon = boundary.inset || boundary.points
+            
+            console.debug('[transform-boundary-check]', {
+              elementId,
+              forma: elemento?.forma,
+              position: { x, y, width, height },
+              polygonPoints: polygon?.length || 0
+            })
+            
+            if (elemento?.forma === 'circular') {
+              // Para círculos, verificar que el círculo completo esté dentro
+              const radius = Math.min(width, height) / 2
+              const centerX = x + radius
+              const centerY = y + radius
+              isInsidePolygon = circleInPolygon({ x: centerX, y: centerY, radius }, polygon)
+              
+              console.debug('[transform-circle-check]', {
+                center: { x: centerX, y: centerY },
+                radius,
+                isInside: isInsidePolygon
+              })
+            } else {
+              // Para rectángulos, usar verificación completa con muestreo denso
+              isInsidePolygon = isRectCompletelyInPolygon(x, y, width, height, polygon)
+              
+              console.debug('[transform-rect-check]', {
+                rect: { x, y, width, height },
+                isInside: isInsidePolygon,
+                samplingPoints: '10 per side + 8x8 internal grid + midpoints'
+              })
+            }
+
+            if (!isInsidePolygon) {
+              console.debug('[transform-debug] Elemento fuera del polígono, revirtiendo transformación')
+              showToast('El elemento debe permanecer completamente dentro del área de la planta', 'warning')
+              revertTransform(elementId, 'elemento fuera del polígono')
+              return
+            } else {
+              console.debug('[transform-debug] Elemento validado correctamente dentro del polígono')
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[transform-boundary-validation-error]', err)
+      }
+
+      // VALIDACIÓN 3: Placement validation (colisiones, área)
       const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementId)
       const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height }
       const elementoParaValidacion = elemento?.forma === 'circular'
