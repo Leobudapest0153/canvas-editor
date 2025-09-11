@@ -70,12 +70,12 @@ export function usePlacementGuards({ useTopeClamp = true } = {}) {
     dragState.set(el.id, { shape, lastGood, orig })
   }
 
-  const run = (el, cand) => {
+  const run = (el, cand, options = {}) => {
     const ctx = getCtx()
     const neighbors = store.elementosVisibles.filter((n) => n.id !== el?.id)
     for (const v of validators) {
       let res
-      if (v === validateZStacking) res = v(el, cand, neighbors)
+      if (v === validateZStacking) res = v(el, cand, neighbors, options)
       else res = v(el, cand, ctx)
       if (res && res.valid === false) return res
     }
@@ -83,7 +83,7 @@ export function usePlacementGuards({ useTopeClamp = true } = {}) {
   }
 
   const handle = (el, cand, opts = {}) => {
-    const res = run(el, cand)
+    const res = run(el, cand, opts.validationOptions)
     if (!res.valid) {
       opts.revert?.()
       console.warn('[placement-guard]', errorsPlacement[res.code] || 'Invalid position', { el, cand, code: res.code })

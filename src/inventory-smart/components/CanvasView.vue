@@ -589,7 +589,7 @@ import { useElementDrag } from '@/inventory-smart/composables/useElementDrag'
 import TemplateSaveModal from '@/inventory-smart/components/TemplateSaveModal.vue'
 import CanvasInfo from '@/inventory-smart/components/CanvasInfo.vue'
 import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
-import { toTwoDecimals } from '../utils/fixedDimensions'
+import { toPrecisionCm } from '../utils/fixedDimensions'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -671,8 +671,8 @@ const getElementPixelDimensions = (elemento) => {
     }
 
     return {
-      width: toTwoDecimals(cmToPx(widthCm, viewport.cmPerPx)),
-      height: toTwoDecimals(cmToPx(heightCm, viewport.cmPerPx)),
+      width: toPrecisionCm(cmToPx(widthCm, viewport.cmPerPx)),
+      height: toPrecisionCm(cmToPx(heightCm, viewport.cmPerPx)),
     }
   }
 
@@ -1174,7 +1174,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
       }
       const off = OFFSETS?.offsetByType?.[elemento.id]?.zOffsetShare
       if (typeof off === 'number' && isFinite(off)) {
-        const zBase = toTwoDecimals((planta.dimensiones.alto || 0) * off)
+        const zBase = toPrecisionCm((planta.dimensiones.alto || 0) * off)
         elemento.alturaRespectoAlSuelo = zBase
       }
     }

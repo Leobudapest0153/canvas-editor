@@ -5,7 +5,7 @@ import { CM_TO_PX } from '@/inventory-smart/utils/constants'
 import { clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { circleInPolygon, pointInPolygon } from '@/inventory-smart/utils/polygonBounds'
 import { correctTransformValues } from '@/inventory-smart/utils/precision'
-import { toTwoDecimals } from '../utils/fixedDimensions'
+import { toTransformerPrecision } from '../utils/fixedDimensions'
 
 /**
  * Composable para manejar la lógica de transformación de elementos en el canvas
@@ -38,7 +38,6 @@ export function useTransformer({
   // Helper para verificar si un rectángulo está completamente dentro del polígono
   // Usa intersección de segmentos para detectar si algún borde del rectángulo cruza el polígono
   const isRectCompletelyInPolygon = (x, y, width, height, polygon) => {
-    console.debug('[rect-validation-start]', { x, y, width, height, polygon: polygon?.length })
 
     // 1. Verificar que todas las esquinas estén dentro
     const corners = [
@@ -51,7 +50,6 @@ export function useTransformer({
     for (const corner of corners) {
       const isInside = pointInPolygon(corner, polygon)
       if (!isInside) {
-        console.error('[corner-failed]', corner)
         return false
       }
     }
@@ -87,13 +85,6 @@ export function useTransformer({
 
       for (const rectEdge of rectEdges) {
         if (doLinesIntersect(rectEdge.start, rectEdge.end, polyStart, polyEnd)) {
-          console.error('[edge-intersection]', {
-            rectEdge: rectEdge.label,
-            rectStart: rectEdge.start,
-            rectEnd: rectEdge.end,
-            polyStart,
-            polyEnd
-          })
           return false
         }
       }
@@ -110,7 +101,6 @@ export function useTransformer({
         }
         const isInside = pointInPolygon(internalPoint, polygon)
         if (!isInside) {
-          console.error('[internal-failed]', internalPoint)
           return false
         }
       }
@@ -125,7 +115,6 @@ export function useTransformer({
       const t = i / EDGE_SAMPLES
       const point = { x: x + width * t, y: y + EDGE_OFFSET }
       if (!pointInPolygon(point, polygon)) {
-        console.error('[near-edge-failed]', { point, edge: 'top' })
         return false
       }
     }
@@ -135,7 +124,6 @@ export function useTransformer({
       const t = i / EDGE_SAMPLES
       const point = { x: x + width * t, y: y + height - EDGE_OFFSET }
       if (!pointInPolygon(point, polygon)) {
-        console.error('[near-edge-failed]', { point, edge: 'bottom' })
         return false
       }
     }
@@ -145,7 +133,6 @@ export function useTransformer({
       const t = i / EDGE_SAMPLES
       const point = { x: x + EDGE_OFFSET, y: y + height * t }
       if (!pointInPolygon(point, polygon)) {
-        console.error('[near-edge-failed]', { point, edge: 'left' })
         return false
       }
     }
@@ -155,15 +142,10 @@ export function useTransformer({
       const t = i / EDGE_SAMPLES
       const point = { x: x + width - EDGE_OFFSET, y: y + height * t }
       if (!pointInPolygon(point, polygon)) {
-        console.error('[near-edge-failed]', { point, edge: 'right' })
         return false
       }
     }
 
-    console.debug('[rect-validation-passed]', {
-      totalPointsChecked: corners.length + (INTERNAL_SAMPLES - 1) * (INTERNAL_SAMPLES - 1) + (EDGE_SAMPLES + 1) * 4,
-      rectBounds: { x, y, width, height, right: x + width, bottom: y + height }
-    })
     return true
   }
 
@@ -331,16 +313,15 @@ export function useTransformer({
     try {
       const node = getNode(elementId)
       if (node) {
-        // Aplicar corrección de precisión a los valores de reversión
-        const prevCorregidos = correctTransformValues(prev)
-
-        node.x(prevCorregidos.x)
-        node.y(prevCorregidos.y)
-        node.width && node.width(prevCorregidos.width)
-        node.height && node.height(prevCorregidos.height)
-        node.scaleX && node.scaleX(1)
-        node.scaleY && node.scaleY(1)
-        node.rotation && node.rotation(prevCorregidos.rotation || 0)
+        // NO aplicar corrección de precisión - usar valores originales exactos
+        node.x(prev.x)
+        node.y(prev.y)
+        // Importante: resetear escala antes de reestablecer dimensiones para evitar drift
+        if (typeof node.scaleX === 'function') node.scaleX(1)
+        if (typeof node.scaleY === 'function') node.scaleY(1)
+        if (typeof node.width === 'function') node.width(prev.width)
+        if (typeof node.height === 'function') node.height(prev.height)
+        node.rotation && node.rotation(prev.rotation || 0)
       } else {
         console.warn('[transform-revert] No se pudo encontrar el nodo para revertir:', elementId)
       }
@@ -348,21 +329,6 @@ export function useTransformer({
       clearTransformVisualFeedback(elementId)
     } catch (error) {
       console.error('[transform-revert-error] Error revirtiendo transformación visual:', error)
-    }
-
-    // Persistir reversión en el store con valores corregidos
-    try {
-      const prevCorregidos = correctTransformValues(prev)
-      canvasStore.actualizarElemento(elementId, {
-        x: prevCorregidos.x,
-        y: prevCorregidos.y,
-        width: prevCorregidos.width,
-        height: prevCorregidos.height,
-        rotation: prevCorregidos.rotation,
-      })
-      lastValidPositions.value.set(elementId, { x: prevCorregidos.x, y: prevCorregidos.y })
-    } catch (err) {
-      console.error('[transform-revert-store-error] Error persisting transform revert:', err)
     }
 
     console.debug('[transform-debug] reverted', elementId, { reason, prev })
@@ -391,7 +357,6 @@ export function useTransformer({
       const height = node.height() * node.scaleY()
       const state = { x, y, width, height, rotation: node.rotation?.() || 0 }
       transformInitialState.set(elementId, state)
-      console.debug('[transform-debug] start', elementId, state)
 
       // Mostrar guías de snapping al iniciar transform si está habilitado
       if (isSnappingEnabled?.value && typeof performSnap === 'function') {
@@ -475,17 +440,6 @@ export function useTransformer({
             pageSnapDistance: 24,
             isTransforming: true,
           })
-          // NOTA: Durante transformer, no aplicamos el snap automáticamente - solo mostramos guías
-          // El código anterior que aplicaba snap se comenta para evitar interferir con el transformer
-          /*
-          if (snapRes && (snapRes.x !== x || snapRes.y !== y)) {
-            node.x(snapRes.x)
-            node.y(snapRes.y)
-            // Actualizar el estado cache con la posición ajustada
-            transformState.set(elementId, { x: snapRes.x, y: snapRes.y, width, height })
-            node.getLayer()?.batchDraw?.()
-          }
-          */
         } catch (error) {
           console.warn('[transform-move-snap] Error en snapping durante move:', error)
         }
@@ -498,7 +452,6 @@ export function useTransformer({
   // Fin de transformación - validación completa y persistencia
   const handleTransformEnd = (e, elementId) => {
     isInteractingWithTransformer.value = false
-    console.debug('[transform-debug] end', elementId)
     try {
       const node = e.target
       if (!node) {
@@ -540,7 +493,25 @@ export function useTransformer({
       // Limpiar estado de transformación
       transformState.delete(elementId)
 
-      // VALIDACIÓN 1: Guards del sistema (usar valores corregidos)
+      // Preparar dimensiones (cm) para validaciones: se usarán tanto por guards como por validación de dimensiones
+      let tempDimensiones = elementoSnapshot?.dimensiones
+        ? { ...elementoSnapshot.dimensiones }
+        : undefined
+      if (tempDimensiones) {
+        const widthCm = toTransformerPrecision(valoresParaValidacion.width / CM_TO_PX)
+        const heightCm = toTransformerPrecision(valoresParaValidacion.height / CM_TO_PX)
+        if (canvasStore.vistaActiva === 'XY') {
+          tempDimensiones.ancho = widthCm
+          tempDimensiones.largo = heightCm
+        } else if (canvasStore.vistaActiva === 'XZ') {
+          tempDimensiones.ancho = widthCm
+          tempDimensiones.alto = heightCm
+          if (tempDimensiones.largo === undefined)
+            tempDimensiones.largo = elementoSnapshot.dimensiones?.largo || 60
+        }
+      }
+
+      // VALIDACIÓN 1: Guards del sistema (usar valores corregidos con contexto de transformación y dimensiones cm)
       const guardRes = onTransformEndGuard(
         elementoSnapshot,
         {
@@ -548,9 +519,13 @@ export function useTransformer({
           y: valoresParaValidacion.y,
           width: valoresParaValidacion.width,
           height: valoresParaValidacion.height,
-          rotation: valoresParaValidacion.rotation
+          rotation: valoresParaValidacion.rotation,
+          dimensiones: tempDimensiones,
         },
-        { revert: () => revertTransform(elementId, 'guard validation failed') },
+        {
+          revert: () => revertTransform(elementId, 'guard validation failed'),
+          validationOptions: { isTransforming: true } // Indicar que es una validación de transformación
+        },
       )
       if (!guardRes.valid) return
 
@@ -562,43 +537,21 @@ export function useTransformer({
             let isInsidePolygon = false
             const polygon = boundary.inset || boundary.points
 
-            console.debug('[transform-boundary-check]', {
-              elementId,
-              forma: elemento?.forma,
-              position: { x, y, width, height },
-              polygonPoints: polygon?.length || 0
-            })
-
             if (elemento?.forma === 'circular') {
               // Para círculos, verificar que el círculo completo esté dentro
               const radius = Math.min(width, height) / 2
               const centerX = x + radius
               const centerY = y + radius
               isInsidePolygon = circleInPolygon({ x: centerX, y: centerY, radius }, polygon)
-
-              console.debug('[transform-circle-check]', {
-                center: { x: centerX, y: centerY },
-                radius,
-                isInside: isInsidePolygon
-              })
             } else {
               // Para rectángulos, usar verificación completa con muestreo denso
               isInsidePolygon = isRectCompletelyInPolygon(x, y, width, height, polygon)
-
-              console.debug('[transform-rect-check]', {
-                rect: { x, y, width, height },
-                isInside: isInsidePolygon,
-                samplingPoints: '10 per side + 8x8 internal grid + midpoints'
-              })
             }
 
             if (!isInsidePolygon) {
-              console.debug('[transform-debug] Elemento fuera del polígono, revirtiendo transformación')
               showToast('El elemento debe permanecer completamente dentro del área de la planta', 'warning')
               revertTransform(elementId, 'elemento fuera del polígono')
               return
-            } else {
-              console.debug('[transform-debug] Elemento validado correctamente dentro del polígono')
             }
           }
         }
@@ -649,22 +602,7 @@ export function useTransformer({
       }
 
       // VALIDACIÓN 3: Dimension validation (usar valores corregidos)
-      let tempDimensiones = elementoSnapshot?.dimensiones
-        ? { ...elementoSnapshot.dimensiones }
-        : undefined
-      if (tempDimensiones) {
-        const widthCm = toTwoDecimals(valoresParaValidacion.width / CM_TO_PX)
-        const heightCm = toTwoDecimals(valoresParaValidacion.height / CM_TO_PX)
-        if (canvasStore.vistaActiva === 'XY') {
-          tempDimensiones.ancho = widthCm
-          tempDimensiones.largo = heightCm
-        } else if (canvasStore.vistaActiva === 'XZ') {
-          tempDimensiones.ancho = widthCm
-          tempDimensiones.alto = heightCm
-          if (tempDimensiones.largo === undefined)
-            tempDimensiones.largo = elementoSnapshot.dimensiones?.largo || 60
-        }
-      }
+      // tempDimensiones ya calculado para los guards; se reutiliza para validación de dimensiones
 
       // Crear elemento temporal con valores corregidos solo para validación
       const elementoTemporal = {
@@ -676,7 +614,7 @@ export function useTransformer({
         dimensiones: tempDimensiones,
       }
 
-      // Ejecutar validación de dimensiones (silenciosa)
+      // Ejecutar validación de dimensiones (silenciosa y con tolerancia para transformaciones)
       const resultadoValidacionDimensiones = dimensionValidation.validarDimensiones(
         elementId,
         {
@@ -687,6 +625,8 @@ export function useTransformer({
         {
           silencioso: true,
           elementoTemporal: elementoTemporal, // Pasar el elemento con coordenadas de transformación
+          isTransforming: true, // Indicar que es una validación durante transformación
+          relaxedTolerance: true, // Usar tolerancias más permisivas
         },
       )
 
@@ -762,7 +702,6 @@ export function useTransformer({
 
       nextTick(() => setupTransformer())
     } catch (err) {
-      console.error('[transform-end-error] Error en handleTransformEnd:', err)
       // En caso de error, revertir la transformación como medida de seguridad
       revertTransform(elementId, `unexpected error: ${err.message}`)
     }
