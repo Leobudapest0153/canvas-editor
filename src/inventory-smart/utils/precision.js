@@ -3,8 +3,10 @@
  * Previene errores de punto flotante en operaciones de transformación
  */
 
-// Precisión para píxeles (6 decimales de precisión, suficiente para píxeles)
-const PRECISION_PIXELS = 1000000
+import { PRECISION_CM, CM_TO_PX } from './constants'
+
+// Precisión para píxeles basada en la precisión de centímetros
+const PRECISION_PIXELS = Math.pow(10, Math.ceil(Math.log10(CM_TO_PX / PRECISION_CM)))
 
 /**
  * Corrige la precisión de un valor numérico para evitar errores de punto flotante

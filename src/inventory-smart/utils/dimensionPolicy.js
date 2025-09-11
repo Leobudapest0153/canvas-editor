@@ -6,7 +6,8 @@
  * - Aplica snap a grilla y clamps de min/max por tipo.
  */
 
-import { DIMENSIONS, CM_TO_PX, GRID_SIZE } from '@/inventory-smart/utils/constants'
+import { DIMENSIONS, CM_TO_PX, GRID_SIZE, PRECISION_CM } from '@/inventory-smart/utils/constants'
+import { toPrecisionCm } from './fixedDimensions'
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v))
 
@@ -15,10 +16,10 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, v))
  * round(cm) => round((cm*px/cm)/gridPx)*gridPx / (px/cm)
  */
 const roundSnapCm = (cm, gridPx = GRID_SIZE) => {
-  if (!gridPx || gridPx <= 0) return Math.round(cm)
+  if (!gridPx || gridPx <= 0) return toPrecisionCm(cm)
   const px = cm * CM_TO_PX
   const snappedPx = Math.round(px / gridPx) * gridPx
-  return snappedPx / CM_TO_PX
+  return toPrecisionCm(snappedPx / CM_TO_PX)
 }
 
 /**
@@ -63,7 +64,7 @@ export function computeDimsByAxisScale(typeKey, parentDims, opts = {}) {
   h = clamp(h, limits.min.h, limits.max.h)
   d = clamp(d, limits.min.d, limits.max.d)
 
-  return { ancho: Math.round(w), largo: Math.round(h), alto: Math.round(d) }
+  return { ancho: toPrecisionCm(w), largo: toPrecisionCm(h), alto: toPrecisionCm(d) }
 }
 
 /**
@@ -73,9 +74,9 @@ export function computeDimsByAxisScale(typeKey, parentDims, opts = {}) {
  */
 export function toCanvasSizePx(dimensionesCm, vista = 'XY') {
   if (!dimensionesCm) return { width: 0, height: 0 }
-  const anchoPx = (dimensionesCm.ancho || 0) * CM_TO_PX
-  const largoPx = (dimensionesCm.largo || 0) * CM_TO_PX
-  const altoPx = (dimensionesCm.alto || 0) * CM_TO_PX
+  const anchoPx = toPrecisionCm(dimensionesCm.ancho || 0) * CM_TO_PX
+  const largoPx = toPrecisionCm(dimensionesCm.largo || 0) * CM_TO_PX
+  const altoPx = toPrecisionCm(dimensionesCm.alto || 0) * CM_TO_PX
   if (vista === 'XZ') {
     return { width: anchoPx, height: altoPx }
   }
