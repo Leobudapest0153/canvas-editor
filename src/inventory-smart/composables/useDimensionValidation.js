@@ -145,21 +145,42 @@ export function useDimensionValidation() {
 
     for (const hijo of hijos) {
       // Obtener posición del hijo en el canvas (en cm)
-      const posHijoX = (hijo.x || 0) / CM_TO_PX; // Posición X en canvas
-      const posHijoY = (hijo.y || 0) / CM_TO_PX; // Posición Y en canvas
-
-      // Obtener dimensiones del hijo según la vista
+      const posHijoX_px = hijo.x || 0;
+      const posHijoY_px = hijo.y || 0;
+      const posHijoX = posHijoX_px / CM_TO_PX; // Posición X en canvas
+      const posHijoY_raw = posHijoY_px / CM_TO_PX; // Posición Y en canvas
+      
+      // Obtener dimensiones del hijo
       const dimHijo = hijo.dimensiones || {};
-      let anchoHijoCanvas, altoHijoCanvas;
+      let anchoHijoCanvas, altoHijoCanvas, posHijoY;
+      let correccionAplicada = false;
 
       if (esVistaFrontal) {
-        // Vista XZ: hijo ocupa ancho × alto en canvas
+        // Vista XZ (frontal): validamos ancho × alto
+        // Y representa la coordenada Z (altura), usar tal como está
+        posHijoY = posHijoY_raw;
         anchoHijoCanvas = dimHijo.ancho || 0;
         altoHijoCanvas = dimHijo.alto || 0;
       } else {
-        // Vista XY: hijo ocupa ancho × largo en canvas
+        // Vista XY (superior): validamos ancho × largo
         anchoHijoCanvas = dimHijo.ancho || 0;
-        altoHijoCanvas = dimHijo.largo || 0;
+        altoHijoCanvas = dimHijo.largo || 0; // En vista XY mostramos largo
+        
+        // CORRECCIÓN CRÍTICA: Detectar si el hijo fue posicionado en vista frontal
+        // Heurística: Si el hijo es muy grande comparado con el área disponible
+        // y está desplazado, probablemente fue posicionado en otra vista
+        const hijoOcupaTodoElLargo = altoHijoCanvas >= (dimensionesPadre.largo * 0.9); // 90% o más del largo
+        const hijoDesplazadoEnY = posHijoY_raw > 1; // Más de 1cm de desplazamiento
+        const seSaleDelArea = (posHijoY_raw + altoHijoCanvas) > dimensionesPadre.largo;
+        
+        if (hijoOcupaTodoElLargo && hijoDesplazadoEnY && seSaleDelArea) {
+          // El hijo probablemente fue posicionado en vista frontal
+          posHijoY = 0; // Posicionar en Y=0 para vista superior
+          correccionAplicada = true;
+        } else {
+          // El hijo está correctamente posicionado en vista XY
+          posHijoY = posHijoY_raw;
+        }
       }
 
       // Calcular límites del hijo en el canvas
