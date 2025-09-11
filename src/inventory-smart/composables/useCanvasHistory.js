@@ -27,7 +27,6 @@ const historyEvents = reactive({
   lastOperation: null,
   operationsCount: 0,
   errors: [],
-  debugMode: false
 })
 
 export const useCanvasHistory = () => {
@@ -122,10 +121,6 @@ export const useCanvasHistory = () => {
           }
         }
       }
-
-      if (historyEvents.debugMode) {
-        console.log('🔄 Cambios incrementales aplicados:', changes.length, 'cambios')
-      }
     } catch (error) {
       console.error('❌ Error aplicando cambios incrementales:', error)
       historyEvents.errors.push({
@@ -159,15 +154,6 @@ export const useCanvasHistory = () => {
       canvasStore.zoom = snapshot.zoom
       canvasStore.panX = snapshot.panX
       canvasStore.panY = snapshot.panY
-
-      if (historyEvents.debugMode) {
-        console.log('📸 Estado restaurado desde snapshot:', {
-          timestamp: new Date(snapshot.timestamp).toLocaleTimeString(),
-          elementos: snapshot.elementos.length,
-          plantaActiva: snapshot.plantaActiva,
-          type: snapshot.type || 'full'
-        })
-      }
     } catch (error) {
       console.error('❌ Error al restaurar snapshot:', error)
       historyEvents.errors.push({
@@ -199,10 +185,6 @@ export const useCanvasHistory = () => {
       if (currentIndex.value < historyStack.value.length - 1) {
         const removedStates = historyStack.value.length - currentIndex.value - 1
         historyStack.value.splice(currentIndex.value + 1)
-
-        if (historyEvents.debugMode) {
-          console.log(`🗑️ Eliminados ${removedStates} estados futuros del historial`)
-        }
       }
 
       // Agregar nuevo estado
@@ -218,10 +200,6 @@ export const useCanvasHistory = () => {
         if (itemsToRemove > 0) {
           historyStack.value.splice(1, itemsToRemove) // Preservar el estado inicial en índice 0
           currentIndex.value = Math.max(0, currentIndex.value - itemsToRemove)
-
-          if (historyEvents.debugMode) {
-            console.log(`✂️ Historial recortado: eliminados ${itemsToRemove} estados antiguos`)
-          }
         }
       }
 
@@ -234,17 +212,6 @@ export const useCanvasHistory = () => {
         historySize: historyStack.value.length
       }
       historyEvents.operationsCount++
-
-      if (historyEvents.debugMode) {
-        console.log('💾 Estado guardado en historial:', {
-          description,
-          type: changeType,
-          position: currentPosition.value,
-          total: historySize.value,
-          canUndo: canUndo.value,
-          canRedo: canRedo.value,
-        })
-      }
     } catch (error) {
       console.error('❌ Error al guardar estado en historial:', error)
       historyEvents.errors.push({
@@ -268,13 +235,6 @@ export const useCanvasHistory = () => {
     try {
       currentIndex.value--
       const snapshot = historyStack.value[currentIndex.value]
-
-      console.log('↩️ Deshaciendo acción:', {
-        description: snapshot.description,
-        timestamp: new Date(snapshot.timestamp).toLocaleTimeString(),
-        newPosition: currentPosition.value,
-        type: snapshot.type
-      })
 
       // Aplicar cambios según el tipo de snapshot
       if (snapshot.type === 'full') {
@@ -325,13 +285,6 @@ export const useCanvasHistory = () => {
       currentIndex.value++
       const snapshot = historyStack.value[currentIndex.value]
 
-      console.log('↪️ Rehaciendo acción:', {
-        description: snapshot.description,
-        timestamp: new Date(snapshot.timestamp).toLocaleTimeString(),
-        newPosition: currentPosition.value,
-        type: snapshot.type
-      })
-
       // Aplicar cambios según el tipo de snapshot
       if (snapshot.type === 'full') {
         await restoreSnapshot(snapshot)
@@ -373,11 +326,6 @@ export const useCanvasHistory = () => {
 
     // Crear un nuevo estado inicial con el contexto actual
     initializeHistory(description)
-
-    console.log('🔄 Historial reiniciado por cambio de contexto:', {
-      newContext: newContext?.tipo || 'desconocido',
-      description
-    })
   }
 
   /**
@@ -422,12 +370,6 @@ export const useCanvasHistory = () => {
         historySize: 1
       }
 
-      console.log('🎯 Historial inicializado:', {
-        description,
-        elementos: initialSnapshot.elementos?.length || 0,
-        plantas: initialSnapshot.plantas?.length || 0,
-        plantaActiva: initialSnapshot.plantaActiva
-      })
     } catch (error) {
       console.error('❌ Error al inicializar historial:', error)
       historyEvents.errors.push({

@@ -211,8 +211,8 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
     // Vertical page lines
     for (const movingVLine of movingPoints.verticalLines) {
       for (const pV of pageVLines) {
-  const distance = Math.abs(movingVLine.x - pV.x)
-  if (distance <= snapDistance) {
+        const distance = Math.abs(movingVLine.x - pV.x)
+        if (distance <= snapDistance) {
           const priority = (movingVLine.label === 'center' || pV.label.includes('center')) ? 2 : 1
           if (!snapResult.snappedX || priority > snapResult.snapPriorityX) {
             const adjustment = pV.x - movingVLine.x
@@ -225,8 +225,9 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
             const guide = {
               type: 'vertical',
               x: pV.x,
-              y1: Math.min(movingElement.y - GUIDE_EXTEND, 0),
-              y2: Math.max(movingElement.y + movingElement.height + GUIDE_EXTEND, H),
+              // Importante: usar tempElement (posición/dimensiones candidatas) para la extensión visual
+              y1: Math.min(tempElement.y - GUIDE_EXTEND, 0),
+              y2: Math.max(tempElement.y + tempElement.height + GUIDE_EXTEND, H),
               movingLabel: movingVLine.label,
               otherLabel: pV.label,
               otherElementId: '__page__'
@@ -240,8 +241,8 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
     // Horizontal page lines
     for (const movingHLine of movingPoints.horizontalLines) {
       for (const pH of pageHLines) {
-  const distance = Math.abs(movingHLine.y - pH.y)
-  if (distance <= snapDistance) {
+        const distance = Math.abs(movingHLine.y - pH.y)
+        if (distance <= snapDistance) {
           const priority = (movingHLine.label === 'center' || pH.label.includes('center')) ? 2 : 1
           if (!snapResult.snappedY || priority > snapResult.snapPriorityY) {
             const adjustment = pH.y - movingHLine.y
@@ -253,8 +254,9 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
             const guide = {
               type: 'horizontal',
               y: pH.y,
-              x1: Math.min(movingElement.x - GUIDE_EXTEND, 0),
-              x2: Math.max(movingElement.x + movingElement.width + GUIDE_EXTEND, W),
+              // Usar tempElement para las guías horizontales también
+              x1: Math.min(tempElement.x - GUIDE_EXTEND, 0),
+              x2: Math.max(tempElement.x + tempElement.width + GUIDE_EXTEND, W),
               movingLabel: movingHLine.label,
               otherLabel: pH.label,
               otherElementId: '__page__'

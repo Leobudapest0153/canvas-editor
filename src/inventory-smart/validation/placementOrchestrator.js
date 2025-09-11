@@ -1,6 +1,7 @@
 import { resolveVerticalProps } from './fieldResolvers'
 import { narrowPhase2D } from '@/inventory-smart/utils/collision'
 import { correctPrecision } from '@/inventory-smart/utils/precision'
+import { PRECISION_CM } from '@/inventory-smart/utils/constants'
 
 // Tolerancias específicas para validación de colocación
 export const PLACEMENT_TOLERANCES = {
@@ -8,8 +9,8 @@ export const PLACEMENT_TOLERANCES = {
   WAREHOUSE_HEIGHT: 1e-6,
   // Tolerancia para considerar elementos en la misma capa (0.5cm)
   Z_LAYER: 0.5,
-  // Tolerancia para detectar conflictos de apilamiento (0.001cm = 0.01mm)
-  Z_STACKING: 0.001,
+  // Tolerancia para detectar conflictos de apilamiento - ajustada a precision configurada
+  Z_STACKING: Math.max(PRECISION_CM * 2, 0.01), // Mínimo 2x la precisión configurada o 1cm
 }
 
 /**
@@ -105,8 +106,13 @@ export function validateZStacking(
   element = {},
   candidate = {},
   neighbors = [],
-  Z_EPS = 0.001,
+  options = {}
 ) {
+  // Usar tolerancia relajada si es una transformación
+  const Z_EPS = options.isTransforming
+    ? PLACEMENT_TOLERANCES.Z_STACKING * 5 // 5x más tolerante durante transformaciones
+    : PLACEMENT_TOLERANCES.Z_STACKING
+
   const { zBaseCm: zBaseA, altoCm: altoA } = resolveVerticalProps(element, candidate)
   if (!Number.isFinite(zBaseA) || !Number.isFinite(altoA)) return { valid: true }
   const moving = { ...element, ...candidate }
@@ -129,8 +135,8 @@ export function validateZStacking(
     const b0 = correctedZBaseB
     const b1 = correctedZBaseB + correctedAltoB
 
-    // Usar la nueva función de comparación de rangos con tolerancia centralizada
-    if (rangesOverlap(a0, a1, b0, b1, PLACEMENT_TOLERANCES.Z_STACKING)) {
+    // Usar la tolerancia ajustada (más permisiva durante transformaciones)
+    if (rangesOverlap(a0, a1, b0, b1, Z_EPS)) {
       return { valid: false, code: 'Z_STACK_CONFLICT', offenderId: n.id }
     }
   }
