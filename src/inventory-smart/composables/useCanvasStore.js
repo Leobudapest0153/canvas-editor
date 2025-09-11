@@ -650,9 +650,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     }, ZOOM_PAN_DEBOUNCE_DELAY)
   }
 
-  const configurarZoom = (nuevoZoom) => {
+  const configurarZoom = (nuevoZoom, minZoom = 0.1) => {
     const zoomAnterior = zoom.value
-    zoom.value = Math.max(0.1, Math.min(5, nuevoZoom))
+    zoom.value = Math.max(minZoom, Math.min(5, nuevoZoom))
 
     // Solo guardar en historial si cambió significativamente
     if (Math.abs(zoom.value - zoomAnterior) > 0.01) {
