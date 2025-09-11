@@ -81,7 +81,7 @@
               <div class="item-name">{{ item.elemento.nombre || item.elemento.tipo }}</div>
               <div class="item-details">
                 <span class="item-size">
-                  {{ toTwoDecimals(item.elemento.width) }}×{{ toTwoDecimals(item.elemento.height) }}
+                  {{ toPrecisionCm(item.elemento.width) }}×{{ toPrecisionCm(item.elemento.height) }}
                 </span>
                 <span class="item-origin">
                   desde {{ getPlantaName(item.sourceInfo.plantaId) }}
@@ -134,7 +134,7 @@ import { ref, computed } from 'vue'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
-import { toTwoDecimals } from '@/inventory-smart/utils/fixedDimensions'
+import { toPrecisionCm } from '@/inventory-smart/utils/fixedDimensions'
 
 // Composables
 const buffer = useCanvasBuffer()

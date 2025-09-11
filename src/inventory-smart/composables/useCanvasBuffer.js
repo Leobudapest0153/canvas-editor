@@ -16,6 +16,7 @@ import { useCanvasStore } from './useCanvasStore'
 import { useWeightValidation } from './useWeightValidation'
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
 import { useToast } from './useToast'
+import { toPrecisionCm } from '@/inventory-smart/utils/fixedDimensions'
 
 
 // Estado global del buffer (singleton)
@@ -119,24 +120,11 @@ export const useCanvasBuffer = () => {
         }
       }
 
-      console.log(`📋 Elemento clonado nivel ${level}:`, {
-        original: elem.id,
-        nuevo: newId,
-        nombre: elem.nombre || elem.tipo,
-        hijos: clonedElement.hijos.length,
-        padre: clonedElement.padre
-      })
-
       return clonedElement
     }    // Iniciar clonado recursivo
     const rootClonedElement = cloneElementRecursive(elemento, null, 0)
 
     if (rootClonedElement) {
-      console.log('📋 Estructura clonada completa:', {
-        elementoOriginal: elemento.nombre || elemento.tipo,
-        elementosProcesados: idMapping.size,
-        mapeoIds: Array.from(idMapping.entries())
-      })
 
       return {
         rootElement: rootClonedElement,
@@ -205,11 +193,6 @@ export const useCanvasBuffer = () => {
     const success = addToBuffer(clonedStructure.rootElement, sourceInfo)
     if (success) {
       const totalElements = countElementsInStructure(elemento)
-      console.log('📋 Estructura copiada al buffer:', {
-        elemento: elemento.nombre || elemento.tipo,
-        elementosProcesados: totalElements,
-        hijos: elemento.hijos ? elemento.hijos.length : 0
-      })
 
       // Mostrar mensaje de éxito
       if (typeof window !== 'undefined' && window.__toasts?.show) {
@@ -272,9 +255,9 @@ export const useCanvasBuffer = () => {
 
         if (!newElement.dimensiones) {
           newElement.dimensiones = {
-            ancho: newElement.width ? Math.round(newElement.width / CM_TO_PX) : 10,
+            ancho: newElement.width ? toPrecisionCm(newElement.width / CM_TO_PX) : 10,
             largo: largoPadreCm,
-            alto: newElement.height ? Math.round(newElement.height / CM_TO_PX) : 10
+            alto: newElement.height ? toPrecisionCm(newElement.height / CM_TO_PX) : 10
           }
         } else {
           newElement.dimensiones.largo = largoPadreCm
@@ -301,16 +284,8 @@ export const useCanvasBuffer = () => {
       return null
     }
 
-    console.log('📋 Elemento agregado:', {
-      original: elementoToPaste.id,
-      nuevo: newElementId,
-      nombre: elementoToPaste.nombre || elementoToPaste.tipo,
-      padre: parentId
-    })
-
     // Agregar hijos recursivamente
     if (elementoToPaste.hijos && elementoToPaste.hijos.length > 0) {
-      console.log(`📋 Agregando ${elementoToPaste.hijos.length} hijos para ${elementoToPaste.nombre || elementoToPaste.tipo}`)
 
       for (const hijoId of elementoToPaste.hijos) {
         const hijoElement = allElementsMap.get(hijoId)
@@ -321,14 +296,7 @@ export const useCanvasBuffer = () => {
             y: hijoElement.y
           }
 
-          const childNewId = pasteStructureRecursive(hijoElement, childPosition, allElementsMap, newElementId)
-          if (childNewId) {
-            console.log('📋 Hijo agregado:', {
-              padre: elementoToPaste.nombre || elementoToPaste.tipo,
-              hijo: hijoElement.nombre || hijoElement.tipo,
-              hijoId: childNewId
-            })
-          }
+          pasteStructureRecursive(hijoElement, childPosition, allElementsMap, newElementId)
         } else {
           console.warn('⚠️ Elemento hijo no encontrado en mapa:', hijoId)
         }
@@ -344,7 +312,6 @@ export const useCanvasBuffer = () => {
   const addElementDirectly = (elemento, parentId) => {
     // Configurar relación padre-hijo
     if (parentId) {
-      console.log('📋 addElementDirectly - parentId:', parentId)
 
       // Buscar el padre directamente en el array de elementos del store
       if (!canvasStore.elementos) {
@@ -375,13 +342,6 @@ export const useCanvasBuffer = () => {
       // Agregar al array de hijos del padre
       padre.hijos.push(elemento.id)
 
-      console.log('📋 Elemento agregado directamente como hijo:', {
-        padre: padre.nombre || padre.tipo,
-        hijo: elemento.nombre || elemento.tipo,
-        hijoId: elemento.id,
-        totalHijos: padre.hijos.length
-      })
-
       return elemento.id
     }
 
@@ -404,12 +364,6 @@ export const useCanvasBuffer = () => {
       const newId = `${element.tipo || element.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
       newIdMapping.set(oldId, newId)
       counter++
-
-      console.log('🔄 ID regenerado:', {
-        original: oldId,
-        nuevo: newId,
-        elemento: element.nombre || element.tipo
-      })
     }
 
     // Luego, crear los elementos con los nuevos IDs y referencias actualizadas
