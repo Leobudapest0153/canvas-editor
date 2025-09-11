@@ -103,13 +103,13 @@ export function useElementDrag({
         const radius = Math.min(w, h) / 2
         const centerX = x + radius
         const centerY = y + radius
-        
+
         // Obtener posición previa para movimiento suave
         const lastPos = lastValidPositions.value.get(elemento.id)
         const previousCenter = lastPos ? { x: lastPos.x + radius, y: lastPos.y + radius } : null
-        
+
         const clampedCenter = clampCircleToPolygonSmooth(
-          { x: centerX, y: centerY, radius }, 
+          { x: centerX, y: centerY, radius },
           boundary.inset,
           previousCenter
         )
@@ -168,13 +168,13 @@ export function useElementDrag({
           const radius = Math.min(w, h) / 2
           const centerX = x + radius
           const centerY = y + radius
-          
+
           // Obtener posición previa para movimiento suave
           const lastPos = lastValidPositions.value.get(elemento.id)
           const previousCenter = lastPos ? { x: lastPos.x + radius, y: lastPos.y + radius } : null
-          
+
           const clampedCenter = clampCircleToPolygonSmooth(
-            { x: centerX, y: centerY, radius }, 
+            { x: centerX, y: centerY, radius },
             boundary.inset,
             previousCenter
           )
@@ -243,7 +243,6 @@ export function useElementDrag({
       return
     }
 
-    console.log('Iniciando arrastre del elemento:', elementId)
     isElementDragging.value = true
     stageDragEnabled.value = false // Deshabilitar arrastre del canvas
 
@@ -552,10 +551,8 @@ export function useElementDrag({
             console.log('Posición final inválida, usando fallback...')
 
             if (lastGoodPos) {
-              console.log('Usando lastGoodPos del RAF drag:', lastGoodPos)
               finalPosition = { x: lastGoodPos.x, y: lastGoodPos.y }
             } else {
-              console.log('Usando lastValidPos de dragstart:', lastPos)
               finalPosition = { x: lastPos.x, y: lastPos.y }
             }
 
@@ -589,7 +586,6 @@ export function useElementDrag({
               finalPosition = { x: reclampResult.x, y: reclampResult.y }
             } else {
               // Si sigue inválido, mantener lastValidPos original
-              console.log('Re-clamp sigue inválido, manteniendo lastValidPos original')
               finalPosition = { x: lastPos.x, y: lastPos.y }
             }
 
@@ -707,17 +703,11 @@ export function useElementDrag({
             )
             // Actualizar lastValidPositions para evitar divergencias posteriores
             lastValidPositions.value.set(elementId, { x: finalX, y: finalY })
-            console.debug('[finalize] persisted final pos for', elementId, { finalX, finalY })
           }
         } else {
           // Si la posición final NO es válida, revertir visualmente a la última válida y persistir esa última válida
           const revertPos = lastGoodPos ||
             lastValidPositions.value.get(elementId) || { x: storeEl.x || 0, y: storeEl.y || 0 }
-          console.debug(
-            '[finalize] final pos INVALID - reverting to last valid pos for',
-            elementId,
-            { finalX, finalY, revertPos },
-          )
           try {
             const stage2 = stageRef.value?.getNode?.()
             const layer2 = layerRef.value?.getNode?.()
@@ -749,13 +739,6 @@ export function useElementDrag({
             console.warn('Error persisting revert position', err)
           }
         }
-      } else {
-        console.debug('[finalize] no persistence needed for', elementId, {
-          finalX,
-          finalY,
-          storeX: storeEl?.x,
-          storeY: storeEl?.y,
-        })
       }
     } catch (err) {
       console.warn('Error persisting final position for', elementId, err)

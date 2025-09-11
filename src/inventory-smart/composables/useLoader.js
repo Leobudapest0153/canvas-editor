@@ -48,7 +48,6 @@ export function useLoader() {
     // Verificar si ya existe una operación de este tipo (para prevenir duplicados)
     for (const [existingId, operation] of loadingOperations.value) {
       if (operation.type === operationType && operation.preventDuplicates) {
-        console.warn(`⚠️ Operación de tipo "${operationType}" ya en progreso. ID: ${existingId}`)
         return null // No iniciar operación duplicada
       }
     }
@@ -63,9 +62,6 @@ export function useLoader() {
 
     loadingOperations.value.set(id, operation)
     loadingCounter.value++
-
-    console.log(`🟡 Iniciando operación: ${operationType}`)
-
     return id
   }
 
@@ -84,14 +80,6 @@ export function useLoader() {
       console.warn(`⚠️ No se encontró operación con ID: ${operationId}`)
       return false
     }
-
-    const duration = Date.now() - operation.startTime
-
-    console.log(`🟢 Finalizando operación: ${operation.type}`, {
-      id: operationId,
-      duration: `${duration}ms`,
-      remainingOperations: loadingCounter.value - 1
-    })
 
     loadingOperations.value.delete(operationId)
     loadingCounter.value = Math.max(0, loadingCounter.value - 1)
@@ -113,7 +101,6 @@ export function useLoader() {
       }
     }
 
-    console.log(`🟢 Detenidas ${stoppedCount} operaciones de tipo: ${operationType}`)
     return stoppedCount
   }
 
@@ -125,7 +112,6 @@ export function useLoader() {
     loadingOperations.value.clear()
     loadingCounter.value = 0
 
-    console.log(`🟢 Detenidas todas las operaciones (${operationCount})`)
     return operationCount
   }
 

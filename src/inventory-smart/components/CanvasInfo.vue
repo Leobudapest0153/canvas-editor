@@ -5,7 +5,7 @@
     <span v-if="store.estaEnPlanta && store.plantaActivaData">
       Planta: {{ fmtCm(store.plantaActivaData.dimensiones.ancho) }} x {{ fmtCm(store.plantaActivaData.dimensiones.largo) }}
     </span>
-    <span v-if="(store.estaEnElemento || store.estaEnContenedor) && store.elementoContenedorActual">
+    <!-- <span v-if="(store.estaEnElemento || store.estaEnContenedor) && store.elementoContenedorActual">
       {{ store.estaEnElemento ? 'Elemento' : 'Contenedor' }}: {{ store.elementoContenedorActual.nombre }}
       <template v-if="store.vistaActiva === 'XZ' && store.elementoContenedorActual.dimensiones">
         ({{ fmtCm(store.elementoContenedorActual.dimensiones.ancho) }} x {{ fmtCm(store.elementoContenedorActual.dimensiones.alto) }})
@@ -13,7 +13,7 @@
       <template v-else>
         ({{ fmtCm(pxToCm(store.canvasAdaptativo.width, viewport.cmPerPx)) }} x {{ fmtCm(pxToCm(store.canvasAdaptativo.height, viewport.cmPerPx)) }})
       </template>
-    </span>
+    </span> -->
   </div>
 </template>
 <script setup>

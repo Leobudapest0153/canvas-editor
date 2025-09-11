@@ -9,6 +9,7 @@
 import { applyEdgeConstraint, finalizeRectClampSnapReclamp } from '@/inventory-smart/utils/edgeConstraint'
 import { detectConflictsFor, computeMTD } from '@/inventory-smart/utils/collision'
 import { snapToGrid } from '@/inventory-smart/utils/geometry'
+import { GRID_SIZE } from './constants'
 
 function getModelBBoxFromShape(shape) {
   if (!shape) return { x: 0, y: 0, width: 0, height: 0, className: '' }
@@ -136,7 +137,7 @@ function resolveBlockingCollisions(x0, y0, el, elements, areaBounds) {
   return { x, y }
 }
 
-export async function runFinalClamp({ shape, el, areaBounds, grid = 50, elements = [], lastValidPos = null, CM_TO_PX }) {
+export async function runFinalClamp({ shape, el, areaBounds, grid = GRID_SIZE, elements = [], lastValidPos = null, CM_TO_PX }) {
   if (!shape || !el || !areaBounds) return { x: el?.x ?? 0, y: el?.y ?? 0, appliedFallback: true }
   // marcar CM_TO_PX como usado para evitar lint si no se requiere
   void CM_TO_PX
@@ -240,7 +241,7 @@ export function solveFinalPlacement({
   movingEl,
   neighbors = [],
   areaBounds,
-  grid = 50,
+  grid = GRID_SIZE,
   CM_TO_PX, // sin uso directo, mantenido por compat
   lastValidPos = null,
   lastVelocity = null,
@@ -339,7 +340,7 @@ export function finalizePlacement({
   movingEl,
   neighbors = [],
   areaBounds,
-  grid = 50,
+  grid = GRID_SIZE,
   lastValidPos = null,
   CM_TO_PX,
   strokePx = 0,

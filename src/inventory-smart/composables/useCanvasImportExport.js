@@ -99,13 +99,6 @@ export const useCanvasImportExport = () => {
             console.warn('⚠️ Archivo válido pero con advertencias:', validacion.warnings)
           }
 
-          console.log('✅ Archivo validado exitosamente:', {
-            plantas: validacion.plantas,
-            elementos: validacion.elementos,
-            version: validacion.version,
-            advertencias: validacion.warnings?.length || 0
-          })
-
           const exito = canvasStore.deserialize(jsonString)
 
           if (exito) {

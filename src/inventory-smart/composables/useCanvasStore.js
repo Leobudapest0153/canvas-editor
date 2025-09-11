@@ -146,31 +146,11 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Getters
   const elementosVisibles = computed(() => {
-    console.log('DEBUG elementosVisibles - Estado actual:', {
-      contextoNavegacion: contextoNavegacion.value,
-      totalElementos: elementos.value.length,
-      plantaActiva: plantaActiva.value,
-    })
-
     // Si estamos en una planta, mostrar solo elementos de tipo 'elementos' (sin padre)
     if (contextoNavegacion.value.tipo === 'plantas') {
       const plantaId = contextoNavegacion.value.id
       const elementosEnEstaPlanta = elementos.value.filter((el) => el.plantaId === plantaId)
       const visibles = elementosEnEstaPlanta.filter((el) => !el.padre && el.tipo === 'elementos')
-
-      console.log('DEBUG elementosVisibles - En planta:', {
-        plantaId,
-        elementosEnEstaPlanta: elementosEnEstaPlanta.length,
-        elementosRaiz: visibles.length,
-        elementos: visibles.map((el) => ({
-          id: el.id,
-          nombre: el.nombre,
-          tipo: el.tipo,
-          x: el.x,
-          y: el.y,
-          plantaId: el.plantaId,
-        })),
-      })
       return visibles
     }
 
@@ -181,12 +161,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         const hijosCompletos = elementoPadre.hijos
           .map((hijoId) => elementos.value.find((el) => el.id === hijoId))
           .filter((hijo) => hijo && hijo.tipo === 'contenedores')
-
-        console.log('Contenedores visibles en elemento:', {
-          elementoId: contextoNavegacion.value.id,
-          contenedoresVisibles: hijosCompletos.length,
-          contenedores: hijosCompletos,
-        })
         return hijosCompletos
       }
     }
@@ -198,14 +172,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         const hijosCompletos = contenedorPadre.hijos
           .map((hijoId) => elementos.value.find((el) => el.id === hijoId))
           .filter((hijo) => hijo && (hijo.tipo === 'elementos' || hijo.tipo === 'contenedores'))
-
-        console.log('Elementos y contenedores visibles en contenedor:', {
-          contenedorId: contextoNavegacion.value.id,
-          hijosVisibles: hijosCompletos.length,
-          elementos: hijosCompletos.filter((h) => h.tipo === 'elementos').length,
-          contenedores: hijosCompletos.filter((h) => h.tipo === 'contenedores').length,
-          todos: hijosCompletos,
-        })
         return hijosCompletos
       }
     }
@@ -370,18 +336,10 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Deseleccionar elemento actual
     elementoSeleccionado.value = null
-
-    console.log('Navegando a elemento:', {
-      elementoId,
-      nombre: elemento.nombre,
-      tipo: elemento.tipo,
-      path: nuevoPath,
-    })
   }
 
   const navegarAlPadre = () => {
     if (contextoNavegacion.value.path.length <= 1) {
-      console.warn('Ya estás en el nivel raíz')
       return
     }
 
@@ -430,11 +388,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Deseleccionar elemento actual
     elementoSeleccionado.value = null
-
-    console.log('Navegando al padre:', {
-      nuevoContexto: contextoNavegacion.value,
-      path: nuevoPath,
-    })
   }
 
   /**
@@ -514,21 +467,9 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Deseleccionar elemento actual
     elementoSeleccionado.value = null
-
-    console.log('Navegando a planta:', {
-      plantaId,
-      nombre: planta.nombre,
-    })
   }
 
   const calcularCanvasAdaptativo = (elemento) => {
-    console.log('Calculando canvas adaptativo para elemento:', {
-      id: elemento.id,
-      nombre: elemento.nombre,
-      tipo: elemento.tipo,
-      dimensiones: elemento.dimensiones,
-    })
-
     // Calcular tamaño del canvas basado en las dimensiones del elemento
     let elementWidthPx, elementHeightPx
 
@@ -537,29 +478,19 @@ export const useCanvasStore = defineStore('canvas', () => {
       // (ya que navegamos "dentro" del elemento, vemos su vista frontal)
       elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
       elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
-      console.log('Usando dimensiones en cm (Vista de frente - ancho × alto):', {
-        anchoCm: elemento.dimensiones.ancho,
-        altoCm: elemento.dimensiones.alto,
-        widthPx: elementWidthPx,
-        heightPx: elementHeightPx,
-      })
+      console.log('Usando dimensiones en cm (Vista de frente - ancho x alto)')
     } else if (elemento.width && elemento.height) {
       // Fallback a dimensiones legacy en píxeles
       elementWidthPx = elemento.width
       elementHeightPx = elemento.height
-      console.log('Usando dimensiones legacy en px:', { elementWidthPx, elementHeightPx })
+      console.log('Usando dimensiones legacy en px')
     } else {
       // Fallback final - tamaño mínimo para contenedores pequeños
       const defaultWidth = elemento.tipo === 'contenedores' ? 30 : 100 // contenedores más pequeños
       const defaultHeight = elemento.tipo === 'contenedores' ? 40 : 60
       elementWidthPx = defaultWidth * CM_TO_PX
       elementHeightPx = defaultHeight * CM_TO_PX
-      console.log('Usando dimensiones por defecto:', {
-        defaultWidthCm: defaultWidth,
-        defaultHeightCm: defaultHeight,
-        elementWidthPx,
-        elementHeightPx,
-      })
+      console.log('Usando dimensiones por defecto')
     }
 
     // Asegurar dimensiones mínimas para navegación
@@ -575,16 +506,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       height: elementHeightPx,
       escala: CM_TO_PX, // La escala es la conversión cm→px
     }
-
-    console.log('Canvas adaptativo calculado:', {
-      elemento: {
-        id: elemento.id,
-        tipo: elemento.tipo,
-        widthPx: elementWidthPx,
-        heightPx: elementHeightPx,
-      },
-      canvas: canvasAdaptativo.value,
-    })
   }
 
   const calcularCanvasAdaptativoPlanta = (planta) => {
@@ -606,11 +527,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       height: planta.dimensiones.largo * CM_TO_PX, // largo = y
       escala: CM_TO_PX, // La escala es la conversión cm->px
     }
-
-    console.log('Canvas adaptativo calculado para planta:', {
-      planta: { anchoCm: planta.dimensiones.ancho, largoCm: planta.dimensiones.largo },
-      canvas: canvasAdaptativo.value,
-    })
   }
 
   // Actions
@@ -959,13 +875,6 @@ export const useCanvasStore = defineStore('canvas', () => {
           elementoPadre.hijos = []
         }
         elementoPadre.hijos.push(nuevoElemento.id)
-
-        console.log('Elemento agregado como hijo de:', {
-          padre: elementoPadre.nombre,
-          hijo: nuevoElemento.nombre,
-          tipoHijo: nuevoElemento.tipo,
-          hijosDelPadre: elementoPadre.hijos.length,
-        })
       }
     } else {
       // Si estamos en una planta, agregar normalmente
@@ -980,11 +889,6 @@ export const useCanvasStore = defineStore('canvas', () => {
           planta.elementos = []
         }
         planta.elementos.push(nuevoElemento.id)
-        console.log('Elemento agregado al array de elementos de la planta:', {
-          plantaId: planta.id,
-          elementoId: nuevoElemento.id,
-          totalElementosEnPlanta: planta.elementos.length,
-        })
       }
     }
 
@@ -1027,8 +931,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     elementos.value.push(nuevoElemento)
-    console.log('Total elementos en store:', elementos.value.length)
-    console.log('Elementos visibles:', elementosVisibles.value.length)
 
     // Guardar estado en historial
     saveToHistory(`Elemento agregado: ${nuevoElemento.nombre || nuevoElemento.tipo}`)
@@ -1048,11 +950,6 @@ export const useCanvasStore = defineStore('canvas', () => {
           const elementoIndex = planta.elementos.indexOf(elementoId)
           if (elementoIndex > -1) {
             planta.elementos.splice(elementoIndex, 1)
-            console.log('Elemento removido del array de elementos de la planta:', {
-              plantaId: planta.id,
-              elementoId,
-              elementosRestantes: planta.elementos.length,
-            })
           }
         }
       }
@@ -1064,11 +961,6 @@ export const useCanvasStore = defineStore('canvas', () => {
           const hijoIndex = padre.hijos.indexOf(elementoId)
           if (hijoIndex > -1) {
             padre.hijos.splice(hijoIndex, 1)
-            console.log('Elemento removido del array de hijos del padre:', {
-              padreId: padre.id,
-              elementoId,
-              hijosRestantes: padre.hijos.length,
-            })
           }
         }
       }
@@ -1397,20 +1289,11 @@ export const useCanvasStore = defineStore('canvas', () => {
   watch(
     () => [contextoNavegacion.value.tipo, contextoNavegacion.value.id],
     ([tipo, id]) => {
-      console.log('Watcher canvas adaptativo - cambio de contexto:', { tipo, id })
-
       if (tipo === 'plantas') {
         const planta = plantaPorId.value(id)
-        console.log('Calculando canvas para planta:', planta?.nombre)
         calcularCanvasAdaptativoPlanta(planta)
       } else if (tipo === 'elementos' || tipo === 'contenedores') {
         const elemento = elementoPorId.value(id)
-        console.log('Calculando canvas para elemento/contenedor:', {
-          encontrado: !!elemento,
-          id: elemento?.id,
-          tipo: elemento?.tipo,
-          nombre: elemento?.nombre,
-        })
         if (elemento) {
           calcularCanvasAdaptativo(elemento)
         } else {
