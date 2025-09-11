@@ -24,7 +24,7 @@
               </div>
               <div class="line"><strong>Clase:</strong> {{ c.clase }}</div>
               <div class="line"><strong>XY:</strong> {{ c.xyOverlap ? 'superpuesto' : 'ok' }}</div>
-              <div class="line"><strong>Z:</strong> {{ c.zOverlap ? ('conflicto (' + Math.round(c.zAmount) + 'cm)') : 'ok' }}</div>
+              <div class="line"><strong>Z:</strong> {{ c.zOverlap ? ('conflicto (' + toTwoDecimals(c.zAmount) + 'cm)') : 'ok' }}</div>
             </div>
             <div class="actions">
               <div class="group">
@@ -58,6 +58,7 @@
 import { computed } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
+import { toTwoDecimals } from '../utils/fixedDimensions'
 
 const emit = defineEmits(['confirm'])
 const store = useCanvasStore()

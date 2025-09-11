@@ -589,6 +589,7 @@ import { useElementDrag } from '@/inventory-smart/composables/useElementDrag'
 import TemplateSaveModal from '@/inventory-smart/components/TemplateSaveModal.vue'
 import CanvasInfo from '@/inventory-smart/components/CanvasInfo.vue'
 import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
+import { toTwoDecimals } from '../utils/fixedDimensions'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -670,8 +671,8 @@ const getElementPixelDimensions = (elemento) => {
     }
 
     return {
-      width: Math.round(cmToPx(widthCm, viewport.cmPerPx)),
-      height: Math.round(cmToPx(heightCm, viewport.cmPerPx)),
+      width: toTwoDecimals(cmToPx(widthCm, viewport.cmPerPx)),
+      height: toTwoDecimals(cmToPx(heightCm, viewport.cmPerPx)),
     }
   }
 
@@ -967,10 +968,10 @@ const dragBoundForElement = (pos, elemento) => {
     const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
     const w = w_cm * CM_TO_PX
     const h = h_cm * CM_TO_PX
-    
+
     // Obtener posición previa para movimiento suave
     const lastPos = dragLastValidPositions.value.get(elemento.id)
-    
+
     const c = clampInsideArea(lp.x, lp.y, w, h, boundary, elemento, true, lastPos)
     return toStageCoords(c)
   } catch {
@@ -1171,14 +1172,14 @@ const runPreDropValidations = (elemento, dropEvent) => {
       }
       const off = OFFSETS?.offsetByType?.[elemento.id]?.zOffsetShare
       if (typeof off === 'number' && isFinite(off)) {
-        const zBase = Math.round((planta.dimensiones.alto || 0) * off)
+        const zBase = toTwoDecimals((planta.dimensiones.alto || 0) * off)
         elemento.alturaRespectoAlSuelo = zBase
       }
     }
   }
 
-  const MIN_WIDTH = 40
-  const MIN_HEIGHT = 30
+  const MIN_WIDTH = 10
+  const MIN_HEIGHT = 10
   let finalWidth = Math.max(width, MIN_WIDTH)
   let finalHeight = Math.max(height, MIN_HEIGHT)
 

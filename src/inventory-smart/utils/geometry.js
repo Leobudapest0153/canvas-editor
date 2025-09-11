@@ -2,6 +2,7 @@
 // Units: use canvas world units (same as layer coordinates, pixels tied to cm in UI)
 
 import { clampRectToPolygon, clampCircleToPolygon, circleInPolygon, pointInPolygon } from './polygonBounds'
+import { GRID_SIZE } from './constants'
 
 export const EPSILON = 1e-6
 
@@ -10,9 +11,9 @@ export const clamp = (v, min, max) => Math.max(min, Math.min(max, v))
 export const approxEqual = (a, b, eps = EPSILON) => Math.abs(a - b) <= eps
 
 // Grid snapping
-export const snapToGrid = (x, y, gridSize = 50) => {
+export const snapToGrid = (x, y, gridSize = GRID_SIZE) => {
   // If gridSize is falsy (0, null, undefined) or <= 0, treat as disabled: return original coords
-  if (typeof gridSize !== 'number') gridSize = 50
+  if (typeof gridSize !== 'number') gridSize = GRID_SIZE
   if (gridSize <= 0) return { x, y }
   const sx = Math.round(x / gridSize) * gridSize
   const sy = Math.round(y / gridSize) * gridSize
@@ -267,7 +268,7 @@ export const safeSnapRect = (
   h,
   boundaryRect,
   neighbors = [],
-  gridSize = 50,
+  gridSize = GRID_SIZE,
   eps = EPSILON,
   axes = { snapX: true, snapY: true },
   gridEps = 6,
@@ -316,7 +317,7 @@ export const nudgePlace = (
   boundary,
   allElements,
   elementToPlace,
-  gridSize = 20,
+  gridSize = GRID_SIZE,
   maxAttempts = 16,
   detectConflictsFn = null, // Función para detectar conflictos pasada como parámetro
 ) => {

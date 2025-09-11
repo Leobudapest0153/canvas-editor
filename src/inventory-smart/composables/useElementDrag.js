@@ -103,13 +103,13 @@ export function useElementDrag({
         const radius = Math.min(w, h) / 2
         const centerX = x + radius
         const centerY = y + radius
-        
+
         // Obtener posición previa para movimiento suave
         const lastPos = lastValidPositions.value.get(elemento.id)
         const previousCenter = lastPos ? { x: lastPos.x + radius, y: lastPos.y + radius } : null
-        
+
         const clampedCenter = clampCircleToPolygonSmooth(
-          { x: centerX, y: centerY, radius }, 
+          { x: centerX, y: centerY, radius },
           boundary.inset,
           previousCenter
         )
@@ -168,13 +168,13 @@ export function useElementDrag({
           const radius = Math.min(w, h) / 2
           const centerX = x + radius
           const centerY = y + radius
-          
+
           // Obtener posición previa para movimiento suave
           const lastPos = lastValidPositions.value.get(elemento.id)
           const previousCenter = lastPos ? { x: lastPos.x + radius, y: lastPos.y + radius } : null
-          
+
           const clampedCenter = clampCircleToPolygonSmooth(
-            { x: centerX, y: centerY, radius }, 
+            { x: centerX, y: centerY, radius },
             boundary.inset,
             previousCenter
           )

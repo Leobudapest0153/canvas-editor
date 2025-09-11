@@ -252,6 +252,7 @@ import { t } from '@/inventory-smart/utils/i18n.js'
 import TagFilter from '@/inventory-smart/components/TagFilter.vue'
 import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
+import { toTwoDecimals } from '../utils/fixedDimensions'
 
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
@@ -759,7 +760,7 @@ const infoPesoPadre = computed(() => {
 
 const capacidadContextoTexto = computed(() => {
   const info = infoPesoPadre.value
-  return `Actualmente la bodega tiene ${info.usado} kg ocupados (${Math.round(info.porcentajeUsado)}% de su capacidad).
+  return `Actualmente la bodega tiene ${info.usado} kg ocupados (${toTwoDecimals(info.porcentajeUsado)}% de su capacidad).
   Todavía puedes ocupar ${info.disponible} kg sin problemas.`;
 })
 
@@ -946,14 +947,14 @@ const porcentajePesoUsado = computed(() => {
   const peso = parseFloat(usoRealPeso.value)
   const maximo = edited.value?.pesoMaximo || 0
   if (maximo === 0) return 0
-  return Math.min(100, Math.round((peso / maximo) * 100))
+  return Math.min(100, toTwoDecimals((peso / maximo) * 100))
 })
 
 const porcentajeVolumenUsado = computed(() => {
   const volumen = parseFloat(usoRealVolumen.value)
   const maximo = parseFloat(volumenTeorico.value)
   if (maximo === 0) return 0
-  return Math.min(100, Math.round((volumen / maximo) * 100))
+  return Math.min(100, toTwoDecimals((volumen / maximo) * 100))
 })
 
 const colorPesoUsado = computed(() => {
