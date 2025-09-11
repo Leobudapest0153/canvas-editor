@@ -6,6 +6,7 @@
 // Devuelve: { pos: {x,y}, hitX: boolean, hitY: boolean }
 
 import { getEdgeState, setEdgeState, getLastPos, setLastPos } from '@/inventory-smart/composables/useEdgeState'
+import { GRID_SIZE } from './constants'
 
 export function applyEdgeConstraint(candidate, el, areaBounds, opts = {}) {
   const { epsEnter = 0.25, epsExit = 0.75 } = opts || {}
@@ -85,7 +86,7 @@ export function applyEdgeConstraint(candidate, el, areaBounds, opts = {}) {
 }
 
 // Finalización: clamp → snap → re-clamp para rectángulos
-export function finalizeRectClampSnapReclamp(x, y, w, h, areaBounds, gridSize = 50) {
+export function finalizeRectClampSnapReclamp(x, y, w, h, areaBounds, gridSize = GRID_SIZE) {
   const minX = areaBounds?.minX ?? 0
   const minY = areaBounds?.minY ?? 0
   const maxX = areaBounds?.maxX ?? 0

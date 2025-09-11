@@ -232,7 +232,7 @@ export const CM_TO_PX = 10
 // Tolerancia para aplicar "pegado" al borde en px
 export const SNAP_EPS = 4
 // Tamaño de grilla para snap y búsqueda en espiral
-export const GRID_SIZE = 20
+export const GRID_SIZE = 0
 
 // Parámetros por defecto para guard de redimensionado
 export const MARGIN_CM = 5 // margen perimetral interno en cm para packing

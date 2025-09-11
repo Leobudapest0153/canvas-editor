@@ -1,6 +1,10 @@
 /**
  * Composable para object snapping - detecta alineaciones entre elementos y proporciona snap automático
  * Optimizado para múltiples elementos y extensible a nuevos tipos de shapes
+ *
+ * COMPORTAMIENTO ESPECIAL PARA TRANSFORMER:
+ * - Cuando isTransforming=true, solo muestra guías visuales sin aplicar snap automático
+ * - Esto evita interferir con la lógica interna del transformer de Konva
  */
 
 import { ref, computed } from 'vue'
@@ -16,21 +20,21 @@ const GUIDE_EXTEND = 50 // píxeles que se extienden las guías más allá de lo
  */
 function getSnapPoints(element) {
   // Verificar que el elemento tiene las propiedades básicas necesarias
-  if (!element || typeof element.x === 'undefined' || typeof element.y === 'undefined' || 
+  if (!element || typeof element.x === 'undefined' || typeof element.y === 'undefined' ||
       typeof element.width === 'undefined' || typeof element.height === 'undefined') {
     return {
       verticalLines: [],
       horizontalLines: []
     }
   }
-  
+
   const { x, y, width, height, forma } = element
-  
+
   if (forma === 'circular') {
     const centerX = x + width / 2
     const centerY = y + height / 2
     const radius = Math.min(width, height) / 2
-    
+
     return {
       verticalLines: [
         { x: x, label: 'left' },           // izquierda
@@ -44,11 +48,11 @@ function getSnapPoints(element) {
       ]
     }
   }
-  
+
   // Forma rectangular o por defecto
   const centerX = x + width / 2
   const centerY = y + height / 2
-  
+
   return {
     verticalLines: [
       { x: x, label: 'left' },           // izquierda
@@ -73,7 +77,7 @@ function getSnapPoints(element) {
  */
 function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBounds, snapDistance = SNAP_DISTANCE) {
   // Validar entrada
-  if (!movingElement || !Array.isArray(otherElements) || 
+  if (!movingElement || !Array.isArray(otherElements) ||
       typeof candidateX !== 'number' || typeof candidateY !== 'number') {
     return {
       x: candidateX || 0,
@@ -83,14 +87,14 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
       guides: []
     }
   }
-  
+
   // Crear elemento temporal en la posición candidata
   const tempElement = {
     ...movingElement,
     x: candidateX,
     y: candidateY
   }
-  
+
   const movingPoints = getSnapPoints(tempElement)
   const snapResult = {
     x: candidateX,
@@ -101,22 +105,22 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
     snapPriorityX: 0, // 0 = no snap, 1 = edge, 2 = center
     snapPriorityY: 0
   }
-  
+
   // Buscar snaps contra otros elementos
   for (const otherElement of otherElements) {
     if (otherElement.id === movingElement.id) continue
-    
+
     const otherPoints = getSnapPoints(otherElement)
-    
+
     // Detectar snap vertical (líneas verticales)
     for (const movingVLine of movingPoints.verticalLines) {
       for (const otherVLine of otherPoints.verticalLines) {
   const distance = Math.abs(movingVLine.x - otherVLine.x)
-        
+
   if (distance <= snapDistance) {
           // Calcular prioridad (center > edge)
           const priority = (movingVLine.label === 'center' || otherVLine.label === 'center') ? 2 : 1
-          
+
           // Solo aplicar si no hay snap o si tiene mayor prioridad
           if (!snapResult.snappedX || priority > snapResult.snapPriorityX) {
             // Calcular el ajuste necesario
@@ -124,12 +128,12 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
             snapResult.x = candidateX + adjustment
             snapResult.snappedX = true
             snapResult.snapPriorityX = priority
-            
+
             // Limpiar guías verticales anteriores si hay nueva prioridad
             if (priority > 1) {
               snapResult.guides = snapResult.guides.filter(g => g.type !== 'vertical')
             }
-            
+
             // Crear guía vertical
             const guide = createVerticalGuide(
               otherVLine.x,
@@ -143,16 +147,16 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
         }
       }
     }
-    
+
     // Detectar snap horizontal (líneas horizontales)
     for (const movingHLine of movingPoints.horizontalLines) {
       for (const otherHLine of otherPoints.horizontalLines) {
   const distance = Math.abs(movingHLine.y - otherHLine.y)
-        
+
   if (distance <= snapDistance) {
           // Calcular prioridad (center > edge)
           const priority = (movingHLine.label === 'center' || otherHLine.label === 'center') ? 2 : 1
-          
+
           // Solo aplicar si no hay snap o si tiene mayor prioridad
           if (!snapResult.snappedY || priority > snapResult.snapPriorityY) {
             // Calcular el ajuste necesario
@@ -160,12 +164,12 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
             snapResult.y = candidateY + adjustment
             snapResult.snappedY = true
             snapResult.snapPriorityY = priority
-            
+
             // Limpiar guías horizontales anteriores si hay nueva prioridad
             if (priority > 1) {
               snapResult.guides = snapResult.guides.filter(g => g.type !== 'horizontal')
             }
-            
+
             // Crear guía horizontal
             const guide = createHorizontalGuide(
               otherHLine.y,
@@ -179,7 +183,7 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
         }
       }
     }
-    
+
     // Si ya tenemos snap en ambos ejes, no necesitamos buscar más
     if (snapResult.snappedX && snapResult.snappedY) {
       break
@@ -261,7 +265,7 @@ function detectSnap(movingElement, candidateX, candidateY, otherElements, pageBo
       }
     }
   }
-  
+
   return snapResult
 }
 
@@ -277,7 +281,7 @@ function createVerticalGuide(x, movingElement, otherElement, movingLabel, otherL
     movingElement.y + movingElement.height + GUIDE_EXTEND,
     otherElement.y + otherElement.height + GUIDE_EXTEND
   )
-  
+
   return {
     type: 'vertical',
     x,
@@ -301,7 +305,7 @@ function createHorizontalGuide(y, movingElement, otherElement, movingLabel, othe
     movingElement.x + movingElement.width + GUIDE_EXTEND,
     otherElement.x + otherElement.width + GUIDE_EXTEND
   )
-  
+
   return {
     type: 'horizontal',
     y,
@@ -319,17 +323,19 @@ function createHorizontalGuide(y, movingElement, otherElement, movingLabel, othe
 export function useObjectSnapping() {
   const activeGuides = ref([])
   const isSnapping = ref(false)
-  
+
   // Configuración reactiva
   const snapDistance = ref(SNAP_DISTANCE)
   const guideExtend = ref(GUIDE_EXTEND)
-  
+
   /**
    * Ejecuta detección de snap y actualiza guías
    * @param {Object} movingElement - Elemento que se mueve
    * @param {Number} candidateX - Posición X candidata
-   * @param {Number} candidateY - Posición Y candidata  
+   * @param {Number} candidateY - Posición Y candidata
    * @param {Array} otherElements - Otros elementos en el canvas
+   * @param {Object} pageBounds - Límites de la página
+   * @param {Object} options - Opciones adicionales (allowSnap, snapDistance, isTransforming)
    * @returns {Object} - Posición final ajustada
    */
   function performSnap(movingElement, candidateX, candidateY, otherElements, pageBounds, options = {}) {
@@ -338,14 +344,28 @@ export function useObjectSnapping() {
       return { x: candidateX, y: candidateY }
     }
 
+    // Detectar si el movimiento proviene del transformer
+    const isTransforming = options.isTransforming || false
+
     // Pasar pageBounds a detectSnap; permitir que pageBounds genere guías aun si no hay otros elementos
-  // Allow caller to override snap distance (e.g. make XZ more strict)
-  const runtimeSnapDistance = (options && typeof options.snapDistance === 'number') ? options.snapDistance : snapDistance.value
-  const snapResult = detectSnap(movingElement, candidateX, candidateY, otherElements || [], pageBounds, runtimeSnapDistance)
-    
+    // Allow caller to override snap distance (e.g. make XZ more strict)
+    const runtimeSnapDistance = (options && typeof options.snapDistance === 'number') ? options.snapDistance : snapDistance.value
+    const snapResult = detectSnap(movingElement, candidateX, candidateY, otherElements || [], pageBounds, runtimeSnapDistance)
+
     // Actualizar guías activas
     activeGuides.value = snapResult.guides
     isSnapping.value = snapResult.snappedX || snapResult.snappedY
+
+    // Si se está transformando con el transformer, solo mostrar guías, NO aplicar snap
+    if (isTransforming) {
+      return {
+        x: candidateX,
+        y: candidateY,
+        snappedX: snapResult.snappedX,
+        snappedY: snapResult.snappedY,
+        guidesOnly: true // Indicador de que solo se muestran guías
+      }
+    }
 
     // Si se pidió solo mostrar guías, no ajustar la posición final
     if (options && options.allowSnap === false) {
@@ -364,7 +384,7 @@ export function useObjectSnapping() {
       snappedY: snapResult.snappedY,
     }
   }
-  
+
   /**
    * Limpia las guías activas
    */
@@ -372,7 +392,7 @@ export function useObjectSnapping() {
     activeGuides.value = []
     isSnapping.value = false
   }
-  
+
   // Retornar solo lo que se usa externamente (evitar exportar utilidades internas)
   return {
     activeGuides: computed(() => activeGuides.value),
