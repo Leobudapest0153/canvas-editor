@@ -1077,7 +1077,9 @@ const {
   // Snapping helpers
   performSnap,
   clearGuides,
-  isSnappingEnabled
+  isSnappingEnabled,
+  // Boundary provider para clamping
+  computeBoundary
 })
 
 // Función auxiliar para convertir coordenadas del puntero a coordenadas de mundo
