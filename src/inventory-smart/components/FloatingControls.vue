@@ -15,14 +15,14 @@
       </button>
     </UiTooltip>
     <UiTooltip label="Alejar (Ctrl+ -)" :delay="200" position="bottom">
-      <button @click="$emit('zoom-out')" :disabled="!canZoomOut" class="floating-btn btn-zoom btn-zoom-out" title="Alejar (Ctrl+ -)">
+      <button @click="$emit('zoom-out')" :disabled="!canZoomOut" class="floating-btn btn-zoom btn-zoom-out">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       </button>
     </UiTooltip>
     <UiTooltip label="Acercar (Ctrl+ +)" :delay="200" position="bottom">
-      <button @click="$emit('zoom-in')" :disabled="!canZoomIn" class="floating-btn btn-zoom btn-zoom-in" title="Acercar (Ctrl+ +)">
+      <button @click="$emit('zoom-in')" :disabled="!canZoomIn" class="floating-btn btn-zoom btn-zoom-in">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <line x1="12" y1="5" x2="12" y2="19" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />

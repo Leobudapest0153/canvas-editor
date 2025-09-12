@@ -16,10 +16,10 @@
 <template>
   <div class="bg-white border-b border-gray-200 px-4 py-2 shadow-sm">
     <div class="flex items-center gap-4">
-      <!-- Lista de plantas con scroll horizontal -->
-      <div class="flex items-center gap-3 min-w-0 flex-1">
+      <!-- Contenedor de plantas y botón agregar - alineado a la izquierda -->
+      <div class="flex items-center gap-3 plantas-container">
         <!-- Contenedor de plantas scrolleable -->
-        <div class="flex overflow-x-auto space-x-3 plantas-scroll-container flex-1 min-w-0">
+        <div class="flex overflow-x-auto space-x-3 plantas-scroll-container">
           <!-- Tarjetas de plantas -->
           <div
             v-for="planta in canvasStore.plantas"
@@ -66,7 +66,6 @@
               <button
                 @click.stop="toggleMenuPlanta(planta.id, $event)"
                 class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-primary-200 transition-colors cursor-pointer"
-                title="Opciones de planta"
               >
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path
@@ -76,36 +75,38 @@
               </button>
             </UiTooltip>
             <!-- Indicador de planta activa -->
-            <div
+            <!-- <div
               v-if="planta.id === canvasStore.plantaActiva"
               class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
-            ></div>
+            ></div> -->
           </div>
         </div>
 
         <!-- Botón de agregar planta - siempre visible -->
         <UiTooltip
-          label="Agregar nueva planta"
+          label="Agregar nueva planta de almacén"
           :delay="200"
-          position="left"
+          position="right"
         >
-
-        <button
-          @click="canvasStore.abrirEditor()"
-          class="flex-shrink-0 inline-flex items-center justify-center w-12 h-12 bg-primary hover:bg-primary-900 text-white rounded-lg shadow-md hover:shadow-lg cursor-pointer transition-colors"
-          type="button"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-        </button>
+          <button
+            @click="canvasStore.abrirEditor()"
+            class="flex-shrink-0 inline-flex items-center justify-center w-12 h-12 bg-primary hover:bg-primary-900 text-white rounded-lg shadow-md hover:shadow-lg cursor-pointer transition-colors"
+            type="button"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+          </button>
         </UiTooltip>
       </div>
+
+      <!-- Espacio flexible para empujar las acciones hacia la derecha -->
+      <div class="flex-1"></div>
 
       <!-- Separador visual -->
       <div class="w-px h-8 bg-gray-300 separador-visual"></div>
@@ -946,6 +947,8 @@ const vClickOutside = {
 .plantas-scroll-container {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
+  /* Limitar el ancho máximo para que aparezca el scroll cuando sea necesario */
+  max-width: calc(100vw - 400px); /* Resta espacio para botones de acción y separador */
 }
 
 .plantas-scroll-container::-webkit-scrollbar {
@@ -965,8 +968,40 @@ const vClickOutside = {
   background-color: #94a3b8;
 }
 
+/* Contenedor principal de plantas - configuración de overflow */
+.plantas-container {
+  /* Asegurar que se adapte al contenido y no crezca más de lo necesario */
+  flex-shrink: 1;
+  /* Permitir que el contenedor se reduzca cuando sea necesario */
+  min-width: 0;
+  /* Establecer un ancho máximo basado en el viewport menos espacio para acciones */
+  max-width: calc(100vw - 350px);
+}
+
 /* Animación suave para el separador */
 .separador-visual {
   transition: background-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+/* Responsive: ajustar en pantallas más pequeñas */
+@media (max-width: 1024px) {
+  .plantas-container {
+    max-width: calc(100vw - 280px);
+  }
+
+  .plantas-scroll-container {
+    max-width: calc(100vw - 320px);
+  }
+}
+
+@media (max-width: 768px) {
+  .plantas-container {
+    max-width: calc(100vw - 220px);
+  }
+
+  .plantas-scroll-container {
+    max-width: calc(100vw - 260px);
+  }
 }
 </style>

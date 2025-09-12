@@ -140,7 +140,7 @@
     <!-- Fill container -->
     <UiTooltip
       v-if="isElementSelected && !isContainer"
-      label="Asignar datos de uso"
+      label="(DEV) Asignar datos de uso"
       :delay="200"
     >
       <UiIconButton

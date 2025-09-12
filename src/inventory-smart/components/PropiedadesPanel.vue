@@ -67,7 +67,7 @@
               <div>
                 <label class="text-sm text-gray-500">Ancho</label>
                 <div class="flex items-center">
-                  <input type="number" min="0" v-model.number="edited.dimensiones.ancho"
+                  <input type="number" min="0" step="any" v-model.number="edited.dimensiones.ancho"
                     @change="validarDimension('ancho')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     :disabled="isSaving" />
@@ -77,7 +77,7 @@
               <div>
                 <label class="text-sm text-gray-500">Largo</label>
                 <div class="flex items-center">
-                  <input type="number" min="0" v-model.number="edited.dimensiones.largo"
+                  <input type="number" min="0" step="any" v-model.number="edited.dimensiones.largo"
                     @change="validarDimension('largo')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                     :disabled="isSaving" />
@@ -88,7 +88,7 @@
             <div v-if="!esCircular">
               <label class="text-sm text-gray-500">Alto</label>
               <div class="flex items-center">
-                <input type="number" min="0" v-model.number="edited.dimensiones.alto" @change="validarDimension('alto')"
+                <input type="number" min="0" step="any" v-model.number="edited.dimensiones.alto" @change="validarDimension('alto')"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                   :disabled="isSaving || esPasillo" />
                 <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
@@ -99,7 +99,7 @@
             <div v-if="esCircular">
               <label class="text-sm text-gray-500">Diámetro</label>
               <div class="flex items-center">
-                <input type="number" min="1" step="1" :max="maxDiametroPlanta" v-model.number="edited.diametroCm"
+                <input type="number" min="1" step="any" :max="maxDiametroPlanta" v-model.number="edited.diametroCm"
                   @change="validarDiametro"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                   :disabled="isSaving" />

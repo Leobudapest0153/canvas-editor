@@ -11,15 +11,16 @@
     <div class="breadcrumbs">
       <template v-for="(crumb, index) in canvasStore.breadcrumbs" :key="`${crumb.tipo}-${crumb.id}`">
         <span class="crumb-group">
-          <button
-            class="breadcrumb-item"
-            :class="{ active: index === canvasStore.breadcrumbs.length - 1 }"
-            @click="navegarACrumb(crumb, index)"
-          >
-            <span class="crumb-icon">{{ crumb.icono }}</span>
-            <span class="crumb-text">{{ crumb.nombre }}</span>
-          </button>
-
+          <UiTooltip :label="index === canvasStore.breadcrumbs.length - 1 ? `Contexto actual` : `Ir a ${crumb.nombre}`" position="top">
+            <button
+              class="breadcrumb-item"
+              :class="{ active: index === canvasStore.breadcrumbs.length - 1 }"
+              @click="navegarACrumb(crumb, index)"
+            >
+              <span class="crumb-icon">{{ crumb.icono }}</span>
+              <span class="crumb-text">{{ crumb.nombre }}</span>
+            </button>
+          </UiTooltip>
           <!-- Separador entre elementos, no renderizar después del último -->
           <svg
             v-if="index < canvasStore.breadcrumbs.length - 1"
@@ -34,18 +35,19 @@
         </span>
       </template>
 
-      <!-- Botón redondo con solo icono; tooltip indica a dónde regresa -->
-      <UiIconButton
-        v-if="canvasStore.puedeNavegar"
-        :ariaLabel="previousCrumb ? `Volver a ${previousCrumb.nombre}` : 'Volver al nivel anterior'"
-        :title="previousCrumb ? `Volver a ${previousCrumb.nombre}` : 'Volver al nivel anterior'"
-        @click="canvasStore.navegarAlPadre()"
-        class="breadcrumb-back"
-      >
-        <svg class="crumb-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-        </svg>
-      </UiIconButton>
+      <!-- Botón "Regresar" con texto e icono -->
+      <UiTooltip :label="previousCrumb ? `Volver a ${previousCrumb.nombre}` : 'Volver al nivel anterior'" position="top">
+        <button
+          v-if="canvasStore.puedeNavegar"
+          class="breadcrumb-item breadcrumb-back"
+          @click="canvasStore.navegarAlPadre()"
+        >
+          <svg class="crumb-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      </UiTooltip>
+
     </div>
 
     <!-- Controles de navegación -->
@@ -84,7 +86,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
-import UiIconButton from './ui/UiIconButton.vue'
+import UiTooltip from './ui/UiTooltip.vue'
 
 // Composables
 const canvasStore = useCanvasStore()
@@ -176,15 +178,15 @@ const previousCrumb = computed(() => {
 
 /* Estilos para el botón "Regresar" dentro de las breadcrumbs */
 .breadcrumb-back {
-  background: linear-gradient(180deg,#ffffff 0%, #f1fdf6 100%);
-  border: 1px solid #c7e6d8;
-  color: #065f46;
+  background: var(--color-primary-100);
+  border: 1px solid var(--color-primary-300);
+  color: #1d1e4c;
   font-weight: 600;
   box-shadow: 0 2px 6px rgba(6,95,70,0.08);
   width: 36px;
   height: 36px;
   padding: 0;
-  border-radius: 999px;
+  border-radius: 120px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -266,16 +268,6 @@ const previousCrumb = computed(() => {
 .nav-btn:hover {
   background: #f9fafb;
   border-color: #9ca3af;
-}
-
-.nav-back {
-  color: #059669;
-  border-color: #d1fae5;
-}
-
-.nav-back:hover {
-  background: #ecfdf5;
-  border-color: #a7f3d0;
 }
 
 .nav-btn .icon {
