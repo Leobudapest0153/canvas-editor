@@ -167,13 +167,15 @@ export function useDimensionValidation() {
         altoHijoCanvas = dimHijo.largo || 0; // En vista XY mostramos largo
         
         // CORRECCIÓN CRÍTICA: Detectar si el hijo fue posicionado en vista frontal
-        // Heurística: Si el hijo es muy grande comparado con el área disponible
-        // y está desplazado, probablemente fue posicionado en otra vista
-        const hijoOcupaTodoElLargo = altoHijoCanvas >= (dimensionesPadre.largo * 0.9); // 90% o más del largo
+        // Si un hijo se sale del área padre debido a desplazamiento Y, probablemente fue posicionado en vista frontal
         const hijoDesplazadoEnY = posHijoY_raw > 1; // Más de 1cm de desplazamiento
         const seSaleDelArea = (posHijoY_raw + altoHijoCanvas) > dimensionesPadre.largo;
+        const hijoTieneAltoProbablementeZ = (dimHijo.alto || 0) > (dimensionesPadre.largo * 0.5); // Su alto sugiere coordenada Z
         
-        if (hijoOcupaTodoElLargo && hijoDesplazadoEnY && seSaleDelArea) {
+        // Condiciones para detectar posicionamiento en vista frontal:
+        // 1. Se sale del área Y está desplazado (caso más común)
+        // 2. O tiene alto significativo comparado con el largo del padre (sugiere que su Y es coordenada Z)
+        if ((seSaleDelArea && hijoDesplazadoEnY) || hijoTieneAltoProbablementeZ) {
           // El hijo probablemente fue posicionado en vista frontal
           posHijoY = 0; // Posicionar en Y=0 para vista superior
           correccionAplicada = true;
