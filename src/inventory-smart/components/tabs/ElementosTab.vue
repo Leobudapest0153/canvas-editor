@@ -26,7 +26,7 @@
             aria-label="Catálogo de elementos"
           >
             <span aria-hidden="true" class="text-sm">📦</span>
-            <span class="ml-1">Elementos</span>
+            <span class="ml-1">Espacios</span>
           </button>
 
           <button
@@ -138,7 +138,7 @@
             <!-- Botón de acciones (tres puntos) -->
             <button
               type="button"
-              class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded cursor-pointer"
               aria-haspopup="menu"
               :aria-expanded="ctxMenu.visible && ctxMenu.template?.id === tpl.id ? 'true' : 'false'"
               :aria-controls="`tpl-menu-${tpl.id}`"
@@ -168,17 +168,17 @@
 
               <div class="elemento-specs space-y-1">
                 <div class="spec-item flex justify-between text-xs">
-                  <span class="spec-label text-gray-500 font-medium">Dim:</span>
+                  <span class="spec-label text-gray-500 font-medium">Dimensiones:</span>
                   <span class="spec-value text-gray-700">
                     {{ getTemplateDims(tpl).ancho }}x{{ getTemplateDims(tpl).largo }}x{{ getTemplateDims(tpl).alto }}
                   </span>
                 </div>
                 <div class="spec-item flex justify-between text-xs">
-                  <span class="spec-label text-gray-500 font-medium">Peso:</span>
+                  <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
                   <span class="spec-value text-gray-700">{{ formatTemplateWeight(tpl) }}</span>
                 </div>
                 <div class="spec-item flex justify-between text-xs">
-                  <span class="spec-label text-gray-500 font-medium">Ubic:</span>
+                  <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
                   <span class="spec-value text-gray-700 capitalize">{{ formatTemplateLocation(tpl) }}</span>
                 </div>
               </div>
@@ -233,7 +233,7 @@
         @keydown.esc.stop.prevent="closeTemplateContextMenu"
       >
         <button
-          class="block w-full text-left px-3 py-2 rounded text-red-600 hover:bg-red-50"
+          class="block cursor-pointer w-full text-left px-3 py-2 rounded text-red-600 hover:bg-red-50"
           role="menuitem"
           @click.stop="handleDeleteTemplate(ctxMenu.template)"
         >

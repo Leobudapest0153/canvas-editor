@@ -15,14 +15,14 @@
       </button>
     </UiTooltip>
     <UiTooltip label="Alejar (Ctrl+ -)" :delay="200" position="bottom">
-      <button @click="$emit('zoom-out')" :disabled="!canZoomOut" class="floating-btn btn-zoom btn-zoom-out" title="Alejar (Ctrl+ -)">
+      <button @click="$emit('zoom-out')" :disabled="!canZoomOut" class="floating-btn btn-zoom btn-zoom-out">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       </button>
     </UiTooltip>
     <UiTooltip label="Acercar (Ctrl+ +)" :delay="200" position="bottom">
-      <button @click="$emit('zoom-in')" :disabled="!canZoomIn" class="floating-btn btn-zoom btn-zoom-in" title="Acercar (Ctrl+ +)">
+      <button @click="$emit('zoom-in')" :disabled="!canZoomIn" class="floating-btn btn-zoom btn-zoom-in">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <line x1="12" y1="5" x2="12" y2="19" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           <line x1="5" y1="12" x2="19" y2="12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -132,11 +132,11 @@ watch(() => props.safeRight, recomputeFloatingRight)
 
 /* Botones de zoom: heredan tamaño de .floating-btn y comparten color/hover con btn-undo */
 .btn-zoom:not(:disabled) {
-  color: #3b82f6;
+  color: var(--color-primary);
 }
 .btn-zoom:hover:not(:disabled) {
   background: #eff6ff;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
 }
 
 /* Si el espacio horizontal es reducido, desplazar .canvas-info hacia la izquierda y reducir su padding */
@@ -172,12 +172,12 @@ watch(() => props.safeRight, recomputeFloatingRight)
 }
 
 .btn-undo:not(:disabled) {
-  color: #3b82f6;
+  color: var(--color-primary);
 }
 
 .btn-undo:hover:not(:disabled) {
   background: #eff6ff;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
 }
 
 .btn-redo:not(:disabled) {
@@ -191,20 +191,20 @@ watch(() => props.safeRight, recomputeFloatingRight)
 
 /* Ajuste visual del botón de 'fit' para que coincida con el botón Deshacer */
 .btn-fit:not(:disabled) {
-  color: #3b82f6;
+  color: var(--color-primary);
 }
 .btn-fit:hover:not(:disabled) {
   background: #eff6ff;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
 }
 
 /* Gear button style to match Undo */
 .btn-gear {
-  color: #3b82f6;
+  color: var(--color-primary);
 }
 .btn-gear:hover:not(:disabled) {
   background: #eff6ff;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
 }
 
 .floating-btn .icon {

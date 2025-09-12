@@ -16,18 +16,18 @@
 <template>
   <div class="bg-white border-b border-gray-200 px-4 py-2 shadow-sm">
     <div class="flex items-center gap-4">
-      <!-- Lista de plantas con scroll horizontal -->
-      <div class="flex items-center gap-3 min-w-0 flex-1">
+      <!-- Contenedor de plantas y botón agregar - alineado a la izquierda -->
+      <div class="flex items-center gap-3 plantas-container">
         <!-- Contenedor de plantas scrolleable -->
-        <div class="flex overflow-x-auto space-x-3 plantas-scroll-container flex-1 min-w-0">
+        <div class="flex overflow-x-auto space-x-3 plantas-scroll-container">
           <!-- Tarjetas de plantas -->
           <div
             v-for="planta in canvasStore.plantas"
             :key="planta.id"
             :class="[
-              'relative flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-blue-400 flex-shrink-0',
+              'relative m-2 flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 hover:border-primary-400 flex-shrink-0',
               {
-                'bg-blue-50 border-blue-300 shadow-md': planta.id === canvasStore.plantaActiva,
+                'bg-primary-200 border-primary-200 shadow-md': planta.id === canvasStore.plantaActiva,
                 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300':
                   planta.id !== canvasStore.plantaActiva,
               },
@@ -35,7 +35,7 @@
           >
             <div class="flex items-center space-x-3" @click="seleccionarPlanta(planta.id)">
               <div
-                class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-gradient-to-br from-blue-500 to-blue-600"
+                class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-primary"
               >
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path
@@ -65,8 +65,7 @@
             >
               <button
                 @click.stop="toggleMenuPlanta(planta.id, $event)"
-                class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
-                title="Opciones de planta"
+                class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-primary-200 transition-colors cursor-pointer"
               >
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path
@@ -76,36 +75,38 @@
               </button>
             </UiTooltip>
             <!-- Indicador de planta activa -->
-            <div
+            <!-- <div
               v-if="planta.id === canvasStore.plantaActiva"
               class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
-            ></div>
+            ></div> -->
           </div>
         </div>
 
         <!-- Botón de agregar planta - siempre visible -->
         <UiTooltip
-          label="Agregar nueva planta"
+          label="Agregar nueva planta de almacén"
           :delay="200"
-          position="left"
+          position="right"
         >
-
-        <button
-          @click="canvasStore.abrirEditor()"
-          class="flex-shrink-0 inline-flex items-center justify-center w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-md hover:shadow-lg cursor-pointer transition-colors"
-          type="button"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-        </button>
+          <button
+            @click="canvasStore.abrirEditor()"
+            class="flex-shrink-0 inline-flex items-center justify-center w-12 h-12 bg-primary hover:bg-primary-900 text-white rounded-lg shadow-md hover:shadow-lg cursor-pointer transition-colors"
+            type="button"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+          </button>
         </UiTooltip>
       </div>
+
+      <!-- Espacio flexible para empujar las acciones hacia la derecha -->
+      <div class="flex-1"></div>
 
       <!-- Separador visual -->
       <div class="w-px h-8 bg-gray-300 separador-visual"></div>
@@ -239,7 +240,7 @@
               id="nombre"
               v-model="formularioPlanta.nombre"
               type="text"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all"
               placeholder="Ej: Planta Baja, Primer Piso..."
               required
             />
@@ -252,7 +253,7 @@
             <textarea
               id="descripcion"
               v-model="formularioPlanta.descripcion"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all resize-none"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all resize-none"
               placeholder="Descripción de la planta..."
               rows="3"
             ></textarea>
@@ -271,7 +272,7 @@
                   v-model.number="formularioPlanta.dimensiones.ancho"
                   @input="onDimChange()"
                   type="number"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all"
                   placeholder="800"
                   min="100"
                   max="5000"
@@ -287,7 +288,7 @@
                   v-model.number="formularioPlanta.dimensiones.largo"
                   @input="onDimChange()"
                   type="number"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all"
                   placeholder="1000"
                   min="100"
                   max="5000"
@@ -300,7 +301,7 @@
                   id="alto"
                   v-model.number="formularioPlanta.dimensiones.alto"
                   type="number"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all"
                   placeholder="280"
                   min="200"
                   max="1000"
@@ -334,7 +335,7 @@
               id="pesoMaximo"
               v-model.number="formularioPlanta.pesoMaximoSoportado"
               type="number"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all"
               placeholder="3000"
               min="500"
               max="50000"
@@ -352,7 +353,7 @@
             </button>
             <button
               type="submit"
-              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white border-none rounded-lg cursor-pointer transition-colors"
+              class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white border-none rounded-lg cursor-pointer transition-colors"
             >
               {{ mostrarModalEditar ? 'Guardar Cambios' : 'Crear Planta' }}
             </button>
@@ -946,6 +947,8 @@ const vClickOutside = {
 .plantas-scroll-container {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
+  /* Limitar el ancho máximo para que aparezca el scroll cuando sea necesario */
+  max-width: calc(100vw - 400px); /* Resta espacio para botones de acción y separador */
 }
 
 .plantas-scroll-container::-webkit-scrollbar {
@@ -965,8 +968,40 @@ const vClickOutside = {
   background-color: #94a3b8;
 }
 
+/* Contenedor principal de plantas - configuración de overflow */
+.plantas-container {
+  /* Asegurar que se adapte al contenido y no crezca más de lo necesario */
+  flex-shrink: 1;
+  /* Permitir que el contenedor se reduzca cuando sea necesario */
+  min-width: 0;
+  /* Establecer un ancho máximo basado en el viewport menos espacio para acciones */
+  max-width: calc(100vw - 350px);
+}
+
 /* Animación suave para el separador */
 .separador-visual {
   transition: background-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+/* Responsive: ajustar en pantallas más pequeñas */
+@media (max-width: 1024px) {
+  .plantas-container {
+    max-width: calc(100vw - 280px);
+  }
+
+  .plantas-scroll-container {
+    max-width: calc(100vw - 320px);
+  }
+}
+
+@media (max-width: 768px) {
+  .plantas-container {
+    max-width: calc(100vw - 220px);
+  }
+
+  .plantas-scroll-container {
+    max-width: calc(100vw - 260px);
+  }
 }
 </style>
