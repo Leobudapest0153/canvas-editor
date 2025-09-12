@@ -1,14 +1,14 @@
 ﻿<!-- components/FloatingToolbar.vue -->
 <template>
   <div
-    class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[49] inline-flex items-center gap-3 whitespace-nowrap max-w-max rounded-[20px] border border-white/12 dark:border-white/6 bg-white/50 dark:bg-slate-900/45 backdrop-blur-xl backdrop-saturate-150 px-3.5 py-2 shadow-[0_6px_18px_rgba(0,0,0,.08),inset_0_0_0_1px_rgba(255,255,255,.06)]"
+    class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[49] inline-flex items-center gap-3 whitespace-nowrap max-w-max rounded-[20px] border border-white/6 bg-slate-900/45 backdrop-blur-xl backdrop-saturate-150 px-3.5 py-2 shadow-[0_6px_18px_rgba(0,0,0,.08),inset_0_0_0_1px_rgba(255,255,255,.06)]"
     :class="{ 'translate-y-20': avoidOverlap }"
     role="toolbar"
     aria-label="Toolbar de lienzo"
   >
     <!-- Grupo conmutador Mano / Edición -->
     <div
-      class="relative isolate flex items-center h-[40px] rounded-[14px] border border-white/10 dark:border-white/8 bg-white/35 dark:bg-white/5 overflow-visible"
+      class="relative isolate flex items-center h-[40px] rounded-[14px] border border-white/8 bg-white/5 overflow-visible"
       role="group"
       aria-label="Cambiar modo"
       :style="{ '--seg-w':'36px','--seg-gap':'8px','--seg-pad':'0px','--seg-index': activeMode==='edit' ? 1 : 0 }"
@@ -64,13 +64,13 @@
     </div>
 
     <!-- Divider between group and secondary actions -->
-    <div class="h-6 w-px bg-white/10 dark:bg-white/10 mx-1.5" aria-hidden="true" />
+    <div class="h-6 w-px bg-white/10 mx-1.5" aria-hidden="true" />
 
     <!-- Snapping -->
     <UiTooltip label="Ajuste automático (S)" :delay="200">
       <div class="relative group">
         <UiIconButton
-          class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
+          class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-white/[.06] text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
           @click.stop="$emit('toggle-snapping')"
           :state="isSnappingEnabled ? 'on' : 'off'"
           aria-label="Alternar ajuste automático (S)"
@@ -100,12 +100,12 @@
       :delay="200"
     >
       <UiIconButton
-        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-white/[.06] text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
         @click.stop="$emit('toggle-lock')"
         :state="isElementLocked ? 'on' : 'off'"
         :aria-label="isElementLocked ? 'Desbloquear elemento (L)' : 'Bloquear elemento (L)'"
         :aria-pressed="isElementLocked ? 'true' : 'false'"
-        :class="{ 'text-amber-600 dark:text-amber-400': isElementLocked }"
+        :class="{ 'text-amber-400': isElementLocked }"
       >
         <!-- Icono candado -->
         <svg v-if="isElementLocked" viewBox="0 0 512 512" class="pointer-events-none h-[18px] w-[18px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
@@ -120,7 +120,7 @@
     <!-- Delete button -->
     <UiTooltip v-if="isElementSelected" label="Borrar elemento (Supr)" :delay="200">
       <UiIconButton
-        class="hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
+        class="hover:bg-white/[0.06]"
         aria-label="Borrar elemento (Supr)"
         @click.stop="$emit('delete')"
       >
@@ -144,7 +144,7 @@
       :delay="200"
     >
       <UiIconButton
-        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-black/[.05] dark:hover:bg-white/[.06] text-slate-600 dark:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
+        class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-white/[.06] text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
         @click.stop="$emit('fill-container')"
         aria-label="Asignar datos de uso"
         state="off"
