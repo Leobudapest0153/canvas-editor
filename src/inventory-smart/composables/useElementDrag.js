@@ -766,10 +766,10 @@ export function useElementDrag({
   }
 
   const onShapeDragStart = (e, el) => {
-    if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
+    if (!canvasStore.estaEnPlanta) {
       const shape = e.target
       const parent =
-        canvasStore.elementoContenedorActual ||
+        canvasStore.estructuraContenedorActual ||
         canvasStore.elementoPorId(canvasStore.elementoSeleccionado)
       const siblings =
         parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []

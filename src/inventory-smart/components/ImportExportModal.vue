@@ -216,6 +216,12 @@ const contextoActual = computed(() => {
   const contexto = canvasStore.contextoNavegacion
   if (contexto.tipo === 'plantas') {
     return `Planta: ${plantaActivaNombre.value}`
+  } else if (contexto.tipo === 'pisos') {
+    const piso = canvasStore.elementoPorId(contexto.id)
+    return `Piso: ${piso?.nombre || 'Desconocido'}`
+  } else if (contexto.tipo === 'cuartos') {
+    const cuarto = canvasStore.elementoPorId(contexto.id)
+    return `Cuarto: ${cuarto?.nombre || 'Desconocido'}`
   } else if (contexto.tipo === 'elementos') {
     const elemento = canvasStore.elementoPorId(contexto.id)
     return `Elemento: ${elemento?.nombre || 'Desconocido'}`

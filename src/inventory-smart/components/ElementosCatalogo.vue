@@ -319,8 +319,7 @@ const onGuardarElemento = (elemento) => {
     id: `custom_${Date.now()}`,
     icono: 'box',
     personalizado: true,
-    // Asegurar que tenga la propiedad tipo basada en la categoría
-    tipo: elemento.categoria === 'contenedores' ? 'contenedores' : 'elementos',
+    tipo: elemento.tipo,
   }
   items.value.push(elementoNuevo)
   cerrarModal()
@@ -460,6 +459,18 @@ watch(
   (ctx) => {
     if (ctx.tipo === 'plantas') {
       catalogStore.setCatalogContext({ mode: 'root' })
+    } else if (ctx.tipo === 'cuartos') {
+      catalogStore.setCatalogContext({
+        mode: 'detail-room',
+        currentId: ctx.id,
+        currentType: 'room',
+      })
+    } else if (ctx.tipo === 'pisos') {
+      catalogStore.setCatalogContext({
+        mode: 'detail-floor',
+        currentId: ctx.id,
+        currentType: 'floor',
+      })
     } else if (ctx.tipo === 'elementos') {
       catalogStore.setCatalogContext({
         mode: 'detail-element',
@@ -471,6 +482,12 @@ watch(
         mode: 'detail-container',
         currentId: ctx.id,
         currentType: 'container',
+      })
+    } else if (ctx.tipo === 'pasillos') {
+      catalogStore.setCatalogContext({
+        mode: 'detail-aisle',
+        currentId: ctx.id,
+        currentType: 'aisle',
       })
     }
   },

@@ -205,7 +205,7 @@ export function useAutoPaste() {
           bounds.maxY = (planta.dimensiones.alto || 0) * CM_TO_PX
         }
       }
-    } else if (contexto.tipo === 'elementos' || contexto.tipo === 'contenedores') {
+    } else {
       const elemento = canvasStore.elementoPorId(contexto.id)
       if (elemento?.dimensiones) {
         // Usar las dimensiones reales del elemento según la vista
@@ -251,13 +251,9 @@ export function useAutoPaste() {
       // Si estamos en una planta, verificar que tenga paredes
       if (contexto.tipo === 'plantas') {
         return true // Las plantas pueden tener elementos de pared
-      }
-
-      // Si estamos dentro de un elemento, verificar que el padre soporte pared
-      if (contexto.tipo === 'elementos' || contexto.tipo === 'contenedores') {
+      } else {
         const elementoPadre = canvasStore.elementoPorId(contexto.id)
         const padreUbic = elementoPadre?.ubicacion || 'suelo'
-
         // Pared puede ir en pared o en suelo (como pared interior)
         return padreUbic === 'pared' || padreUbic === 'suelo'
       }

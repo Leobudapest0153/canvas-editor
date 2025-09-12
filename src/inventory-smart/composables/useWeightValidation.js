@@ -40,7 +40,7 @@ export function useWeightValidation() {
    * no lo que cada elemento pesa en sí mismo.
    *
    * @param {string} padreId - ID del elemento/planta padre
-   * @param {string} padreType - Tipo del padre ('plantas', 'elementos', 'contenedores')
+   * @param {string} padreType - Tipo del padre ('plantas', 'cuartos', 'pisos', 'elementos', 'contenedores')
    * @param {Object} options - Opciones adicionales
    * @param {boolean} options.recursive - Si es true, calcula recursivamente el peso de todos los descendientes
    * @param {string} options.excluirElementoId - ID del elemento a excluir del cálculo (útil al editar)
@@ -96,7 +96,7 @@ export function useWeightValidation() {
    * SIN recursión, ya que se asume que el uso.peso de cada elemento ya incluye el peso de sus hijos.
    *
    * @param {string} padreId - ID del elemento/planta padre
-   * @param {string} padreType - Tipo del padre ('plantas', 'elementos', 'contenedores')
+   * @param {string} padreType - Tipo del padre ('plantas', 'cuartos', 'pisos', 'elementos', 'contenedores')
    * @param {Object} options - Opciones adicionales (recursive se ignora para peso real)
    * @param {boolean} options.recursive - IGNORADO: El peso real no necesita recursión
    * @param {string} options.excluirElementoId - ID del elemento a excluir del cálculo (útil al editar)
@@ -175,7 +175,7 @@ export function useWeightValidation() {
    *
    * @param {Object} nuevoElemento - Elemento que se intenta agregar o editar
    * @param {string} padreId - ID del elemento/planta padre
-   * @param {string} padreType - Tipo del padre ('plantas', 'elementos', 'contenedores')
+   * @param {string} padreType - Tipo del padre ('plantas', 'cuartos', 'pisos', 'elementos', 'contenedores')
    * @param {Object} options - Opciones de validación
    * @param {boolean} options.validacionTeorica - Si true, valida capacidad teórica máxima. Si false, valida solo uso real
    * @param {boolean} options.strict - Alias para validacionTeorica (mantiene compatibilidad)
@@ -247,7 +247,7 @@ export function useWeightValidation() {
    * NOTA: Este cálculo puede ser teórico (capacidad máxima) o real (uso actual) según configuración.
    *
    * @param {string} padreId - ID del elemento/planta padre
-   * @param {string} padreType - Tipo del padre ('plantas', 'elementos', 'contenedores')
+   * @param {string} padreType - Tipo del padre ('plantas', 'cuartos', 'pisos', 'elementos', 'contenedores')
    * @param {Object} options - Opciones de cálculo
    * @param {boolean} options.validacionTeorica - Si true, calcula basado en capacidad teórica. Si false, en uso real
    * @returns {Object} { disponible: number, usado: number, maximo: number, porcentajeUsado: number }
