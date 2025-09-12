@@ -471,8 +471,8 @@ export function useTransformer({
         return
       }
 
-      // Usar el snapshot congelado para todas las operaciones
-      const elementoSnapshot = elemento
+  // Usar el snapshot congelado para todas las operaciones
+  const elementoSnapshot = elemento
 
       // Extraer valores de Konva (mantener valores originales para Konva y store)
       const width = node.width() * node.scaleX()
@@ -481,12 +481,167 @@ export function useTransformer({
       const y = node.y()
       const rotation = node.rotation?.() || 0
 
+      // Paso opcional: aplicar snap final a la posición si hay guías cercanas
+      let snappedX = x
+      let snappedY = y
+      let snappedW = width
+      let snappedH = height
+      if (isSnappingEnabled?.value && typeof performSnap === 'function') {
+        try {
+          const neighborsForSnap = Array.from(elementosSnapshot.values()).filter((e) => e.id !== elementId)
+          const pageBounds = layerConfig?.value
+            ? { width: layerConfig.value.width, height: layerConfig.value.height }
+            : null
+          const movingForSnap = elementoSnapshot?.forma === 'circular'
+            ? { ...elementoSnapshot, x, y, width: Math.min(width, height), height: Math.min(width, height) }
+            : { ...elementoSnapshot, x, y, width, height }
+          const snapRes = performSnap(movingForSnap, x, y, neighborsForSnap, pageBounds, {
+            allowSnap: true,
+            pageSnapDistance: 24,
+            isTransforming: false,
+          })
+          if (snapRes && (Number.isFinite(snapRes.x) && Number.isFinite(snapRes.y))) {
+            snappedX = snapRes.x
+            snappedY = snapRes.y
+            if (snappedX !== x || snappedY !== y) {
+              node.x(snappedX)
+              node.y(snappedY)
+            }
+          }
+
+          // Snap de tamaño: al finalizar, ajustar borde que más se movió para alinearlo con bordes vecinos o de página
+          // Esto previene solapes XY mínimos que disparan conflictos de altura
+          try {
+            const prevState = transformInitialState.get(elementId)
+            if (prevState && elementoSnapshot?.forma !== 'circular') {
+              const prevRight = prevState.x + prevState.width
+              const prevBottom = prevState.y + prevState.height
+              const right = snappedX + snappedW
+              const bottom = snappedY + snappedH
+              const dLeft = Math.abs(snappedX - prevState.x)
+              const dRight = Math.abs(right - prevRight)
+              const dTop = Math.abs(snappedY - prevState.y)
+              const dBottom = Math.abs(bottom - prevBottom)
+              const edges = [
+                { key: 'left', d: dLeft },
+                { key: 'right', d: dRight },
+                { key: 'top', d: dTop },
+                { key: 'bottom', d: dBottom },
+              ]
+              edges.sort((a, b) => b.d - a.d)
+              const movedEdge = edges[0]?.key
+
+              const W = pageBounds?.width ?? layerConfig?.value?.width ?? 0
+              const H = pageBounds?.height ?? layerConfig?.value?.height ?? 0
+              const EDGE_EPS = 8 // px
+              const MINW = 10
+              const MINH = 10
+
+              // utilidades
+              const overlap1D = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0)
+
+              const neighbors = neighborsForSnap
+
+              if (movedEdge === 'right' || movedEdge === 'left') {
+                // Candidatos de X a los que alinear
+                const candidatesX = [0, W]
+                for (const n of neighbors) {
+                  candidatesX.push(n.x, n.x + n.width)
+                }
+                // Elegir target más cercano con solape vertical suficiente
+                let best = null
+                for (const tx of candidatesX) {
+                  // Requiere solape vertical con algún rect destino (para vecinos) o con la página (siempre)
+                  let hasOverlap = false
+                  if (tx === 0 || tx === W) {
+                    hasOverlap = true // borde de página, consideramos válido
+                  } else {
+                    for (const n of neighbors) {
+                      if (Math.abs(tx - n.x) <= EDGE_EPS || Math.abs(tx - (n.x + n.width)) <= EDGE_EPS) {
+                        if (overlap1D(snappedY, snappedY + snappedH, n.y, n.y + n.height) > 0) {
+                          hasOverlap = true
+                          break
+                        }
+                      }
+                    }
+                  }
+                  if (!hasOverlap) continue
+                  const ex = movedEdge === 'right' ? right : snappedX
+                  const dist = Math.abs(ex - tx)
+                  if (dist <= EDGE_EPS && (!best || dist < best.dist)) {
+                    best = { tx, dist }
+                  }
+                }
+                if (best) {
+                  if (movedEdge === 'right') {
+                    const newW = Math.max(MINW, best.tx - snappedX)
+                    snappedW = newW
+                  } else {
+                    const rightEdge = right
+                    const newX = best.tx
+                    const newW = Math.max(MINW, rightEdge - newX)
+                    snappedX = newX
+                    node.x(newX)
+                    snappedW = newW
+                  }
+                }
+              } else if (movedEdge === 'bottom' || movedEdge === 'top') {
+                // Candidatos de Y a los que alinear
+                const candidatesY = [0, H]
+                for (const n of neighbors) {
+                  candidatesY.push(n.y, n.y + n.height)
+                }
+                let best = null
+                for (const ty of candidatesY) {
+                  let hasOverlap = false
+                  if (ty === 0 || ty === H) {
+                    hasOverlap = true
+                  } else {
+                    for (const n of neighbors) {
+                      if (Math.abs(ty - n.y) <= EDGE_EPS || Math.abs(ty - (n.y + n.height)) <= EDGE_EPS) {
+                        if (overlap1D(snappedX, snappedX + snappedW, n.x, n.x + n.width) > 0) {
+                          hasOverlap = true
+                          break
+                        }
+                      }
+                    }
+                  }
+                  if (!hasOverlap) continue
+                  const ey = movedEdge === 'bottom' ? bottom : snappedY
+                  const dist = Math.abs(ey - ty)
+                  if (dist <= EDGE_EPS && (!best || dist < best.dist)) {
+                    best = { ty, dist }
+                  }
+                }
+                if (best) {
+                  if (movedEdge === 'bottom') {
+                    const newH = Math.max(MINH, best.ty - snappedY)
+                    snappedH = newH
+                  } else {
+                    const bottomEdge = bottom
+                    const newY = best.ty
+                    const newH = Math.max(MINH, bottomEdge - newY)
+                    snappedY = newY
+                    node.y(newY)
+                    snappedH = newH
+                  }
+                }
+              }
+            }
+          } catch (edgeErr) {
+            console.warn('[transform-end-edge-snap] Error en snap de tamaño:', edgeErr)
+          }
+        } catch (e2) {
+          console.warn('[transform-end-snap] Error aplicando snap final:', e2)
+        }
+      }
+
       // CORRECCIÓN DE PRECISIÓN: Solo para validaciones
       const valoresParaValidacion = correctTransformValues({
-        x,
-        y,
-        width,
-        height,
+        x: snappedX,
+        y: snappedY,
+        width: snappedW,
+        height: snappedH,
         rotation,
       })
 
@@ -527,7 +682,11 @@ export function useTransformer({
           validationOptions: { isTransforming: true } // Indicar que es una validación de transformación
         },
       )
-      if (!guardRes.valid) return
+      if (!guardRes.valid) {
+        // Reconfigurar el transformer tras revertir para evitar estados visuales viejos
+        nextTick(() => setupTransformer())
+        return
+      }
 
       // VALIDACIÓN 2: Verificar que esté dentro del polígono de la planta
       try {
@@ -655,8 +814,8 @@ export function useTransformer({
       // IMPORTANTE: Usar valores originales de Konva (sin corrección de precisión)
       // Solo aplicar dimensiones y rotación originales - NO modificar coordenadas x, y
       const valoresFinales = {
-        width,
-        height,
+        width: snappedW,
+        height: snappedH,
         rotation,
       }
 
@@ -668,8 +827,8 @@ export function useTransformer({
       // NO llamar node.x() ni node.y() - dejar que transformer mantenga sus coordenadas
 
       // Para el store, usar las coordenadas finales del transformer sin corrección
-      const finalNodeX = node.x()
-      const finalNodeY = node.y()
+  const finalNodeX = node.x()
+  const finalNodeY = node.y()
 
       // Limpiar feedback visual
       clearTransformVisualFeedback(elementId)
@@ -698,7 +857,7 @@ export function useTransformer({
         `Elemento redimensionado: ${elementoSnapshot?.nombre || elementoSnapshot?.tipo || elementId}`,
       )
 
-      lastValidPositions.value.set(elementId, { x: finalNodeX, y: finalNodeY })
+  lastValidPositions.value.set(elementId, { x: finalNodeX, y: finalNodeY })
 
       nextTick(() => setupTransformer())
     } catch (err) {

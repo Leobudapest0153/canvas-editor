@@ -60,9 +60,9 @@ export function computeDimsByAxisScale(typeKey, parentDims, opts = {}) {
     d = roundSnapCm(d, gridPx)
   }
 
-  w = clamp(w, limits.min.w, limits.max.w)
-  h = clamp(h, limits.min.h, limits.max.h)
-  d = clamp(d, limits.min.d, limits.max.d)
+  w = toPrecisionCm(clamp(w, limits.min.w, limits.max.w))
+  h = toPrecisionCm(clamp(h, limits.min.h, limits.max.h))
+  d = toPrecisionCm(clamp(d, limits.min.d, limits.max.d))
 
   return { ancho: toPrecisionCm(w), largo: toPrecisionCm(h), alto: toPrecisionCm(d) }
 }

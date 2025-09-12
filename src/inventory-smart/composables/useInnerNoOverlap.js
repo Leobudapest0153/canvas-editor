@@ -105,8 +105,8 @@ export function makeInnerSession({ parentEl, movingEl, siblings, vista }) {
     contact = { id: null, axis: null }
     let p = clampRectToBounds(candidateLocal, mSize, bounds)
     if (!isValidLocal(p)) p = lastGoodLocal
-    // En vista frontal (XZ) no aplicar redondeo a la grilla para permitir movimientos mínimos libres
-    const G = (vista === 'XZ') ? 0 : Math.max(1, GRID_SIZE || 10)
+    // En vista frontal (XZ) no aplicar redondeo a la grilla; y si GRID_SIZE=0, respetar desactivación
+    const G = (vista === 'XZ') ? 0 : (GRID_SIZE > 0 ? GRID_SIZE : 0)
     if (G > 0) {
       p = { x: Math.round(p.x / G) * G, y: Math.round(p.y / G) * G }
     }

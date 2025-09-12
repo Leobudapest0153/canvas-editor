@@ -2,6 +2,7 @@
 // Detección de conflictos: broad-phase (AABB), narrow-phase (2D) y chequeo Z
 
 import { detectCircleCircleCollision, areBothCircular, detectCircleRectCollision } from './circleCollisions'
+import { PRECISION_PIXELS } from './precision'
 
 // Pequeño throttle (16-32ms)
 export function throttle(fn, wait = 16) {
@@ -52,8 +53,16 @@ export function broadPhaseCandidates(movingEl, index) {
 // suelo = polígono (aquí aproximamos como rect del elemento)
 // pared = segmento bufferizado a rect usando elevacion.espesor (aprox: usar rect existente y engrosar por espesor en el eje menor)
 
-function rectsIntersect(ax, ay, aw, ah, bx, by, bw, bh) {
-  return !(ax + aw <= bx || bx + bw <= ax || ay + ah <= by || by + bh <= ay)
+// Epsilon para tratar tangencias (bordes tocándose) como NO solape XY
+const XY_EPSILON = 1 / (PRECISION_PIXELS || 1000) + 1e-6 // ~0.001px por defecto
+
+function rectsIntersect(ax, ay, aw, ah, bx, by, bw, bh, eps = XY_EPSILON) {
+  const aRight = ax + aw
+  const bRight = bx + bw
+  const aBottom = ay + ah
+  const bBottom = by + bh
+  // No hay solape si están separados o solo tangentes dentro de eps
+  return !(aRight <= bx + eps || bRight <= ax + eps || aBottom <= by + eps || bBottom <= ay + eps)
 }
 
 function inflateRectForWall(el) {
