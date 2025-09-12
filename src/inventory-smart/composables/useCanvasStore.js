@@ -317,13 +317,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     return '📦'
   }
 
-  // === FUNCIONES DE NAVEGACIÓN JERÁRQUICA ===
-  const updateInteractionPolicyForContext = () => {
-    const t = contextoNavegacion.value.tipo
-    // Elementos: no drag/transform; otros contextos: sí
-    isDraggable.value = !(t === 'elementos')
-  }
-
   const navegarAElemento = (elementoId) => {
     const elemento = elementoPorId.value(elementoId)
     if (!elemento) {
@@ -370,7 +363,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Deseleccionar elemento actual
     elementoSeleccionado.value = null
-    updateInteractionPolicyForContext()
   }
 
   const navegarAlPadre = () => {
@@ -423,7 +415,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Deseleccionar elemento actual
     elementoSeleccionado.value = null
-    updateInteractionPolicyForContext()
   }
 
   /**
@@ -460,7 +451,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     panX.value = 0
     panY.value = 0
     elementoSeleccionado.value = null
-    updateInteractionPolicyForContext()
   }
 
   const navegarAPlanta = (plantaId) => {
@@ -504,7 +494,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Deseleccionar elemento actual
     elementoSeleccionado.value = null
-    updateInteractionPolicyForContext()
   }
 
   const calcularCanvasAdaptativo = (elemento) => {
@@ -1359,7 +1348,6 @@ export const useCanvasStore = defineStore('canvas', () => {
           console.error('Elemento no encontrado para calcular canvas:', { tipo, id })
         }
       }
-      updateInteractionPolicyForContext()
     },
     { immediate: true },
   )

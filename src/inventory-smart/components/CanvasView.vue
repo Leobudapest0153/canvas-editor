@@ -1815,12 +1815,7 @@ const createElementFromTemplate = (data, dropEvent) => {
 // Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
 // Por defecto activado (true) para que el modo edición esté disponible al iniciar
 const dragModeGlobal = ref(true)
-// Sincronizar con la política del store: desactivar arrastre si el contexto lo prohíbe
-watch(() => canvasStore.isDraggable, (val) => {
-  if (val === false) {
-    dragModeGlobal.value = false
-  }
-}, { immediate: true })
+
 const isDragModeActive = computed(() => dragModeGlobal.value)
 
 // Limpiar modos si se bloquea el elemento
