@@ -147,15 +147,19 @@
                 width: elemento.width,
                 height: elemento.height,
                 fill: elemento.tipo === 'pasillos' ? '#ffffff' : elemento.color,
-                stroke: elemento.tipo === 'pasillos' ? '#000' : undefined,
-                strokeWidth: elemento.tipo === 'pasillos' ? (2 / canvasStore.zoom) : 0,
-                dash: elemento.tipo === 'pasillos' ? [6 / canvasStore.zoom, 4 / canvasStore.zoom] : undefined,
+                stroke: elemento.tipo === 'pasillos'
+                  ? '#959799'
+                  : (elemento.tipo === 'pisos' ? 'rgba(0,0,0,0.3)' : undefined),
+                strokeWidth: (elemento.tipo === 'pasillos' || elemento.tipo === 'pisos') ? (1 / canvasStore.zoom) : 0,
+                dash: (elemento.tipo === 'pasillos' || elemento.tipo === 'pisos') ? [6 / canvasStore.zoom, 4 / canvasStore.zoom] : undefined,
                 opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
                 shadowColor: elemento.tipo === 'pasillos' ? undefined : getElementShadow(elemento).color,
                 shadowBlur: elemento.tipo === 'pasillos' ? 0 : (getElementShadow(elemento).blur / canvasStore.zoom),
                 shadowOpacity: elemento.tipo === 'pasillos' ? 0 : getElementShadow(elemento).opacity,
               }"
             />
+            <!-- Etiqueta centrada del elemento (rectangular) -->
+            <v-text :config="computeLabelProps(elemento)" />
           </v-group>
           <!-- Icono de candado para elemento bloqueado -->
           <v-group
@@ -251,6 +255,8 @@
                 strokeWidth: 0,
               }"
             />
+            <!-- Etiqueta centrada del elemento (circular XY) -->
+            <v-text :config="computeLabelProps(elemento)" />
           </v-group>
 
           <!-- Elementos circulares en vista de frente (XZ) se muestran como rectángulos (cilindro visto de frente) -->
@@ -305,6 +311,8 @@
                 shadowOpacity: 0.3,
               }"
             />
+            <!-- Etiqueta centrada del elemento (circular en XZ como rectángulo) -->
+            <v-text :config="computeLabelProps(elemento)" />
           </v-group>
           <!-- Icono de candado para elemento circular bloqueado en vista aérea (XY) -->
           <v-group
@@ -387,22 +395,7 @@
             />
           </v-group>
 
-          <!-- Texto con el nombre del elemento -->
-          <v-text
-            v-if="canvasStore.zoom > 0.8 "
-            :config="{
-              x: elemento.x + 5,
-              y: elemento.y + 5,
-              text: elemento.nombre || elemento.tipo || 'Elemento',
-              fontSize: 14 / canvasStore.zoom,
-              fontFamily: 'Arial',
-              fill: '#fff',
-              shadowColor: 'black',
-              shadowBlur: 2,
-              shadowOpacity: 0.8,
-              listening: false,
-            }"
-          />
+          <!-- Etiqueta centrada por grupo aplicada; se elimina texto flotante anterior -->
         </template>
       </v-layer>
       <v-layer ref="uiLayerRef" :config="{ listening: false }">
@@ -1426,6 +1419,33 @@ const getElementShadow = (elemento) => {
     opacity: 0.3,
     offsetX: 0,
     offsetY: 0,
+  }
+}
+
+// ====== INVENTORY: Etiquetas centradas de elementos ======
+// Calcula las props del <Text> (Konva) para rotular el elemento sin interferir con eventos.
+const computeLabelProps = (elemento) => {
+  const w = elemento.width || 0
+  const h = elemento.height || 0
+  const minSide = Math.max(0, Math.min(w, h))
+  // Escala base: proporcional al tamaño; límites 10–28px
+  const base = Math.min(280, Math.max(100, minSide * 0.22))
+  return {
+    x: 0,
+    y: 0,
+    width: w,
+    height: h,
+    text: elemento.nombre || elemento.tipo || 'Elemento',
+    align: 'center',
+    verticalAlign: 'middle',
+    fontStyle: 'bold',
+    fontFamily: 'Arial',
+    fontSize: base,
+    listening: false,
+    fill: '#111827',
+    shadowColor: 'black',
+    shadowBlur: 2,
+    shadowOpacity: 0.6,
   }
 }
 
