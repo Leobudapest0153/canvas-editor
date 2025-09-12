@@ -460,6 +460,18 @@ watch(
   (ctx) => {
     if (ctx.tipo === 'plantas') {
       catalogStore.setCatalogContext({ mode: 'root' })
+    } else if (ctx.tipo === 'cuartos') {
+      catalogStore.setCatalogContext({
+        mode: 'detail-room',
+        currentId: ctx.id,
+        currentType: 'room',
+      })
+    } else if (ctx.tipo === 'pisos') {
+      catalogStore.setCatalogContext({
+        mode: 'detail-floor',
+        currentId: ctx.id,
+        currentType: 'floor',
+      })
     } else if (ctx.tipo === 'elementos') {
       catalogStore.setCatalogContext({
         mode: 'detail-element',
@@ -471,6 +483,12 @@ watch(
         mode: 'detail-container',
         currentId: ctx.id,
         currentType: 'container',
+      })
+    } else if (ctx.tipo === 'pasillos') {
+      catalogStore.setCatalogContext({
+        mode: 'detail-aisle',
+        currentId: ctx.id,
+        currentType: 'aisle',
       })
     }
   },

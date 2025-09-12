@@ -90,9 +90,10 @@
               <div class="flex items-center">
                 <input type="number" min="0" v-model.number="edited.dimensiones.alto" @change="validarDimension('alto')"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  :disabled="isSaving" />
+                  :disabled="isSaving || esPasillo" />
                 <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
+              <p v-if="esPasillo" class="text-xs text-gray-500 mt-1">El alto del pasillo se ajusta a la altura de la planta.</p>
             </div>
             <!-- Diámetro para circulares -->
             <div v-if="esCircular">
@@ -815,6 +816,7 @@ const mostrarCapacidad = computed(() => esAnaquelOEstante.value || esContenedorB
 const mostrarDimensiones = computed(() => true)
 const esCircular = computed(() => (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circular' || (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circle')
 const ocultarAnchoLargo = computed(() => esCircular.value)
+const esPasillo = computed(() => (elementoSeleccionado.value?.tipo || '').toLowerCase() === 'pasillos')
 
 const volumen = computed(() => {
   if (!esContenedorBarril.value) return null

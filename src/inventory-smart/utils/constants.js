@@ -6,24 +6,99 @@
 
 export const TIPOS_ENTIDAD = [
   { id: 'plantas', nombre: 'Plantas', color: '#10b981', icono: '🏢' },
+  { id: 'cuartos', nombre: 'Cuartos', color: '#0ea5e9', icono: '🏠' },
+  { id: 'pisos', nombre: 'Pisos', color: '#22c55e', icono: '🧱' },
+  { id: 'pasillos', nombre: 'Pasillos', color: '#111827', icono: '🛣️' },
   { id: 'elementos', nombre: 'Elementos', color: '#3b82f6', icono: '📦' },
   { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', icono: '🗃️' },
 ]
 
 // === REGLAS DE JERARQUÍA ===
 export const JERARQUIA_PERMITIDA = {
-  plantas: ['elementos'], // Las plantas pueden contener elementos
-  elementos: ['contenedores'], // Los elementos pueden contener contenedores
-  contenedores: ['elementos', 'contenedores'], // Los contenedores pueden contener elementos Y otros contenedores
+  plantas: ['cuartos', 'elementos', 'pasillos'],
+  cuartos: ['pisos'],
+  pisos: ['elementos'],
+  elementos: ['contenedores'],
+  contenedores: [],
+  pasillos: [],
 }
 
 export const CATALOGO = {
   // Tipos base visibles en el catálogo raíz (plantas)
-  SISTEMA_BASE_KEYS: ['anaquel_metalico_grande', 'estante_pared_pequeno', 'barril_basico'],
+  SISTEMA_BASE_KEYS: [
+    'pasillo_base',
+    'cuarto_frio',
+    'piso_base',
+    'anaquel_metalico_grande',
+    'estante_pared_pequeno',
+    'barril_basico',
+  ],
 }
 
 export const ELEMENTOS_PREDEFINIDOS = [
-  // === ELEMENTOS (solo pueden ir en plantas) ===
+  // === ESPACIOS / ESTRUCTURAS ===
+
+  // Pasillo base (no navegable, altura = 100% de la planta)
+  {
+    id: 'pasillo_base',
+    nombre: 'Pasillo',
+    tipo: 'pasillos',
+    categoria: 'pasillos',
+    forma: 'rectangular',
+    colorBase: 'transparent',
+    dimensiones: {
+      ancho: 150,
+      largo: 600,
+      alto: 10, // será igualado a planta.alto
+    },
+    pesoMaximo: 0,
+    ubicacion: 'suelo',
+    descripcion: 'Pasillo de circulación (altura = 100% de la planta)',
+    icono: 'road',
+    props: { system: true, catalogVisible: true },
+  },
+
+  // Cuarto frío (navegable)
+  {
+    id: 'cuarto_frio',
+    nombre: 'Cuarto frío',
+    tipo: 'cuartos',
+    categoria: 'cuartos',
+    forma: 'rectangular',
+    colorBase: '#e0f2fe',
+    dimensiones: {
+      ancho: 400,
+      largo: 400,
+      alto: 250,
+    },
+    pesoMaximo: 0,
+    ubicacion: 'suelo',
+    descripcion: 'Cuarto especial (vista XY, permite drag/transform y navegar)',
+    icono: 'home',
+    props: { system: true, catalogVisible: true },
+  },
+
+  // Piso base (navegable)
+  {
+    id: 'piso_base',
+    nombre: 'Piso',
+    tipo: 'pisos',
+    categoria: 'pisos',
+    forma: 'rectangular',
+    colorBase: '#f1f5f9',
+    dimensiones: {
+      ancho: 300,
+      largo: 300,
+      alto: 10,
+    },
+    pesoMaximo: 0,
+    ubicacion: 'suelo',
+    descripcion: 'Piso interno (vista XY, permite drag/transform y navegar)',
+    icono: 'brick',
+    props: { system: true, catalogVisible: true },
+  },
+
+  // === ELEMENTOS (visibles cuando el contexto lo permita) ===
 
   // Anaqueles
   {
@@ -142,6 +217,18 @@ export const CATEGORIAS_CONTENEDORES = [
   { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', tipo: 'contenedores' },
 ]
 
+export const CATEGORIAS_CUARTOS = [
+  { id: 'cuartos', nombre: 'Cuartos', color: '#0ea5e9', tipo: 'cuartos' },
+]
+
+export const CATEGORIAS_PISOS = [
+  { id: 'pisos', nombre: 'Pisos', color: '#22c55e', tipo: 'pisos' },
+]
+
+export const CATEGORIAS_PASILLOS = [
+  { id: 'pasillos', nombre: 'Pasillos', color: '#111827', tipo: 'pasillos' },
+]
+
 // === CATEGORÍAS LEGACY (mantener por compatibilidad temporal) ===
 export const CATEGORIAS = [
   { id: 'anaqueles', nombre: 'Anaqueles', color: '#3b82f6' },
@@ -149,10 +236,19 @@ export const CATEGORIAS = [
   { id: 'mesas', nombre: 'Mesas', color: '#f59e0b' },
   { id: 'armarios', nombre: 'Armarios', color: '#7c3aed' },
   { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626' },
+  { id: 'cuartos', nombre: 'Cuartos', color: '#0ea5e9' },
+  { id: 'pisos', nombre: 'Pisos', color: '#22c55e' },
+  { id: 'pasillos', nombre: 'Pasillos', color: '#111827' },
 ]
 
 // === TODAS LAS CATEGORÍAS UNIFICADAS ===
-export const TODAS_LAS_CATEGORIAS = [...CATEGORIAS_ELEMENTOS, ...CATEGORIAS_CONTENEDORES]
+export const TODAS_LAS_CATEGORIAS = [
+  ...CATEGORIAS_ELEMENTOS,
+  ...CATEGORIAS_CONTENEDORES,
+  ...CATEGORIAS_CUARTOS,
+  ...CATEGORIAS_PISOS,
+  ...CATEGORIAS_PASILLOS,
+]
 
 export const FORMAS_DISPONIBLES = [
   { id: 'rectangular', nombre: 'Rectangular' },
@@ -160,7 +256,7 @@ export const FORMAS_DISPONIBLES = [
 ]
 
 export const UBICACIONES_DISPONIBLES = [
-  { id: 'suelo', nombre: 'Suelo', aplicaA: ['elementos'] },
+  { id: 'suelo', nombre: 'Suelo', aplicaA: ['elementos', 'cuartos', 'pisos', 'pasillos'] },
   { id: 'pared', nombre: 'Pared', aplicaA: ['elementos'] },
   { id: 'interior', nombre: 'Interior', aplicaA: ['contenedores'] },
 ]
@@ -176,6 +272,12 @@ export const getCategoriasPorTipo = (tipo) => {
       return CATEGORIAS_ELEMENTOS
     case 'contenedores':
       return CATEGORIAS_CONTENEDORES
+    case 'cuartos':
+      return CATEGORIAS_CUARTOS
+    case 'pisos':
+      return CATEGORIAS_PISOS
+    case 'pasillos':
+      return CATEGORIAS_PASILLOS
     default:
       return []
   }
@@ -263,6 +365,10 @@ export const DIMENSIONS = {
     // Estante de pared: w=20% ancho, d=10% largo (profundidad), h=20% alto
     estante_pared_pequeno: { x: 0.2, y: 0.1, z: 0.2 },
     barril_basico: { x: 0.2, y: 0.2, z: 0.2 },
+    // Nuevos predefinidos
+    pasillo_base: { x: 0.2, y: 0.2, z: 1 },
+    cuarto_frio: { x: 0.3, y: 0.3, z: 0.5 },
+    piso_base: { x: 0.3, y: 0.3, z: 0.1 },
   },
   // Límites por tipo
   minMax: {

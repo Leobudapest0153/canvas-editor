@@ -146,11 +146,14 @@
                 y: 0,
                 width: elemento.width,
                 height: elemento.height,
-                fill: elemento.color,
+                fill: elemento.tipo === 'pasillos' ? 'transparent' : elemento.color,
+                stroke: elemento.tipo === 'pasillos' ? '#000' : undefined,
+                strokeWidth: elemento.tipo === 'pasillos' ? (2 / canvasStore.zoom) : 0,
+                dash: elemento.tipo === 'pasillos' ? [6 / canvasStore.zoom, 4 / canvasStore.zoom] : undefined,
                 opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
-                shadowColor: getElementShadow(elemento).color,
-                shadowBlur: getElementShadow(elemento).blur / canvasStore.zoom,
-                shadowOpacity: getElementShadow(elemento).opacity,
+                shadowColor: elemento.tipo === 'pasillos' ? undefined : getElementShadow(elemento).color,
+                shadowBlur: elemento.tipo === 'pasillos' ? 0 : (getElementShadow(elemento).blur / canvasStore.zoom),
+                shadowOpacity: elemento.tipo === 'pasillos' ? 0 : getElementShadow(elemento).opacity,
               }"
             />
           </v-group>
@@ -1062,19 +1065,16 @@ const selectElement = (elementId) => {
 const handleElementDoubleClick = (elemento) => {
   console.log('Double-click en elemento:', elemento.nombre)
 
-  // Verificar si el elemento puede tener hijos (contenedor)
-  const tiposContenedor = ['elementos', 'contenedores']
-
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
     const msg = "No puedes entrar a un elemento si tienes cambios pendientes de guardar";
     showToast(msg, 'warn');
     return;
   }
-  if (tiposContenedor.includes(elemento.tipo)) {
-    console.log('Navegando al interior del elemento:', elemento.nombre)
+  // Navegables según la nueva jerarquía: cuartos, pisos, elementos
+  const navegables = ['cuartos', 'pisos', 'elementos']
+  if (navegables.includes(elemento.tipo)) {
+    console.log('Navegando dentro de:', elemento.nombre)
     canvasStore.navegarAElemento(elemento.id)
-  } else {
-    console.log('Elemento no es un contenedor:', elemento.tipo)
   }
 }
 
@@ -1248,22 +1248,26 @@ const runPreDropValidations = (elemento, dropEvent) => {
   const contextoActual = canvasStore.contextoActual.tipo
   const tipoElemento = elemento.tipo
 
-  if (contextoActual === 'plantas' && tipoElemento !== 'elementos') {
-    showToast('No puedes agregar este tipo aquí. En la vista de plantas solo se permiten elementos.', 'error')
-    return { ok: false, reason: 'hierarchy' }
+  // Reglas de jerarquía actualizadas
+  const allowedByContext = {
+    plantas: ['cuartos', 'elementos', 'pasillos'],
+    cuartos: ['pisos'],
+    pisos: ['elementos'],
+    elementos: ['contenedores'],
+    contenedores: [],
+    pasillos: [],
   }
-
-  if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
-    showToast('No puedes agregar ese tipo aquí. Dentro de elementos solo se permiten contenedores.', 'error')
-    return { ok: false, reason: 'hierarchy' }
-  }
-
-  if (
-    contextoActual === 'contenedores' &&
-    tipoElemento !== 'elementos' &&
-    tipoElemento !== 'contenedores'
-  ) {
-    showToast('En contenedores solo se pueden agregar elementos u otros contenedores', 'error')
+  const permitidos = allowedByContext[contextoActual] || []
+  if (!permitidos.includes(tipoElemento)) {
+    const msgMap = {
+      plantas: 'Aquí solo puedes agregar cuartos, elementos o pasillos.',
+      cuartos: 'Aquí solo puedes agregar pisos.',
+      pisos: 'Aquí solo puedes agregar elementos.',
+      elementos: 'Dentro de elementos solo se permiten contenedores.',
+      contenedores: 'No puedes agregar elementos dentro de contenedores.',
+      pasillos: 'No puedes agregar elementos dentro de pasillos.',
+    }
+    showToast(msgMap[contextoActual] || 'No puedes agregar este tipo aquí.', 'error')
     return { ok: false, reason: 'hierarchy' }
   }
 
@@ -1593,6 +1597,31 @@ const createElementFromBuffer = (data, dropEvent) => {
 
   const elemento = bufferItem.elemento
 
+  // Validación de jerarquía por contexto (alineada a runPreDropValidations)
+  const contextoActual = canvasStore.contextoActual.tipo
+  const tipoElemento = elemento.tipo
+  const allowedByContext = {
+    plantas: ['cuartos', 'elementos', 'pasillos'],
+    cuartos: ['pisos'],
+    pisos: ['elementos'],
+    elementos: ['contenedores'],
+    contenedores: [],
+    pasillos: [],
+  }
+  const permitidos = allowedByContext[contextoActual] || []
+  if (!permitidos.includes(tipoElemento)) {
+    const msgMap = {
+      plantas: 'Aquí solo puedes pegar cuartos, elementos o pasillos.',
+      cuartos: 'Aquí solo puedes pegar pisos.',
+      pisos: 'Aquí solo puedes pegar elementos.',
+      elementos: 'Dentro de elementos solo se pueden pegar contenedores.',
+      contenedores: 'No puedes pegar dentro de contenedores.',
+      pasillos: 'No puedes pegar dentro de pasillos.',
+    }
+    showToast(msgMap[contextoActual] || 'No puedes pegar este tipo aquí.', 'error')
+    return
+  }
+
   // ===== VALIDACIÓN DE PESO MÁXIMO =====
   const resultadoValidacionPeso = weightValidation.validarPesoElemento(
     elemento,
@@ -1789,6 +1818,12 @@ const createElementFromTemplate = (data, dropEvent) => {
 // Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
 // Por defecto activado (true) para que el modo edición esté disponible al iniciar
 const dragModeGlobal = ref(true)
+// Sincronizar con la política del store: desactivar arrastre si el contexto lo prohíbe
+watch(() => canvasStore.isDraggable, (val) => {
+  if (val === false) {
+    dragModeGlobal.value = false
+  }
+}, { immediate: true })
 const isDragModeActive = computed(() => dragModeGlobal.value)
 
 // Limpiar modos si se bloquea el elemento

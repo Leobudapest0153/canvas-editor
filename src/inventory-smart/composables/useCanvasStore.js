@@ -93,13 +93,10 @@ export const useCanvasStore = defineStore('canvas', () => {
   const cambiosNoAplicados = ref(false);
 
   const vistaActiva = computed(() => {
-    // Vista automática según el contexto
-    if (estaEnPlanta.value) {
-      return 'XY' // Vista superior para plantas
-    } else if (estaEnElemento.value || estaEnContenedor.value) {
-      return 'XZ' // Vista frontal para elementos y contenedores
-    }
-    return 'XY' // Fallback por defecto
+    const t = contextoNavegacion.value.tipo
+    if (t === 'plantas' || t === 'cuartos' || t === 'pisos') return 'XY'
+    if (t === 'elementos') return 'XZ'
+    return 'XY'
   })
   const zoom = ref(1)
   const crearPlanta = ref(false)
@@ -132,7 +129,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   // === NAVEGACIÓN JERÁRQUICA ===
   // Contexto de navegación: representa la "ubicación" actual en la jerarquía
   const contextoNavegacion = ref({
-    tipo: 'plantas', // 'plantas' | 'elementos' | 'contenedores'
+    tipo: 'plantas', // 'plantas' | 'cuartos' | 'pisos' | 'elementos' | 'contenedores'
     id: 'planta_1', // ID de la planta, elemento o contenedor actual
     path: [], // Array de objetos: [{ tipo: 'plantas', id: 'planta_1', nombre: 'Planta Baja' }]
   })
@@ -146,33 +143,38 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Getters
   const elementosVisibles = computed(() => {
-    // Si estamos en una planta, mostrar solo elementos de tipo 'elementos' (sin padre)
-    if (contextoNavegacion.value.tipo === 'plantas') {
-      const plantaId = contextoNavegacion.value.id
-      const elementosEnEstaPlanta = elementos.value.filter((el) => el.plantaId === plantaId)
-      const visibles = elementosEnEstaPlanta.filter((el) => !el.padre && el.tipo === 'elementos')
-      return visibles
+    const t = contextoNavegacion.value.tipo
+    const id = contextoNavegacion.value.id
+
+    if (t === 'plantas') {
+      const enPlanta = elementos.value.filter((el) => el.plantaId === id && !el.padre)
+      return enPlanta.filter((el) => ['cuartos', 'elementos', 'pasillos'].includes(el.tipo))
     }
 
-    // Si estamos dentro de un elemento, mostrar solo contenedores hijos
-    if (contextoNavegacion.value.tipo === 'elementos') {
-      const elementoPadre = elementos.value.find((el) => el.id === contextoNavegacion.value.id)
-      if (elementoPadre && elementoPadre.hijos) {
-        const hijosCompletos = elementoPadre.hijos
-          .map((hijoId) => elementos.value.find((el) => el.id === hijoId))
-          .filter((hijo) => hijo && hijo.tipo === 'contenedores')
-        return hijosCompletos
+    if (t === 'cuartos') {
+      const padre = elementos.value.find((el) => el.id === id)
+      if (padre?.hijos) {
+        return padre.hijos
+          .map((hid) => elementos.value.find((e) => e.id === hid))
+          .filter((h) => h && h.tipo === 'pisos')
       }
     }
 
-    // Si estamos dentro de un contenedor, mostrar elementos Y otros contenedores hijos
-    if (contextoNavegacion.value.tipo === 'contenedores') {
-      const contenedorPadre = elementos.value.find((el) => el.id === contextoNavegacion.value.id)
-      if (contenedorPadre && contenedorPadre.hijos) {
-        const hijosCompletos = contenedorPadre.hijos
-          .map((hijoId) => elementos.value.find((el) => el.id === hijoId))
-          .filter((hijo) => hijo && (hijo.tipo === 'elementos' || hijo.tipo === 'contenedores'))
-        return hijosCompletos
+    if (t === 'pisos') {
+      const padre = elementos.value.find((el) => el.id === id)
+      if (padre?.hijos) {
+        return padre.hijos
+          .map((hid) => elementos.value.find((e) => e.id === hid))
+          .filter((h) => h && h.tipo === 'elementos')
+      }
+    }
+
+    if (t === 'elementos') {
+      const padre = elementos.value.find((el) => el.id === id)
+      if (padre?.hijos) {
+        return padre.hijos
+          .map((hid) => elementos.value.find((e) => e.id === hid))
+          .filter((h) => h && h.tipo === 'contenedores')
       }
     }
 
@@ -209,6 +211,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     return contextoNavegacion.value.tipo === 'plantas'
   })
 
+  const estaEnCuarto = computed(() => {
+    return contextoNavegacion.value.tipo === 'cuartos'
+  })
+
+  const estaEnPiso = computed(() => {
+    return contextoNavegacion.value.tipo === 'pisos'
+  })
+
   const estaEnElemento = computed(() => {
     return contextoNavegacion.value.tipo === 'elementos'
   })
@@ -227,6 +237,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     return null
   })
 
+  // Nodo actual genérico para cualquier contexto (planta o elemento)
+  const nodoActual = computed(() => {
+    const t = contextoNavegacion.value.tipo
+    const id = contextoNavegacion.value.id
+    if (t === 'plantas') return plantaPorId.value(id)
+    return elementos.value.find((el) => el.id === id) || null
+  })
+
   const breadcrumbs = computed(() => {
     const crumbs = []
 
@@ -241,10 +259,15 @@ export const useCanvasStore = defineStore('canvas', () => {
       })
     }
 
-    // Agregar elementos/contenedores del path
+    // Agregar items del path navegable (cuartos, pisos, elementos) y contenedores si existieran en el path
     for (let i = 1; i < contextoNavegacion.value.path.length; i++) {
       const pathItem = contextoNavegacion.value.path[i]
-      if (pathItem.tipo === 'elementos' || pathItem.tipo === 'contenedores') {
+      if (
+        pathItem.tipo === 'cuartos' ||
+        pathItem.tipo === 'pisos' ||
+        pathItem.tipo === 'elementos' ||
+        pathItem.tipo === 'contenedores'
+      ) {
         const elemento = elementoPorId.value(pathItem.id)
         if (elemento) {
           crumbs.push({
@@ -267,6 +290,9 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Helper function para iconos
   const getIconoElemento = (tipo, categoria) => {
     // Iconos por tipo
+    if (tipo === 'pasillos') return '🛣️'
+    if (tipo === 'cuartos') return '🏠'
+    if (tipo === 'pisos') return '🧱'
     if (tipo === 'contenedores') {
       const iconosContenedores = {
         cajas: '📦',
@@ -290,6 +316,12 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   // === FUNCIONES DE NAVEGACIÓN JERÁRQUICA ===
+  const updateInteractionPolicyForContext = () => {
+    const t = contextoNavegacion.value.tipo
+    // Elementos: no drag/transform; otros contextos: sí
+    isDraggable.value = !(t === 'elementos')
+  }
+
   const navegarAElemento = (elementoId) => {
     const elemento = elementoPorId.value(elementoId)
     if (!elemento) {
@@ -298,10 +330,10 @@ export const useCanvasStore = defineStore('canvas', () => {
       return
     }
 
-    // Verificar que el elemento sea navegable (elementos o contenedores)
-    if (elemento.tipo !== 'elementos' && elemento.tipo !== 'contenedores') {
-      showToast('Solo se puede navegar a elementos o contenedores')
-      console.error('Solo se puede navegar a elementos o contenedores:', elemento.tipo)
+    // Verificar que el elemento sea navegable: cuartos, pisos, elementos
+    if (!['cuartos', 'pisos', 'elementos'].includes(elemento.tipo)) {
+      showToast('Este elemento no permite navegación')
+      console.error('No navegable:', elemento.tipo)
       return
     }
 
@@ -336,6 +368,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Deseleccionar elemento actual
     elementoSeleccionado.value = null
+    updateInteractionPolicyForContext()
   }
 
   const navegarAlPadre = () => {
@@ -388,6 +421,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Deseleccionar elemento actual
     elementoSeleccionado.value = null
+    updateInteractionPolicyForContext()
   }
 
   /**
@@ -424,6 +458,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     panX.value = 0
     panY.value = 0
     elementoSeleccionado.value = null
+    updateInteractionPolicyForContext()
   }
 
   const navegarAPlanta = (plantaId) => {
@@ -467,6 +502,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Deseleccionar elemento actual
     elementoSeleccionado.value = null
+    updateInteractionPolicyForContext()
   }
 
   const calcularCanvasAdaptativo = (elemento) => {
@@ -474,11 +510,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     let elementWidthPx, elementHeightPx
 
     if (elemento.dimensiones) {
-      // Para elementos/contenedores usamos vista de frente (XZ): ancho × alto
-      // (ya que navegamos "dentro" del elemento, vemos su vista frontal)
-      elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
-      elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
-      console.log('Usando dimensiones en cm (Vista de frente - ancho x alto)')
+      // XY para cuartos/pisos/pasillos; XZ para elementos
+      if (['cuartos', 'pisos', 'pasillos'].includes(elemento.tipo)) {
+        elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
+        elementHeightPx = elemento.dimensiones.largo * CM_TO_PX
+      } else {
+        elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
+        elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
+      }
     } else if (elemento.width && elemento.height) {
       // Fallback a dimensiones legacy en píxeles
       elementWidthPx = elemento.width
@@ -758,6 +797,13 @@ export const useCanvasStore = defineStore('canvas', () => {
               actualizarElemento(el.id, { alturaRespectoAlSuelo: zBase })
             }
           }
+
+          // Ajustar altura de pasillos al alto de la planta
+          const pasillos = elementos.value.filter((e) => e.plantaId === plantaId && !e.padre && e.tipo === 'pasillos')
+          for (const pa of pasillos) {
+            if (!pa.dimensiones) pa.dimensiones = { ancho: 0, largo: 0, alto: 0 }
+            pa.dimensiones.alto = planta.dimensiones.alto
+          }
         }
       } catch (e) {
         console.warn('Recalculo de dimensiones al editar planta falló:', e)
@@ -834,36 +880,35 @@ export const useCanvasStore = defineStore('canvas', () => {
     const contextoActual = contextoNavegacion.value.tipo
     const tipoElemento = nuevoElemento.tipo
 
-    // Reglas de jerarquía:
-    // - elementos solo pueden ir en plantas
-    // - contenedores solo pueden ir en elementos
-    // - elementos pueden ir en contenedores
-    if (contextoActual === 'plantas' && tipoElemento !== 'elementos') {
-      showToast('En plantas solo se pueden agregar elementos')
-      console.error('En plantas solo se pueden agregar elementos')
+    // Reglas de jerarquía actualizadas
+    if (contextoActual === 'plantas' && !['cuartos', 'elementos', 'pasillos'].includes(tipoElemento)) {
+      showToast('En plantas solo se pueden agregar cuartos, elementos o pasillos')
       return null
     }
-
+    if (contextoActual === 'cuartos' && tipoElemento !== 'pisos') {
+      showToast('En cuartos solo se pueden agregar pisos')
+      return null
+    }
+    if (contextoActual === 'pisos' && tipoElemento !== 'elementos') {
+      showToast('En pisos solo se pueden agregar elementos')
+      return null
+    }
     if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
       showToast('En elementos solo se pueden agregar contenedores')
-      console.error('En elementos solo se pueden agregar contenedores')
       return null
     }
-
-    if (
-      contextoActual === 'contenedores' &&
-      tipoElemento !== 'elementos' &&
-      tipoElemento !== 'contenedores'
-    ) {
-      console.error('En contenedores solo se pueden agregar elementos u otros contenedores')
+    if (contextoActual === 'contenedores') {
+      showToast('Los contenedores no pueden contener nada')
       return null
     }
 
     // Si estamos dentro de un elemento o contenedor, el nuevo elemento es hijo
-    if (
-      contextoNavegacion.value.tipo === 'elementos' ||
-      contextoNavegacion.value.tipo === 'contenedores'
-    ) {
+    if ([
+      'cuartos',
+      'pisos',
+      'elementos',
+      'contenedores',
+    ].includes(contextoNavegacion.value.tipo)) {
       const elementoPadre = elementos.value.find((el) => el.id === contextoNavegacion.value.id)
       if (elementoPadre) {
         // Agregar como hijo del elemento/contenedor actual
@@ -892,10 +937,19 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }
 
+    // Política especial: altura de pasillos = planta.alto al crear
+    if (nuevoElemento.tipo === 'pasillos') {
+      const planta = plantas.value.find((p) => p.id === (nuevoElemento.plantaId || contextoNavegacion.value.id))
+      if (planta) {
+        if (!nuevoElemento.dimensiones) nuevoElemento.dimensiones = { ancho: 0, largo: 0, alto: 0 }
+        nuevoElemento.dimensiones.alto = planta.dimensiones.alto
+      }
+    }
+
     // Política de dimensiones al crear en planta para elementos de sistema
     try {
       const shouldAuto = true
-      if (shouldAuto && nuevoElemento.tipo === 'elementos') {
+      if (shouldAuto && ['cuartos','pisos','elementos','pasillos'].includes(nuevoElemento.tipo)) {
         const typeKey = nuevoElemento.systemTypeKey || nuevoElemento.id
         const isSystemDefault = !!(
           typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey)
@@ -914,7 +968,8 @@ export const useCanvasStore = defineStore('canvas', () => {
               // Ajustar dimensiones de modelo
               nuevoElemento.dimensiones = { ...nuevoElemento.dimensiones, ...dims }
               // Ajustar canvas en px según vista actual
-              const { width, height } = toCanvasSizePx(dims, 'XY')
+              const view = ['cuartos','pisos','pasillos'].includes(nuevoElemento.tipo) ? 'XY' : 'XZ'
+              const { width, height } = toCanvasSizePx(dims, view)
               if (Number.isFinite(width)) nuevoElemento.width = width
               if (Number.isFinite(height)) nuevoElemento.height = height
             }
@@ -1152,36 +1207,38 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   const elementosVisiblesParaCapas = computed(() => {
-    // "Desenvolvemos" los elementos para asegurarnos de que trabajamos con el objeto de datos real.
     const elementosLimpios = elementos.value.map((el) => el?._custom?.value || el)
+    const t = contextoNavegacion.value.tipo
+    const id = contextoNavegacion.value.id
 
-    // Si estamos en una planta, mostrar solo elementos de tipo 'elementos' (sin padre)
-    if (contextoNavegacion.value.tipo === 'plantas') {
-      const plantaId = contextoNavegacion.value.id
-      const elementosEnEstaPlanta = elementosLimpios.filter((el) => el.plantaId === plantaId)
-      return elementosEnEstaPlanta.filter((el) => !el.padre && el.tipo === 'elementos')
+    if (t === 'plantas') {
+      const enPlanta = elementosLimpios.filter((el) => el.plantaId === id && !el.padre)
+      return enPlanta.filter((el) => ['cuartos', 'elementos', 'pasillos'].includes(el.tipo))
     }
-
-    // Si estamos dentro de un elemento, mostrar solo contenedores hijos
-    if (contextoNavegacion.value.tipo === 'elementos') {
-      const elementoPadre = elementosLimpios.find((el) => el.id === contextoNavegacion.value.id)
-      if (elementoPadre && elementoPadre.hijos) {
-        return elementoPadre.hijos
-          .map((hijoId) => elementosLimpios.find((el) => el.id === hijoId))
-          .filter((hijo) => hijo && hijo.tipo === 'contenedores')
+    if (t === 'cuartos') {
+      const padre = elementosLimpios.find((el) => el.id === id)
+      if (padre?.hijos) {
+        return padre.hijos
+          .map((hid) => elementosLimpios.find((e) => e.id === hid))
+          .filter((h) => h && h.tipo === 'pisos')
       }
     }
-
-    // Si estamos dentro de un contenedor, mostrar elementos Y otros contenedores hijos
-    if (contextoNavegacion.value.tipo === 'contenedores') {
-      const contenedorPadre = elementosLimpios.find((el) => el.id === contextoNavegacion.value.id)
-      if (contenedorPadre && contenedorPadre.hijos) {
-        return contenedorPadre.hijos
-          .map((hijoId) => elementosLimpios.find((el) => el.id === hijoId))
-          .filter((hijo) => hijo && (hijo.tipo === 'elementos' || hijo.tipo === 'contenedores'))
+    if (t === 'pisos') {
+      const padre = elementosLimpios.find((el) => el.id === id)
+      if (padre?.hijos) {
+        return padre.hijos
+          .map((hid) => elementosLimpios.find((e) => e.id === hid))
+          .filter((h) => h && h.tipo === 'elementos')
       }
     }
-
+    if (t === 'elementos') {
+      const padre = elementosLimpios.find((el) => el.id === id)
+      if (padre?.hijos) {
+        return padre.hijos
+          .map((hid) => elementosLimpios.find((e) => e.id === hid))
+          .filter((h) => h && h.tipo === 'contenedores')
+      }
+    }
     return []
   })
 
@@ -1264,7 +1321,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   const setDraggableMode = (mode) => {
-    this.isDraggable = mode
+    isDraggable.value = !!mode
   }
 
   // === INTEGRACIÓN CON AUTOSAVE ===
@@ -1292,7 +1349,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (tipo === 'plantas') {
         const planta = plantaPorId.value(id)
         calcularCanvasAdaptativoPlanta(planta)
-      } else if (tipo === 'elementos' || tipo === 'contenedores') {
+      } else {
         const elemento = elementoPorId.value(id)
         if (elemento) {
           calcularCanvasAdaptativo(elemento)
@@ -1300,6 +1357,7 @@ export const useCanvasStore = defineStore('canvas', () => {
           console.error('Elemento no encontrado para calcular canvas:', { tipo, id })
         }
       }
+      updateInteractionPolicyForContext()
     },
     { immediate: true },
   )
@@ -1337,12 +1395,15 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Navegación jerárquica - Getters
     contextoActual,
     estaEnPlanta,
+  estaEnCuarto,
+  estaEnPiso,
     estaEnElemento,
     estaEnContenedor,
     elementoContenedorActual,
     breadcrumbs,
     puedeNavegar,
     contextoNavegacion,
+  nodoActual,
     canvasAdaptativo,
 
     // Actions - Canvas

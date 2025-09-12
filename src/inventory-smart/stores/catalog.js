@@ -19,6 +19,9 @@ export const useCatalogStore = defineStore('catalog', () => {
       root: 'plantas',
       'detail-element': 'elementos',
       'detail-container': 'contenedores',
+      'detail-room': 'cuartos',
+      'detail-floor': 'pisos',
+      'detail-aisle': 'pasillos',
     }
     const parent = map[context.mode]
     return parent ? JERARQUIA_PERMITIDA[parent] || [] : []
