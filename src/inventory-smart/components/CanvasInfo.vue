@@ -2,13 +2,13 @@
   <div ref="infoRef" class="canvas-info" :style="styleObject">
     <span>Zoom: {{ (store.zoom * 100).toFixed(2) }}%</span>
     <span>{{ t('views.label') }}: {{ t(`views.${store.vistaActiva}`) }}</span>
-    <span v-if="store.estaEnPlanta && store.plantaActivaData">
+    <!-- <span v-if="store.estaEnPlanta && store.plantaActivaData">
       Planta: {{ fmtCm(store.plantaActivaData.dimensiones.ancho) }} x {{ fmtCm(store.plantaActivaData.dimensiones.largo) }}
-    </span>
-    <!-- <span v-if="(store.estaEnElemento || store.estaEnContenedor) && store.elementoContenedorActual">
-      {{ store.estaEnElemento ? 'Elemento' : 'Contenedor' }}: {{ store.elementoContenedorActual.nombre }}
-      <template v-if="store.vistaActiva === 'XZ' && store.elementoContenedorActual.dimensiones">
-        ({{ fmtCm(store.elementoContenedorActual.dimensiones.ancho) }} x {{ fmtCm(store.elementoContenedorActual.dimensiones.alto) }})
+    </span> -->
+    <!-- <span v-if="(store.estaEnElemento || store.estaEnContenedor) && store.estructuraContenedorActual">
+      {{ store.estaEnElemento ? 'Elemento' : 'Contenedor' }}: {{ store.estructuraContenedorActual.nombre }}
+      <template v-if="store.vistaActiva === 'XZ' && store.estructuraContenedorActual.dimensiones">
+        ({{ fmtCm(store.estructuraContenedorActual.dimensiones.ancho) }} x {{ fmtCm(store.estructuraContenedorActual.dimensiones.alto) }})
       </template>
       <template v-else>
         ({{ fmtCm(pxToCm(store.canvasAdaptativo.width, viewport.cmPerPx)) }} x {{ fmtCm(pxToCm(store.canvasAdaptativo.height, viewport.cmPerPx)) }})

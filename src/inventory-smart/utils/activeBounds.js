@@ -20,8 +20,8 @@ export function mapDimsByView(dims = {}, view = 'XY') {
 // depending on navigation context. Returns { boundsPx:{width,height}, polygonPx }
 export function getActiveBounds(canvasStore) {
   // Inside element/container: use its dimensions
-  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
-    const elem = canvasStore.elementoContenedorActual || {}
+  if (!canvasStore.estaEnPlanta) {
+    const elem = canvasStore.estructuraContenedorActual || {}
     const dims = elem.dimensiones || {}
     let { widthCm, heightCm } = mapDimsByView(dims, canvasStore.vistaActiva)
 

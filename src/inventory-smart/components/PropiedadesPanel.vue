@@ -118,7 +118,7 @@
         </details>
 
         <!-- Posicionamiento en pared -->
-        <details v-if="esPared" open class="bg-gray-50 rounded-lg p-4">
+        <details v-if="estaUbicadoEnPared" open class="bg-gray-50 rounded-lg p-4">
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">Posicionamiento en pared</summary>
           <div class="mt-3 space-y-3">
             <div>
@@ -127,7 +127,7 @@
                 <input type="number" :min="0" :max="maxAlturaSobreSuelo" v-model.number="edited.alturaSobreSueloCm"
                   @change="validarAlturaSobreSuelo"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  :disabled="isSaving || !esPared" />
+                  :disabled="isSaving || !estaUbicadoEnPared" />
                 <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
               <p v-if="advertenciaZBase" class="text-xs text-amber-600">{{ advertenciaZBase }}</p>
@@ -152,7 +152,7 @@
             </div>
 
             <!-- Capacidad de volumen teórico -->
-            <div>
+            <!-- <div>
               <label class="text-sm text-gray-500">Volumen teórico</label>
               <div class="flex items-center">
                 <input :value="volumenTeorico" disabled
@@ -162,7 +162,7 @@
               <p v-if="volumenTeorico" class="text-xs text-gray-500 mt-1">
                 {{ descripcionVolumenTeorico }}
               </p>
-            </div>
+            </div> -->
 
             <!-- Uso real (solo lectura) -->
             <div v-if="mostrarUsoReal" class="border-t pt-3">
@@ -189,7 +189,7 @@
               </div>
 
               <!-- Volumen real usado -->
-              <div>
+              <!-- <div>
                 <label class="text-xs text-gray-500">Volumen usado</label>
                 <div class="flex items-center">
                   <input :value="usoRealVolumen" disabled
@@ -206,7 +206,7 @@
                          :style="{ width: porcentajeVolumenUsado + '%', backgroundColor: colorVolumenUsado }"></div>
                   </div>
                 </div>
-              </div>
+              </div> -->
             </div>
 
             <!-- Información del contexto padre -->
@@ -555,7 +555,7 @@ const guardar = async () => {
   delete patch.tags
 
   // Si es un elemento de pared, reflejar valores verticales y posicionar Y en px
-  if (esPared.value) {
+  if (estaUbicadoEnPared.value) {
     const zBase = Number(edited.value?.alturaSobreSueloCm) || 0
     patch.alturaRespectoAlSuelo = zBase
     patch.alturaSobreSueloCm = zBase
@@ -666,20 +666,6 @@ const ejecutarValidacionDimensiones = () => {
     areaBounds,
     CM_TO_PX,
     epsPx: 0.5
-  })
-
-  console.debug('[PropiedadesPanel] validación de posicionamiento', elementoSeleccionado.value.id, {
-    elementoTemporal: {
-      id: elementoTemporal.id,
-      x: elementoTemporal.x,
-      y: elementoTemporal.y,
-      width: elementoTemporal.width,
-      height: elementoTemporal.height
-    },
-    areaBounds,
-    dimensionesCm: { anchoCm, largoCm, altoCm },
-    vista,
-    isValidPosition
   })
 
   if (!isValidPosition) {
@@ -795,137 +781,132 @@ const getCategoriaDisplay = (categoria) => {
   return TODAS_LAS_CATEGORIAS.find(c => c.id === categoria)?.nombre || categoria
 }
 
-const esAnaquelOEstante = computed(() => {
+const esEstructura = computed(() => {
   const cat = elementoSeleccionado.value?.categoria
-  return cat === 'anaqueles' || cat === 'estantes'
+  return cat !== 'contenedores' && cat !== 'pasillos'
 })
 
-const esPared = computed(() => (elementoSeleccionado.value?.ubicacion || '').toLowerCase() === 'pared')
+const estaUbicadoEnPared = computed(() => (elementoSeleccionado.value?.ubicacion || '').toLowerCase() === 'pared')
 
-const esContenedorBarril = computed(() => {
+const esContenedor = computed(() => {
   const el = elementoSeleccionado.value
-  return el?.tipo === 'contenedores' || el?.categoria === 'contenedores'
+  return el?.tipo === 'contenedores'
 })
 
-const esCajaOPallet = computed(() => {
-  const cat = elementoSeleccionado.value?.categoria
-  return cat === 'cajas' || cat === 'pallets'
-})
-
-const mostrarCapacidad = computed(() => esAnaquelOEstante.value || esContenedorBarril.value || esCajaOPallet.value)
+const mostrarCapacidad = computed(() => esEstructura.value || esContenedor.value)
 const mostrarDimensiones = computed(() => true)
 const esCircular = computed(() => (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circular' || (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circle')
 const ocultarAnchoLargo = computed(() => esCircular.value)
 const esPasillo = computed(() => (elementoSeleccionado.value?.tipo || '').toLowerCase() === 'pasillos')
 
-const volumen = computed(() => {
-  if (!esContenedorBarril.value) return null
-  const d = edited.value?.dimensiones || {}
-  if (elementoSeleccionado.value?.forma === 'circular') {
-    const diam = d.ancho || 0
-    const alto = d.alto || 0
-    return ((Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000).toFixed(2)
-  }
-  return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(2)
-})
+// const volumen = computed(() => {
+//   if (!esContenedor.value) return null
+//   const d = edited.value?.dimensiones || {}
+//   if (elementoSeleccionado.value?.forma === 'circular') {
+//     const diam = d.ancho || 0
+//     const alto = d.alto || 0
+//     return ((Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000).toFixed(2)
+//   }
+//   return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(2)
+// })
 
 /**
  * Calcula el volumen teórico basándose en los hijos del elemento
  */
-const volumenTeorico = computed(() => {
-  const elemento = elementoSeleccionado.value
-  if (!elemento) return '0.00'
+// const volumenTeorico = computed(() => {
+//   const elemento = elementoSeleccionado.value
+//   if (!elemento) return '0.00'
 
-  // Para contenedores: siempre calcular basándose en sus propias dimensiones
-  if (elemento.tipo === 'contenedores') {
-    const d = elemento.dimensiones || {}
-    if (elemento.forma === 'circular') {
-      const diam = d.ancho || 0
-      const alto = d.alto || 0
-      return ((Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000).toFixed(3)
-    }
-    return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(3)
-  }
+//   // Para contenedores: siempre calcular basándose en sus propias dimensiones
+//   if (elemento.tipo === 'contenedores') {
+//     const d = elemento.dimensiones || {}
+//     if (elemento.forma === 'circular') {
+//       const diam = d.ancho || 0
+//       const alto = d.alto || 0
+//       return ((Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000).toFixed(3)
+//     }
+//     return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(3)
+//   }
 
-  // Para elementos: calcular basándose en el volumen de los contenedores que tiene dentro
-  if (elemento.tipo === 'elementos') {
-    return calcularVolumenPorHijos(elemento.id, 'contenedores')
-  }
+//   // Para elementos: calcular basándose en el volumen de los contenedores que tiene dentro
+//   if (elemento.tipo === 'elementos') {
+//     return calcularVolumenPorHijos(elemento.id, 'contenedores')
+//   }
 
-  // Fallback: calcular volumen por dimensiones propias
-  const d = elemento.dimensiones || {}
-  if (elemento.forma === 'circular') {
-    const diam = d.ancho || 0
-    const alto = d.alto || 0
-    return ((Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000).toFixed(3)
-  }
-  return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(3)
-})
+//   // Fallback: calcular volumen por dimensiones propias
+//   const d = elemento.dimensiones || {}
+//   if (elemento.forma === 'circular') {
+//     const diam = d.ancho || 0
+//     const alto = d.alto || 0
+//     return ((Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000).toFixed(3)
+//   }
+//   return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(3)
+// })
 
 /**
  * Calcula el volumen total de los hijos de un elemento
  */
-const calcularVolumenPorHijos = (elementoId, tipoHijos) => {
-  const elemento = canvasStore.elementoPorId(elementoId)
-  if (!elemento || !elemento.hijos || elemento.hijos.length === 0) {
-    return '0.000'
-  }
+// const calcularVolumenPorHijos = (elementoId, tipoHijos) => {
+//   const elemento = canvasStore.elementoPorId(elementoId)
+//   if (!elemento || !elemento.hijos || elemento.hijos.length === 0) {
+//     return '0.000'
+//   }
 
-  let volumenTotal = 0
+//   let volumenTotal = 0
 
-  for (const hijoId of elemento.hijos) {
-    const hijo = canvasStore.elementoPorId(hijoId)
-    if (!hijo) continue
+//   for (const hijoId of elemento.hijos) {
+//     const hijo = canvasStore.elementoPorId(hijoId)
+//     if (!hijo) continue
 
-    // Filtrar por tipo si es necesario
-    if (tipoHijos === 'contenedores' && hijo.tipo !== 'contenedores') continue
+//     // Filtrar por tipo si es necesario
+//     if (tipoHijos === 'contenedores' && hijo.tipo !== 'contenedores') continue
 
-    // Calcular volumen del hijo basándose en sus dimensiones
-    const dims = hijo.dimensiones || {}
-    let volumenHijo = 0
+//     // Calcular volumen del hijo basándose en sus dimensiones
+//     const dims = hijo.dimensiones || {}
+//     let volumenHijo = 0
 
-    if (hijo.forma === 'circular') {
-      const diam = dims.ancho || 0
-      const alto = dims.alto || 0
-      volumenHijo = (Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000 // cm³ a m³
-    } else {
-      volumenHijo = ((dims.ancho || 0) * (dims.largo || 0) * (dims.alto || 0)) / 1_000_000 // cm³ a m³
-    }
+//     if (hijo.forma === 'circular') {
+//       const diam = dims.ancho || 0
+//       const alto = dims.alto || 0
+//       volumenHijo = (Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000 // cm³ a m³
+//     } else {
+//       volumenHijo = ((dims.ancho || 0) * (dims.largo || 0) * (dims.alto || 0)) / 1_000_000 // cm³ a m³
+//     }
 
-    volumenTotal += volumenHijo
+//     volumenTotal += volumenHijo
 
-    // Si este hijo también tiene hijos, sumarlos recursivamente
-    if (hijo.hijos && hijo.hijos.length > 0) {
-      const volumenSubhijos = parseFloat(calcularVolumenPorHijos(hijoId, 'todos'))
-      volumenTotal += volumenSubhijos
-    }
-  }
+//     // Si este hijo también tiene hijos, sumarlos recursivamente
+//     if (hijo.hijos && hijo.hijos.length > 0) {
+//       const volumenSubhijos = parseFloat(calcularVolumenPorHijos(hijoId, 'todos'))
+//       volumenTotal += volumenSubhijos
+//     }
+//   }
 
-  return volumenTotal.toFixed(3)
-}
+//   return volumenTotal.toFixed(3)
+// }
 
-const descripcionVolumenTeorico = computed(() => {
-  const elemento = elementoSeleccionado.value
-  if (!elemento) return ''
+// const descripcionVolumenTeorico = computed(() => {
+//   const elemento = elementoSeleccionado.value
+//   if (!elemento) return ''
 
-  const numHijos = elemento.hijos?.length || 0
+//   const numHijos = elemento.hijos?.length || 0
 
-  if (elemento.tipo === 'elementos') {
-    const contenedores = elemento.hijos?.filter(hijoId => {
-      const hijo = canvasStore.elementoPorId(hijoId)
-      return hijo && hijo.tipo === 'contenedores'
-    }).length || 0
+//   if (elemento.tipo === 'elementos') {
+//     const contenedores = elemento.hijos?.filter(hijoId => {
+//       const hijo = canvasStore.elementoPorId(hijoId)
+//       return hijo && hijo.tipo === 'contenedores'
+//     }).length || 0
 
-    if (contenedores === 0) return 'Sin contenedores internos'
-    return `Calculado desde ${contenedores} contenedor${contenedores > 1 ? 'es' : ''}`
-  }
+//     if (contenedores === 0) return 'Sin contenedores internos'
+//     return `Calculado desde ${contenedores} contenedor${contenedores > 1 ? 'es' : ''}`
+//   }
 
-  if (elemento.tipo === 'contenedores') {
-    return 'Calculado desde dimensiones propias'
-  }
+//   if (elemento.tipo === 'contenedores') {
+//     return 'Calculado desde dimensiones propias'
+//   }
 
-  return 'Calculado desde dimensiones'
-})
+//   return 'Calculado desde dimensiones'
+// })
 
 /**
  * Uso real del elemento
@@ -940,10 +921,10 @@ const usoRealPeso = computed(() => {
   return uso?.peso ? uso.peso.toFixed(2) : '0.00'
 })
 
-const usoRealVolumen = computed(() => {
-  const uso = elementoSeleccionado.value?.uso
-  return uso?.volumen ? uso.volumen.toFixed(3) : '0.000'
-})
+// const usoRealVolumen = computed(() => {
+//   const uso = elementoSeleccionado.value?.uso
+//   return uso?.volumen ? uso.volumen.toFixed(3) : '0.000'
+// })
 
 const porcentajePesoUsado = computed(() => {
   const peso = parseFloat(usoRealPeso.value)
@@ -952,12 +933,12 @@ const porcentajePesoUsado = computed(() => {
   return Math.min(100, toPrecisionCm((peso / maximo) * 100))
 })
 
-const porcentajeVolumenUsado = computed(() => {
-  const volumen = parseFloat(usoRealVolumen.value)
-  const maximo = parseFloat(volumenTeorico.value)
-  if (maximo === 0) return 0
-  return Math.min(100, toPrecisionCm((volumen / maximo) * 100))
-})
+// const porcentajeVolumenUsado = computed(() => {
+//   const volumen = parseFloat(usoRealVolumen.value)
+//   const maximo = parseFloat(volumenTeorico.value)
+//   if (maximo === 0) return 0
+//   return Math.min(100, toPrecisionCm((volumen / maximo) * 100))
+// })
 
 const colorPesoUsado = computed(() => {
   const porcentaje = porcentajePesoUsado.value
@@ -966,16 +947,16 @@ const colorPesoUsado = computed(() => {
   return '#ef4444' // Rojo
 })
 
-const colorVolumenUsado = computed(() => {
-  const porcentaje = porcentajeVolumenUsado.value
-  if (porcentaje < 50) return '#10b981' // Verde
-  if (porcentaje < 85) return '#f59e0b' // Amarillo
-  return '#ef4444' // Rojo
-})
+// const colorVolumenUsado = computed(() => {
+//   const porcentaje = porcentajeVolumenUsado.value
+//   if (porcentaje < 50) return '#10b981' // Verde
+//   if (porcentaje < 85) return '#f59e0b' // Amarillo
+//   return '#ef4444' // Rojo
+// })
 
 const alturaPlanta = computed(() => canvasStore.plantaPorId(canvasStore.plantaActiva)?.dimensiones?.alto || 0)
 const advertenciaAltura = computed(() => {
-  if (!esAnaquelOEstante.value) return null
+  if (!esEstructura.value) return null
   const max = alturaPlanta.value;
   const actual = edited.value?.dimensiones?.alto || 0
   return actual > max ? `La altura no debe superar ${max} cm (debido a la altura de planta o un elemento situado encima)` : null
@@ -1097,7 +1078,7 @@ const maxAlturaSobreSuelo = computed(() => {
 })
 
 const advertenciaZBase = computed(() => {
-  if (!esPared.value) return null
+  if (!estaUbicadoEnPared.value) return null
   const z = Number(edited.value?.alturaSobreSueloCm)
   if (!Number.isFinite(z) || z < 0) return 'La altura sobre suelo debe ser mayor o igual a 0 cm'
   const max = maxAlturaSobreSuelo.value
@@ -1105,7 +1086,7 @@ const advertenciaZBase = computed(() => {
 })
 
 const validarAlturaSobreSuelo = () => {
-  if (!esPared.value) return
+  if (!estaUbicadoEnPared.value) return
   const z = Number(edited.value?.alturaSobreSueloCm)
   if (!Number.isFinite(z) || z < 0) {
     showWarning('La altura sobre el suelo debe ser mayor o igual a 0 cm')

@@ -227,10 +227,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     return contextoNavegacion.value.tipo === 'contenedores'
   })
 
-  const elementoContenedorActual = computed(() => {
+  const estructuraContenedorActual = computed(() => {
     if (
       contextoNavegacion.value.tipo === 'elementos' ||
-      contextoNavegacion.value.tipo === 'contenedores'
+      contextoNavegacion.value.tipo === 'contenedores' ||
+      contextoNavegacion.value.tipo === 'pisos' ||
+      contextoNavegacion.value.tipo === 'cuartos'
     ) {
       return elementos.value.find((el) => el.id === contextoNavegacion.value.id)
     }
@@ -777,7 +779,7 @@ export const useCanvasStore = defineStore('canvas', () => {
             d: planta.dimensiones.alto,
           }
           const elems = elementos.value.filter(
-            (el) => el.plantaId === plantaId && !el.padre && el.tipo === 'elementos'
+            (el) => el.plantaId === plantaId && !el.padre && (el.tipo === 'elementos' || el.tipo === 'pasillos' || el.tipo === 'cuartos')
           )
           for (const el of elems) {
             const typeKey = el.systemTypeKey || el.id
@@ -1399,7 +1401,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   estaEnPiso,
     estaEnElemento,
     estaEnContenedor,
-    elementoContenedorActual,
+    estructuraContenedorActual,
     breadcrumbs,
     puedeNavegar,
     contextoNavegacion,

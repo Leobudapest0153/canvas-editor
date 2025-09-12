@@ -146,7 +146,7 @@
                 y: 0,
                 width: elemento.width,
                 height: elemento.height,
-                fill: elemento.tipo === 'pasillos' ? 'transparent' : elemento.color,
+                fill: elemento.tipo === 'pasillos' ? '#ffffff' : elemento.color,
                 stroke: elemento.tipo === 'pasillos' ? '#000' : undefined,
                 strokeWidth: elemento.tipo === 'pasillos' ? (2 / canvasStore.zoom) : 0,
                 dash: elemento.tipo === 'pasillos' ? [6 / canvasStore.zoom, 4 / canvasStore.zoom] : undefined,
@@ -413,9 +413,9 @@
             x: 10,
             y: -(39 / canvasStore.zoom),
             text:
-              canvasStore.estaEnElemento || canvasStore.estaEnContenedor
-                ? `${canvasStore.elementoContenedorActual?.nombre || 'Elemento'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`
-                : `${canvasStore.plantaActivaData?.nombre || 'Planta'} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`,
+              !canvasStore.estaEnPlanta
+                ? `${canvasStore.estructuraContenedorActual?.nombre} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`
+                : `${canvasStore.plantaActivaData?.nombre} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`,
             fontSize: 12 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#3b82f6',
@@ -434,6 +434,33 @@
             listening: false,
           }"
         />
+
+          <v-text
+            v-else-if="canvasStore.estaEnCuarto"
+            :config="{
+              x: 10,
+              y: -(11 / canvasStore.zoom) - (8 / canvasStore.zoom),
+              text: `Pisos: ${elementosVisiblesEnCanvas.length}`,
+              fontSize: 11 / canvasStore.zoom,
+              fontFamily: 'Arial',
+              fill: '#6b7280',
+              listening: false,
+            }"
+          />
+
+          <v-text
+            v-else-if="canvasStore.estaEnPiso"
+            :config="{
+              x: 10,
+              y: -(11 / canvasStore.zoom) - (8 / canvasStore.zoom),
+              text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
+              fontSize: 11 / canvasStore.zoom,
+              fontFamily: 'Arial',
+              fill: '#6b7280',
+              listening: false,
+            }"
+          />
+
         <v-text
           v-if="canvasStore.estaEnElemento"
           :config="{
@@ -805,10 +832,10 @@ const getDynamicMinZoom = () => {
 
   let bbox = null
 
-  // Contexto 1: si estamos en elemento o contenedor
-  if ((canvasStore.estaEnElemento || canvasStore.estaEnContenedor) && canvasStore.elementoContenedorActual) {
-    const localW = layerConfig.value.width || Math.max(1, canvasStore.elementoContenedorActual.width || 1)
-    const localH = layerConfig.value.height || Math.max(1, canvasStore.elementoContenedorActual.height || 1)
+  // Contexto 1: si no estamos en planta
+  if ((!canvasStore.estaEnPlanta) && canvasStore.estructuraContenedorActual) {
+    const localW = layerConfig.value.width || Math.max(1, canvasStore.estructuraContenedorActual.width || 1)
+    const localH = layerConfig.value.height || Math.max(1, canvasStore.estructuraContenedorActual.height || 1)
     bbox = { x: 0, y: 0, width: Math.max(1, localW), height: Math.max(1, localH) }
   }
   // Contexto 2: planta activa
@@ -864,11 +891,11 @@ const handleWheel = (e) => {
   let bbox = null
 
   // Verificación se un elemento
-  if ((canvasStore.estaEnElemento || canvasStore.estaEnContenedor) && canvasStore.elementoContenedorActual) {
+  if ((!canvasStore.estaEnPlanta) && canvasStore.estructuraContenedorActual) {
         try {
         // Usar el tamaño del layer (canvas adaptativo) como la caja a encuadrar
-        const localW = layerConfig.value.width || Math.max(1, canvasStore.elementoContenedorActual.width || 1)
-        const localH = layerConfig.value.height || Math.max(1, canvasStore.elementoContenedorActual.height || 1)
+        const localW = layerConfig.value.width || Math.max(1, canvasStore.estructuraContenedorActual.width || 1)
+        const localH = layerConfig.value.height || Math.max(1, canvasStore.estructuraContenedorActual.height || 1)
         const elBbox = { x: 0, y: 0, width: Math.max(1, localW), height: Math.max(1, localH) }
 
         // Calcular fit directo para el elemento y salir
@@ -1281,6 +1308,10 @@ const runPreDropValidations = (elemento, dropEvent) => {
     let tipoPadre = ""
     if (canvasStore.estaEnPlanta) {
       tipoPadre = "la planta"
+    } else if (canvasStore.estaEnCuarto) {
+      tipoPadre = "el cuarto"
+    } else if (canvasStore.estaEnPiso) {
+      tipoPadre = "el piso"
     } else if (canvasStore.estaEnContenedor) {
       tipoPadre = "el contenedor"
     } else if (canvasStore.estaEnElemento) {
@@ -1339,9 +1370,8 @@ const runPreDropValidations = (elemento, dropEvent) => {
   candX = snapped.x
   candY = snapped.y
 
-  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
-    if (elemento.tipo === 'contenedores') {
-      const parent = canvasStore.elementoContenedorActual
+  if (!canvasStore.estaEnPlanta) {
+      const parent = canvasStore.estructuraContenedorActual
       const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
       const temp = {
         id: '__temp',
@@ -1358,7 +1388,6 @@ const runPreDropValidations = (elemento, dropEvent) => {
       const worldPos = sess.toWorld(local, parent)
       candX = worldPos.x
       candY = worldPos.y
-    }
   }
 
   const boundary = computeBoundary()
@@ -1475,20 +1504,10 @@ const createElementFromDrop = (data, dropEvent) => {
 
   let largoCmFinal = largoCm
   let finalHeightFinal = finalHeight
-  if (canvasStore.contextoActual.tipo === 'elementos' && elemento.tipo === 'contenedores') {
-    const elementoPadre = canvasStore.elementoContenedorActual
-    if (elementoPadre && elementoPadre.dimensiones) {
-      largoCmFinal = elementoPadre.dimensiones.largo
-      if (canvasStore.vistaActiva === 'XY') {
-        finalHeightFinal = largoCmFinal * CM_TO_PX
-      }
-      console.log('Contenedor ajustado al largo del elemento padre:', { largoPadre: largoCmFinal, altoPxFinal: finalHeightFinal, vista: canvasStore.vistaActiva })
-    }
-  }
 
   const nuevoElemento = {
     id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
-    tipo: elemento.tipo || (elemento.categoria === 'contenedores' ? 'contenedores' : 'elementos'),
+    tipo: elemento.tipo,
     categoria: elemento.categoria,
     nombre: elemento.nombre || 'Nuevo elemento',
     dimensiones: { ancho: anchoCm, largo: largoCmFinal, alto: altoCm },
@@ -1641,28 +1660,6 @@ const createElementFromBuffer = (data, dropEvent) => {
 
   // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
   let { width, height } = getElementPixelDimensions(elemento)
-
-  // Ajustar las dimensiones del contenedor si estamos en un elemento
-  if (canvasStore.contextoActual.tipo === 'elementos' && elemento.tipo === 'contenedores') {
-    // Obtener el elemento padre (el elemento actual donde estamos)
-    const elementoPadre = canvasStore.elementoContenedorActual;
-    if (elementoPadre && elementoPadre.dimensiones) {
-      // Si estamos en vista de frente (XZ), ajustar el alto según el alto del padre
-      if (canvasStore.vistaActiva === 'XZ') {
-        const altoPadreCm = elementoPadre.dimensiones.alto;
-
-        // Actualizar también las dimensiones en el elemento del buffer
-        if (elemento.dimensiones) {
-          elemento.dimensiones.alto = altoPadreCm;
-        }
-
-        console.log('Buffer: Contenedor ajustado al alto del elemento padre:', {
-          altoPadreCm,
-          altoPixelesFinal: height
-        });
-      }
-    }
-  }
 
   // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
   const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
@@ -2023,11 +2020,11 @@ const fitToPlanta = () => {
 
     // Si estamos dentro de un elemento o contenedor (navegando dentro), ajustar al canvas adaptativo
     // En este modo las coordenadas locales del elemento empiezan en 0,0 — usar layerConfig para el tamaño
-    if ((canvasStore.estaEnElemento || canvasStore.estaEnContenedor) && canvasStore.elementoContenedorActual) {
+    if (!canvasStore.estaEnPlanta && canvasStore.estructuraContenedorActual) {
       try {
         // Usar el tamaño del layer (canvas adaptativo) como la caja a encuadrar
-        const localW = layerConfig.value.width || Math.max(1, canvasStore.elementoContenedorActual.width || 1)
-        const localH = layerConfig.value.height || Math.max(1, canvasStore.elementoContenedorActual.height || 1)
+        const localW = layerConfig.value.width || Math.max(1, canvasStore.estructuraContenedorActual.width || 1)
+        const localH = layerConfig.value.height || Math.max(1, canvasStore.estructuraContenedorActual.height || 1)
         const elBbox = { x: 0, y: 0, width: Math.max(1, localW), height: Math.max(1, localH) }
 
         // Calcular fit directo para el elemento y salir

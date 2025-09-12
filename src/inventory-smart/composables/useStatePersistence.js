@@ -707,8 +707,8 @@ export const useStatePersistence = () => {
             if (!elemento.categoria) {
               validationResult.warnings.push(`${context}: se recomienda tener categoría`)
             }
-            if (elemento.tipo === 'elementos' && !elemento.ubicacion) {
-              validationResult.warnings.push(`${context}: elementos deben tener ubicación`)
+            if (elemento.tipo !== 'plantas' && !elemento.ubicacion) {
+              validationResult.warnings.push(`${context}: estructuras/espacios deben tener ubicación`)
             }
           }
 

@@ -28,7 +28,6 @@ export const CATALOGO = {
   SISTEMA_BASE_KEYS: [
     'pasillo_base',
     'cuarto_frio',
-    'piso_base',
     'anaquel_metalico_grande',
     'estante_pared_pequeno',
     'barril_basico',

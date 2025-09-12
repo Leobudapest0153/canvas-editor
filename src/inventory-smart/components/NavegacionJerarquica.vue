@@ -59,10 +59,10 @@
           <span v-if="canvasStore.estaEnPlanta">
             {{ canvasStore.elementosVisibles.length }} items (cuartos, elementos, pasillos)
           </span>
-          <span v-else-if="canvasStore.contextoActual.tipo === 'cuartos'">
+          <span v-else-if="canvasStore.estaEnCuarto">
             {{ canvasStore.elementosVisibles.length }} pisos
           </span>
-          <span v-else-if="canvasStore.contextoActual.tipo === 'pisos'">
+          <span v-else-if="canvasStore.estaEnPiso">
             {{ canvasStore.elementosVisibles.length }} elementos
           </span>
           <span v-else-if="canvasStore.estaEnElemento">
@@ -91,8 +91,8 @@ const canvasStore = useCanvasStore()
 
 // Computed properties
 const elementoActual = computed(() => {
-  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
-    return canvasStore.elementoContenedorActual
+  if (!canvasStore.estaEnPlanta) {
+    return canvasStore.estructuraContenedorActual
   }
   return null
 })
