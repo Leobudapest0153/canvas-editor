@@ -39,13 +39,13 @@
           <button
             type="button"
             @click="close"
-            class="px-4 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-200"
+            class="px-4 py-2 cursor-pointer bg-white border border-gray-300 rounded-md text-sm text-primary hover:bg-gray-100"
           >
             Cancelar
           </button>
           <button
             type="submit"
-            class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
+            class="px-4 py-2 cursor-pointer bg-primary text-white rounded-md text-sm hover:bg-primary-800"
           >
             Guardar Etiqueta
           </button>

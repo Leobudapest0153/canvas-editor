@@ -179,7 +179,22 @@ onUnmounted(() => {
 </script>
 
 <style>
-/* Design tokens and utility helpers */
+
+@import "tailwindcss";
+
+/* Ignorar warning de unknown at rule */
+@theme {
+  --color-primary: #1C1E4D;
+  --color-primary-100: #f0f1f5;
+  --color-primary-200: #d9dbec;
+  --color-primary-300: #b3b6d9;
+  --color-primary-400: #8c91c6;
+  --color-primary-500: #666bb3;
+  --color-primary-600: #4d5190;
+  --color-primary-700: #33366d;
+  --color-primary-800: #1a1b4a;
+  --color-primary-900: #0d0e2a;
+}
 
 :root {
   --ui-bg: rgba(255, 255, 255, 0.92);
@@ -266,12 +281,12 @@ onUnmounted(() => {
 }
 
 .catalog-tab.is-active {
-  background: var(--primary);
+  background: var(--color-primary);
   color: #fff;
 }
 
 .catalog-tab.kb-focus {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 

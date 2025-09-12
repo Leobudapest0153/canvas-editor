@@ -221,17 +221,17 @@
     <div v-if="elementoSeleccionado" class="p-4 border-t border-gray-200 bg-white">
       <div v-if="isDirty" class="space-x-2 mb-3 flex justify-end">
         <button
-          class="px-3 py-1 border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+          class="px-3 py-1 cursor-pointer border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
           @click="revertir" :disabled="isSaving">
           Revertir
         </button>
-        <button class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:opacity-50"
+        <button class="px-3 cursor-pointer py-1 bg-primary text-white rounded text-sm hover:bg-primary-900 disabled:opacity-50"
           @click="guardar" :disabled="guardarDeshabilitado">
           Guardar
         </button>
       </div>
       <button @click="deseleccionarElemento"
-        class="w-full cursor-pointer px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm">
+        class="w-full cursor-pointer px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors text-sm">
         Deseleccionar
       </button>
     </div>

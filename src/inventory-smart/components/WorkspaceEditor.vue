@@ -133,11 +133,11 @@
 
       <!-- Footer con Cerrar + Guardar -->
       <div class="px-5 py-4 border-t border-t-slate-200 bg-gray-50 flex justify-end gap-3 flex-shrink-0">
-        <button class="px-4 py-2 cursor-pointer rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        <button class="px-4 py-2 cursor-pointer rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary"
                 @click="closeModal">
           Cerrar
         </button>
-        <button class="px-4 py-2 cursor-pointer rounded-lg bg-indigo-600 text-white font-medium shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        <button class="px-4 py-2 cursor-pointer rounded-lg bg-primary text-white font-medium shadow-sm hover:bg-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-900"
                 @click="onSave">
           Guardar Cambios
         </button>

@@ -132,11 +132,11 @@ watch(() => props.safeRight, recomputeFloatingRight)
 
 /* Botones de zoom: heredan tamaño de .floating-btn y comparten color/hover con btn-undo */
 .btn-zoom:not(:disabled) {
-  color: #3b82f6;
+  color: var(--color-primary);
 }
 .btn-zoom:hover:not(:disabled) {
   background: #eff6ff;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
 }
 
 /* Si el espacio horizontal es reducido, desplazar .canvas-info hacia la izquierda y reducir su padding */
@@ -172,12 +172,12 @@ watch(() => props.safeRight, recomputeFloatingRight)
 }
 
 .btn-undo:not(:disabled) {
-  color: #3b82f6;
+  color: var(--color-primary);
 }
 
 .btn-undo:hover:not(:disabled) {
   background: #eff6ff;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
 }
 
 .btn-redo:not(:disabled) {
@@ -191,20 +191,20 @@ watch(() => props.safeRight, recomputeFloatingRight)
 
 /* Ajuste visual del botón de 'fit' para que coincida con el botón Deshacer */
 .btn-fit:not(:disabled) {
-  color: #3b82f6;
+  color: var(--color-primary);
 }
 .btn-fit:hover:not(:disabled) {
   background: #eff6ff;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
 }
 
 /* Gear button style to match Undo */
 .btn-gear {
-  color: #3b82f6;
+  color: var(--color-primary);
 }
 .btn-gear:hover:not(:disabled) {
   background: #eff6ff;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
 }
 
 .floating-btn .icon {

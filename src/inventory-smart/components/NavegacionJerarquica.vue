@@ -216,9 +216,9 @@ const previousCrumb = computed(() => {
 }
 
 .breadcrumb-item.active {
-  background: #3b82f6;
+  background: var(--color-primary);
   color: white;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
   cursor: default;
 }
 

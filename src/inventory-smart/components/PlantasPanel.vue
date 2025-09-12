@@ -25,9 +25,9 @@
             v-for="planta in canvasStore.plantas"
             :key="planta.id"
             :class="[
-              'relative flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-blue-400 flex-shrink-0',
+              'relative m-2 flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 hover:border-primary-400 flex-shrink-0',
               {
-                'bg-blue-50 border-blue-300 shadow-md': planta.id === canvasStore.plantaActiva,
+                'bg-primary-200 border-primary-200 shadow-md': planta.id === canvasStore.plantaActiva,
                 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300':
                   planta.id !== canvasStore.plantaActiva,
               },
@@ -35,7 +35,7 @@
           >
             <div class="flex items-center space-x-3" @click="seleccionarPlanta(planta.id)">
               <div
-                class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-gradient-to-br from-blue-500 to-blue-600"
+                class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-primary"
               >
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path
@@ -65,7 +65,7 @@
             >
               <button
                 @click.stop="toggleMenuPlanta(planta.id, $event)"
-                class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
+                class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-primary-200 transition-colors cursor-pointer"
                 title="Opciones de planta"
               >
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -92,7 +92,7 @@
 
         <button
           @click="canvasStore.abrirEditor()"
-          class="flex-shrink-0 inline-flex items-center justify-center w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-md hover:shadow-lg cursor-pointer transition-colors"
+          class="flex-shrink-0 inline-flex items-center justify-center w-12 h-12 bg-primary hover:bg-primary-900 text-white rounded-lg shadow-md hover:shadow-lg cursor-pointer transition-colors"
           type="button"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -239,7 +239,7 @@
               id="nombre"
               v-model="formularioPlanta.nombre"
               type="text"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all"
               placeholder="Ej: Planta Baja, Primer Piso..."
               required
             />
@@ -252,7 +252,7 @@
             <textarea
               id="descripcion"
               v-model="formularioPlanta.descripcion"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all resize-none"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all resize-none"
               placeholder="Descripción de la planta..."
               rows="3"
             ></textarea>
@@ -271,7 +271,7 @@
                   v-model.number="formularioPlanta.dimensiones.ancho"
                   @input="onDimChange()"
                   type="number"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all"
                   placeholder="800"
                   min="100"
                   max="5000"
@@ -287,7 +287,7 @@
                   v-model.number="formularioPlanta.dimensiones.largo"
                   @input="onDimChange()"
                   type="number"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all"
                   placeholder="1000"
                   min="100"
                   max="5000"
@@ -300,7 +300,7 @@
                   id="alto"
                   v-model.number="formularioPlanta.dimensiones.alto"
                   type="number"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all"
                   placeholder="280"
                   min="200"
                   max="1000"
@@ -334,7 +334,7 @@
               id="pesoMaximo"
               v-model.number="formularioPlanta.pesoMaximoSoportado"
               type="number"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-3 focus:ring-blue-100 transition-all"
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all"
               placeholder="3000"
               min="500"
               max="50000"
@@ -352,7 +352,7 @@
             </button>
             <button
               type="submit"
-              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white border-none rounded-lg cursor-pointer transition-colors"
+              class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white border-none rounded-lg cursor-pointer transition-colors"
             >
               {{ mostrarModalEditar ? 'Guardar Cambios' : 'Crear Planta' }}
             </button>
