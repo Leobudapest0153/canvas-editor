@@ -247,28 +247,6 @@ export const useCanvasBuffer = () => {
       newElement.padre = null
     }
 
-    // Ajustar dimensiones para contenedores si estamos en un elemento
-    if (canvasStore.contextoActual.tipo === 'elementos' && elementoToPaste.tipo === 'contenedores') {
-      const elementoPadre = canvasStore.elementoContenedorActual
-      if (elementoPadre && elementoPadre.dimensiones && elementoPadre.dimensiones.largo) {
-        const largoPadreCm = elementoPadre.dimensiones.largo
-
-        if (!newElement.dimensiones) {
-          newElement.dimensiones = {
-            ancho: newElement.width ? toPrecisionCm(newElement.width / CM_TO_PX) : 10,
-            largo: largoPadreCm,
-            alto: newElement.height ? toPrecisionCm(newElement.height / CM_TO_PX) : 10
-          }
-        } else {
-          newElement.dimensiones.largo = largoPadreCm
-        }
-
-        if (canvasStore.vistaActiva === 'XY') {
-          newElement.height = largoPadreCm * CM_TO_PX
-        }
-      }
-    }
-
     let newElementId
 
     if (!parentId) {

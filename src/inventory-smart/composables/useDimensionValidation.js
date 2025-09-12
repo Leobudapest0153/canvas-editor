@@ -90,14 +90,14 @@ export function useDimensionValidation() {
     }
 
     // Validar volumen mínimo
-    const validacionVolumen = validarVolumenMinimo(elementoTemporal)
-    if (!validacionVolumen.valida) {
-      console.log('❌ VALIDACIÓN DE VOLUMEN FALLIDA:', validacionVolumen.razon)
-      if (!silencioso) {
-        toast.showError(validacionVolumen.razon)
-      }
-      return validacionVolumen
-    }
+    // const validacionVolumen = validarVolumenMinimo(elementoTemporal)
+    // if (!validacionVolumen.valida) {
+    //   console.log('❌ VALIDACIÓN DE VOLUMEN FALLIDA:', validacionVolumen.razon)
+    //   if (!silencioso) {
+    //     toast.showError(validacionVolumen.razon)
+    //   }
+    //   return validacionVolumen
+    // }
 
     console.log('✅ TODAS LAS VALIDACIONES DE DIMENSIONES FÍSICAS EXITOSAS')
 
@@ -149,7 +149,7 @@ export function useDimensionValidation() {
       const posHijoY_px = hijo.y || 0;
       const posHijoX = posHijoX_px / CM_TO_PX; // Posición X en canvas
       const posHijoY_raw = posHijoY_px / CM_TO_PX; // Posición Y en canvas
-      
+
       // Obtener dimensiones del hijo
       const dimHijo = hijo.dimensiones || {};
       let anchoHijoCanvas, altoHijoCanvas, posHijoY;
@@ -165,7 +165,7 @@ export function useDimensionValidation() {
         // Vista XY (superior): validamos ancho × largo
         anchoHijoCanvas = dimHijo.ancho || 0;
         altoHijoCanvas = dimHijo.largo || 0; // En vista XY mostramos largo
-        
+
         // CORRECCIÓN CRÍTICA: Detectar si el hijo fue posicionado en vista frontal
         // Si un hijo se sale del área padre debido a desplazamiento Y, probablemente fue posicionado en vista frontal
         const hijoDesplazadoEnY = posHijoY_raw > 1; // Más de 1cm de desplazamiento
@@ -388,110 +388,110 @@ export function useDimensionValidation() {
    * @param {Object} elemento - Elemento con las nuevas dimensiones a validar
    * @returns {Object} Resultado de la validación
    */
-  function validarVolumenMinimo(elemento) {
-    // Obtener el volumen usado actual del elemento
-    const usoActual = elemento.uso || {};
-    const volumenUsado = usoActual.volumen || 0;
+  // function validarVolumenMinimo(elemento) {
+  //   // Obtener el volumen usado actual del elemento
+  //   const usoActual = elemento.uso || {};
+  //   const volumenUsado = usoActual.volumen || 0;
 
-    // Si no hay volumen usado, la validación pasa
-    if (volumenUsado === 0) {
-      return { valida: true, razon: 'No hay volumen usado registrado' };
-    }
+  //   // Si no hay volumen usado, la validación pasa
+  //   if (volumenUsado === 0) {
+  //     return { valida: true, razon: 'No hay volumen usado registrado' };
+  //   }
 
-    // Calcular el nuevo volumen teórico según el tipo de elemento
-    const dimensiones = elemento.dimensiones;
-    let nuevoVolumenTeorico = 0;
+  //   // Calcular el nuevo volumen teórico según el tipo de elemento
+  //   const dimensiones = elemento.dimensiones;
+  //   let nuevoVolumenTeorico = 0;
 
-    if (elemento.tipo === 'contenedores') {
-      // Para contenedores: volumen teórico = sus propias dimensiones
-      if (elemento.forma === 'circular') {
-        // Para formas circulares: V = π × r² × h
-        const radio = (dimensiones.ancho || 0) / 2;
-        const alto = dimensiones.alto || 0;
-        nuevoVolumenTeorico = (Math.PI * Math.pow(radio, 2) * alto) / 1_000_000; // cm³ a m³
-      } else {
-        // Para formas rectangulares: V = ancho × largo × alto
-        const ancho = dimensiones.ancho || 0;
-        const largo = dimensiones.largo || 0;
-        const alto = dimensiones.alto || 0;
-        nuevoVolumenTeorico = (ancho * largo * alto) / 1_000_000; // cm³ a m³
-      }
-    } else {
-      // Para elementos: volumen teórico = suma de volúmenes de sus contenedores hijos
-      const contenedoresHijos = canvasStore.elementos.filter(el =>
-        el.padre === elemento.id && el.tipo === 'contenedores'
-      );
+  //   if (elemento.tipo === 'contenedores') {
+  //     // Para contenedores: volumen teórico = sus propias dimensiones
+  //     if (elemento.forma === 'circular') {
+  //       // Para formas circulares: V = π × r² × h
+  //       const radio = (dimensiones.ancho || 0) / 2;
+  //       const alto = dimensiones.alto || 0;
+  //       nuevoVolumenTeorico = (Math.PI * Math.pow(radio, 2) * alto) / 1_000_000; // cm³ a m³
+  //     } else {
+  //       // Para formas rectangulares: V = ancho × largo × alto
+  //       const ancho = dimensiones.ancho || 0;
+  //       const largo = dimensiones.largo || 0;
+  //       const alto = dimensiones.alto || 0;
+  //       nuevoVolumenTeorico = (ancho * largo * alto) / 1_000_000; // cm³ a m³
+  //     }
+  //   } else {
+  //     // Para elementos: volumen teórico = suma de volúmenes de sus contenedores hijos
+  //     const contenedoresHijos = canvasStore.elementos.filter(el =>
+  //       el.padre === elemento.id && el.tipo === 'contenedores'
+  //     );
 
-      nuevoVolumenTeorico = contenedoresHijos.reduce((suma, contenedor) => {
-        const dimContenedor = contenedor.dimensiones || {};
-        let volumenContenedor = 0;
+  //     nuevoVolumenTeorico = contenedoresHijos.reduce((suma, contenedor) => {
+  //       const dimContenedor = contenedor.dimensiones || {};
+  //       let volumenContenedor = 0;
 
-        if (contenedor.forma === 'circular') {
-          const radio = (dimContenedor.ancho || 0) / 2;
-          const alto = dimContenedor.alto || 0;
-          volumenContenedor = (Math.PI * Math.pow(radio, 2) * alto) / 1_000_000;
-        } else {
-          const ancho = dimContenedor.ancho || 0;
-          const largo = dimContenedor.largo || 0;
-          const alto = dimContenedor.alto || 0;
-          volumenContenedor = (ancho * largo * alto) / 1_000_000;
-        }
+  //       if (contenedor.forma === 'circular') {
+  //         const radio = (dimContenedor.ancho || 0) / 2;
+  //         const alto = dimContenedor.alto || 0;
+  //         volumenContenedor = (Math.PI * Math.pow(radio, 2) * alto) / 1_000_000;
+  //       } else {
+  //         const ancho = dimContenedor.ancho || 0;
+  //         const largo = dimContenedor.largo || 0;
+  //         const alto = dimContenedor.alto || 0;
+  //         volumenContenedor = (ancho * largo * alto) / 1_000_000;
+  //       }
 
-        return suma + volumenContenedor;
-      }, 0);
-    }
+  //       return suma + volumenContenedor;
+  //     }, 0);
+  //   }
 
-    // Verificar si el nuevo volumen es suficiente
-    if (nuevoVolumenTeorico < volumenUsado) {
-      const deficit = volumenUsado - nuevoVolumenTeorico;
+  //   // Verificar si el nuevo volumen es suficiente
+  //   if (nuevoVolumenTeorico < volumenUsado) {
+  //     const deficit = volumenUsado - nuevoVolumenTeorico;
 
-      // Calcular sugerencias de ajuste según el tipo de elemento
-      const sugerencias = [];
+  //     // Calcular sugerencias de ajuste según el tipo de elemento
+  //     const sugerencias = [];
 
-      if (elemento.tipo === 'contenedores') {
+  //     if (elemento.tipo === 'contenedores') {
 
-        if (elemento.forma === 'circular') {
-          sugerencias.push(`Verificar las dimensiones necesarias`);
-        } else {
-          sugerencias.push(`Verificar las dimensiones necesarias`);
-        }
-      } else {
-        // Para elementos: sugerir agregar más contenedores o aumentar el tamaño de los existentes
-        const contenedoresHijos = canvasStore.elementos.filter(el =>
-          el.padre === elemento.id && el.tipo === 'contenedores'
-        );
+  //       if (elemento.forma === 'circular') {
+  //         sugerencias.push(`Verificar las dimensiones necesarias`);
+  //       } else {
+  //         sugerencias.push(`Verificar las dimensiones necesarias`);
+  //       }
+  //     } else {
+  //       // Para elementos: sugerir agregar más contenedores o aumentar el tamaño de los existentes
+  //       const contenedoresHijos = canvasStore.elementos.filter(el =>
+  //         el.padre === elemento.id && el.tipo === 'contenedores'
+  //       );
 
-        if (contenedoresHijos.length === 0) {
-          sugerencias.push('Agregar más contenedores internos para alcanzar el volumen requerido');
-        } else {
-          const volumenAdicionalRequerido = volumenUsado - nuevoVolumenTeorico;
-          sugerencias.push(`Aumentar el volumen de los contenedores existentes en ${volumenAdicionalRequerido.toFixed(3)}m³`);
-          sugerencias.push('O agregar contenedores adicionales para completar el volumen requerido');
-        }
-      }
+  //       if (contenedoresHijos.length === 0) {
+  //         sugerencias.push('Agregar más contenedores internos para alcanzar el volumen requerido');
+  //       } else {
+  //         const volumenAdicionalRequerido = volumenUsado - nuevoVolumenTeorico;
+  //         sugerencias.push(`Aumentar el volumen de los contenedores existentes en ${volumenAdicionalRequerido.toFixed(3)}m³`);
+  //         sugerencias.push('O agregar contenedores adicionales para completar el volumen requerido');
+  //       }
+  //     }
 
-      // const tipoElemento = elemento.tipo === 'contenedores' ? 'contenedores' : 'elementos';
-      const explicacionCalculo = elemento.tipo === 'contenedores' ?
-        'basado en sus dimensiones propias' :
-        'basado en la suma de volúmenes de sus contenedores hijos';
+  //     // const tipoElemento = elemento.tipo === 'contenedores' ? 'contenedores' : 'elementos';
+  //     const explicacionCalculo = elemento.tipo === 'contenedores' ?
+  //       'basado en sus dimensiones propias' :
+  //       'basado en la suma de volúmenes de sus contenedores hijos';
 
-      return {
-        valida: false,
-        razon: `El nuevo volumen (${nuevoVolumenTeorico.toFixed(3)}m³, ${explicacionCalculo}) no es suficiente para satisfacer su uso actual. Déficit: ${deficit.toFixed(3)}m³`,
-        sugerencias: sugerencias,
-        deficit: deficit,
-        volumenUsado: volumenUsado,
-        volumenNuevo: nuevoVolumenTeorico
-      };
-    }
+  //     return {
+  //       valida: false,
+  //       razon: `El nuevo volumen (${nuevoVolumenTeorico.toFixed(3)}m³, ${explicacionCalculo}) no es suficiente para satisfacer su uso actual. Déficit: ${deficit.toFixed(3)}m³`,
+  //       sugerencias: sugerencias,
+  //       deficit: deficit,
+  //       volumenUsado: volumenUsado,
+  //       volumenNuevo: nuevoVolumenTeorico
+  //     };
+  //   }
 
-    const tipoElemento = elemento.tipo === 'contenedores' ? 'contenedores' : 'elementos';
-    const explicacionCalculo = elemento.tipo === 'contenedores' ?
-      'basado en sus dimensiones propias' :
-      'basado en la suma de volúmenes de sus contenedores hijos';
+  //   const tipoElemento = elemento.tipo === 'contenedores' ? 'contenedores' : 'elementos';
+  //   const explicacionCalculo = elemento.tipo === 'contenedores' ?
+  //     'basado en sus dimensiones propias' :
+  //     'basado en la suma de volúmenes de sus contenedores hijos';
 
-    return { valida: true, razon: `El nuevo volumen del ${tipoElemento} (${nuevoVolumenTeorico.toFixed(3)}m³, ${explicacionCalculo}) es suficiente para el volumen usado (${volumenUsado.toFixed(3)}m³)` };
-  }
+  //   return { valida: true, razon: `El nuevo volumen del ${tipoElemento} (${nuevoVolumenTeorico.toFixed(3)}m³, ${explicacionCalculo}) es suficiente para el volumen usado (${volumenUsado.toFixed(3)}m³)` };
+  // }
 
   return {
     validarDimensiones

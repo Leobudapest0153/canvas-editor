@@ -57,6 +57,12 @@
         </div>
         <div class="context-details">
           <span v-if="canvasStore.estaEnPlanta">
+            {{ canvasStore.elementosVisibles.length }} items (cuartos, elementos, pasillos)
+          </span>
+          <span v-else-if="canvasStore.estaEnCuarto">
+            {{ canvasStore.elementosVisibles.length }} pisos
+          </span>
+          <span v-else-if="canvasStore.estaEnPiso">
             {{ canvasStore.elementosVisibles.length }} elementos
           </span>
           <span v-else-if="canvasStore.estaEnElemento">
@@ -85,17 +91,20 @@ const canvasStore = useCanvasStore()
 
 // Computed properties
 const elementoActual = computed(() => {
-  if (canvasStore.estaEnElemento || canvasStore.estaEnContenedor) {
-    return canvasStore.elementoContenedorActual
+  if (!canvasStore.estaEnPlanta) {
+    return canvasStore.estructuraContenedorActual
   }
   return null
 })
 
 // Métodos
 const getTipoContextoNombre = () => {
-  if (canvasStore.estaEnPlanta) return 'Planta'
-  if (canvasStore.estaEnElemento) return 'Elemento'
-  if (canvasStore.estaEnContenedor) return 'Contenedor'
+  const t = canvasStore.contextoActual.tipo
+  if (t === 'plantas') return 'Planta'
+  if (t === 'cuartos') return 'Cuarto'
+  if (t === 'pisos') return 'Piso'
+  if (t === 'elementos') return 'Elemento'
+  if (t === 'contenedores') return 'Contenedor'
   return 'Desconocido'
 }
 
@@ -107,7 +116,7 @@ const navegarACrumb = (crumb, index) => {
 
   if (crumb.tipo === 'plantas') {
     canvasStore.navegarAPlanta(crumb.id)
-  } else if (crumb.tipo === 'elementos' || crumb.tipo === 'contenedores') {
+  } else if (['cuartos','pisos','elementos','contenedores'].includes(crumb.tipo)) {
     // Usar la función del store para navegar a un elemento/contenedor
     // Esto asegura que zoom/pan, selección y canvas adaptativo se actualicen correctamente
     // Reconstruir el path hasta este elemento y usar navegarAContexto para reemplazarlo
