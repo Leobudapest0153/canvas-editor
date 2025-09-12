@@ -50,9 +50,9 @@ export const useCanvasStore = defineStore('canvas', () => {
       elementos: [], // Los elementos se calculan dinámicamente
       activa: true,
       dimensiones: {
-        alto: 500, // cm
-        ancho: 500, // cm
-        largo: 500, // cm
+        alto: 1500, // cm
+        ancho: 1500, // cm
+        largo: 1500, // cm
       },
       pesoMaximoSoportado: 5000, // kg
       poligono: [
@@ -61,16 +61,16 @@ export const useCanvasStore = defineStore('canvas', () => {
           y: 0,
         },
         {
-          x: 5000,
+          x: 15000,
           y: 0,
         },
         {
-          x: 5000,
-          y: 5000,
+          x: 15000,
+          y: 15000,
         },
         {
           x: 0,
-          y: 5000,
+          y: 15000,
         },
       ],
     },
@@ -94,8 +94,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const vistaActiva = computed(() => {
     const t = contextoNavegacion.value.tipo
-    if (t === 'plantas' || t === 'cuartos' || t === 'pisos') return 'XY'
-    if (t === 'elementos') return 'XZ'
+    if (t === 'plantas' || t === 'pisos') return 'XY'
+    if (t === 'elementos' || t === 'cuartos') return 'XZ'
     return 'XY'
   })
   const zoom = ref(1)
@@ -490,7 +490,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     if (elemento.dimensiones) {
       // XY para cuartos/pisos/pasillos; XZ para elementos
-      if (['cuartos', 'pisos', 'pasillos'].includes(elemento.tipo)) {
+      if (['pisos'].includes(elemento.tipo)) {
         elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
         elementHeightPx = elemento.dimensiones.largo * CM_TO_PX
       } else {
@@ -510,13 +510,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       elementHeightPx = defaultHeight * CM_TO_PX
       console.log('Usando dimensiones por defecto')
     }
-
-    // Asegurar dimensiones mínimas para navegación
-    // const MIN_CANVAS_WIDTH = 200 // px mínimos para el canvas
-    // const MIN_CANVAS_HEIGHT = 150 // px mínimos para el canvas
-
-    // elementWidthPx = Math.max(elementWidthPx, MIN_CANVAS_WIDTH)
-    // elementHeightPx = Math.max(elementHeightPx, MIN_CANVAS_HEIGHT)
 
     // El canvas muestra el espacio real del elemento
     canvasAdaptativo.value = {

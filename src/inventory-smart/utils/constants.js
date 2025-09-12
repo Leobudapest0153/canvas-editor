@@ -86,8 +86,8 @@ export const ELEMENTOS_PREDEFINIDOS = [
     forma: 'rectangular',
     colorBase: '#f1f5f9',
     dimensiones: {
-      ancho: 300,
-      largo: 300,
+      ancho: 100,
+      largo: 100,
       alto: 10,
     },
     pesoMaximo: 0,
@@ -337,7 +337,7 @@ export const GRID_SIZE = 0
 
 // === CONFIGURACIÓN DE PRECISIÓN ===
 // Precisión decimal para dimensiones en centímetros (0.01 = 2 decimales)
-export const PRECISION_CM = 0.1
+export const PRECISION_CM = 0.01
 // Número de decimales para redondeo
 export const DECIMAL_PLACES = 2
 
@@ -367,13 +367,17 @@ export const DIMENSIONS = {
     // Nuevos predefinidos
     pasillo_base: { x: 0.2, y: 0.2, z: 1 },
     cuarto_frio: { x: 0.3, y: 0.3, z: 0.5 },
-    piso_base: { x: 0.3, y: 0.3, z: 0.1 },
+    piso_base: { x: 0.2, y: 0.2, z: 0.1 },
   },
   // Límites por tipo
   minMax: {
     anaquel_metalico_grande: { min: { w: 30, h: 50, d: 30 }, max: { w: 500, h: 500, d: 500 } },
     estante_pared_pequeno: { min: { w: 40, h: 30, d: 20 }, max: { w: 500, h: 500, d: 500 } },
     barril_basico: { min: { w: 30, h: 30, d: 30 }, max: { w: 500, h: 500, d: 500 } },
+    // Nuevos predefinidos
+    pasillo_base: { min: { w: 100, h: 10, d: 100 }, max: { w: 2000, h: 500, d: 2000 } },
+    cuarto_frio: { min: { w: 100, h: 100, d: 100 }, max: { w: 2000, h: 500, d: 2000 } },
+    piso_base: { min: { w: 50, h: 10, d: 50 }, max: { w: 2000, h: 500, d: 2000 } },
   },
   autoResizeOnParentChange: true,
   // Reusar conversión de cm→px existente
