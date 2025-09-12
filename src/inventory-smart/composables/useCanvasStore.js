@@ -355,13 +355,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Calcular tamaño del canvas según el elemento
     calcularCanvasAdaptativo(elemento)
 
-    // Reset zoom y pan
-    clearZoomPanDebounce() // Limpiar timer pendiente antes del reset
-    zoom.value = 1
-    panX.value = 0
-    panY.value = 0
-
-    // Deseleccionar elemento actual
+    // Limpiar timer pendiente y deseleccionar elemento
+    clearZoomPanDebounce()
     elementoSeleccionado.value = null
   }
 
@@ -407,14 +402,11 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }
 
-    // Reset zoom y pan
-    clearZoomPanDebounce() // Limpiar timer pendiente antes del reset
-    zoom.value = 1
-    panX.value = 0
-    panY.value = 0
-
-    // Deseleccionar elemento actual
+    // Limpiar timer pendiente y deseleccionar elemento
+    clearZoomPanDebounce()
     elementoSeleccionado.value = null
+
+    // ✅ No resetear zoom/pan aquí - lo maneja el watch en CanvasView
   }
 
   /**
@@ -445,12 +437,11 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (elemento) calcularCanvasAdaptativo(elemento)
     }
 
-    // Reset zoom/pan y deseleccionar
-    clearZoomPanDebounce() // Limpiar timer pendiente antes del reset
-    zoom.value = 1
-    panX.value = 0
-    panY.value = 0
+    // Limpiar timer pendiente y deseleccionar elemento
+    clearZoomPanDebounce()
     elementoSeleccionado.value = null
+
+    // ✅ No resetear zoom/pan aquí - lo maneja el watch en CanvasView
   }
 
   const navegarAPlanta = (plantaId) => {
@@ -486,14 +477,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Calcular canvas adaptativo para la planta
     calcularCanvasAdaptativoPlanta(planta)
 
-    // Reset zoom y pan
-    clearZoomPanDebounce() // Limpiar timer pendiente antes del reset
-    zoom.value = 1
-    panX.value = 0
-    panY.value = 0
-
-    // Deseleccionar elemento actual
+    // Limpiar timer pendiente y deseleccionar elemento
+    clearZoomPanDebounce()
     elementoSeleccionado.value = null
+
+    // ✅ No resetear zoom/pan aquí - lo maneja el watch en CanvasView
   }
 
   const calcularCanvasAdaptativo = (elemento) => {
