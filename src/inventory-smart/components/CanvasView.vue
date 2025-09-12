@@ -158,6 +158,8 @@
                 shadowOpacity: elemento.tipo === 'pasillos' ? 0 : getElementShadow(elemento).opacity,
               }"
             />
+            <!-- Barra de orientación (no para formas circulares) -->
+            <v-rect v-if="getOrientationBarRect(elemento)" :config="getOrientationBarRect(elemento)" />
             <!-- Etiqueta centrada del elemento (rectangular) -->
             <v-text :config="computeLabelProps(elemento)" />
           </v-group>
@@ -1385,6 +1387,7 @@ const createElementFromDrop = (data, dropEvent) => {
     color: color,
     colorBase: color,
     forma: elemento.forma || 'rectangular',
+    orientacion: Number(elemento.orientacion) || 0,
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
@@ -1419,6 +1422,41 @@ const getElementShadow = (elemento) => {
     opacity: 0.3,
     offsetX: 0,
     offsetY: 0,
+  }
+}
+
+// Barra de orientación: rectángulo amarillo interior indicando el lado de orientación (no aplica a circulares)
+const getOrientationBarRect = (elemento) => {
+  try {
+    if (!elemento || (elemento.forma && elemento.forma.toLowerCase() === 'circular')) return null
+    const w = Number(elemento.width) || 0
+    const h = Number(elemento.height) || 0
+    if (w <= 0 || h <= 0) return null
+    const allowed = [0, 90, 180, 270]
+    let o = Number(elemento.orientacion)
+    if (!Number.isFinite(o)) o = 0
+    o = ((o % 360) + 360) % 360
+    if (!allowed.includes(o)) o = 0
+    const margin = Math.max(2, 4 / (canvasStore.zoom || 1))
+    const thick = Math.max(2, 4 / (canvasStore.zoom || 1))
+    const color = '#facc15'
+    if (o === 0) {
+      const width = Math.max(1, w - 2 * margin)
+      return { x: margin, y: margin, width, height: thick, fill: color, listening: false, opacity: 0.95 }
+    }
+    if (o === 180) {
+      const width = Math.max(1, w - 2 * margin)
+      return { x: margin, y: Math.max(0, h - margin - thick), width, height: thick, fill: color, listening: false, opacity: 0.95 }
+    }
+    if (o === 90) {
+      const height = Math.max(1, h - 2 * margin)
+      return { x: Math.max(0, w - margin - thick), y: margin, width: thick, height, fill: color, listening: false, opacity: 0.95 }
+    }
+    // 270
+    const height = Math.max(1, h - 2 * margin)
+    return { x: margin, y: margin, width: thick, height, fill: color, listening: false, opacity: 0.95 }
+  } catch {
+    return null
   }
 }
 

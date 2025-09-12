@@ -39,6 +39,19 @@
               </div>
             </div>
 
+            <!-- Orientación -->
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Orientación</label>
+              <select v-model.number="edited.orientacion" :disabled="isSaving"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option :value="0">0°</option>
+                <option :value="90">90°</option>
+                <option :value="180">180°</option>
+                <option :value="270">270°</option>
+              </select>
+              <p class="text-xs text-gray-500 mt-1">Indica el lado de referencia del elemento para su orientación visual.</p>
+            </div>
+
             <!-- Etiquetas -->
             <div>
               <TagFilter
@@ -281,6 +294,7 @@ onMounted(() => {
 const cargarDesdeStore = (el) => deepClone({
   nombre: el.nombre || '',
   color: el.color || '#3B82F6',
+  orientacion: (Number(el.orientacion) || 0),
   dimensiones: {
     ancho: el.dimensiones?.ancho || 0,
     largo: el.dimensiones?.largo || 0,
