@@ -10,7 +10,7 @@ export function clampToAreaFast(x, y, w, h, area) {
 }
 
 export function computeSnapFast(x, y, grid = 1) {
-  if (!grid || grid <= 1) return { x, y }
+  if (!grid || grid <= 0) return { x, y }
   const sx = Math.round(x / grid) * grid
   const sy = Math.round(y / grid) * grid
   return { x: sx, y: sy }
