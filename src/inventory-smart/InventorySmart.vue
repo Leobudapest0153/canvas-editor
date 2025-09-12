@@ -196,6 +196,14 @@ onUnmounted(() => {
   --muted: #64748b;
 }
 
+/* ====== INVENTORY: Etiquetas de elementos ======
+   Render: nombre centrado y en negrita dentro de cada figura
+   Implementación: <v-text> insertado en el <v-group> de cada elemento
+   Props: align:'center', verticalAlign:'middle', fontStyle:'bold', listening:false
+   Fuente: proporcional a min(width,height) con límites (10–28px)
+   Reactivo: cambia con elemento.nombre; no afecta selección/drag/resize
+================================================================= */
+
 @media (max-width: 480px) {
   :root {
     --btn-size: 36px;
