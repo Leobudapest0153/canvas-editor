@@ -311,39 +311,117 @@ export function useDeleteElement() {
     const okCascade = deleteCascade([selectedId])
     if (!okCascade) return false
 
-    // Snackbar con deshacer (5s)
+    // Snackbar con deshacer (5s) - versión reactiva
     try {
-    if (typeof window !== 'undefined' && window.__toasts?.show) {
-      let tiempo = 5
-      let interval
+      if (typeof window !== 'undefined') {
+        let tiempo = 5
+        let interval
+        let toastCerrado = false
+        let toastId = null
 
-      const mostrarToast = () => {
-        showInfo(`Elemento(s) eliminados — Deshacer (${tiempo}s)`, {
-          timeout: 1000,
+        // Crear una función que genera el mensaje
+        const generarMensaje = () => `Elemento(s) eliminados — Deshacer (${tiempo}s)`
+
+        // Crear el toast inicial
+        toastId = showInfo(generarMensaje(), {
+          timeout: 6000, // Un poco más que nuestra cuenta regresiva
+          onDismiss: () => {
+            toastCerrado = true
+            if (interval) {
+              clearInterval(interval)
+              interval = null
+            }
+          },
           cta: {
             label: 'Deshacer',
             onClick: () => {
-              clearInterval(interval)
+              toastCerrado = true
+              if (interval) {
+                clearInterval(interval)
+                interval = null
+              }
               try { history.undo() } catch (err) { void err }
             },
           },
         })
+
+        // Actualizar el countdown
+        interval = setInterval(() => {
+          if (toastCerrado) {
+            clearInterval(interval)
+            interval = null
+            return
+          }
+
+          tiempo--
+          
+          if (tiempo <= 0) {
+            clearInterval(interval)
+            interval = null
+            return
+          }
+
+          // Buscar el toast en el DOM usando diferentes selectores posibles
+          try {
+            const selectors = [
+              '[data-toast-message]',
+              '.vue-notification',
+              '.notification',
+              '.toast',
+              '[role="alert"]'
+            ]
+            
+            let toastElement = null
+            for (const selector of selectors) {
+              const elements = document.querySelectorAll(selector)
+              const found = Array.from(elements).find(el => 
+                el.textContent && el.textContent.includes('Elemento(s) eliminados')
+              )
+              if (found) {
+                toastElement = found
+                break
+              }
+            }
+            
+            if (toastElement) {
+              // Intentar actualizar diferentes tipos de elementos de texto
+              const textSelectors = [
+                '[data-toast-text]',
+                '.notification-content',
+                '.toast-message',
+                '.message',
+                'div',
+                'span',
+                'p'
+              ]
+              
+              let updated = false
+              for (const textSelector of textSelectors) {
+                const textEl = toastElement.querySelector(textSelector)
+                if (textEl && textEl.textContent && textEl.textContent.includes('Elemento(s) eliminados')) {
+                  textEl.textContent = generarMensaje()
+                  updated = true
+                  break
+                }
+              }
+              
+              // Si no encontramos un elemento hijo, actualizar directamente
+              if (!updated && toastElement.textContent && toastElement.textContent.includes('Elemento(s) eliminados')) {
+                // Preservar el botón de deshacer si existe
+                const actionButton = toastElement.querySelector('button')
+                toastElement.textContent = generarMensaje()
+                if (actionButton && actionButton.textContent === 'Deshacer') {
+                  toastElement.appendChild(actionButton)
+                }
+              }
+            }
+          } catch (e) {
+            // Fallback silencioso
+            void e
+          }
+        }, 1000)
       }
-
-      // Mostrar el primero inmediatamente
-      mostrarToast()
-
-      // Arrancar la cuenta regresiva
-      interval = setInterval(() => {
-        tiempo--
-        if (tiempo > 0) {
-          mostrarToast()
-        } else {
-          clearInterval(interval)
-        }
-      }, 1000)
-    }
-  } catch (e) { void e }
+    } catch (e) { void e }
 
     return true
   }
