@@ -21,7 +21,7 @@
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount, computed } from 'vue'
+import { ref, onBeforeUnmount, computed, onUnmounted } from 'vue'
 defineOptions({ name: 'UiTooltip' })
 
 const props = defineProps({
@@ -59,9 +59,13 @@ function onLeave() {
   visible.value = false
 }
 
-onBeforeUnmount(() => {
+function cleanup() {
   clearTimeout(timer)
-})
+  visible.value = false
+}
+
+onBeforeUnmount(cleanup)
+onUnmounted(cleanup)
 </script>
 
 <style>

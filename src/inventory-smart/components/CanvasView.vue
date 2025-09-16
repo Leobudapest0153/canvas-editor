@@ -158,6 +158,8 @@
                 shadowOpacity: elemento.tipo === 'pasillos' ? 0 : getElementShadow(elemento).opacity,
               }"
             />
+            <!-- Barra de orientación (no para formas circulares) -->
+            <v-rect v-if="getOrientationBarRect(elemento)" :config="getOrientationBarRect(elemento)" />
             <!-- Etiqueta centrada del elemento (rectangular) -->
             <v-text :config="computeLabelProps(elemento)" />
           </v-group>
@@ -585,7 +587,8 @@ import {
   snapToGrid,
   nudgePlace,
 } from '@/inventory-smart/utils/geometry'
-import { clampRectToPolygon, clampCircleToPolygon, circleInPolygon, pointInPolygon, clampPointToPolygon } from '@/inventory-smart/utils/polygonBounds'
+import { clampRectToPolygon, clampCircleToPolygon, circleInPolygon, pointInPolygon, clampPointToPolygon, isRectCompletelyInPolygon } from '@/inventory-smart/utils/polygonBounds'
+import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
@@ -768,7 +771,13 @@ const layerConfig = computed(() => {
 })
 
 // Composable para zoom (después de declarar stageSize y layerConfig)
-const { getDynamicMinZoom: getMinZoom, fitToMinZoom } = useZoom(stageSize, layerConfig)
+const {
+  getDynamicMinZoom: getMinZoom,
+  fitToMinZoom,
+  fitToContent,
+  calculateBoundingBox,
+  chooseBestBoundingBox
+} = useZoom(stageSize, layerConfig)
 
 // Elementos visibles en el canvas (excluye elementos ocultos)
 const elementosVisiblesEnCanvas = computed(() => {
@@ -1165,8 +1174,17 @@ const runPreDropValidations = (elemento, dropEvent) => {
     return { ok: false, reason: 'hierarchy' }
   }
 
+  // Si es pasillo, ajustar alto al de la planta ANTES de validar
+  let elementoParaPeso = elemento
+  const plantaAlto = canvasStore.plantaActivaData?.dimensiones?.alto
+  if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
+    const dims = { ...(elemento.dimensiones || {}) }
+    if (Number.isFinite(plantaAlto)) dims.alto = plantaAlto
+    elementoParaPeso = { ...elemento, dimensiones: dims }
+  }
+
   const resultadoValidacionPeso = weightValidation.validarPesoElemento(
-    elemento,
+    elementoParaPeso,
     canvasStore.contextoActual.id,
     canvasStore.contextoActual.tipo
   )
@@ -1196,6 +1214,10 @@ const runPreDropValidations = (elemento, dropEvent) => {
   let anchoCm = elemento.dimensiones?.ancho || 100
   let largoCm = elemento.dimensiones?.largo || 60
   let altoCm = elemento.dimensiones?.alto || 20
+
+  if ((elemento?.tipo || '').toLowerCase() === 'pasillos' && Number.isFinite(plantaAlto)) {
+    altoCm = plantaAlto
+  }
 
   const isSystemDefault = !!(elemento?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(elemento.id))
   if (isSystemDefault && elemento?.dimensionLock !== true) {
@@ -1257,39 +1279,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
       candY = worldPos.y
   }
 
-  const boundary = computeBoundary()
-  let isInside = true
-  if (boundary.type === 'rect') {
-    isInside = candX >= 0 && candY >= 0 && candX + finalWidth <= boundary.W && candY + finalHeight <= boundary.H
-    if (!isInside) {
-      const clamped = clampRectToRect(candX, candY, finalWidth, finalHeight, boundary.W, boundary.H)
-      candX = clamped.x
-      candY = clamped.y
-    }
-  } else if (boundary.type === 'polygon') {
-    // Para elementos circulares, verificar si el círculo está dentro del polígono
-    if (elemento.forma === 'circular') {
-      const radius = Math.min(finalWidth, finalHeight) / 2
-      const centerX = candX + radius
-      const centerY = candY + radius
-      isInside = circleInPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-      if (!isInside) {
-        const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-        candX = clampedCenter.x - radius
-        candY = clampedCenter.y - radius
-        isInside = circleInPolygon({ x: clampedCenter.x, y: clampedCenter.y, radius }, boundary.inset)
-      }
-    } else {
-      isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
-      if (!isInside) {
-        const clamped = clampRectToPolygon({ x: candX, y: candY, width: finalWidth, height: finalHeight }, boundary.inset)
-        candX = clamped.x
-        candY = clamped.y
-        isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
-      }
-    }
-  }
-
+  // 4. Crear elemento temporal para validaciones
   const tempEl = {
     id: '__temp_drop__',
     x: candX,
@@ -1301,6 +1291,20 @@ const runPreDropValidations = (elemento, dropEvent) => {
     forma: elemento.forma || 'rectangular',
   }
 
+  const boundary = computeBoundary()
+
+  // Usar la misma validación estricta que isPlacementValid
+  const areaBounds = {
+    minX: 0,
+    minY: 0,
+    maxX: boundary.W || layerConfig.value.width,
+    maxY: boundary.H || layerConfig.value.height,
+    polygon: boundary.points
+  }
+
+  // Validación inicial estricta usando insideAreaModel
+  let isInside = insideAreaModel({ x: candX, y: candY }, tempEl, areaBounds, 0.5)
+
   const all = canvasStore.elementosVisibles
   const conflicts = detectConflictsFor(tempEl, all)
   const blocking = conflicts.filter((c) => c.bloqueante)
@@ -1308,7 +1312,8 @@ const runPreDropValidations = (elemento, dropEvent) => {
   let finalPos = { x: candX, y: candY }
   let ok = blocking.length === 0 && isInside
 
-  if (!ok) {
+  // Solo usar nudgePlace si no hay conflictos de colisión, pero mantener validación estricta de área
+  if (blocking.length > 0) {
     const nudge = nudgePlace(
       candX,
       candY,
@@ -1322,8 +1327,12 @@ const runPreDropValidations = (elemento, dropEvent) => {
       detectConflictsFor,
     )
     if (nudge.found) {
-      finalPos = { x: nudge.x, y: nudge.y }
-      ok = true
+      // Validar que la posición encontrada por nudge también esté dentro del área
+      const nudgedEl = { ...tempEl, x: nudge.x, y: nudge.y }
+      if (insideAreaModel({ x: nudge.x, y: nudge.y }, nudgedEl, areaBounds, 0.5)) {
+        finalPos = { x: nudge.x, y: nudge.y }
+        ok = true
+      }
     }
   }
 
@@ -1332,20 +1341,10 @@ const runPreDropValidations = (elemento, dropEvent) => {
     return { ok: false, reason: 'bounds' }
   }
 
-  if (boundary.type === 'polygon') {
-    if (elemento.forma === 'circular') {
-      const radius = Math.min(finalWidth, finalHeight) / 2
-      const centerX = finalPos.x + radius
-      const centerY = finalPos.y + radius
-      const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-      finalPos = { x: clampedCenter.x - radius, y: clampedCenter.y - radius }
-    } else {
-      const c = clampRectToPolygon(
-        { x: finalPos.x, y: finalPos.y, width: finalWidth, height: finalHeight },
-        boundary.inset,
-      )
-      finalPos = { x: c.x, y: c.y }
-    }
+  // Validación final: asegurar que la posición final sea válida con la misma lógica que drag
+  if (!insideAreaModel(finalPos, { ...tempEl, x: finalPos.x, y: finalPos.y }, areaBounds, 0.5)) {
+    showToast('El elemento quedaría fuera del área permitida.', 'error')
+    return { ok: false, reason: 'bounds' }
   }
 
   return {
@@ -1385,6 +1384,7 @@ const createElementFromDrop = (data, dropEvent) => {
     color: color,
     colorBase: color,
     forma: elemento.forma || 'rectangular',
+    orientacion: Number(elemento.orientacion) || 0,
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
     pesoMaximo: elemento.pesoMaximo || 0,
@@ -1422,19 +1422,64 @@ const getElementShadow = (elemento) => {
   }
 }
 
+// Barra de orientación: rectángulo amarillo interior indicando el lado de orientación (no aplica a circulares)
+const getOrientationBarRect = (elemento) => {
+  try {
+    if (!elemento) return null
+    // No mostrar para circulares ni para pasillos
+    const forma = (elemento.forma || '').toLowerCase()
+    const tipo = (elemento.tipo || '').toLowerCase()
+    if (forma === 'circular' || tipo === 'pasillos') return null
+    const w = Number(elemento.width) || 0
+    const h = Number(elemento.height) || 0
+    if (w <= 0 || h <= 0) return null
+    const allowed = [0, 90, 180, 270]
+    let o = Number(elemento.orientacion)
+    if (!Number.isFinite(o)) o = 0
+    o = ((o % 360) + 360) % 360
+    if (!allowed.includes(o)) o = 0
+    // Barra pegada al borde (sin margen), grosor escalado por zoom
+    const margin = 0
+    const thick = Math.max(2, 4 / (canvasStore.zoom || 1))
+    const color = '#facc15'
+    if (o === 0) {
+      const width = Math.max(1, w - 2 * margin)
+      return { x: margin, y: 0, width, height: thick, fill: color, listening: false, opacity: 0.95 }
+    }
+    if (o === 180) {
+      const width = Math.max(1, w - 2 * margin)
+      return { x: margin, y: Math.max(0, h - thick), width, height: thick, fill: color, listening: false, opacity: 0.95 }
+    }
+    if (o === 90) {
+      const height = Math.max(1, h - 2 * margin)
+      return { x: Math.max(0, w - thick), y: margin, width: thick, height, fill: color, listening: false, opacity: 0.95 }
+    }
+    // 270
+    const height = Math.max(1, h - 2 * margin)
+    return { x: 0, y: margin, width: thick, height, fill: color, listening: false, opacity: 0.95 }
+  } catch {
+    return null
+  }
+}
+
 // ====== INVENTORY: Etiquetas centradas de elementos ======
 // Calcula las props del <Text> (Konva) para rotular el elemento sin interferir con eventos.
+// Regla: si el elemento es más alto que ancho (h > w), mostramos el texto en vertical (rotado -90°);
+// si no, horizontal. Esto reacciona automáticamente cuando cambian las dimensiones.
 const computeLabelProps = (elemento) => {
-  const w = elemento.width || 0
-  const h = elemento.height || 0
+  const w = Number(elemento.width) || 0
+  const h = Number(elemento.height) || 0
   const minSide = Math.max(0, Math.min(w, h))
-  // Escala base: proporcional al tamaño; límites 10–28px
+  // Escala base: proporcional al tamaño
   const base = Math.min(280, Math.max(100, minSide * 0.22))
-  return {
+
+  // Por defecto: horizontal
+  let cfg = {
     x: 0,
     y: 0,
     width: w,
     height: h,
+    rotation: 0,
     text: elemento.nombre || elemento.tipo || 'Elemento',
     align: 'center',
     verticalAlign: 'middle',
@@ -1447,6 +1492,22 @@ const computeLabelProps = (elemento) => {
     shadowBlur: 2,
     shadowOpacity: 0.6,
   }
+
+  // Si es más alto que ancho, rotar a vertical
+  if (h > w && w > 0 && h > 0) {
+    // Para rotación -90° alrededor del origen (0,0), desplazar en Y por h para mantenerlo dentro del grupo.
+    // Usamos un área de texto con width = h y height = w para un centrado correcto del contenido.
+    cfg = {
+      ...cfg,
+      x: 0,
+      y: h, // desplaza para corregir el origen tras la rotación
+      width: h,
+      height: w,
+      rotation: -90,
+    }
+  }
+
+  return cfg
 }
 
 watch(
@@ -1501,185 +1562,19 @@ watch(
 )
 
 const createElementFromBuffer = (data, dropEvent) => {
-  // Obtener el elemento del buffer para validar sus dimensiones
+  // Obtener el elemento del buffer
   const bufferItem = buffer.getBufferItem(data.bufferItemId)
   if (!bufferItem) {
     showToast('Elemento no encontrado en el buffer', 'error')
     return
   }
 
-  const elemento = bufferItem.elemento
+  // Delegar todas las validaciones a la ruta unificada
+  const res = runPreDropValidations(bufferItem.elemento, dropEvent)
+  if (!res.ok) return
 
-  // Validación de jerarquía por contexto (alineada a runPreDropValidations)
-  const contextoActual = canvasStore.contextoActual.tipo
-  const tipoElemento = elemento.tipo
-  const allowedByContext = {
-    plantas: ['cuartos', 'elementos', 'pasillos'],
-    cuartos: ['pisos'],
-    pisos: ['elementos'],
-    elementos: ['contenedores'],
-    contenedores: [],
-    pasillos: [],
-  }
-  const permitidos = allowedByContext[contextoActual] || []
-  if (!permitidos.includes(tipoElemento)) {
-    const msgMap = {
-      plantas: 'Aquí solo puedes pegar cuartos, elementos o pasillos.',
-      cuartos: 'Aquí solo puedes pegar pisos.',
-      pisos: 'Aquí solo puedes pegar elementos.',
-      elementos: 'Dentro de elementos solo se pueden pegar contenedores.',
-      contenedores: 'No puedes pegar dentro de contenedores.',
-      pasillos: 'No puedes pegar dentro de pasillos.',
-    }
-    showToast(msgMap[contextoActual] || 'No puedes pegar este tipo aquí.', 'error')
-    return
-  }
-
-  // ===== VALIDACIÓN DE PESO MÁXIMO =====
-  const resultadoValidacionPeso = weightValidation.validarPesoElemento(
-    elemento,
-    canvasStore.contextoActual.id,
-    canvasStore.contextoActual.tipo
-  )
-
-  if (!resultadoValidacionPeso.valido) {
-    // El elemento excedería el peso máximo permitido
-    showToast(
-      `No se puede pegar: habría un exceso de peso soportado de ${resultadoValidacionPeso.exceso} kg`,
-      'error'
-    )|
-    console.log('Validación de peso fallida en buffer:', resultadoValidacionPeso)
-    return
-  }
-
-  // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
-  let { width, height } = getElementPixelDimensions(elemento)
-
-  // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
-  const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
-
-  // 2. Calcular posición candidata
-  let candX = worldCoords.x - width / 2
-  let candY = worldCoords.y - height / 2
-
-  // 3. Aplicar snap a grilla ANTES de validar (usar valor runtime de canvasStore.gridSize: 0 desactiva)
-  const snapped = snapToGrid(candX, candY, canvasStore.gridSize ?? GRID_SIZE)
-  candX = snapped.x
-  candY = snapped.y
-
-  // 4. Verificar área y conflictos
-  const boundary = computeBoundary()
-
-  let isInsideArea = true
-  if (boundary.type === 'rect') {
-    isInsideArea =
-      candX >= 0 && candY >= 0 && candX + width <= boundary.W && candY + height <= boundary.H
-
-    if (!isInsideArea) {
-      const clamped = clampRectToRect(candX, candY, width, height, boundary.W, boundary.H)
-      candX = clamped.x
-      candY = clamped.y
-    }
-  } else if (boundary.type === 'polygon') {
-    if (elemento.forma === 'circular') {
-      const radius = Math.min(width, height) / 2
-      const centerX = candX + radius
-      const centerY = candY + radius
-      isInsideArea = circleInPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-      if (!isInsideArea) {
-        const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-        candX = clampedCenter.x - radius
-        candY = clampedCenter.y - radius
-        isInsideArea = circleInPolygon({ x: clampedCenter.x, y: clampedCenter.y, radius }, boundary.inset)
-      }
-    } else {
-      isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
-      if (!isInsideArea) {
-        const clamped = clampRectToPolygon({ x: candX, y: candY, width, height }, boundary.inset)
-        candX = clamped.x
-        candY = clamped.y
-        isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
-      }
-    }
-  }
-
-  // 5. Crear elemento temporal y detectar conflictos
-  const tempElement = {
-    id: '__temp_buffer__',
-    x: candX,
-    y: candY,
-    width,
-    height,
-    ubicacion: elemento.ubicacion || 'suelo',
-    tipo: elemento.tipo || 'elemento',
-    forma: elemento.forma || 'rectangular',
-  }
-
-  const allElements = canvasStore.elementosVisibles
-  const conflicts = detectConflictsFor(tempElement, allElements)
-  const blockingConflicts = conflicts.filter((c) => c.bloqueante)
-
-  // 6. Si hay conflictos o está fuera de área, intentar nudgePlace
-  let finalPosition = { x: candX, y: candY }
-  let placementSuccessful = blockingConflicts.length === 0 && isInsideArea
-
-  if (!placementSuccessful) {
-    console.log('🔍 Elemento del buffer tiene conflictos, intentando nudgePlace...')
-
-    const nudgeResult = nudgePlace(
-      candX,
-      candY,
-      width,
-      height,
-      boundary,
-      allElements,
-      tempElement,
-      canvasStore.gridSize ?? GRID_SIZE,
-      16,
-      detectConflictsFor, // Pasar la función como parámetro
-    )
-
-    if (nudgeResult.found) {
-      finalPosition = { x: nudgeResult.x, y: nudgeResult.y }
-      placementSuccessful = true
-      console.log('✅ nudgePlace encontró posición válida para elemento del buffer:', finalPosition)
-    } else {
-      console.log('❌ nudgePlace no encontró posición válida para elemento del buffer')
-    }
-  }
-
-  // 7. Si no hay posición válida, rechazar
-  if (!placementSuccessful) {
-    showToast('Fuera de los límites de la planta', 'error')
-    return // NO pegar, NO comprometer historial
-  }
-
-  if (boundary.type === 'polygon') {
-    if (elemento.forma === 'circular') {
-      const radius = Math.min(width, height) / 2
-      const centerX = finalPosition.x + radius
-      const centerY = finalPosition.y + radius
-      const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-      finalPosition = { x: clampedCenter.x - radius, y: clampedCenter.y - radius }
-    } else {
-      const c = clampRectToPolygon(
-        { x: finalPosition.x, y: finalPosition.y, width, height },
-        boundary.inset,
-      )
-      finalPosition = { x: c.x, y: c.y }
-    }
-  }
-
-  // 8. Pegar elemento desde buffer en posición válida
-  const newElementId = buffer.pasteFromBuffer(data.bufferItemId, finalPosition)
-
+  const newElementId = buffer.pasteFromBuffer(data.bufferItemId, res.position)
   if (newElementId) {
-    console.log(
-      '✅ Elemento pegado desde buffer al canvas en posición válida:',
-      newElementId,
-      finalPosition,
-    )
-    // Seleccionar el elemento recién pegado
     canvasStore.seleccionarElemento(newElementId)
   }
 }
@@ -1897,108 +1792,24 @@ watch(() => canvasStore.elementoSeleccionadoCompleto, (elementoActual) => {
   }
 }, { deep: true });
 
-// Ajustar la vista para encuadrar la planta activa (usa polígono si existe o dimensiones en cm)
-// ✅ Modificado para usar zoom mínimo dinámico en lugar de fit completo
+// Ajustar la vista para encuadrar la planta activa
+// ✅ Simplificado para usar el composable useZoom unificado
 const fitToPlanta = () => {
   try {
     const stage = stageRef.value?.getNode?.()
     if (!stage) return
 
-    const margin = 40 // píxeles de margen visual
-    const planta = canvasStore.plantaActivaData
-    let bbox = null
-
-    // Si estamos dentro de un elemento o contenedor (navegando dentro), ajustar al canvas adaptativo
-    // En este modo las coordenadas locales del elemento empiezan en 0,0 — usar layerConfig para el tamaño
-    if (!canvasStore.estaEnPlanta && canvasStore.estructuraContenedorActual) {
-      try {
-        // Usar el tamaño del layer (canvas adaptativo) como la caja a encuadrar
-        const localW = layerConfig.value.width || Math.max(1, canvasStore.estructuraContenedorActual.width || 1)
-        const localH = layerConfig.value.height || Math.max(1, canvasStore.estructuraContenedorActual.height || 1)
-        const elBbox = { x: 0, y: 0, width: Math.max(1, localW), height: Math.max(1, localH) }
-
-        const dynamicMinZoom = getDynamicMinZoom()
-
-        // En coordenadas locales la caja comienza en 0,0
-        const stageXel = (stageSize.value.width - elBbox.width * dynamicMinZoom) / 2
-        const stageYel = (stageSize.value.height - elBbox.height * dynamicMinZoom) / 2
-        canvasStore.configurarZoom(dynamicMinZoom, dynamicMinZoom)
-        canvasStore.configurarPan(stageXel, stageYel)
-        return
-      } catch (e) {
-        // si algo falla, continuar con lógica de planta
-        console.error('fitToPlanta (element) error', e)
-      }
-    }
-
-    if (planta) {
-      // Priorizar polígono si está disponible
-      if (planta.poligono && Array.isArray(planta.poligono) && planta.poligono.length > 0) {
-        const xs = planta.poligono.map((p) => p.x)
-        const ys = planta.poligono.map((p) => p.y)
-        const minX = Math.min(...xs)
-        const maxX = Math.max(...xs)
-        const minY = Math.min(...ys)
-        const maxY = Math.max(...ys)
-        // Aquí no asumimos unidades; conservamos bboxRaw para probar ambas interpretaciones
-        const bboxRaw = { x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) }
-        // Interpretación 1: coordenadas ya en px
-        const bboxPx = { ...bboxRaw }
-        // Interpretación 2: coordenadas en cm → convertir a px
-        const bboxCmToPx = { x: bboxRaw.x * CM_TO_PX, y: bboxRaw.y * CM_TO_PX, width: Math.max(1, bboxRaw.width * CM_TO_PX), height: Math.max(1, bboxRaw.height * CM_TO_PX) }
-        bbox = { _candidates: [bboxPx, bboxCmToPx] }
-      } else if (planta.dimensiones && (planta.dimensiones.ancho || planta.dimensiones.largo)) {
-        // Usar dimensiones físicas de la planta (cm → px)
-        const w = (planta.dimensiones.ancho || 100) * CM_TO_PX
-        const h = (planta.dimensiones.largo || 100) * CM_TO_PX
-        bbox = { x: 0, y: 0, width: Math.max(1, w), height: Math.max(1, h) }
-      } else if (layerConfig.value && layerConfig.value.width && layerConfig.value.height) {
-        // Fallback razonable
-        bbox = { x: 0, y: 0, width: Math.max(1, layerConfig.value.width), height: Math.max(1, layerConfig.value.height) }
-      }
-    }
-
-    if (!bbox) {
-      centrarPlantaEnCanvas()
-      return
-    }
-
-    // Calcular tamaño del viewport disponible
-    const vw = Math.max(16, stageSize.value.width - margin * 2)
-    const vh = Math.max(16, stageSize.value.height - margin * 2)
-
-    // Si bbox tiene candidatos (polígono con unidades inciertas), probar ambas interpretaciones
-    let chosen = null
-    if (bbox && bbox._candidates) {
-      const candidates = bbox._candidates
-      const scales = candidates.map((b) => {
-        const sX = b.width > 0 ? vw / b.width : 1
-        const sY = b.height > 0 ? vh / b.height : 1
-        return Math.min(sX, sY)
-      })
-      // Elegir la interpretación que produce mayor escala (más acercamiento)
-      const bestIndex = scales[0] >= scales[1] ? 0 : 1
-      chosen = candidates[bestIndex]
-    } else {
-      chosen = bbox
-    }
-
-    if (!chosen) {
-      centrarPlantaEnCanvas()
-      return
-    }
-
-    const dynamicMinZoom = getDynamicMinZoom()
-
-    // Calcular pan para centrar bbox en viewport (en coords de stage)
-    const stageX = (stageSize.value.width - chosen.width * dynamicMinZoom) / 2 - chosen.x * dynamicMinZoom
-    const stageY = (stageSize.value.height - chosen.height * dynamicMinZoom) / 2 - chosen.y * dynamicMinZoom
-
-    canvasStore.configurarZoom(dynamicMinZoom, dynamicMinZoom)
-    canvasStore.configurarPan(stageX, stageY)
-
+    // Usar la función unificada del composable
+    fitToContent(stage)
   } catch (e) {
     console.error('fitToPlanta error', e)
+    // Fallback seguro
+    try {
+      const stage = stageRef.value?.getNode?.()
+      if (stage) fitToMinZoom(stage)
+    } catch {
+      /* ignore */
+    }
   }
 }
 

@@ -740,41 +740,48 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (planta) {
       Object.assign(planta, datosActualizados)
       try {
-        // Recalcular dimensiones de hijos (solo elementos de sistema) si aplica
-        const shouldAuto = DIMENSIONS?.autoResizeOnParentChange !== false
-        if (shouldAuto && planta?.dimensiones) {
-          const parentDims = {
-            w: planta.dimensiones.ancho,
-            h: planta.dimensiones.largo,
-            d: planta.dimensiones.alto,
-          }
-          const elems = elementos.value.filter(
-            (el) => el.plantaId === plantaId && !el.padre && (el.tipo === 'elementos' || el.tipo === 'pasillos' || el.tipo === 'cuartos')
-          )
-          for (const el of elems) {
-            const typeKey = el.systemTypeKey || el.id
-            const isSystemDefault = !!(
-              typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey)
-            )
-            if (!isSystemDefault) continue
-            if (el.dimensionLock === true) continue
-            const dims = computeDimsByAxisScale(typeKey, parentDims, { snap: true, gridPx: gridSize.value })
-            if (!dims) continue
-            // Persistir nuevas dimensiones; width/height se recalculan según vista en actualizarElemento
-            actualizarElemento(el.id, { dimensiones: dims }, true, `Auto-resize por cambio de planta: ${el.nombre || el.id}`)
-            // Offset vertical configurable (por tipo) — solo si aplica
-            const off = OFFSETS?.offsetByType?.[typeKey]?.zOffsetShare
-            if (typeof off === 'number' && isFinite(off)) {
-              const zBase = Math.round((planta.dimensiones.alto || 0) * off)
-              actualizarElemento(el.id, { alturaRespectoAlSuelo: zBase })
-            }
-          }
+        // Recalcular dimensiones de elementos "sistema base" si la planta cambia de tamaño
+        // const shouldAuto = DIMENSIONS?.autoResizeOnParentChange !== false
+        // if (shouldAuto && planta?.dimensiones) {
+        //   const parentDims = {
+        //     w: planta.dimensiones.ancho,
+        //     h: planta.dimensiones.largo,
+        //     d: planta.dimensiones.alto,
+        //   }
+        //   const elems = elementos.value.filter(
+        //     (el) => el.plantaId === plantaId && !el.padre && (el.tipo === 'elementos' || el.tipo === 'pasillos' || el.tipo === 'cuartos')
+        //   )
+        //   for (const el of elems) {
+        //     const typeKey = el.systemTypeKey || el.id
+        //     const isSystemDefault = !!(
+        //       typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey)
+        //     )
+        //     if (!isSystemDefault) continue
+        //     if (el.dimensionLock === true) continue
+        //     const dims = computeDimsByAxisScale(typeKey, parentDims, { snap: true, gridPx: gridSize.value })
+        //     if (!dims) continue
+        //     // Persistir nuevas dimensiones; width/height se recalculan según vista en actualizarElemento
+        //     actualizarElemento(el.id, { dimensiones: dims }, true, `Auto-resize por cambio de planta: ${el.nombre || el.id}`)
+        //     // Offset vertical configurable (por tipo) — solo si aplica
+        //     const off = OFFSETS?.offsetByType?.[typeKey]?.zOffsetShare
+        //     if (typeof off === 'number' && isFinite(off)) {
+        //       const zBase = Math.round((planta.dimensiones.alto || 0) * off)
+        //       actualizarElemento(el.id, { alturaRespectoAlSuelo: zBase })
+        //     }
+        //   }
+        // }
 
-          // Ajustar altura de pasillos al alto de la planta
+        // Ajuste SIEMPRE aplicado: altura de pasillos = alto de la planta
+        const plantaAlto = planta?.dimensiones?.alto
+        if (Number.isFinite(plantaAlto)) {
           const pasillos = elementos.value.filter((e) => e.plantaId === plantaId && !e.padre && e.tipo === 'pasillos')
           for (const pa of pasillos) {
-            if (!pa.dimensiones) pa.dimensiones = { ancho: 0, largo: 0, alto: 0 }
-            pa.dimensiones.alto = planta.dimensiones.alto
+            actualizarElemento(
+              pa.id,
+              { dimensiones: { alto: plantaAlto } },
+              true,
+              `Altura de pasillo actualizada por cambio de planta: ${pa.nombre || pa.id}`,
+            )
           }
         }
       } catch (e) {

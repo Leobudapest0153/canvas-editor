@@ -44,6 +44,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     tipo: 'pasillos',
     categoria: 'pasillos',
     forma: 'rectangular',
+    orientacion: 0,
     colorBase: '#ffffff',
     dimensiones: {
       ancho: 150,
@@ -64,6 +65,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     tipo: 'cuartos',
     categoria: 'cuartos',
     forma: 'rectangular',
+    orientacion: 0,
     colorBase: '#e0f2fe',
     dimensiones: {
       ancho: 400,
@@ -84,6 +86,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     tipo: 'pisos',
     categoria: 'pisos',
     forma: 'rectangular',
+    orientacion: 0,
     colorBase: '#f1f5f9',
     dimensiones: {
       ancho: 100,
@@ -106,6 +109,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     tipo: 'elementos', // NUEVO CAMPO
     categoria: 'anaqueles',
     forma: 'rectangular',
+    orientacion: 0,
     colorBase: '#3b82f6',
     dimensiones: {
       ancho: 120,
@@ -126,6 +130,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     tipo: 'elementos', // NUEVO CAMPO
     categoria: 'estantes',
     forma: 'rectangular',
+    orientacion: 0,
     colorBase: '#10b981',
     dimensiones: {
       ancho: 80,
@@ -147,6 +152,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     tipo: 'elementos', // NUEVO CAMPO
     categoria: 'armarios',
     forma: 'rectangular',
+    orientacion: 0,
     colorBase: '#7c3aed',
     dimensiones: {
       ancho: 60,
@@ -168,6 +174,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     tipo: 'elementos',
     categoria: 'contenedores',
     forma: 'circular',
+    orientacion: 0,
     colorBase: '#f97316',
     dimensiones: {
       ancho: 60,
@@ -190,6 +197,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     tipo: 'contenedores',
     categoria: 'contenedores',
     forma: 'rectangular',
+    orientacion: 0,
     colorBase: '#F0FAFF',
     dimensiones: {
       ancho: 10,
