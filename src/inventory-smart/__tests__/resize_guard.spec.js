@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fitsIndividually, usePlantResizeGuard } from '@/inventory-smart/composables/usePlantResizeGuard'
+import { computeExpandedAreaM, expandSuggestedAreaIfNeeded } from '@/inventory-smart/composables/useCanvasStore.js'
 import { setActivePinia, createPinia } from 'pinia'
 import { shallowMount } from '@vue/test-utils'
 import PlantasPanel from '@/inventory-smart/components/PlantasPanel.vue'
@@ -80,6 +81,24 @@ describe('usePlantResizeGuard - helpers', () => {
     } else {
       throw new Error('Esperaba ok o auto_adjust')
     }
+  })
+})
+
+describe('elastic floor helpers', () => {
+  it('computeExpandedAreaM amplía área para incluir elemento', () => {
+    const base = { width: 1, depth: 1, height: 1 }
+    const el = { x: 1, y: 1, width: 1, depth: 1, height: 1 }
+    const expanded = computeExpandedAreaM(base, el, 0.25)
+    expect(expanded.width).toBeGreaterThan(base.width)
+    expect(expanded.depth).toBeGreaterThan(base.depth)
+  })
+
+  it('expandSuggestedAreaIfNeeded detecta cambios', () => {
+    const base = { width: 1, depth: 1, height: 1 }
+    const el = { x: 2, y: 0, width: 1, depth: 1, height: 1 }
+    const { changed, area } = expandSuggestedAreaIfNeeded(base, el, 0)
+    expect(changed).toBe(true)
+    expect(area.width).toBe(3)
   })
 })
 

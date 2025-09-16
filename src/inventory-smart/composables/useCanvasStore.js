@@ -16,7 +16,14 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
+import {
+  CM_TO_PX,
+  DIMENSIONS,
+  CATALOGO,
+  OFFSETS,
+  ELASTIC_FLOOR_DEFAULT_SIZE_M,
+  ELASTIC_FLOOR_DEFAULT_PADDING,
+} from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
@@ -29,6 +36,44 @@ import {
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'
+
+/**
+ * Calcula un área expandida que incluye un rectángulo dado y un padding.
+ * Las unidades son metros para mantener la precisión al crecer.
+ * @param {{width:number, depth:number, height:number}} area Área actual sugerida.
+ * @param {{x:number,y:number,width:number,depth:number,height?:number}} bounds Rectángulo a incluir.
+ * @param {number} paddingRatio Proporción adicional alrededor del rectángulo.
+ * @returns {{width:number,depth:number,height:number}}
+ */
+export function computeExpandedAreaM(area, bounds, paddingRatio = ELASTIC_FLOOR_DEFAULT_PADDING) {
+  const padX = (bounds.width || 0) * paddingRatio
+  const padY = (bounds.depth || 0) * paddingRatio
+  const minX = Math.min(0, bounds.x - padX)
+  const minY = Math.min(0, bounds.y - padY)
+  const maxX = Math.max(area.width, bounds.x + bounds.width + padX)
+  const maxY = Math.max(area.depth, bounds.y + bounds.depth + padY)
+  return {
+    width: maxX - minX,
+    depth: maxY - minY,
+    height: Math.max(area.height, bounds.height || 0),
+  }
+}
+
+/**
+ * Determina si es necesario expandir el área sugerida para incluir bounds.
+ * @param {object} area Área sugerida actual (metros).
+ * @param {object} bounds Rectángulo en metros.
+ * @param {number} paddingRatio Proporción adicional.
+ * @returns {{changed:boolean, area:{width:number,depth:number,height:number}}}
+ */
+export function expandSuggestedAreaIfNeeded(area, bounds, paddingRatio = ELASTIC_FLOOR_DEFAULT_PADDING) {
+  const expanded = computeExpandedAreaM(area, bounds, paddingRatio)
+  const changed =
+    expanded.width !== area.width ||
+    expanded.depth !== area.depth ||
+    expanded.height !== area.height
+  return { changed, area: changed ? expanded : area }
+}
 
 export const useCanvasStore = defineStore('canvas', () => {
   const { showToast } = useToast()
@@ -718,12 +763,17 @@ export const useCanvasStore = defineStore('canvas', () => {
   const agregarPlanta = (nuevaPlanta) => {
     const id = `planta_${Date.now()}`
 
+    const isElastic = nuevaPlanta?.isElastic
+
     plantas.value.push({
       id,
       nombre: nuevaPlanta.nombre || 'Nueva Planta',
       descripcion: nuevaPlanta.descripcion || '',
       elementos: [],
       activa: false,
+      isElastic: !!isElastic,
+      suggestedArea: isElastic ? { ...ELASTIC_FLOOR_DEFAULT_SIZE_M } : undefined,
+      paddingRatio: isElastic ? ELASTIC_FLOOR_DEFAULT_PADDING : undefined,
       dimensiones: {
         alto: nuevaPlanta.dimensiones?.alto || 0,
         ancho: nuevaPlanta.dimensiones?.ancho || 0,
@@ -818,6 +868,36 @@ export const useCanvasStore = defineStore('canvas', () => {
         return false
       }
     }
+    return true
+  }
+
+  /**
+   * Expande dinámicamente el área sugerida de un piso elástico para incluir un elemento.
+   * @param {string} pisoId ID del piso a expandir.
+   * @param {{x:number,y:number,width:number,depth:number,height:number}} bounds Área en metros del elemento a incluir.
+   * @returns {boolean} true si el área se expandió.
+   */
+  const expandirPisoParaIncluir = (pisoId, bounds) => {
+    const piso = elementos.value.find((e) => e.id === pisoId)
+    if (!piso || !piso.isElastic) return false
+    const actual = piso.suggestedArea || { ...ELASTIC_FLOOR_DEFAULT_SIZE_M }
+    const { changed, area } = expandSuggestedAreaIfNeeded(
+      actual,
+      bounds,
+      piso.paddingRatio ?? ELASTIC_FLOOR_DEFAULT_PADDING,
+    )
+    if (!changed) return false
+    piso.suggestedArea = area
+    // Sincronizar dimensiones en cm y en canvas (px)
+    const nuevasDimensiones = {
+      ancho: Math.round(area.width * 100),
+      largo: Math.round(area.depth * 100),
+      alto: Math.round(area.height * 100),
+    }
+    piso.dimensiones = { ...piso.dimensiones, ...nuevasDimensiones }
+    const sizePx = toCanvasSizePx(nuevasDimensiones, 'XY')
+    piso.width = sizePx.width
+    piso.height = sizePx.height
     return true
   }
 
@@ -955,6 +1035,15 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     } catch (e) {
       console.warn('Auto-scale on create failed:', e)
+    }
+
+    // Inicializar propiedades de piso elástico si aplica
+    if (nuevoElemento.isElastic) {
+      nuevoElemento.suggestedArea = { ...ELASTIC_FLOOR_DEFAULT_SIZE_M }
+      nuevoElemento.paddingRatio =
+        nuevoElemento.paddingRatio != null
+          ? nuevoElemento.paddingRatio
+          : ELASTIC_FLOOR_DEFAULT_PADDING
     }
 
     elementos.value.push(nuevoElemento)
@@ -1399,6 +1488,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     agregarElemento,
     eliminarElemento,
     toggleElementoVisibilidad,
+    expandirPisoParaIncluir,
 
     // Navegación jerárquica - Actions
     navegarAElemento,

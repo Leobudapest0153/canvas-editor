@@ -85,6 +85,8 @@ export const ELEMENTOS_PREDEFINIDOS = [
     categoria: 'pisos',
     forma: 'rectangular',
     colorBase: '#f1f5f9',
+    // Piso por defecto no es elástico; requiere dimensiones explícitas
+    isElastic: false,
     dimensiones: {
       ancho: 100,
       largo: 100,
@@ -391,6 +393,15 @@ export const OFFSETS = {
     estante_pared_pequeno: { zOffsetShare: 0.5 },
   },
 }
+
+// === Configuración de piso elástico ===
+// Dimensiones por defecto del área sugerida (en metros)
+export const ELASTIC_FLOOR_DEFAULT_SIZE_M = { width: 10, depth: 10, height: 10 }
+// Porcentaje adicional alrededor del elemento más exterior
+export const ELASTIC_FLOOR_DEFAULT_PADDING = 0.25
+// Flags para activar/desactivar la característica y telemetría (por ahora siempre activos)
+export const ELASTIC_FLOOR_FEATURE_ENABLED = true
+export const ELASTIC_FLOOR_TELEMETRY = true
 
 // (Opcional) Política de peso — OFF por defecto
 export const WEIGHT = {

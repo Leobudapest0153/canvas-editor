@@ -55,6 +55,25 @@
                 @save="onTagCreateSave"
               />
             </div>
+
+            <!-- Configuración de piso elástico -->
+            <div>
+              <label class="flex items-center gap-2 text-xs font-medium text-gray-600">
+                <input type="checkbox" v-model="edited.isElastic" :disabled="isSaving" />
+                Piso elástico (∞)
+              </label>
+            </div>
+            <div v-if="edited.isElastic" class="flex items-center gap-2">
+              <input
+                type="range"
+                min="0.1"
+                max="0.4"
+                step="0.01"
+                v-model.number="edited.paddingRatio"
+                :disabled="isSaving"
+              />
+              <span class="text-xs text-gray-500">{{ (edited.paddingRatio * 100).toFixed(0) }}%</span>
+            </div>
           </div>
         </details>
 
@@ -254,6 +273,7 @@ import TagFilter from '@/inventory-smart/components/TagFilter.vue'
 import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { toPrecisionCm } from '../utils/fixedDimensions'
+import { ELASTIC_FLOOR_DEFAULT_PADDING } from '@/inventory-smart/utils/constants'
 
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
@@ -287,6 +307,9 @@ const cargarDesdeStore = (el) => deepClone({
     alto: el.dimensiones?.alto || 0,
   },
   pesoMaximo: el.pesoMaximo || 0,
+  isElastic: !!el.isElastic,
+  paddingRatio:
+    el.paddingRatio != null ? Number(el.paddingRatio) : ELASTIC_FLOOR_DEFAULT_PADDING,
   alturaSobreSueloCm: el.alturaSobreSueloCm != null
     ? Number(el.alturaSobreSueloCm)
     : (el.alturaRespectoAlSuelo != null ? Number(el.alturaRespectoAlSuelo) : 0),
@@ -793,8 +816,10 @@ const esContenedor = computed(() => {
   return el?.tipo === 'contenedores'
 })
 
-const mostrarCapacidad = computed(() => esEstructura.value || esContenedor.value)
-const mostrarDimensiones = computed(() => true)
+const mostrarCapacidad = computed(
+  () => (esEstructura.value || esContenedor.value) && !edited.value?.isElastic,
+)
+const mostrarDimensiones = computed(() => !edited.value?.isElastic)
 const esCircular = computed(() => (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circular' || (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circle')
 const ocultarAnchoLargo = computed(() => esCircular.value)
 const esPasillo = computed(() => (elementoSeleccionado.value?.tipo || '').toLowerCase() === 'pasillos')

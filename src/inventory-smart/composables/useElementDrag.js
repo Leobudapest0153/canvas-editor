@@ -338,7 +338,14 @@ export function useElementDrag({
           const W = layerConfig.value.width
           const H = layerConfig.value.height
           const activeForFrame = getActiveBounds(canvasStore)
-          const areaBounds = { minX: 0, minY: 0, maxX: W, maxY: H, polygon: activeForFrame.polygonPx }
+          const areaBounds = {
+            minX: 0,
+            minY: 0,
+            maxX: W,
+            maxY: H,
+            polygon: activeForFrame.polygonPx,
+            isElastic: canvasStore.estructuraContenedorActual?.isElastic,
+          }
 
           // Para círculos, desiredPos ya es top-left (convertido en updateElementPosition)
           const asRect =
@@ -375,7 +382,33 @@ export function useElementDrag({
           if (!elemento) return false
           const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
           const activeForValidate = getActiveBounds(canvasStore)
-          const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: activeForValidate.polygonPx }
+          const areaBounds = {
+            minX: 0,
+            minY: 0,
+            maxX: layerConfig.value.width,
+            maxY: layerConfig.value.height,
+            polygon: activeForValidate.polygonPx,
+            isElastic: canvasStore.estructuraContenedorActual?.isElastic,
+          }
+
+          const parent = canvasStore.estructuraContenedorActual
+          if (parent?.isElastic) {
+            const outside =
+              pos.x < 0 ||
+              pos.y < 0 ||
+              pos.x + elemento.width > areaBounds.maxX ||
+              pos.y + elemento.height > areaBounds.maxY
+            if (outside) {
+              canvasStore.expandirPisoParaIncluir(parent.id, {
+                x: pos.x / CM_TO_PX / 100,
+                y: pos.y / CM_TO_PX / 100,
+                width: (elemento.dimensiones?.ancho || elemento.width / CM_TO_PX) / 100,
+                depth: (elemento.dimensiones?.largo || elemento.height / CM_TO_PX) / 100,
+                height: (elemento.dimensiones?.alto || 0) / 100,
+              })
+            }
+          }
+
           return isPlacementValid({ pos, movingEl: elemento, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
         }
 

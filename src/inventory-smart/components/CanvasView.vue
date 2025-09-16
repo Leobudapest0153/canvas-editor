@@ -21,6 +21,11 @@
     @dragenter="handleDragEnter"
     @dragleave="handleDragLeave"
   >
+    <!-- Overlay para indicar área sugerida de piso elástico -->
+    <div v-if="elasticFloorStyle" class="absolute top-0 left-0" style="pointer-events:none;">
+      <div class="elastic-floor-outline" :style="elasticFloorStyle"></div>
+      <div class="elastic-floor-label">∞ Piso elástico</div>
+    </div>
     <v-stage
       ref="stageRef"
       :config="stageConfig"
@@ -589,7 +594,14 @@ import { clampRectToPolygon, clampCircleToPolygon, circleInPolygon, pointInPolyg
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
-import { GRID_SIZE, CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
+import {
+  GRID_SIZE,
+  CM_TO_PX,
+  DIMENSIONS,
+  CATALOGO,
+  OFFSETS,
+  ELASTIC_FLOOR_DEFAULT_SIZE_M,
+} from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { cmToPx, pxToCm, fmtCm } from '@/inventory-smart/utils/units'
 import { useViewportStore } from '@/inventory-smart/stores/viewport'
@@ -703,6 +715,17 @@ const getElementPixelDimensions = (elemento) => {
   // Fallback a valores por defecto (solo para elementos sin dimensiones definidas)
   return { width: 100, height: 60 }
 }
+
+// Estilo del contorno del piso elástico actual (si aplica)
+const elasticFloorStyle = computed(() => {
+  const parent = canvasStore.estructuraContenedorActual
+  if (!parent?.isElastic) return null
+  const area = parent.suggestedArea || ELASTIC_FLOOR_DEFAULT_SIZE_M
+  return {
+    width: `${cmToPx(area.width * 100, viewport.cmPerPx)}px`,
+    height: `${cmToPx(area.depth * 100, viewport.cmPerPx)}px`,
+  }
+})
 const conflictsApi = useConflicts()
 
 // === BLOQUEO DE ELEMENTOS ===
@@ -1346,6 +1369,20 @@ const runPreDropValidations = (elemento, dropEvent) => {
       )
       finalPos = { x: c.x, y: c.y }
     }
+  }
+
+  // Si el contenedor es un piso elástico, expandir área sugerida antes de finalizar
+  const parent = canvasStore.estructuraContenedorActual
+  if (parent?.isElastic) {
+    const posCmX = pxToCm(finalPos.x, viewport.cmPerPx)
+    const posCmY = pxToCm(finalPos.y, viewport.cmPerPx)
+    canvasStore.expandirPisoParaIncluir(parent.id, {
+      x: posCmX / 100,
+      y: posCmY / 100,
+      width: anchoCm / 100,
+      depth: largoCm / 100,
+      height: altoCm / 100,
+    })
   }
 
   return {

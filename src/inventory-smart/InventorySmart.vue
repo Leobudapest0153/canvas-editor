@@ -208,6 +208,18 @@ onUnmounted(() => {
   --ui-border: var(--ui-border-dark);
 }
 
+/* Indicadores visuales para piso elástico */
+.elastic-floor-outline {
+  outline: 2px dashed rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+.elastic-floor-label {
+  font-weight: 600;
+  font-size: 12px;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
 /* Utility helpers */
 .ui-surface {
   background: var(--ui-bg);

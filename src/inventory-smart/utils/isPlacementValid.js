@@ -64,8 +64,10 @@ export function isPlacementValid({ pos, movingEl, neighbors = [], areaBounds, CM
   void CM_TO_PX
   if (!pos || !movingEl || !areaBounds) return false
 
-  // 1) Dentro de área (modelo puro)
-  if (!insideAreaModel(pos, movingEl, areaBounds, epsPx)) return false
+  // 1) Dentro de área (modelo puro) — omitir si el contenedor es elástico
+  if (!areaBounds?.isElastic) {
+    if (!insideAreaModel(pos, movingEl, areaBounds, epsPx)) return false
+  }
 
   // 2) Ausencia de conflictos BLOQUEANTES
   const testEl = { ...movingEl, x: pos.x, y: pos.y }

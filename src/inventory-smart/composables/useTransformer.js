@@ -708,9 +708,23 @@ export function useTransformer({
             }
 
             if (!isInsidePolygon) {
-              showToast('El elemento debe permanecer completamente dentro del área de la planta', 'warning')
-              revertTransform(elementId, 'elemento fuera del polígono')
-              return
+              const parent = canvasStore.estructuraContenedorActual
+              if (parent?.isElastic) {
+                canvasStore.expandirPisoParaIncluir(parent.id, {
+                  x: valoresParaValidacion.x / CM_TO_PX / 100,
+                  y: valoresParaValidacion.y / CM_TO_PX / 100,
+                  width: (tempDimensiones?.ancho || valoresParaValidacion.width / CM_TO_PX) / 100,
+                  depth:
+                    (tempDimensiones && (canvasStore.vistaActiva === 'XY' ? tempDimensiones.largo : tempDimensiones.alto)) /
+                      100 ||
+                    valoresParaValidacion.height / CM_TO_PX / 100,
+                  height: (tempDimensiones?.alto || 0) / 100,
+                })
+              } else {
+                showToast('El elemento debe permanecer completamente dentro del área de la planta', 'warning')
+                revertTransform(elementId, 'elemento fuera del polígono')
+                return
+              }
             }
           }
         }
@@ -726,6 +740,7 @@ export function useTransformer({
         minY: 0,
         maxX: layerConfig.value.width,
         maxY: layerConfig.value.height,
+        isElastic: canvasStore.estructuraContenedorActual?.isElastic,
       }
       const elementoParaValidacion =
         elementoSnapshot?.forma === 'circular'
