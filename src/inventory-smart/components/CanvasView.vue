@@ -587,7 +587,8 @@ import {
   snapToGrid,
   nudgePlace,
 } from '@/inventory-smart/utils/geometry'
-import { clampRectToPolygon, clampCircleToPolygon, circleInPolygon, pointInPolygon, clampPointToPolygon } from '@/inventory-smart/utils/polygonBounds'
+import { clampRectToPolygon, clampCircleToPolygon, circleInPolygon, pointInPolygon, clampPointToPolygon, isRectCompletelyInPolygon } from '@/inventory-smart/utils/polygonBounds'
+import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
@@ -1272,39 +1273,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
       candY = worldPos.y
   }
 
-  const boundary = computeBoundary()
-  let isInside = true
-  if (boundary.type === 'rect') {
-    isInside = candX >= 0 && candY >= 0 && candX + finalWidth <= boundary.W && candY + finalHeight <= boundary.H
-    if (!isInside) {
-      const clamped = clampRectToRect(candX, candY, finalWidth, finalHeight, boundary.W, boundary.H)
-      candX = clamped.x
-      candY = clamped.y
-    }
-  } else if (boundary.type === 'polygon') {
-    // Para elementos circulares, verificar si el círculo está dentro del polígono
-    if (elemento.forma === 'circular') {
-      const radius = Math.min(finalWidth, finalHeight) / 2
-      const centerX = candX + radius
-      const centerY = candY + radius
-      isInside = circleInPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-      if (!isInside) {
-        const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-        candX = clampedCenter.x - radius
-        candY = clampedCenter.y - radius
-        isInside = circleInPolygon({ x: clampedCenter.x, y: clampedCenter.y, radius }, boundary.inset)
-      }
-    } else {
-      isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
-      if (!isInside) {
-        const clamped = clampRectToPolygon({ x: candX, y: candY, width: finalWidth, height: finalHeight }, boundary.inset)
-        candX = clamped.x
-        candY = clamped.y
-        isInside = pointInPolygon({ x: candX + finalWidth / 2, y: candY + finalHeight / 2 }, boundary.inset)
-      }
-    }
-  }
-
+  // 4. Crear elemento temporal para validaciones
   const tempEl = {
     id: '__temp_drop__',
     x: candX,
@@ -1316,6 +1285,20 @@ const runPreDropValidations = (elemento, dropEvent) => {
     forma: elemento.forma || 'rectangular',
   }
 
+  const boundary = computeBoundary()
+
+  // Usar la misma validación estricta que isPlacementValid
+  const areaBounds = {
+    minX: 0,
+    minY: 0,
+    maxX: boundary.W || layerConfig.value.width,
+    maxY: boundary.H || layerConfig.value.height,
+    polygon: boundary.points
+  }
+
+  // Validación inicial estricta usando insideAreaModel
+  let isInside = insideAreaModel({ x: candX, y: candY }, tempEl, areaBounds, 0.5)
+
   const all = canvasStore.elementosVisibles
   const conflicts = detectConflictsFor(tempEl, all)
   const blocking = conflicts.filter((c) => c.bloqueante)
@@ -1323,7 +1306,8 @@ const runPreDropValidations = (elemento, dropEvent) => {
   let finalPos = { x: candX, y: candY }
   let ok = blocking.length === 0 && isInside
 
-  if (!ok) {
+  // Solo usar nudgePlace si no hay conflictos de colisión, pero mantener validación estricta de área
+  if (blocking.length > 0) {
     const nudge = nudgePlace(
       candX,
       candY,
@@ -1337,8 +1321,12 @@ const runPreDropValidations = (elemento, dropEvent) => {
       detectConflictsFor,
     )
     if (nudge.found) {
-      finalPos = { x: nudge.x, y: nudge.y }
-      ok = true
+      // Validar que la posición encontrada por nudge también esté dentro del área
+      const nudgedEl = { ...tempEl, x: nudge.x, y: nudge.y }
+      if (insideAreaModel({ x: nudge.x, y: nudge.y }, nudgedEl, areaBounds, 0.5)) {
+        finalPos = { x: nudge.x, y: nudge.y }
+        ok = true
+      }
     }
   }
 
@@ -1347,20 +1335,10 @@ const runPreDropValidations = (elemento, dropEvent) => {
     return { ok: false, reason: 'bounds' }
   }
 
-  if (boundary.type === 'polygon') {
-    if (elemento.forma === 'circular') {
-      const radius = Math.min(finalWidth, finalHeight) / 2
-      const centerX = finalPos.x + radius
-      const centerY = finalPos.y + radius
-      const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-      finalPos = { x: clampedCenter.x - radius, y: clampedCenter.y - radius }
-    } else {
-      const c = clampRectToPolygon(
-        { x: finalPos.x, y: finalPos.y, width: finalWidth, height: finalHeight },
-        boundary.inset,
-      )
-      finalPos = { x: c.x, y: c.y }
-    }
+  // Validación final: asegurar que la posición final sea válida con la misma lógica que drag
+  if (!insideAreaModel(finalPos, { ...tempEl, x: finalPos.x, y: finalPos.y }, areaBounds, 0.5)) {
+    showToast('El elemento quedaría fuera del área permitida.', 'error')
+    return { ok: false, reason: 'bounds' }
   }
 
   return {
@@ -1578,194 +1556,19 @@ watch(
 )
 
 const createElementFromBuffer = (data, dropEvent) => {
-  // Obtener el elemento del buffer para validar sus dimensiones
+  // Obtener el elemento del buffer
   const bufferItem = buffer.getBufferItem(data.bufferItemId)
   if (!bufferItem) {
     showToast('Elemento no encontrado en el buffer', 'error')
     return
   }
 
-  // Clonar para no mutar el buffer y ajustar si es pasillo
-  let elemento = JSON.parse(JSON.stringify(bufferItem.elemento))
-  try {
-    if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
-      const plantaAlto = canvasStore.plantaActivaData?.dimensiones?.alto
-      const dims = { ...(elemento.dimensiones || {}) }
-      if (Number.isFinite(plantaAlto)) dims.alto = plantaAlto
-      elemento.dimensiones = dims
-    }
-  } catch { /* ignore */ }
+  // Delegar todas las validaciones a la ruta unificada
+  const res = runPreDropValidations(bufferItem.elemento, dropEvent)
+  if (!res.ok) return
 
-  // Validación de jerarquía por contexto (alineada a runPreDropValidations)
-  const contextoActual = canvasStore.contextoActual.tipo
-  const tipoElemento = elemento.tipo
-  const allowedByContext = {
-    plantas: ['cuartos', 'elementos', 'pasillos'],
-    cuartos: ['pisos'],
-    pisos: ['elementos'],
-    elementos: ['contenedores'],
-    contenedores: [],
-    pasillos: [],
-  }
-  const permitidos = allowedByContext[contextoActual] || []
-  if (!permitidos.includes(tipoElemento)) {
-    const msgMap = {
-      plantas: 'Aquí solo puedes pegar cuartos, elementos o pasillos.',
-      cuartos: 'Aquí solo puedes pegar pisos.',
-      pisos: 'Aquí solo puedes pegar elementos.',
-      elementos: 'Dentro de elementos solo se pueden pegar contenedores.',
-      contenedores: 'No puedes pegar dentro de contenedores.',
-      pasillos: 'No puedes pegar dentro de pasillos.',
-    }
-    showToast(msgMap[contextoActual] || 'No puedes pegar este tipo aquí.', 'error')
-    return
-  }
-
-  // ===== VALIDACIÓN DE PESO MÁXIMO =====
-  const resultadoValidacionPeso = weightValidation.validarPesoElemento(
-    elemento,
-    canvasStore.contextoActual.id,
-    canvasStore.contextoActual.tipo
-  )
-
-  if (!resultadoValidacionPeso.valido) {
-    // El elemento excedería el peso máximo permitido
-    showToast(
-      `No se puede pegar: habría un exceso de peso soportado de ${resultadoValidacionPeso.exceso} kg`,
-      'error'
-    )|
-    console.log('Validación de peso fallida en buffer:', resultadoValidacionPeso)
-    return
-  }
-
-  // Obtener dimensiones en píxeles (convertir desde cm si es necesario)
-  let { width, height } = getElementPixelDimensions(elemento)
-
-  // 1. Convertir pointer a coords de mundo (considerando zoom/pan)
-  const worldCoords = getWorldCoordinatesFromPointer(dropEvent)
-
-  // 2. Calcular posición candidata
-  let candX = worldCoords.x - width / 2
-  let candY = worldCoords.y - height / 2
-
-  // 3. Aplicar snap a grilla ANTES de validar (usar valor runtime de canvasStore.gridSize: 0 desactiva)
-  const snapped = snapToGrid(candX, candY, canvasStore.gridSize ?? GRID_SIZE)
-  candX = snapped.x
-  candY = snapped.y
-
-  // 4. Verificar área y conflictos
-  const boundary = computeBoundary()
-
-  let isInsideArea = true
-  if (boundary.type === 'rect') {
-    isInsideArea =
-      candX >= 0 && candY >= 0 && candX + width <= boundary.W && candY + height <= boundary.H
-
-    if (!isInsideArea) {
-      const clamped = clampRectToRect(candX, candY, width, height, boundary.W, boundary.H)
-      candX = clamped.x
-      candY = clamped.y
-    }
-  } else if (boundary.type === 'polygon') {
-    if (elemento.forma === 'circular') {
-      const radius = Math.min(width, height) / 2
-      const centerX = candX + radius
-      const centerY = candY + radius
-      isInsideArea = circleInPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-      if (!isInsideArea) {
-        const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-        candX = clampedCenter.x - radius
-        candY = clampedCenter.y - radius
-        isInsideArea = circleInPolygon({ x: clampedCenter.x, y: clampedCenter.y, radius }, boundary.inset)
-      }
-    } else {
-      isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
-      if (!isInsideArea) {
-        const clamped = clampRectToPolygon({ x: candX, y: candY, width, height }, boundary.inset)
-        candX = clamped.x
-        candY = clamped.y
-        isInsideArea = pointInPolygon({ x: candX + width / 2, y: candY + height / 2 }, boundary.inset)
-      }
-    }
-  }
-
-  // 5. Crear elemento temporal y detectar conflictos
-  const tempElement = {
-    id: '__temp_buffer__',
-    x: candX,
-    y: candY,
-    width,
-    height,
-    ubicacion: elemento.ubicacion || 'suelo',
-    tipo: elemento.tipo || 'elemento',
-    forma: elemento.forma || 'rectangular',
-  }
-
-  const allElements = canvasStore.elementosVisibles
-  const conflicts = detectConflictsFor(tempElement, allElements)
-  const blockingConflicts = conflicts.filter((c) => c.bloqueante)
-
-  // 6. Si hay conflictos o está fuera de área, intentar nudgePlace
-  let finalPosition = { x: candX, y: candY }
-  let placementSuccessful = blockingConflicts.length === 0 && isInsideArea
-
-  if (!placementSuccessful) {
-    console.log('🔍 Elemento del buffer tiene conflictos, intentando nudgePlace...')
-
-    const nudgeResult = nudgePlace(
-      candX,
-      candY,
-      width,
-      height,
-      boundary,
-      allElements,
-      tempElement,
-      canvasStore.gridSize ?? GRID_SIZE,
-      16,
-      detectConflictsFor, // Pasar la función como parámetro
-    )
-
-    if (nudgeResult.found) {
-      finalPosition = { x: nudgeResult.x, y: nudgeResult.y }
-      placementSuccessful = true
-      console.log('✅ nudgePlace encontró posición válida para elemento del buffer:', finalPosition)
-    } else {
-      console.log('❌ nudgePlace no encontró posición válida para elemento del buffer')
-    }
-  }
-
-  // 7. Si no hay posición válida, rechazar
-  if (!placementSuccessful) {
-    showToast('Fuera de los límites de la planta', 'error')
-    return // NO pegar, NO comprometer historial
-  }
-
-  if (boundary.type === 'polygon') {
-    if (elemento.forma === 'circular') {
-      const radius = Math.min(width, height) / 2
-      const centerX = finalPosition.x + radius
-      const centerY = finalPosition.y + radius
-      const clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
-      finalPosition = { x: clampedCenter.x - radius, y: clampedCenter.y - radius }
-    } else {
-      const c = clampRectToPolygon(
-        { x: finalPosition.x, y: finalPosition.y, width, height },
-        boundary.inset,
-      )
-      finalPosition = { x: c.x, y: c.y }
-    }
-  }
-
-  // 8. Pegar elemento desde buffer en posición válida
-  const newElementId = buffer.pasteFromBuffer(data.bufferItemId, finalPosition)
-
+  const newElementId = buffer.pasteFromBuffer(data.bufferItemId, res.position)
   if (newElementId) {
-    console.log(
-      '✅ Elemento pegado desde buffer al canvas en posición válida:',
-      newElementId,
-      finalPosition,
-    )
-    // Seleccionar el elemento recién pegado
     canvasStore.seleccionarElemento(newElementId)
   }
 }
