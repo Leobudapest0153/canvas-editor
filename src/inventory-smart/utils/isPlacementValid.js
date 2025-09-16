@@ -5,7 +5,7 @@
 //  - Debe haber AUSENCIA de conflictos bloqueantes según detectConflictsFor.
 
 import { detectConflictsFor } from '@/inventory-smart/utils/collision'
-import { rectFullyInsidePolygon } from '@/inventory-smart/utils/polygonBounds'
+import { isRectCompletelyInPolygon, circleInPolygon } from '@/inventory-smart/utils/polygonBounds'
 
 /**
  * Verifica si un rectángulo del modelo (top-left + ancho/alto) está completamente dentro del área.
@@ -20,18 +20,18 @@ export function insideAreaModel(pos, movingEl, areaBounds, epsPx = 0.5) {
   // Usar las dimensiones de Konva directamente (ya están en píxeles)
   const w = movingEl?.width || 0
   const h = movingEl?.height || 0
-  
+
   // Para elementos circulares, usar geometría circular
   const isCirc = movingEl?.forma === 'circular'
 
   const { minX, minY, maxX, maxY } = areaBounds || { minX: 0, minY: 0, maxX: 0, maxY: 0 }
-
    // Si se proporcionó un polígono, usar validación estricta de rect dentro del polígono
    if (areaBounds && Array.isArray(areaBounds.polygon)) {
      const poly = areaBounds.polygon
-     const rect = { x: pos.x, y: pos.y, width: w, height: h }
+    //  const rect = { x: pos.x, y: pos.y, width: w, height: h }
      // Pasar información de si es circular a la función de validación
-     return rectFullyInsidePolygon(rect, poly, isCirc)
+     if (!isCirc) return isRectCompletelyInPolygon(pos.x, pos.y, w, h, poly)
+     else return circleInPolygon(pos.x + w / 2, pos.y + h / 2, Math.min(w, h) / 2, poly)
    }
 
    // Para circulares en bounds rectangulares, usar su AABB del modelo (diámetro mínimo)
