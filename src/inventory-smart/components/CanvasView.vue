@@ -1167,8 +1167,17 @@ const runPreDropValidations = (elemento, dropEvent) => {
     return { ok: false, reason: 'hierarchy' }
   }
 
+  // Si es pasillo, ajustar alto al de la planta ANTES de validar
+  let elementoParaPeso = elemento
+  const plantaAlto = canvasStore.plantaActivaData?.dimensiones?.alto
+  if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
+    const dims = { ...(elemento.dimensiones || {}) }
+    if (Number.isFinite(plantaAlto)) dims.alto = plantaAlto
+    elementoParaPeso = { ...elemento, dimensiones: dims }
+  }
+
   const resultadoValidacionPeso = weightValidation.validarPesoElemento(
-    elemento,
+    elementoParaPeso,
     canvasStore.contextoActual.id,
     canvasStore.contextoActual.tipo
   )
@@ -1198,6 +1207,10 @@ const runPreDropValidations = (elemento, dropEvent) => {
   let anchoCm = elemento.dimensiones?.ancho || 100
   let largoCm = elemento.dimensiones?.largo || 60
   let altoCm = elemento.dimensiones?.alto || 20
+
+  if ((elemento?.tipo || '').toLowerCase() === 'pasillos' && Number.isFinite(plantaAlto)) {
+    altoCm = plantaAlto
+  }
 
   const isSystemDefault = !!(elemento?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(elemento.id))
   if (isSystemDefault && elemento?.dimensionLock !== true) {
@@ -1428,7 +1441,11 @@ const getElementShadow = (elemento) => {
 // Barra de orientación: rectángulo amarillo interior indicando el lado de orientación (no aplica a circulares)
 const getOrientationBarRect = (elemento) => {
   try {
-    if (!elemento || (elemento.forma && elemento.forma.toLowerCase() === 'circular')) return null
+    if (!elemento) return null
+    // No mostrar para circulares ni para pasillos
+    const forma = (elemento.forma || '').toLowerCase()
+    const tipo = (elemento.tipo || '').toLowerCase()
+    if (forma === 'circular' || tipo === 'pasillos') return null
     const w = Number(elemento.width) || 0
     const h = Number(elemento.height) || 0
     if (w <= 0 || h <= 0) return null
@@ -1437,24 +1454,25 @@ const getOrientationBarRect = (elemento) => {
     if (!Number.isFinite(o)) o = 0
     o = ((o % 360) + 360) % 360
     if (!allowed.includes(o)) o = 0
-    const margin = Math.max(2, 4 / (canvasStore.zoom || 1))
+    // Barra pegada al borde (sin margen), grosor escalado por zoom
+    const margin = 0
     const thick = Math.max(2, 4 / (canvasStore.zoom || 1))
     const color = '#facc15'
     if (o === 0) {
       const width = Math.max(1, w - 2 * margin)
-      return { x: margin, y: margin, width, height: thick, fill: color, listening: false, opacity: 0.95 }
+      return { x: margin, y: 0, width, height: thick, fill: color, listening: false, opacity: 0.95 }
     }
     if (o === 180) {
       const width = Math.max(1, w - 2 * margin)
-      return { x: margin, y: Math.max(0, h - margin - thick), width, height: thick, fill: color, listening: false, opacity: 0.95 }
+      return { x: margin, y: Math.max(0, h - thick), width, height: thick, fill: color, listening: false, opacity: 0.95 }
     }
     if (o === 90) {
       const height = Math.max(1, h - 2 * margin)
-      return { x: Math.max(0, w - margin - thick), y: margin, width: thick, height, fill: color, listening: false, opacity: 0.95 }
+      return { x: Math.max(0, w - thick), y: margin, width: thick, height, fill: color, listening: false, opacity: 0.95 }
     }
     // 270
     const height = Math.max(1, h - 2 * margin)
-    return { x: margin, y: margin, width: thick, height, fill: color, listening: false, opacity: 0.95 }
+    return { x: 0, y: margin, width: thick, height, fill: color, listening: false, opacity: 0.95 }
   } catch {
     return null
   }
@@ -1546,7 +1564,16 @@ const createElementFromBuffer = (data, dropEvent) => {
     return
   }
 
-  const elemento = bufferItem.elemento
+  // Clonar para no mutar el buffer y ajustar si es pasillo
+  let elemento = JSON.parse(JSON.stringify(bufferItem.elemento))
+  try {
+    if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
+      const plantaAlto = canvasStore.plantaActivaData?.dimensiones?.alto
+      const dims = { ...(elemento.dimensiones || {}) }
+      if (Number.isFinite(plantaAlto)) dims.alto = plantaAlto
+      elemento.dimensiones = dims
+    }
+  } catch { /* ignore */ }
 
   // Validación de jerarquía por contexto (alineada a runPreDropValidations)
   const contextoActual = canvasStore.contextoActual.tipo
