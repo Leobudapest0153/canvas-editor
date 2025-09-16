@@ -16,7 +16,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS, ELASTIC_FLOOR_DEFAULT_SIZE_M, ELASTIC_FLOOR_DEFAULT_PADDING } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
@@ -715,10 +715,53 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+  // === Helpers para piso elástico ===
+  // Calcula el área expandida (en metros) considerando el padding
+  const computeExpandedAreaM = (suggested, paddingRatio = ELASTIC_FLOOR_DEFAULT_PADDING) => {
+    const pad = Number(paddingRatio) || 0
+    return {
+      width: suggested.width * (1 + pad * 2),
+      depth: suggested.depth * (1 + pad * 2),
+      height: suggested.height,
+    }
+  }
+
+  // Ajusta suggestedArea si el hijo excede los límites actuales (unidades en metros)
+  const expandSuggestedAreaIfNeeded = (piso, childAreaM) => {
+    if (!piso.suggestedArea) piso.suggestedArea = { ...ELASTIC_FLOOR_DEFAULT_SIZE_M }
+    const area = piso.suggestedArea
+    let changed = false
+    if (childAreaM.width > area.width) { area.width = childAreaM.width; changed = true }
+    if (childAreaM.depth > area.depth) { area.depth = childAreaM.depth; changed = true }
+    if (childAreaM.height > area.height) { area.height = childAreaM.height; changed = true }
+    return changed
+  }
+
+  // Expande las dimensiones del piso para incluir un elemento dado
+  const expandirPisoParaIncluir = (piso, elemento) => {
+    if (!piso?.isElastic) return false
+    const childAreaM = {
+      width: (elemento.dimensiones?.ancho || 0) / 100,
+      depth: (elemento.dimensiones?.largo || 0) / 100,
+      height: (elemento.dimensiones?.alto || 0) / 100,
+    }
+    const changed = expandSuggestedAreaIfNeeded(piso, childAreaM)
+    if (changed) {
+      const expanded = computeExpandedAreaM(piso.suggestedArea, piso.paddingRatio)
+      if (!piso.dimensiones) piso.dimensiones = { ancho: 0, largo: 0, alto: 0 }
+      piso.dimensiones.ancho = expanded.width * 100
+      piso.dimensiones.largo = expanded.depth * 100
+      piso.dimensiones.alto = expanded.height * 100
+      piso.width = piso.dimensiones.ancho
+      piso.height = piso.dimensiones.largo
+    }
+    return changed
+  }
+
   const agregarPlanta = (nuevaPlanta) => {
     const id = `planta_${Date.now()}`
 
-    plantas.value.push({
+    const planta = {
       id,
       nombre: nuevaPlanta.nombre || 'Nueva Planta',
       descripcion: nuevaPlanta.descripcion || '',
@@ -731,7 +774,12 @@ export const useCanvasStore = defineStore('canvas', () => {
       },
       pesoMaximoSoportado: nuevaPlanta.pesoMaximoSoportado || 3000,
       ...nuevaPlanta,
-    })
+    }
+    if (planta.isElastic) {
+      planta.suggestedArea = planta.suggestedArea || { ...ELASTIC_FLOOR_DEFAULT_SIZE_M }
+      planta.paddingRatio = planta.paddingRatio ?? ELASTIC_FLOOR_DEFAULT_PADDING
+    }
+    plantas.value.push(planta)
     return id
   }
 
@@ -955,6 +1003,11 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     } catch (e) {
       console.warn('Auto-scale on create failed:', e)
+    }
+
+    if (nuevoElemento.isElastic) {
+      nuevoElemento.suggestedArea = nuevoElemento.suggestedArea || { ...ELASTIC_FLOOR_DEFAULT_SIZE_M }
+      nuevoElemento.paddingRatio = nuevoElemento.paddingRatio ?? ELASTIC_FLOOR_DEFAULT_PADDING
     }
 
     elementos.value.push(nuevoElemento)
@@ -1444,6 +1497,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     actualizarIdsFiltrados,
 
     setDraggableMode,
+
+    // Helpers de piso elástico
+    computeExpandedAreaM,
+    expandSuggestedAreaIfNeeded,
+    expandirPisoParaIncluir,
 
   }
 })

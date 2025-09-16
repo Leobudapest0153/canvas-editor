@@ -15,12 +15,13 @@
   <div
     ref="containerRef"
     class="canvas-container"
-    :class="{ 'drag-over': isDragOverCanvas, 'cursor-grab': !dragModeGlobal }"
+    :class="[{ 'drag-over': isDragOverCanvas, 'cursor-grab': !dragModeGlobal }, elasticFloorClass]"
     @drop="handleDrop"
     @dragover="handleDragOver"
     @dragenter="handleDragEnter"
     @dragleave="handleDragLeave"
   >
+    <div v-if="elasticFloorClass" class="elastic-floor-label absolute top-1 left-1">∞ Piso elástico</div>
     <v-stage
       ref="stageRef"
       :config="stageConfig"
@@ -732,6 +733,14 @@ const stageSize = ref({ width: 800, height: 600 })
 const isDragOverCanvas = ref(false)
 const highlightAnimation = ref(null);
 
+const elasticFloorClass = computed(() => {
+  if (canvasStore.contextoActual.tipo === 'pisos') {
+    const piso = canvasStore.elementoPorId(canvasStore.contextoActual.id)
+    return piso?.isElastic ? 'elastic-floor-outline' : ''
+  }
+  return ''
+})
+
 // Configuración del stage - OCUPA TODO EL CONTENEDOR
 const stageConfig = computed(() => {
   // Si hay elemento seleccionado y está bloqueado, nunca permitir arrastre del canvas
@@ -1262,9 +1271,16 @@ const runPreDropValidations = (elemento, dropEvent) => {
   if (boundary.type === 'rect') {
     isInside = candX >= 0 && candY >= 0 && candX + finalWidth <= boundary.W && candY + finalHeight <= boundary.H
     if (!isInside) {
-      const clamped = clampRectToRect(candX, candY, finalWidth, finalHeight, boundary.W, boundary.H)
-      candX = clamped.x
-      candY = clamped.y
+      const parent = canvasStore.contextoActual.tipo === 'pisos'
+        ? canvasStore.elementoPorId(canvasStore.contextoActual.id)
+        : null
+      if (parent?.isElastic) {
+        canvasStore.expandirPisoParaIncluir(parent, { dimensiones: { ancho: anchoCm, largo: largoCm, alto: altoCm } })
+      } else {
+        const clamped = clampRectToRect(candX, candY, finalWidth, finalHeight, boundary.W, boundary.H)
+        candX = clamped.x
+        candY = clamped.y
+      }
     }
   } else if (boundary.type === 'polygon') {
     // Para elementos circulares, verificar si el círculo está dentro del polígono

@@ -94,6 +94,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     ubicacion: 'suelo',
     descripcion: 'Piso interno de cuarto',
     icono: 'brick',
+    isElastic: false,
     props: { system: true, catalogVisible: true },
   },
 
@@ -401,3 +402,13 @@ export const WEIGHT = {
 // === VERSIONADO DE EXPORT / SCHEMAS ===
 export const EXPORT_FORMAT_VERSION = '1.1.0'
 export const SCHEMA_VERSION_PLANTILLAS = 1
+
+// === CONFIGURACIÓN DE PISO ELÁSTICO ===
+// Dimensiones por defecto en metros para el área sugerida
+export const ELASTIC_FLOOR_DEFAULT_SIZE_M = { width: 10, depth: 10, height: 10 }
+// Proporción de padding alrededor del área sugerida
+export const ELASTIC_FLOOR_DEFAULT_PADDING = 0.25
+// Feature flag principal para habilitar piso elástico
+export const ELASTIC_FLOOR_FEATURE_ENABLED = true
+// Bandera para telemetría/monitoreo de uso del piso elástico
+export const ELASTIC_FLOOR_TELEMETRY = true

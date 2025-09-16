@@ -258,8 +258,23 @@
             ></textarea>
           </div>
 
-          <!-- Dimensiones -->
+          <!-- Piso elástico -->
           <div class="mb-4">
+            <label class="inline-flex items-center text-sm text-gray-700">
+              <input type="checkbox" v-model="formularioPlanta.isElastic" />
+              <span class="ml-2">Piso elástico (∞)</span>
+            </label>
+            <div v-if="formularioPlanta.isElastic" class="mt-2">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Padding ratio</label>
+              <div class="flex items-center gap-2">
+                <input type="range" min="0.1" max="0.4" step="0.01" v-model.number="formularioPlanta.paddingRatio" class="flex-1" />
+                <input type="number" min="0.1" max="0.4" step="0.01" v-model.number="formularioPlanta.paddingRatio" class="w-16 px-2 py-1 border border-gray-300 rounded-lg" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Dimensiones -->
+          <div class="mb-4" v-if="!formularioPlanta.isElastic">
             <label class="block text-sm font-medium text-gray-700 mb-2">Dimensiones (cm)</label>
             <div class="grid grid-cols-3 gap-3">
               <div>
@@ -326,7 +341,7 @@
           </div>
 
           <!-- Peso máximo soportado -->
-          <div class="mb-6">
+          <div class="mb-6" v-if="!formularioPlanta.isElastic">
             <label for="pesoMaximo" class="block text-sm font-medium text-gray-700 mb-2"
               >Peso máximo soportado (kg)</label
             >
@@ -490,7 +505,7 @@ import HistorialModal from './HistorialModal.vue'
 import ImportExportModal from './ImportExportModal.vue'
 import BackupModal from './BackupModal.vue'
 import { usePlantResizeGuard, pack as packShelf } from '@/inventory-smart/composables/usePlantResizeGuard'
-import { CM_TO_PX, MARGIN_CM, FACTOR_UTILIZACION } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, MARGIN_CM, FACTOR_UTILIZACION, ELASTIC_FLOOR_DEFAULT_SIZE_M, ELASTIC_FLOOR_DEFAULT_PADDING } from '@/inventory-smart/utils/constants'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue';
 
 // Store
@@ -529,6 +544,8 @@ const formularioPlanta = ref({
     largo: 1000,
   },
   pesoMaximoSoportado: 3000,
+  isElastic: false,
+  paddingRatio: ELASTIC_FLOOR_DEFAULT_PADDING,
 })
 
 // Guard de redimensionado ligado al estado actual
@@ -551,7 +568,7 @@ const onDimChange = () => {
   dimChangeTimer = setTimeout(() => {
     const { ancho, largo } = formularioPlanta.value.dimensiones || {}
     if (!Number.isFinite(ancho) || !Number.isFinite(largo)) return
-    const res = guard.simulateResize(ancho, largo)
+    const res = guard.simulateResize(ancho, largo, { isElastic: formularioPlanta.value.isElastic })
     if (res.status === 'block') {
       preview.value = {
         status: 'block',
@@ -778,8 +795,35 @@ const guardarPlanta = async () => {
   }
 
   try {
+    if (formularioPlanta.value.isElastic) {
+      const base = ELASTIC_FLOOR_DEFAULT_SIZE_M
+      const dims = {
+        ancho: base.width * 100,
+        largo: base.depth * 100,
+        alto: base.height * 100,
+      }
+      const payload = {
+        nombre: formularioPlanta.value.nombre.trim(),
+        descripcion: formularioPlanta.value.descripcion.trim(),
+        dimensiones: dims,
+        pesoMaximoSoportado: formularioPlanta.value.pesoMaximoSoportado,
+        isElastic: true,
+        paddingRatio: formularioPlanta.value.paddingRatio,
+        suggestedArea: { ...base },
+      }
+      if (mostrarModalEditar.value) {
+        canvasStore.editarPlanta(canvasStore.plantaActiva, payload)
+      } else {
+        const id = canvasStore.agregarPlanta(payload)
+        canvasStore.seleccionarPlanta(id)
+      }
+      cerrarModales()
+      showToast('Planta guardada correctamente', { type: 'success' })
+      return
+    }
+
     const dims = formularioPlanta.value.dimensiones
-    const res = guard.simulateResize(dims.ancho, dims.largo)
+    const res = guard.simulateResize(dims.ancho, dims.largo, { isElastic: false })
 
     if (res.status === 'block') {
       showToast('No es posible reducir: elementos no caben con las nuevas dimensiones', {
@@ -922,6 +966,8 @@ const cerrarModales = () => {
       largo: 1000,
     },
     pesoMaximoSoportado: 3000,
+    isElastic: false,
+    paddingRatio: ELASTIC_FLOOR_DEFAULT_PADDING,
   }
 }
 

@@ -60,12 +60,13 @@ export function insideAreaModel(pos, movingEl, areaBounds, epsPx = 0.5) {
  * @param {number} params.CM_TO_PX
  * @param {number} params.epsPx
  */
-export function isPlacementValid({ pos, movingEl, neighbors = [], areaBounds, CM_TO_PX, epsPx = 0.5 }) {
+export function isPlacementValid({ pos, movingEl, neighbors = [], areaBounds, CM_TO_PX, epsPx = 0.5, parent = null }) {
   void CM_TO_PX
   if (!pos || !movingEl || !areaBounds) return false
 
   // 1) Dentro de área (modelo puro)
-  if (!insideAreaModel(pos, movingEl, areaBounds, epsPx)) return false
+  const outside = !insideAreaModel(pos, movingEl, areaBounds, epsPx)
+  if (outside && !(parent && parent.isElastic)) return false
 
   // 2) Ausencia de conflictos BLOQUEANTES
   const testEl = { ...movingEl, x: pos.x, y: pos.y }

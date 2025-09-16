@@ -35,6 +35,14 @@ export function useTransformer({
   const transformInitialState = new Map()
   const transformState = new Map()
 
+  // Helper para resolver el padre de un elemento
+  const getParent = (el) => {
+    if (!el) return null
+    if (el.padre) return canvasStore.elementoPorId?.(el.padre) || null
+    if (el.plantaId) return canvasStore.plantaPorId?.(el.plantaId) || null
+    return null
+  }
+
   // Helper para verificar si un rectángulo está completamente dentro del polígono
   // Usa intersección de segmentos para detectar si algún borde del rectángulo cruza el polígono
   const isRectCompletelyInPolygon = (x, y, width, height, polygon) => {
@@ -745,6 +753,7 @@ export function useTransformer({
               height: valoresParaValidacion.height
             }
 
+      const parent = getParent(elementoSnapshot)
       const isValidNow = isPlacementValid({
         pos: { x: valoresParaValidacion.x, y: valoresParaValidacion.y },
         movingEl: elementoParaValidacion,
@@ -752,7 +761,18 @@ export function useTransformer({
         areaBounds,
         CM_TO_PX,
         epsPx: 0.5,
+        parent,
       })
+
+      if (isValidNow && parent?.isElastic) {
+        canvasStore.expandirPisoParaIncluir(parent, {
+          ...elementoSnapshot,
+          x: valoresParaValidacion.x,
+          y: valoresParaValidacion.y,
+          width: valoresParaValidacion.width,
+          height: valoresParaValidacion.height,
+        })
+      }
 
       if (!isValidNow) {
         revertTransform(elementId, 'placement validation failed')

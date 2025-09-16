@@ -62,6 +62,14 @@ export function useElementDrag({
   const innerSessions = new Map()
   const throttle2 = throttleEveryNFrames(2)
 
+  // Obtiene la referencia al elemento padre desde el store
+  const getParent = (el) => {
+    if (!el) return null
+    if (el.padre) return canvasStore.elementoPorId?.(el.padre) || null
+    if (el.plantaId) return canvasStore.plantaPorId?.(el.plantaId) || null
+    return null
+  }
+
   // Schedule drawing
   let needsDraw = false
   let rafId = null
@@ -301,6 +309,7 @@ export function useElementDrag({
             ubicacion: elemento.ubicacion || 'suelo',
           }
           const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
+          const parent = getParent(elemento)
           const isOk = isPlacementValid({
             pos: { x: bbox.x, y: bbox.y },
             movingEl: moving,
@@ -308,6 +317,7 @@ export function useElementDrag({
             areaBounds,
             CM_TO_PX,
             epsPx: 0.5,
+            parent,
           })
           const warn = !isOk
           try {
@@ -376,7 +386,8 @@ export function useElementDrag({
           const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
           const activeForValidate = getActiveBounds(canvasStore)
           const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: activeForValidate.polygonPx }
-          return isPlacementValid({ pos, movingEl: elemento, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
+          const parent = getParent(elemento)
+          return isPlacementValid({ pos, movingEl: elemento, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5, parent })
         }
 
         const ctrl = setupRafDrag({
@@ -541,6 +552,7 @@ export function useElementDrag({
             areaBounds,
             CM_TO_PX,
             epsPx: 0.5,
+            parent: getParent(elementoActual),
           })
 
           let finalPosition = { x: solved.x, y: solved.y }
@@ -580,6 +592,7 @@ export function useElementDrag({
               areaBounds,
               CM_TO_PX,
               epsPx: 0.5,
+              parent: getParent(elementoActual),
             })
 
             if (reclampIsValid) {
@@ -681,6 +694,7 @@ export function useElementDrag({
   const active2 = getActiveBounds(canvasStore)
   const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: active2.polygonPx }
         const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
+        const parent = getParent(storeEl)
         const isValidNow = isPlacementValid({
           pos: { x: finalX, y: finalY },
           movingEl: storeEl,
@@ -688,11 +702,15 @@ export function useElementDrag({
           areaBounds,
           CM_TO_PX,
           epsPx: 0.5,
+          parent,
         })
 
         if (isValidNow) {
           const guardRes = onDragEndGuard(storeEl, { x: finalX, y: finalY })
           if (guardRes.valid) {
+            if (parent?.isElastic) {
+              canvasStore.expandirPisoParaIncluir(parent, { ...storeEl, x: finalX, y: finalY })
+            }
             // Persistir posición final con historial
             canvasStore.actualizarPosicion(
               elementId,

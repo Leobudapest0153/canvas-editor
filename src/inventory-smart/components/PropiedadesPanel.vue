@@ -39,6 +39,21 @@
               </div>
             </div>
 
+            <!-- Piso elástico -->
+            <div v-if="esPiso" class="mt-2">
+              <label class="inline-flex items-center text-sm text-gray-600">
+                <input type="checkbox" v-model="edited.isElastic" :disabled="isSaving" />
+                <span class="ml-2">Piso elástico (∞)</span>
+              </label>
+              <div v-if="edited.isElastic" class="mt-2">
+                <label class="block text-xs font-medium text-gray-600 mb-1">Padding ratio</label>
+                <div class="flex items-center gap-2">
+                  <input type="range" min="0.1" max="0.4" step="0.01" v-model.number="edited.paddingRatio" :disabled="isSaving" class="flex-1" />
+                  <input type="number" min="0.1" max="0.4" step="0.01" v-model.number="edited.paddingRatio" :disabled="isSaving" class="w-16 px-2 py-1 border border-gray-300 rounded-md text-sm" />
+                </div>
+              </div>
+            </div>
+
             <!-- Etiquetas -->
             <div>
               <TagFilter
@@ -508,13 +523,17 @@ const guardar = async () => {
     const layerHeight = canvasStore.canvasAdaptativo?.height || 1000
     const areaBounds = { minX: 0, minY: 0, maxX: layerWidth, maxY: layerHeight }
 
+    const parent = elementoSeleccionado.value?.padre
+      ? canvasStore.elementoPorId(elementoSeleccionado.value.padre)
+      : canvasStore.plantaPorId(canvasStore.plantaActiva)
     const isValidPosition = isPlacementValid({
       pos: { x: elementoTemporal.x, y: elementoTemporal.y },
       movingEl: elementoTemporal,
       neighbors,
       areaBounds,
       CM_TO_PX,
-      epsPx: 0.5
+      epsPx: 0.5,
+      parent,
     })
 
     if (!isValidPosition) {
@@ -659,13 +678,17 @@ const ejecutarValidacionDimensiones = () => {
   const layerHeight = canvasStore.canvasAdaptativo?.height || 1000
   const areaBounds = { minX: 0, minY: 0, maxX: layerWidth, maxY: layerHeight }
 
+  const parent = elementoSeleccionado.value?.padre
+    ? canvasStore.elementoPorId(elementoSeleccionado.value.padre)
+    : canvasStore.plantaPorId(canvasStore.plantaActiva)
   const isValidPosition = isPlacementValid({
     pos: { x: elementoTemporal.x, y: elementoTemporal.y },
     movingEl: elementoTemporal,
     neighbors,
     areaBounds,
     CM_TO_PX,
-    epsPx: 0.5
+    epsPx: 0.5,
+    parent,
   })
 
   if (!isValidPosition) {
@@ -793,8 +816,9 @@ const esContenedor = computed(() => {
   return el?.tipo === 'contenedores'
 })
 
-const mostrarCapacidad = computed(() => esEstructura.value || esContenedor.value)
-const mostrarDimensiones = computed(() => true)
+const esPiso = computed(() => (elementoSeleccionado.value?.tipo || '').toLowerCase() === 'pisos')
+const mostrarCapacidad = computed(() => (esEstructura.value || esContenedor.value) && !(esPiso.value && edited.value?.isElastic))
+const mostrarDimensiones = computed(() => !(esPiso.value && edited.value?.isElastic))
 const esCircular = computed(() => (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circular' || (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circle')
 const ocultarAnchoLargo = computed(() => esCircular.value)
 const esPasillo = computed(() => (elementoSeleccionado.value?.tipo || '').toLowerCase() === 'pasillos')

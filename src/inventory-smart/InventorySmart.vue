@@ -330,6 +330,10 @@ onUnmounted(() => {
 .template-drag--invalid {
   outline: 2px dashed red;
 }
+
+/* Overlay visual para pisos elásticos */
+.elastic-floor-outline { outline: 2px dashed rgba(0,0,0,0.25); pointer-events:none; }
+.elastic-floor-label { font-weight:600; font-size:12px; opacity:.75; pointer-events:none; }
 </style>
 
 <style scoped>

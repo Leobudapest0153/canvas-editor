@@ -139,3 +139,24 @@ describe('PlantasPanel - snapshot solo en confirmaciones', () => {
   })
 })
 
+describe('elastic floor helpers', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('computeExpandedAreaM aplica padding correctamente', () => {
+    const store = useCanvasStore()
+    const res = store.computeExpandedAreaM({ width: 10, depth: 10, height: 10 }, 0.25)
+    expect(res.width).toBeCloseTo(15)
+    expect(res.depth).toBeCloseTo(15)
+  })
+
+  it('expandSuggestedAreaIfNeeded aumenta dimensiones si el hijo excede', () => {
+    const store = useCanvasStore()
+    const piso = { suggestedArea: { width: 5, depth: 5, height: 5 } }
+    const changed = store.expandSuggestedAreaIfNeeded(piso, { width: 6, depth: 4, height: 4 })
+    expect(changed).toBe(true)
+    expect(piso.suggestedArea.width).toBe(6)
+  })
+})
+

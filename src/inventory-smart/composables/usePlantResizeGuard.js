@@ -198,6 +198,11 @@ export function pack(elements, bounds, opts = {}) {
  */
 export function usePlantResizeGuard(getDeps) {
   function simulateResize(newW, newH, override) {
+    // Permitir bypass completo cuando la planta es elástica
+    if (override?.isElastic) {
+      return { status: 'ok', reason: 'elastic-floor' }
+    }
+
     const deps = getDeps()
     const cmToPx = (override && override.cmToPx) ?? deps.cmToPx ?? CM_TO_PX
     const gridPx = (override && override.gridSizePx) ?? deps.gridSizePx
