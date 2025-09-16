@@ -1480,17 +1480,22 @@ const getOrientationBarRect = (elemento) => {
 
 // ====== INVENTORY: Etiquetas centradas de elementos ======
 // Calcula las props del <Text> (Konva) para rotular el elemento sin interferir con eventos.
+// Regla: si el elemento es más alto que ancho (h > w), mostramos el texto en vertical (rotado -90°);
+// si no, horizontal. Esto reacciona automáticamente cuando cambian las dimensiones.
 const computeLabelProps = (elemento) => {
-  const w = elemento.width || 0
-  const h = elemento.height || 0
+  const w = Number(elemento.width) || 0
+  const h = Number(elemento.height) || 0
   const minSide = Math.max(0, Math.min(w, h))
-  // Escala base: proporcional al tamaño; límites 10–28px
+  // Escala base: proporcional al tamaño
   const base = Math.min(280, Math.max(100, minSide * 0.22))
-  return {
+
+  // Por defecto: horizontal
+  let cfg = {
     x: 0,
     y: 0,
     width: w,
     height: h,
+    rotation: 0,
     text: elemento.nombre || elemento.tipo || 'Elemento',
     align: 'center',
     verticalAlign: 'middle',
@@ -1503,6 +1508,22 @@ const computeLabelProps = (elemento) => {
     shadowBlur: 2,
     shadowOpacity: 0.6,
   }
+
+  // Si es más alto que ancho, rotar a vertical
+  if (h > w && w > 0 && h > 0) {
+    // Para rotación -90° alrededor del origen (0,0), desplazar en Y por h para mantenerlo dentro del grupo.
+    // Usamos un área de texto con width = h y height = w para un centrado correcto del contenido.
+    cfg = {
+      ...cfg,
+      x: 0,
+      y: h, // desplaza para corregir el origen tras la rotación
+      width: h,
+      height: w,
+      rotation: -90,
+    }
+  }
+
+  return cfg
 }
 
 watch(
