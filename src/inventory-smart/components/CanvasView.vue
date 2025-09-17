@@ -1442,11 +1442,11 @@ const getOrientationBarRect = (elemento) => {
     const margin = 0
     const thick = Math.max(2, 4 / (canvasStore.zoom || 1))
     const color = '#facc15'
-    if (o === 0) {
+    if (o === 180) {
       const width = Math.max(1, w - 2 * margin)
       return { x: margin, y: 0, width, height: thick, fill: color, listening: false, opacity: 0.95 }
     }
-    if (o === 180) {
+    if (o === 0) {
       const width = Math.max(1, w - 2 * margin)
       return { x: margin, y: Math.max(0, h - thick), width, height: thick, fill: color, listening: false, opacity: 0.95 }
     }
