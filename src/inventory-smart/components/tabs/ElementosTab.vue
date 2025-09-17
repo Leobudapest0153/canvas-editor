@@ -14,19 +14,36 @@
             ref="tabElementos"
             class="catalog-tab flex items-center gap-1 px-2 py-0.5 rounded-md text-gray-600 hover:bg-gray-100 text-xs"
             :class="{
-              'is-active': selectedCatalog === 'elementos',
+              'is-active': selectedCatalog === 'elementos' && currentModo === 'espacio',
             }"
             role="tab"
-            :aria-selected="selectedCatalog === 'elementos'"
+            :aria-selected="selectedCatalog === 'elementos' && currentModo === 'espacio'"
             :tabindex="selectedCatalog === 'elementos' ? 0 : -1"
-            @click="selectCatalog('elementos')"
-            @keydown="onTabKeydown($event, 'elementos')"
+            @click="selectEspacios()"
+            @keydown="onTabKeydown($event, 'espacios')"
             @focus="focusedTab = 'elementos'"
             @blur="focusedTab = null"
             aria-label="Catálogo de elementos"
           >
-            <span aria-hidden="true" class="text-sm">📦</span>
             <span class="ml-1">Espacios</span>
+          </button>
+
+          <button
+            ref="tabCuartos"
+            class="catalog-tab flex items-center gap-1 px-2 py-0.5 rounded-md text-gray-600 hover:bg-gray-100 text-xs"
+            :class="{
+              'is-active': selectedCatalog === 'elementos' && currentModo === 'cuarto',
+            }"
+            role="tab"
+            :aria-selected="selectedCatalog === 'elementos' && currentModo === 'cuarto'"
+            :tabindex="selectedCatalog === 'elementos' ? 0 : -1"
+            @click="selectCuartos()"
+            @keydown="onTabKeydown($event, 'cuartos')"
+            @focus="focusedTab = 'cuartos'"
+            @blur="focusedTab = null"
+            aria-label="Catálogo de cuartos"
+          >
+            <span class="ml-1">Cuartos</span>
           </button>
 
           <button
@@ -44,7 +61,6 @@
             @blur="focusedTab = null"
             aria-label="Catálogo de plantillas"
           >
-            <span aria-hidden="true" class="text-sm">📝</span>
             <span class="ml-1">Plantillas</span>
           </button>
         </div>
@@ -58,8 +74,8 @@
           v-model="selectedCatalog"
           aria-label="Catálogo"
         >
-          <option value="elementos">📦 Catálogo de Elementos</option>
-          <option value="plantillas">📝 Catálogo de Plantillas</option>
+          <option value="elementos">Catálogo de elementos</option>
+          <option value="plantillas">Catálogo de plantillas</option>
         </select>
       </div>
     </div>
@@ -69,7 +85,7 @@
       v-if="selectedCatalog === 'elementos'"
       class="flex-1 overflow-hidden"
     >
-      <ElementosCatalogo />
+  <ElementosCatalogo :modo="currentModo" />
     </div>
     <div
       v-else
@@ -263,7 +279,11 @@ const confirmDialog = useConfirmDialog()
 
 const focusedTab = ref(null)
 const tabElementos = ref(null)
+const tabCuartos = ref(null)
 const tabPlantillas = ref(null)
+
+// Modo actual del catálogo de elementos: 'espacio' | 'cuarto'
+const currentModo = ref('espacio')
 
 // Estado de menú contextual de plantillas
 const ctxMenu = ref({ visible: false, x: 0, y: 0, template: null })
@@ -312,19 +332,43 @@ const selectCatalog = (value) => {
 }
 
 const onTabKeydown = (e, current) => {
-  const order = ['elementos', 'plantillas']
+  // current puede ser 'espacios' | 'cuartos' | 'plantillas'
+  const order = ['espacios', 'cuartos', 'plantillas']
   const idx = order.indexOf(current)
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
     e.preventDefault()
     const dir = e.key === 'ArrowRight' ? 1 : -1
     const next = order[(idx + dir + order.length) % order.length]
-    selectCatalog(next)
-    const refMap = { elementos: tabElementos, plantillas: tabPlantillas }
+    if (next === 'plantillas') {
+      selectCatalog('plantillas')
+    } else {
+      selectCatalog('elementos')
+      currentModo.value = next === 'espacios' ? 'espacio' : 'cuarto'
+    }
+    const refMap = { espacios: tabElementos, cuartos: tabCuartos, plantillas: tabPlantillas }
     refMap[next].value?.focus()
   } else if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault()
-    selectCatalog(current)
+    if (current === 'plantillas') {
+      selectCatalog('plantillas')
+    } else if (current === 'espacios') {
+      selectCatalog('elementos')
+      currentModo.value = 'espacio'
+    } else if (current === 'cuartos') {
+      selectCatalog('elementos')
+      currentModo.value = 'cuarto'
+    }
   }
+}
+
+const selectEspacios = () => {
+  currentModo.value = 'espacio'
+  if (selectedCatalog.value !== 'elementos') selectCatalog('elementos')
+}
+
+const selectCuartos = () => {
+  currentModo.value = 'cuarto'
+  if (selectedCatalog.value !== 'elementos') selectCatalog('elementos')
 }
 
 onMounted(() => {
