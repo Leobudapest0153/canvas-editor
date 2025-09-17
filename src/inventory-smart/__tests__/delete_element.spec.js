@@ -4,6 +4,8 @@ import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useCanvasHistory } from '@/inventory-smart/composables/useCanvasHistory'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
+import { config } from '@vue/test-utils'
+import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 
 const addElement = (store, el) => {
   store.elementos.push({
@@ -27,6 +29,9 @@ describe('deleteSelected', () => {
     setActivePinia(createPinia())
     vi.unstubAllGlobals()
     if (typeof window !== 'undefined') window.__dvCanvasDragActive = false
+    // Reiniciar mock de toasts en cada test
+    const toastMock = { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 }
+    config.global.provide = { ...(config.global.provide || {}), [ToastSymbol]: toastMock }
   })
 
   it('(a) elimina elemento simple y empuja snapshot', async () => {
@@ -162,10 +167,8 @@ describe('deleteSelected', () => {
     history.initializeHistory('pre')
     const hBefore = history.historySize.value
 
-    const toasts = { show: vi.fn() }
-    // stub toasts
-    globalThis.window = globalThis.window || {}
-    globalThis.window.__toasts = toasts
+  // usar mock global configurado
+  const toasts = config.global.provide[ToastSymbol]
 
     const ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(false)
@@ -187,8 +190,8 @@ describe('deleteSelected', () => {
     history.initializeHistory('pre')
 
     // Primero intenta y bloquea
-    globalThis.window = globalThis.window || {}
-    globalThis.window.__toasts = { show: vi.fn() }
+  // mock ya está en provide; solo accedemos para expectativas si queremos
+  const toastApi = config.global.provide[ToastSymbol]
     let ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(false)
 
@@ -221,9 +224,7 @@ describe('deleteSelected', () => {
     history.initializeHistory('pre')
     const hBefore = history.historySize.value
 
-    const toasts = { show: vi.fn() }
-    globalThis.window = globalThis.window || {}
-    globalThis.window.__toasts = toasts
+  const toasts = config.global.provide[ToastSymbol]
 
     const ok = await deleteSelected({ withConfirm: true })
     expect(ok).toBe(false)
@@ -251,9 +252,7 @@ describe('deleteSelected', () => {
     history.initializeHistory('pre')
 
     // Stub de toasts para capturar opciones
-    const showSpy = vi.fn()
-    globalThis.window = globalThis.window || {}
-    globalThis.window.__toasts = { show: showSpy }
+  const showSpy = config.global.provide[ToastSymbol].show
 
     // Confirmación positiva
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)

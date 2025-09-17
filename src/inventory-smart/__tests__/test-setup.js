@@ -30,3 +30,16 @@ if (typeof globalThis !== 'undefined') {
   // @ts-ignore
   globalThis.ResizeObserver = ResizeObserver
 }
+
+// Proveer mock de servicio de toasts por defecto para pruebas
+import { ToastSymbol } from '@/inventory-smart/plugins/toast'
+config.global.provide = {
+  ...(config.global.provide || {}),
+  [ToastSymbol]: {
+    toasts: { value: [] },
+    show: vi.fn(),
+    remove: vi.fn(),
+    clearAll: vi.fn(),
+    maxToasts: 5,
+  },
+}

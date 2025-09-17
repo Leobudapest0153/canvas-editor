@@ -1,16 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, config } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import CanvasView from '@/inventory-smart/components/CanvasView.vue'
 import ElementEditor from '@/inventory-smart/components/modals/ElementEditor.vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { errorsPlacement } from '@/inventory-smart/validation/placementOrchestrator'
+import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 
 describe('wall placement integration', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    globalThis.window = globalThis.window || {}
-    window.__toasts = { show: vi.fn() }
+    const toastMock = { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 }
+    config.global.provide = { ...(config.global.provide || {}), [ToastSymbol]: toastMock }
   })
 
   it('reverts drop that exceeds warehouse height and skips history', () => {
@@ -55,7 +56,7 @@ describe('wall placement integration', () => {
 
     expect(shape.position()).toEqual({ x: 0, y: 0 })
     expect(spy).not.toHaveBeenCalled()
-    expect(window.__toasts.show).toHaveBeenCalledWith(
+    expect(config.global.provide[ToastSymbol].show).toHaveBeenCalledWith(
       errorsPlacement.HEIGHT_EXCEEDS_WAREHOUSE,
       { type: 'error' },
     )
@@ -137,7 +138,7 @@ describe('wall placement integration', () => {
 
     expect(shape.position()).toEqual({ x: 0, y: 0 })
     expect(spy).not.toHaveBeenCalled()
-    expect(window.__toasts.show).toHaveBeenCalledWith(
+    expect(config.global.provide[ToastSymbol].show).toHaveBeenCalledWith(
       errorsPlacement.ZBASE_REQUIRED,
       { type: 'error' },
     )

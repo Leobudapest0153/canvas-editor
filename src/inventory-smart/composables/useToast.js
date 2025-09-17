@@ -1,155 +1,52 @@
 /**
  * useToast.js
- * 
- * Composable para mostrar notificaciones toast del sistema con límite de 5 toasts simultáneos
+ * Composable para consumir el servicio global de toasts.
  */
 
-// Cola global para gestionar los toasts activos (máximo 5)
-const toastQueue = []
-const MAX_TOASTS = 5
+import { getCurrentInstance, inject } from 'vue'
 
 export function useToast() {
-  const manageToastQueue = () => {
-    // Contar toasts reales en el DOM para sincronizar
-    const realToasts = document.querySelectorAll('.vue-notification, .notification, .toast, [role="alert"]')
-    
-    // Si hay más de 5 toasts reales, eliminar los más antiguos del DOM directamente
-    if (realToasts.length >= MAX_TOASTS) {
-      const toastsToRemove = Math.max(0, realToasts.length - MAX_TOASTS + 1)
-      
-      for (let i = 0; i < toastsToRemove; i++) {
-        const oldestToast = realToasts[i]
-        if (oldestToast) {
-          try {
-            // Intentar cerrar con animación si es posible
-            const closeButton = oldestToast.querySelector('button[type="button"], .close, [aria-label*="close"], [aria-label*="cerrar"]')
-            if (closeButton) {
-              closeButton.click()
-            } else {
-              // Remover directamente del DOM
-              oldestToast.remove()
-            }
-            
-            // Remover de nuestra cola también
-            const toastId = oldestToast.getAttribute('data-toast-id') || 
-                           oldestToast.getAttribute('id') || 
-                           oldestToast.textContent?.substring(0, 20)
-            
-            if (toastId) {
-              const index = toastQueue.findIndex(toast => 
-                toast.id === toastId || toast.element === oldestToast
-              )
-              if (index > -1) {
-                toastQueue.splice(index, 1)
-              }
-            }
-          } catch (e) {
-            void e
-          }
-        }
-      }
-    }
-  }
+  // Preferir inject en composición
+  let toastApi = null
 
-  const removeFromQueue = (toastId) => {
-    const index = toastQueue.findIndex(toast => toast.id === toastId)
-    if (index > -1) {
-      toastQueue.splice(index, 1)
-    }
+  // Fallback: acceder por this.$toast si es Options API o fuera del árbol
+  if (!toastApi) {
+    const inst = getCurrentInstance()
+    toastApi = inst?.appContext?.config?.globalProperties?.$toast ?? null
   }
 
   const showToast = (message, type = 'error', options = {}) => {
-    if (typeof window !== 'undefined' && window.__toasts) {
-      // Generar ID único para este toast
-      const toastId = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      
-      // Gestionar la cola ANTES de crear el nuevo toast
-      manageToastQueue()
-      
-      // Configurar opciones con callbacks para gestionar la cola
-      const toastOptions = { 
-        type, 
-        timeout: options.timeout || 4000,
-        cta: options.cta || null,
-        id: toastId,
-        onDismiss: () => {
-          removeFromQueue(toastId)
-          if (options.onDismiss) {
-            options.onDismiss()
-          }
-        }
-      }
-      
-      // Mostrar el toast
-      const result = window.__toasts.show(message, toastOptions)
-      
-      // Agregar a nuestra cola después de crearlo
-      setTimeout(() => {
-        const toastElements = document.querySelectorAll('.vue-notification, .notification, .toast, [role="alert"]')
-        const newestToast = toastElements[toastElements.length - 1]
-        
-        toastQueue.push({
-          id: toastId,
-          timestamp: Date.now(),
-          element: newestToast,
-          message: message.substring(0, 20) // Para identificación
-        })
-      }, 100)
-      
-      return result || toastId
-    } else {
-      console.warn('Toast:', message)
+    if (!toastApi || typeof toastApi.show !== 'function') {
+      console.warn('[toast] servicio no disponible:', message)
       return null
     }
-  }
-
-  const showSuccess = (message, options = {}) => {
-    return showToast(message, 'success', options)
-  }
-
-  const showWarning = (message, options = {}) => {
-    return showToast(message, 'warn', options)
-  }
-
-  const showError = (message, options = {}) => {
-    return showToast(message, 'error', options)
-  }
-
-  const showInfo = (message, options = {}) => {
-    return showToast(message, 'info', options)
-  }
-
-  // Función para obtener información de la cola (útil para debugging)
-  const getQueueInfo = () => {
-    const realToasts = document.querySelectorAll('.vue-notification, .notification, .toast, [role="alert"]')
-    
-    return {
-      queueCount: toastQueue.length,
-      domCount: realToasts.length,
-      maxToasts: MAX_TOASTS,
-      toasts: toastQueue.map(t => ({ 
-        id: t.id, 
-        age: Date.now() - t.timestamp,
-        message: t.message 
-      }))
+    const opts = {
+      type,
+      timeout: options.timeout ?? 4000,
+      cta: options.cta ?? null,
+      id: options.id,
+      onDismiss: options.onDismiss,
     }
+    return toastApi.show(message, opts)
   }
 
-  // Función para limpiar manualmente todos los toasts
-  const clearAllToasts = () => {
-    const toastsToRemove = [...toastQueue]
-    toastQueue.length = 0
-    
-    toastsToRemove.forEach(toast => {
-      try {
-        if (typeof window !== 'undefined' && window.__toasts && window.__toasts.remove) {
-          window.__toasts.remove(toast.id)
-        }
-      } catch (e) {
-        void e
-      }
-    })
-  }
+  const showSuccess = (message, options = {}) => showToast(message, 'success', options)
+  const showWarning = (message, options = {}) => showToast(message, 'warn', options)
+  const showError = (message, options = {}) => showToast(message, 'error', options)
+  const showInfo = (message, options = {}) => showToast(message, 'info', options)
+
+  const clearAllToasts = () => toastApi?.clearAll?.()
+  const removeToast = (id) => toastApi?.remove?.(id)
+  const getQueueInfo = () => ({
+    queueCount: toastApi?.toasts?.value?.length ?? 0,
+    domCount: toastApi?.toasts?.value?.length ?? 0,
+    maxToasts: toastApi?.maxToasts ?? 5,
+    toasts: (toastApi?.toasts?.value ?? []).map((t) => ({
+      id: t.id,
+      age: Date.now() - (t.timestamp || Date.now()),
+      message: String(t.message).substring(0, 20),
+    })),
+  })
 
   return {
     showToast,
@@ -157,7 +54,8 @@ export function useToast() {
     showWarning,
     showError,
     showInfo,
+    clearAllToasts,
+    removeToast,
     getQueueInfo,
-    clearAllToasts
   }
 }

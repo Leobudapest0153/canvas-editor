@@ -40,7 +40,7 @@ onMounted(() => {
   if (savedConfig) {
     try {
       initialConfig.value = savedConfig
-      console.log('Configuración inicial cargada desde localStorage:', initialConfig.value)
+      console.log('Configuración inicial cargada desde localStorage')
     } catch (error) {
       console.error('Error al parsear la configuración guardada:', error)
     }

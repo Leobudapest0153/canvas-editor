@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { shallowMount } from '@vue/test-utils'
+import { shallowMount, config } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import PlantasPanel from '@/inventory-smart/components/PlantasPanel.vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 
 const makeEl = (id, w, h, x, y, opts = {}) => ({
   id,
@@ -20,8 +21,8 @@ const makeEl = (id, w, h, x, y, opts = {}) => ({
 describe('Post-apply validation pass en redimensionado de planta', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    globalThis.window = globalThis.window || {}
-    window.__toasts = { show: vi.fn() }
+    const toastMock = { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 }
+    config.global.provide = { ...(config.global.provide || {}), [ToastSymbol]: toastMock }
   })
 
   it('(1) elemento en esquina que queda fuera tras reducir termina dentro automáticamente', () => {
@@ -50,7 +51,7 @@ describe('Post-apply validation pass en redimensionado de planta', () => {
     expect(el.y + el.height).toBeLessThanOrEqual(200 - 5 + 1e-6)
 
     // Toast warning y snapshot post-apply
-    expect(window.__toasts.show).toHaveBeenCalled()
+  expect(config.global.provide[ToastSymbol].show).toHaveBeenCalled()
   })
 
   it('(2) ok-but-out-of-bounds se convierte en auto_adjust', () => {
@@ -108,7 +109,7 @@ describe('Post-apply validation pass en redimensionado de planta', () => {
     expect(planta.dimensiones.largo).toBe(300)
 
     // Toast error
-    expect(window.__toasts.show).toHaveBeenCalled()
+  expect(config.global.provide[ToastSymbol].show).toHaveBeenCalled()
   })
 })
 

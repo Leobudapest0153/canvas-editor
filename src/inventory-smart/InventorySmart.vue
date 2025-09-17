@@ -103,14 +103,38 @@ const replaceNoticeMessage = computed(() => {
   }
 })
 
-const applyPendingServerConfig = () => {
+// Limpia las copias de seguridad locales (autosave)
+const clearLocalBackups = async () => {
+  try {
+    // Reutilizar instancia de autosave si está registrada en el store
+    const auto = canvasStore?.autoSaveInstance
+    const instance = auto && ('value' in auto ? auto.value : auto)
+    if (instance?.clearAllBackups) {
+      await instance.clearAllBackups()
+    } else {
+      // Fallback a localStorage por compatibilidad
+      localStorage.removeItem(AUTOSAVE_CONFIG.STORAGE_KEY)
+    }
+    console.log('🧹 Copias de seguridad locales eliminadas')
+  } catch (e) {
+    console.warn('No se pudieron limpiar los backups locales', e)
+  }
+}
+
+const applyPendingServerConfig = async () => {
   if (!pendingServerConfig) {
     showReplaceNotice.value = false
     return
   }
   try {
     showToast('Aplicando configuración del servidor…', 'info')
-    canvasStore.deserialize(pendingServerConfig)
+    // Al aplicar servidor, limpiar backups locales
+    await clearLocalBackups()
+    const ok = canvasStore.deserialize(pendingServerConfig)
+    if (ok) {
+      // Notificar al padre que la configuración aplicada proviene del servidor
+      emit('configUpdated', pendingServerConfig)
+    }
   } finally {
     pendingServerConfig = null
     showReplaceNotice.value = false
@@ -253,7 +277,7 @@ onUnmounted(() => {
 
 watch(
   () => props.configCanvas,
-  (newConfig) => {
+  async (newConfig) => {
     try {
       // Si no se provee una configuracion inicial
       if (!newConfig) {
@@ -286,11 +310,8 @@ watch(
             `Se restauró la copia de seguridad local más reciente (${fmtDate(latestBackup.timestamp)}).`,
             'info',
           )
-          // Notificar al padre la nueva config aplicada (opcional pero útil para sincronía)
-          emit('configUpdated', latestBackup.data)
           return
         }
-        // Si falló, continuar con la del servidor
       }
 
       // 2) Si el servidor es más reciente que el backup local -> solo avisar y aplicar servidor
@@ -300,8 +321,9 @@ watch(
         return
       }
 
-      // 3) Caso por defecto: aplicar servidor
+  // 3) Caso por defecto: aplicar servidor (y limpiar backups locales)
       showToast('Iniciando área de trabajo', 'info' )
+      await clearLocalBackups()
       canvasStore.deserialize(newConfig)
     } catch (error) {
       showToast('Ha ocurrido un error al importar la configuración', 'error')

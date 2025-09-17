@@ -60,7 +60,7 @@
             <UiTooltip
               class="relative ml-2"
               label="Opciones de planta"
-              :delay="200"
+              :delay="500"
               position="left"
             >
               <button
@@ -500,6 +500,8 @@ const { showToast } = useToast()
 
 // Autosave
 const autoSave = useAutoSave(canvasStore)
+// Registrar instancia en el store para uso global (evita duplicar lógica de backups)
+canvasStore.setAutoSaveInstance?.(autoSave)
 
 // Estado local para modales
 const showHistorialModal = ref(false)

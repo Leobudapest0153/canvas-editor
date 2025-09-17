@@ -411,7 +411,7 @@ export const AUTOSAVE_CONFIG = {
 }
 
 export const SERIALIZE_CONFIG = {
-  STORAGE_KEY: 'SERIALIZE_CONFIG.STORAGE_KEY',
+  STORAGE_KEY: 'canvas_data',
 }
 
 // === POLÍTICAS DE DIMENSIONES (escalado por eje) ===

@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, config } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import * as orchestrator from '@/inventory-smart/validation/placementOrchestrator'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { errorsPlacement } from '@/inventory-smart/validation/placementOrchestrator'
+import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 import { usePlacementGuards } from '@/inventory-smart/composables/usePlacementGuards'
 
 let CanvasView
@@ -44,8 +45,8 @@ const makeShapeStub = (x, y) => {
 describe('coplanar hard clamp', () => {
   beforeEach(async () => {
     setActivePinia(createPinia())
-    globalThis.window = globalThis.window || {}
-    window.__toasts = { show: vi.fn() }
+    const toastMock = { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 }
+    config.global.provide = { ...(config.global.provide || {}), [ToastSymbol]: toastMock }
     CanvasView = null
   })
 
@@ -67,7 +68,7 @@ describe('coplanar hard clamp', () => {
       { revert: () => shape.position({ x: 60, y: 0 }) },
     )
     expect(shape.position().x).toBe(50)
-    expect(window.__toasts.show).not.toHaveBeenCalled()
+  expect(config.global.provide[ToastSymbol].show).not.toHaveBeenCalled()
   })
 
   it('pared-pared coplanar: clamp evita solape', async () => {
@@ -88,7 +89,7 @@ describe('coplanar hard clamp', () => {
       { revert: () => shape.position({ x: 60, y: 0 }) },
     )
     expect(shape.position().x).toBe(50)
-    expect(window.__toasts.show).not.toHaveBeenCalled()
+  expect(config.global.provide[ToastSymbol].show).not.toHaveBeenCalled()
   })
 
   it('alturas diferentes: sin clamp en vivo y Z-stacking revierte', async () => {
@@ -109,7 +110,7 @@ describe('coplanar hard clamp', () => {
       { revert: () => shape.position({ x: 60, y: 0 }) },
     )
     expect(shape.position().x).toBe(60)
-    expect(window.__toasts.show).toHaveBeenCalledWith(
+    expect(config.global.provide[ToastSymbol].show).toHaveBeenCalledWith(
       errorsPlacement.Z_STACK_CONFLICT,
       { type: 'error' },
     )
