@@ -649,25 +649,42 @@ const esFormularioValido = computed(() => {
 // Helpers para cálculo/validación de niveles
 const autoCompletarDimensionesNiveles = () => {
   const total = pisosNiveles.value.length || 1
-  const largoG = Number(dimensiones.value.largo)
-  const anchoG = Number(dimensiones.value.ancho)
-  const altoG = Number(dimensiones.value.alto)
-  const capG = Number(dimensiones.value.capacidadCarga)
+  const largoG = Number(dimensiones.value.largo) || 0
+  const anchoG = Number(dimensiones.value.ancho) || 0
+  const altoG = Number(dimensiones.value.alto) || 0
+  const capG = Number(dimensiones.value.capacidadCarga) || 0
 
-  const altoPorNivel = altoG / total
-  const capPorNivel = capG / total
-
+  // Nombre por defecto y largo/ancho por defecto (si no se definieron)
   pisosNiveles.value.forEach((p, idx) => {
-    // Nombre por defecto
     const pref = props.tipo === 'cuarto' ? 'Piso' : 'Nivel'
     if (!p.nombre || !p.nombre.trim()) p.nombre = `${pref} ${idx + 1}`
-    // Largo/Ancho toman los del cuarto/espacio si no se definieron
-    if (!(p.largo > 0)) p.largo = largoG
-    if (!(p.ancho > 0)) p.ancho = anchoG
-    // Alto y capacidad de carga proporcionales al total de niveles
-    if (!(p.alto > 0)) p.alto = altoPorNivel
-    if (!(p.capacidadCarga > 0)) p.capacidadCarga = capPorNivel
+    if (!(Number(p.largo) > 0)) p.largo = largoG
+    if (!(Number(p.ancho) > 0)) p.ancho = anchoG
   })
+
+  // Distribución de alto: los definidos se respetan, los no definidos se reparten del remanente
+  let sumaAltoDefinido = 0
+  const nivelesAltoNoDef = []
+  pisosNiveles.value.forEach((p) => {
+    const a = Number(p.alto)
+    if (a > 0) sumaAltoDefinido += a
+    else nivelesAltoNoDef.push(p)
+  })
+  const remAlto = Math.max(altoG - sumaAltoDefinido, 0)
+  const cuotaAlto = nivelesAltoNoDef.length > 0 ? remAlto / nivelesAltoNoDef.length : 0
+  nivelesAltoNoDef.forEach((p) => { p.alto = cuotaAlto })
+
+  // Distribución de capacidad de carga: mismo criterio que alto
+  let sumaCapDefinida = 0
+  const nivelesCapNoDef = []
+  pisosNiveles.value.forEach((p) => {
+    const c = Number(p.capacidadCarga)
+    if (c > 0) sumaCapDefinida += c
+    else nivelesCapNoDef.push(p)
+  })
+  const remCap = Math.max(capG - sumaCapDefinida, 0)
+  const cuotaCap = nivelesCapNoDef.length > 0 ? remCap / nivelesCapNoDef.length : 0
+  nivelesCapNoDef.forEach((p) => { p.capacidadCarga = cuotaCap })
 }
 
 const validarNivelesContraGlobal = () => {

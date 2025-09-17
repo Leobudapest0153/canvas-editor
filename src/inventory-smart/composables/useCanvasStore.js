@@ -877,6 +877,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         tipo: tipoElemento,
         categoria,
         forma: dimensiones.forma,
+        orientacion: datosGenerales.orientacion,
         colorBase,
         dimensiones: dimsCm,
         pesoMaximo: Number(dimensiones.capacidadCarga) || 0,
@@ -885,7 +886,6 @@ export const useCanvasStore = defineStore('canvas', () => {
         icono,
         props: { system: true, catalogVisible: true },
         meta: {
-          orientacion: datosGenerales.orientacion,
           niveles: pisosNiveles.map((p, idx) => ({
             index: idx + 1,
             nombre: p.nombre,
