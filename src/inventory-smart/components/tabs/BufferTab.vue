@@ -183,22 +183,15 @@ const handleRemove = (bufferItemId) => {
 
 // Drag & Drop
 const handleDragStart = (event, item) => {
-  console.log('🔄 handleDragStart llamado con item:', item)
   isDragging.value = true
-
   // Configurar datos de drag
   const dragData = {
     tipo: 'buffer-element',
     bufferItemId: item.id,
     elemento: item.elemento,
   }
-
-  console.log('🔄 dragData creado:', dragData)
-
   event.dataTransfer.setData('application/json', JSON.stringify(dragData))
   event.dataTransfer.effectAllowed = 'all'
-
-  console.log('🔄 Iniciando drag desde buffer:', item.elemento.nombre)
 }
 
 const handleDragEnd = () => {
