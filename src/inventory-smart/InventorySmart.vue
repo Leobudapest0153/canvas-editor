@@ -38,9 +38,9 @@
     <ConfirmReplaceModal
       :mostrar="showReplaceNotice"
       modo="notice"
-      tipo="danger"
-      titulo="Configuración más reciente del servidor"
-      :mensaje="replaceNoticeMessage"
+      tipo="info"
+      titulo="Se detectaron cambios en el servidor"
+      mensaje="Para evitar conflictos, se descartarán los cambios locales que tenías sin guardar y se aplicará la configuración más reciente del servidor."
       :closeOnBackdrop="true"
       @confirmar="applyPendingServerConfig"
       @cerrar="applyPendingServerConfig"
@@ -88,27 +88,18 @@ const { showToast } = useToast()
 // Estado del modal de aviso de reemplazo por servidor
 const showReplaceNotice = ref(false)
 let pendingServerConfig = null
-const replaceNoticeMessage = computed(() => {
-  if (!pendingServerConfig) return 'Se aplicará la configuración del servidor. Se descartarán los cambios locales.'
-  try {
-    const d = JSON.parse(pendingServerConfig)
-    const ts = d?.meta?.timestamp
-    const when = ts ? new Date(ts).toLocaleString('es-ES') : 'reciente'
-    return (
-      `Se detectó una configuración más reciente del servidor (${when}).\n` +
-      'Se aplicará esta configuración y se descartarán los cambios locales para evitar conflictos con nuevas validaciones (por ejemplo, uso de contenedores).'
-    )
-  } catch {
-    return 'Se aplicará la configuración más reciente del servidor y se descartarán los cambios locales.'
-  }
-})
+
+// Helper: obtener la instancia de autosave registrada en el store
+const getAutoSaveInstance = () => {
+  const auto = canvasStore?.autoSaveInstance
+  return auto && ('value' in auto ? auto.value : auto)
+}
 
 // Limpia las copias de seguridad locales (autosave)
 const clearLocalBackups = async () => {
   try {
     // Reutilizar instancia de autosave si está registrada en el store
-    const auto = canvasStore?.autoSaveInstance
-    const instance = auto && ('value' in auto ? auto.value : auto)
+    const instance = getAutoSaveInstance()
     if (instance?.clearAllBackups) {
       await instance.clearAllBackups()
     } else {
@@ -128,13 +119,19 @@ const applyPendingServerConfig = async () => {
   }
   try {
     showToast('Aplicando configuración del servidor…', 'info')
+    const instance = getAutoSaveInstance()
+    const wasEnabled = instance?.isEnabled?.value === true
+    // Pausar autosave si aplica
+    instance?.stopAutoSave?.()
     // Al aplicar servidor, limpiar backups locales
     await clearLocalBackups()
     const ok = canvasStore.deserialize(pendingServerConfig)
-    if (ok) {
-      // Notificar al padre que la configuración aplicada proviene del servidor
-      emit('configUpdated', pendingServerConfig)
+    // Crear un backup inmediato del estado aplicado
+    if (ok && instance?.performBackup) {
+      await instance.performBackup()
     }
+    // Reanudar autosave si estaba activo
+    if (wasEnabled) instance?.startAutoSave?.()
   } finally {
     pendingServerConfig = null
     showReplaceNotice.value = false
@@ -255,7 +252,14 @@ const getLatestLocalBackup = () => {
 
 const fmtDate = (iso) => {
   try {
-    return new Date(iso).toLocaleString('es-ES')
+    return new Date(iso).toLocaleString('es-ES', {
+      hour12: true,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   } catch {
     return iso || ''
   }
@@ -289,7 +293,7 @@ watch(
         return
       }
 
-      // Validar la prop con validarJSON de useCanvasImportExport
+      // Validar la prop
       const isValid = validarJSON(newConfig)
       if (!isValid) {
         showToast('La configuración importada no es válida', 'error')
@@ -301,8 +305,7 @@ watch(
       const latestBackup = getLatestLocalBackup()
       const backupTs = latestBackup?.ts ?? null
 
-      // Decisión:
-      // 1) Si hay backup y es más reciente que el servidor -> restaurar backup automáticamente
+      // Si hay backup y es más reciente que el servidor -> restaurar backup automáticamente
       if (latestBackup && backupTs && (!serverTs || backupTs > serverTs)) {
         const restored = canvasStore.deserialize(latestBackup.data)
         if (restored) {
@@ -314,17 +317,25 @@ watch(
         }
       }
 
-      // 2) Si el servidor es más reciente que el backup local -> solo avisar y aplicar servidor
+      // Si el servidor es más reciente que el backup local -> solo avisar y aplicar servidor
       if (serverTs && latestBackup && backupTs && serverTs > backupTs) {
         pendingServerConfig = newConfig
         showReplaceNotice.value = true
         return
       }
 
-  // 3) Caso por defecto: aplicar servidor (y limpiar backups locales)
+      // Caso por defecto: aplicar servidor (y limpiar backups locales)
       showToast('Iniciando área de trabajo', 'info' )
+      const instance = getAutoSaveInstance()
+      const wasEnabled = instance?.isEnabled?.value === true
+      instance?.stopAutoSave?.()
       await clearLocalBackups()
-      canvasStore.deserialize(newConfig)
+      const ok = canvasStore.deserialize(newConfig)
+      // Crear un backup inmediato del estado del servidor
+      if (ok && instance?.performBackup) {
+        await instance.performBackup()
+      }
+      if (wasEnabled) instance?.startAutoSave?.()
     } catch (error) {
       showToast('Ha ocurrido un error al importar la configuración', 'error')
       console.error('Error al importar la configuración:', error)
@@ -406,7 +417,7 @@ watch(
   border: 1px solid var(--ui-border-dark);
 }
 
-/* ====== INVENTORY: Estilos para el conmutador de Catálogo (Elementos | Plantillas) ======
+/* ====== Estilos para el conmutador de Catálogo (Elementos | Plantillas) ======
    Contexto: pestaña Elementos — controla catálogo visible.
    NOTA: no mover ni duplicar en otros archivos. Mantener aquí.
 ======================================================================================== */

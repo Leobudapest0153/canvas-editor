@@ -8,8 +8,8 @@
             <svg v-if="tipo === 'danger'" class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
-            <svg v-else class="w-6 h-6 text-primary-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-              <path fill="currentColor" d="M11 21q-1.85 0-3.488-.712t-2.85-1.925t-1.925-2.85T2 12t.712-3.513t1.925-2.85t2.85-1.925T11 3q2.975 0 5.162 1.725T19.65 9H18q-.425 0-.712.288T17 10t.288.713T18 11h3q.425 0 .713-.288T22 10V7q0-.425-.288-.712T21 6t-.713.288T20 7v1.35q-1.275-1.6-3.113-2.475T11 5q-2.9 0-4.95 2.05T4 12t2.05 4.95T11 19q2.525 0 4.462-1.55T18 14q0-.425-.288-.712T17 13t-.712.288T16 14q0 1.675-1.163 2.838T11 18" />
+            <svg v-else class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
           <div>
@@ -76,10 +76,10 @@ const confirmBtnClass = computed(() => {
   const base = 'px-4 py-2 rounded-lg text-white font-medium cursor-pointer transition-colors'
   return props.tipo === 'danger'
     ? `${base} bg-red-600 hover:bg-red-700`
-    : `${base} bg-primary hover:bg-primary-200`
+    : `${base} bg-primary hover:bg-primary-800`
 })
 const confirmarTextoComputed = computed(() => {
-  if (props.modo === 'notice') return 'Entendido'
+  if (props.modo === 'notice') return 'Aceptar'
   return props.confirmarTexto || 'Confirmar'
 })
 

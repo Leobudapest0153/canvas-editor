@@ -604,7 +604,7 @@ const closeBackupModal = () => {
   showBackupModal.value = false
 }
 
-const guardarCambios = () => {
+const guardarCambios = async () => {
   try {
     // Serializar el estado actual del canvas
     const configSerializada = canvasStore.serialize()
@@ -612,10 +612,25 @@ const guardarCambios = () => {
     // Emitir el evento al componente padre con la configuración serializada
     emit('configChanged', configSerializada)
 
+    // Reiniciar copias de seguridad: detener autosave, limpiar y crear una nueva copia desde el estado actual
+    try {
+      const wasEnabled = autoSave?.isEnabled?.value === true
+      // Pausar autosave para evitar carreras
+      autoSave?.stopAutoSave?.()
+      // Limpiar todas las copias previas
+      await autoSave?.clearAllBackups?.()
+      // Crear un backup fresco con la configuración actual
+      await autoSave?.performBackup?.()
+      // Reanudar autosave si estaba activo
+      if (wasEnabled) autoSave?.startAutoSave?.()
+    } catch (e) {
+      console.warn('No se pudo reiniciar las copias de seguridad tras guardar', e)
+    }
+
     // Mostrar mensaje de éxito
     showToast('Cambios guardados correctamente', 'success')
 
-    console.log('Configuración del canvas serializada y emitida al componente padre')
+    console.log('Configuración del canvas serializada, emitida y backups reiniciados')
   } catch (error) {
     console.error('Error al guardar cambios:', error)
     showToast('Error al guardar los cambios', 'error')
