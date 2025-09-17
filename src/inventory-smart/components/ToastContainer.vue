@@ -40,6 +40,7 @@ function handleCta(t) {
 .toast {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   padding: 10px 12px;
   background: #111827;
