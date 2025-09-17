@@ -141,6 +141,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     escala: 1,
   })
 
+  // Edición de pisos (cuartos) desde las propiedades
+  const gestionPisosPropiedadesModal = ref(false);
+
   // Getters
   const elementosVisibles = computed(() => {
     const t = contextoNavegacion.value.tipo
@@ -1154,6 +1157,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     plantaEnEdicion.value = null
   }
 
+  const abrirCuartoNivelesPropiedades = () => {
+    gestionPisosPropiedadesModal.value = true;
+  }
+
+  const cerrarCuartoNivelesPropiedades = () => {
+    gestionPisosPropiedadesModal.value = false;
+  }
+
   /* Funciones de filtros*/
   const getEtiquetaPorId = computed(() => {
     return (id) => etiquetas.value.find((etiqueta) => etiqueta.id === id)
@@ -1354,6 +1365,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     elementoAura,
     isDraggable,
     cambiosNoAplicados,
+    gestionPisosPropiedadesModal,
 
     // Getters
     elementosVisibles,
@@ -1445,5 +1457,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     setDraggableMode,
 
+    // == Edición de plantas desde las propiedades
+    abrirCuartoNivelesPropiedades,
+    cerrarCuartoNivelesPropiedades,
   }
 })
