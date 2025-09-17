@@ -104,7 +104,9 @@
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">
             <div class="flex justify-between items-center w-full -mt-6 pl-4">
               Pisos
-              <button class="bg-primary-700 text-white p-1 rounded-full">
+              <button
+                @click="canvasStore.abrirCuartoNivelesPropiedades()"
+                class="bg-primary-700 text-white p-1 rounded-full cursor-pointer">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/>
                 </svg>
@@ -125,7 +127,8 @@
               </div>
 
               <div>
-                <button @click="toggleMenu(index)" class="p-1 rounded-full hover:bg-gray-100 menu-trigger-button">
+                <button @click="toggleMenu(index)" class="p-1 rounded-full hover:bg-gray-100
+                  menu-trigger-button cursor-pointer">
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
                     <path fill="currentColor" d="M12 3a2 2 0 1 0 0 4a2 2 0 0 0 0-4m-2 9a2 2 0 1 1 4 0a2 2 0 0 1-4 0m0 7a2 2 0 1 1 4 0a2 2 0 0 1-4 0"/>
                   </svg>
@@ -134,23 +137,25 @@
                 <div v-if="openMenuIndex === index" class="absolute right-0 mt-2 bg-white rounded-md shadow-lg z-20 border border-gray-100 dropdown-menu">
                   <ul class="py-1">
                     <li>
+                      <button class="flex items-center justify-center px-4 py-2 text-sm
+                        text-primary-700 cursor-pointer">
+                        Eliminar
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="ml-2">
+                          <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/>
+                        </svg>
+                      </button>
+                    </li>
+                    <li>
                       <button
                         @click="canvasStore.abrirCuartoNivelesPropiedades()"
-                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-700 w-full"
+                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-700
+                        w-full cursor-pointer"
                       >
                         Editar
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="ml-2">
                           <path
                             fill="currentColor"
                             d="m14.06 9l.94.94L5.92 19H5v-.92zM17.66 3c-.26 0-.51.1-.7.29l-1.83 1.83l3.75 3.75l1.83-1.83c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29m-3.6 3.19L3 17.25V21h3.75L17.81 9.94z"/>
-                        </svg>
-                      </button>
-                    </li>
-                    <li>
-                      <button class="flex items-center justify-center px-4 py-2 text-sm text-primary-700">
-                        Eliminar
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="ml-2">
-                          <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/>
                         </svg>
                       </button>
                     </li>

@@ -145,7 +145,7 @@
           <div class="relative" ref="dropdownRef">
             <!-- Caja de selección -->
             <button
-              @click="dropdownOpen = !dropdownOpen"
+              @click.stop="dropdownOpen = !dropdownOpen"
               type="button"
               class="w-full border border-gray-300 rounded-[6px] py-2 px-4 flex justify-between items-center text-left text-[#6B7280]"
             >
@@ -203,12 +203,14 @@
         </div>
       </div>
       <button
-        class="bg-[#E5E7EB] px-4 py-3 place-self-end rounded-[6px] text-[#6B7280] w-[122px] h-[50px]"
-        @click="canvasStore.cerrarCuartoNivelPropiedades()"
+        class="bg-[#E5E7EB] px-4 py-3 place-self-end rounded-[6px] text-[#6B7280] w-[122px] h-[50px]
+        cursor-pointer"
+        @click="canvasStore.cerrarCuartoNivelesPropiedades()"
       >
         Cancelar
       </button>
-      <button class="bg-primary-700 w-[117px] h-[50px] font-normal text-white rounded-[6px]">
+      <button class="bg-primary-700 w-[117px] h-[50px] font-normal text-white rounded-[6px]
+        cursor-pointer">
         Guardar
       </button>
 
@@ -244,6 +246,10 @@ const filteredOptions = computed(() =>
 
 // Cierra dropdown al hacer clic fuera
 const handleClickOutside = (event) => {
+  // 1. Si el dropdown está cerrado, no hagas nada.
+  if (!dropdownOpen.value) return;
+
+  // 2. Si está abierto y el clic fue fuera, ciérralo.
   if (dropdownRef.value && !dropdownRef.value.contains(event.target)) {
     dropdownOpen.value = false;
   }
