@@ -240,15 +240,6 @@ export const CATEGORIAS = [
   { id: 'pasillos', nombre: 'Pasillos', color: '#111827' },
 ]
 
-// === TODAS LAS CATEGORÍAS UNIFICADAS ===
-export const TODAS_LAS_CATEGORIAS = [
-  ...CATEGORIAS_ELEMENTOS,
-  ...CATEGORIAS_CONTENEDORES,
-  ...CATEGORIAS_CUARTOS,
-  ...CATEGORIAS_PISOS,
-  ...CATEGORIAS_PASILLOS,
-]
-
 export const FORMAS_DISPONIBLES = [
   { id: 'rectangular', nombre: 'Rectangular' },
   { id: 'circular', nombre: 'Circular' },
@@ -258,6 +249,64 @@ export const UBICACIONES_DISPONIBLES = [
   { id: 'suelo', nombre: 'Suelo', aplicaA: ['elementos', 'cuartos', 'pisos', 'pasillos'] },
   { id: 'pared', nombre: 'Pared', aplicaA: ['elementos'] },
   { id: 'interior', nombre: 'Interior', aplicaA: ['contenedores'] },
+]
+
+// === CATÁLOGOS PARA CUARTOS Y ESPACIOS ===
+
+export const TIPOS_CUARTO = [
+  { id: 'almacen', nombre: 'Almacén General' },
+  { id: 'cuarto_frio', nombre: 'Cuarto Frío' },
+  { id: 'oficina', nombre: 'Oficina' },
+  { id: 'recepcion', nombre: 'Recepción' },
+  { id: 'despacho', nombre: 'Despacho' },
+  { id: 'mantenimiento', nombre: 'Mantenimiento' },
+]
+
+export const TIPOS_ESPACIO = [
+  { id: 'zona_picking', nombre: 'Zona de Picking' },
+  { id: 'zona_packing', nombre: 'Zona de Packing' },
+  { id: 'zona_carga', nombre: 'Zona de Carga/Descarga' },
+  { id: 'zona_clasificacion', nombre: 'Zona de Clasificación' },
+  { id: 'zona_temporal', nombre: 'Almacenamiento Temporal' },
+  { id: 'pasillo_principal', nombre: 'Pasillo Principal' },
+]
+
+export const TIPOS_ZONA_CUARTO = [
+  { id: 'almacenaje', nombre: 'Zona de almacenaje' },
+  { id: 'cross_docking', nombre: 'Zona de Cross-docking' },
+]
+
+export const TIPOS_ZONA_ESPACIO = [
+  { id: 'picking', nombre: 'Zona de picking' },
+]
+
+// === TODAS LAS CATEGORÍAS UNIFICADAS ===
+export const TODAS_LAS_CATEGORIAS = [
+  ...CATEGORIAS_ELEMENTOS,
+  ...CATEGORIAS_CONTENEDORES,
+  ...CATEGORIAS_CUARTOS,
+  ...CATEGORIAS_PISOS,
+  ...CATEGORIAS_PASILLOS,
+  ...TIPOS_CUARTO,
+  ...TIPOS_ESPACIO
+]
+
+// Orientaciones para cuartos (grados)
+export const ORIENTACIONES = [
+  { id: '0', nombre: '0°' },
+  { id: '90', nombre: '90°' },
+  { id: '180', nombre: '180°' },
+  { id: '270', nombre: '270°' },
+]
+
+// Tipos de productos que se pueden admitir en un piso/nivel
+export const TIPOS_PRODUCTO_ADMITIDOS = [
+  { id: 'secos', nombre: 'Productos secos' },
+  { id: 'refrigerados', nombre: 'Refrigerados' },
+  { id: 'congelados', nombre: 'Congelados' },
+  { id: 'fragiles', nombre: 'Frágiles' },
+  { id: 'peligrosos', nombre: 'Peligrosos' },
+  { id: 'voluminosos', nombre: 'Voluminosos' },
 ]
 
 // === FUNCIONES DE UTILIDAD ===
