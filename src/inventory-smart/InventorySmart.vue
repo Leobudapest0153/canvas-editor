@@ -33,11 +33,23 @@
     <!-- Loader global -->
     <LoaderOverlay />
     <WorkspaceEditor />
+
+    <!-- Modal de aviso: el servidor trae cambios más recientes; se descartarán locales -->
+    <ConfirmReplaceModal
+      :mostrar="showReplaceNotice"
+      modo="notice"
+      tipo="danger"
+      titulo="Configuración más reciente del servidor"
+      :mensaje="replaceNoticeMessage"
+      :closeOnBackdrop="true"
+      @confirmar="applyPendingServerConfig"
+      @cerrar="applyPendingServerConfig"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import SidebarPanel from './components/SidebarPanel.vue'
 import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
@@ -53,12 +65,13 @@ import { useToast } from './composables/useToast'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import LoaderOverlay from './components/LoaderOverlay.vue'
+import { AUTOSAVE_CONFIG } from '@/inventory-smart/utils/constants'
+import ConfirmReplaceModal from '@/inventory-smart/components/modals/ConfirmReplaceModal.vue'
 
 const props = defineProps({
   configCanvas: {
-    type: [Object, null],
-    required: true,
-    default: () => null,
+    type: [String, null],
+    default: () => '',
   },
 })
 
@@ -71,6 +84,38 @@ const buffer = useCanvasBuffer()
 const { deleteSelected } = useDeleteElement()
 const { handlePaste } = useAutoPaste()
 const { showToast } = useToast()
+
+// Estado del modal de aviso de reemplazo por servidor
+const showReplaceNotice = ref(false)
+let pendingServerConfig = null
+const replaceNoticeMessage = computed(() => {
+  if (!pendingServerConfig) return 'Se aplicará la configuración del servidor. Se descartarán los cambios locales.'
+  try {
+    const d = JSON.parse(pendingServerConfig)
+    const ts = d?.meta?.timestamp
+    const when = ts ? new Date(ts).toLocaleString('es-ES') : 'reciente'
+    return (
+      `Se detectó una configuración más reciente del servidor (${when}).\n` +
+      'Se aplicará esta configuración y se descartarán los cambios locales para evitar conflictos con nuevas validaciones (por ejemplo, uso de contenedores).'
+    )
+  } catch {
+    return 'Se aplicará la configuración más reciente del servidor y se descartarán los cambios locales.'
+  }
+})
+
+const applyPendingServerConfig = () => {
+  if (!pendingServerConfig) {
+    showReplaceNotice.value = false
+    return
+  }
+  try {
+    showToast('Aplicando configuración del servidor…', 'info')
+    canvasStore.deserialize(pendingServerConfig)
+  } finally {
+    pendingServerConfig = null
+    showReplaceNotice.value = false
+  }
+}
 
 // Manejador para cuando PlantasPanel emite cambios de configuración
 const handleConfigChanged = (configSerializada) => {
@@ -142,33 +187,62 @@ const handleCopyToBuffer = () => {
   }
 }
 
+// ======= Resolución de conflictos (Servidor vs Backups locales) =======
+// Helper: obtener timestamp (ms) desde una configuración serializada
+const getConfigTimestamp = (jsonString) => {
+  try {
+    const data = JSON.parse(jsonString)
+    const ts = data?.meta?.timestamp
+    const t = ts ? Date.parse(ts) : NaN
+    return Number.isFinite(t) ? t : null
+  } catch (e) {
+    return null
+  }
+}
+
+// Helper: carga la copia de seguridad local más reciente
+const getLatestLocalBackup = () => {
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_CONFIG.STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const backups = Array.isArray(parsed?.backups) ? parsed.backups : []
+    if (!backups.length) return null
+    // Elegir por timestamp más reciente (fallback a meta interna si existe)
+    const withTs = backups.map((b) => {
+      let t = b?.timestamp ? Date.parse(b.timestamp) : NaN
+      if (!Number.isFinite(t)) {
+        try {
+          const d = JSON.parse(b?.data || '{}')
+          const mt = Date.parse(d?.meta?.timestamp)
+          if (Number.isFinite(mt)) t = mt
+        } catch (e) { /* noop */ }
+      }
+      return { ...b, _ts: Number.isFinite(t) ? t : 0 }
+    })
+    withTs.sort((a, b) => b._ts - a._ts)
+    const latest = withTs[0]
+    // Normalizar resultado
+    return latest ? { id: latest.id, timestamp: latest.timestamp, ts: latest._ts, data: latest.data } : null
+  } catch (e) {
+    return null
+  }
+}
+
+const fmtDate = (iso) => {
+  try {
+    return new Date(iso).toLocaleString('es-ES')
+  } catch {
+    return iso || ''
+  }
+}
+
 onMounted(() => {
   try {
     window.addEventListener('keydown', handleKeydown)
-
-    // Si no se provee una configuracion inicial
-    if (!props.configCanvas) {
-      showToast('Iniciando entorno', { type: 'info' })
-      const plantaInicial = canvasStore.plantas.find((p) => p.activa) || canvasStore.plantas[0]
-      if (plantaInicial) {
-        canvasStore.navegarAPlanta(plantaInicial.id)
-      }
-      return
-    }
-
-    // Validar la prop con validarJSON de useCanvasImportExport
-    const isValid = validarJSON(props.configCanvas)
-    if (!isValid) {
-      showToast('La configuración importada no es válida', { type: 'error' })
-      return
-    }
-
-    showToast('Iniciando entorno', { type: 'info' })
-    // Restaurar estado
-    canvasStore.deserialize(props.configCanvas)
   } catch (error) {
     window.removeEventListener('keydown', handleKeydown)
-    showToast('Ha ocurrido un error al importar la configuración', { type: 'error' })
+    showToast('Ha ocurrido un error al importar la configuración', 'error')
     console.error('Error al importar la configuración:', error)
   }
 })
@@ -176,15 +250,74 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
 })
+
+watch(
+  () => props.configCanvas,
+  (newConfig) => {
+    try {
+      // Si no se provee una configuracion inicial
+      if (!newConfig) {
+        showToast('Iniciando área de trabajo', 'info')
+        const plantaInicial = canvasStore.plantas.find((p) => p.activa) || canvasStore.plantas[0]
+        if (plantaInicial) {
+          canvasStore.navegarAPlanta(plantaInicial.id)
+        }
+        return
+      }
+
+      // Validar la prop con validarJSON de useCanvasImportExport
+      const isValid = validarJSON(newConfig)
+      if (!isValid) {
+        showToast('La configuración importada no es válida', 'error')
+        return
+      }
+
+      // Comparar timestamps entre servidor y backup local más reciente
+      const serverTs = getConfigTimestamp(newConfig)
+      const latestBackup = getLatestLocalBackup()
+      const backupTs = latestBackup?.ts ?? null
+
+      // Decisión:
+      // 1) Si hay backup y es más reciente que el servidor -> restaurar backup automáticamente
+      if (latestBackup && backupTs && (!serverTs || backupTs > serverTs)) {
+        const restored = canvasStore.deserialize(latestBackup.data)
+        if (restored) {
+          showToast(
+            `Se restauró la copia de seguridad local más reciente (${fmtDate(latestBackup.timestamp)}).`,
+            'info',
+          )
+          // Notificar al padre la nueva config aplicada (opcional pero útil para sincronía)
+          emit('configUpdated', latestBackup.data)
+          return
+        }
+        // Si falló, continuar con la del servidor
+      }
+
+      // 2) Si el servidor es más reciente que el backup local -> solo avisar y aplicar servidor
+      if (serverTs && latestBackup && backupTs && serverTs > backupTs) {
+        pendingServerConfig = newConfig
+        showReplaceNotice.value = true
+        return
+      }
+
+      // 3) Caso por defecto: aplicar servidor
+      showToast('Iniciando área de trabajo', 'info' )
+      canvasStore.deserialize(newConfig)
+    } catch (error) {
+      showToast('Ha ocurrido un error al importar la configuración', 'error')
+      console.error('Error al importar la configuración:', error)
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <style>
-
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Ignorar warning de unknown at rule */
 @theme {
-  --color-primary: #1C1E4D;
+  --color-primary: #1c1e4d;
   --color-primary-100: #f0f1f5;
   --color-primary-200: #d9dbec;
   --color-primary-300: #b3b6d9;
@@ -273,7 +406,9 @@ onUnmounted(() => {
   color: #334155;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
 .catalog-tab:hover {
@@ -307,38 +442,114 @@ onUnmounted(() => {
   }
 }
 
-/* ====== INVENTORY: Ajustes visuales para equiparar modal 'Guardar como plantilla' con 'Eliminar' ======
-   NOTA: Reusar las mismas clases de botones y layout. Solo correcciones menores aquí.
-======================================================================================================= */
-.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1100}
-.modal{width:420px;max-width:92vw;background:#fff;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden}
-.modal-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e5e7eb}
-.modal-header .title{font-size:16px;font-weight:600;color:#111827}
-.modal-header .close{background:transparent;border:none;font-size:20px;cursor:pointer;color:#6b7280}
-.modal-body{padding:16px;color:#374151}
-.modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid #e5e7eb}
-.btn{border:1px solid #e5e7eb;background:#fff;border-radius:6px;padding:8px 12px;font-size:14px;cursor:pointer}
-.btn-primary{background:#2563eb;color:#fff;border-color:#2563eb}
-.btn-primary:hover{background:#1d4ed8}
-.btn:disabled{opacity:.6;cursor:not-allowed}
-.btn:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
-.template-modal__row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-.template-modal__label { font-weight: 600; font-size: 0.95rem; }
+/* ====== Modal 'Guardar como plantilla' ====== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+.modal {
+  width: 420px;
+  max-width: 92vw;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.modal-header .title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+.modal-header .close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #6b7280;
+}
+.modal-body {
+  padding: 16px;
+  color: #374151;
+}
+.modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid #e5e7eb;
+}
+.btn {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.btn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+.template-modal__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.template-modal__label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
 .template-modal__input,
 .template-modal__textarea {
-  width: 100%; border: 1px solid var(--border-color, #e3e6eb); border-radius: 8px;
-  padding: 8px 10px; background: #fff; font: inherit;
+  width: 100%;
+  border: 1px solid var(--border-color, #e3e6eb);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  font: inherit;
 }
 .template-modal__input:focus,
 .template-modal__textarea:focus {
-  outline: none; box-shadow: 0 0 0 3px rgba(38,132,255,.25);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(38, 132, 255, 0.25);
 }
 .template-modal__summary {
-  font-size: 0.9rem; color: var(--text-muted, #5b6473);
-  background: var(--bg-muted, #f7f8fa); border: 1px solid var(--border-color, #e3e6eb);
-  border-radius: 8px; padding: 10px;
+  font-size: 0.9rem;
+  color: var(--text-muted, #5b6473);
+  background: var(--bg-muted, #f7f8fa);
+  border: 1px solid var(--border-color, #e3e6eb);
+  border-radius: 8px;
+  padding: 10px;
 }
-.template-modal__error { color: #c62828; font-size: 0.85rem; }
+.template-modal__error {
+  color: #c62828;
+  font-size: 0.85rem;
+}
 
 /* === Estilos para validaciones: arrastre desde Catálogo de Plantillas === */
 /* No crear archivos nuevos; mantener consistencia con el resto del proyecto */

@@ -200,7 +200,7 @@ export const useCanvasBuffer = () => {
           const mensaje = totalElements > 1
             ? `Estructura "${nombreElemento}" copiada (${totalElements} elementos)`
             : `Elemento "${nombreElemento}" copiado al portapapeles`
-          showToast(mensaje, { type: 'info' })
+          showToast(mensaje, 'info')
       }
     } else {
       console.error('⚠️ Error al copiar la estructura al buffer')
@@ -411,7 +411,7 @@ export const useCanvasBuffer = () => {
       if (typeof window !== 'undefined' && window.__toasts?.show) {
         showToast(
           `No se puede pegar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
-          { type: 'error', timeout: 3000 }
+          'error', { timeout: 3000 }
         )
       }
 
@@ -466,7 +466,7 @@ export const useCanvasBuffer = () => {
           const mensaje = totalElements > 1
             ? `Estructura "${nombreElemento}" pegada (${totalElements} elementos)`
             : `Elemento "${nombreElemento}" pegado correctamente`
-          showToast(mensaje, { type: 'info' })
+          showToast(mensaje, 'info')
         }
 
         return rootElementId
@@ -513,7 +513,7 @@ export const useCanvasBuffer = () => {
         // Mostrar mensaje de éxito para elemento simple
         if (typeof window !== 'undefined' && window.__toasts?.show) {
           const nombreElemento = elemento.nombre || elemento.tipo
-          showToast(`Elemento "${nombreElemento}" pegado correctamente`, { type: 'info' })
+          showToast(`Elemento "${nombreElemento}" pegado correctamente`, 'info')
         }
 
         return finalElementId

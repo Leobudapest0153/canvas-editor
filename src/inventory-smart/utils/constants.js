@@ -361,6 +361,10 @@ export const AUTOSAVE_CONFIG = {
   ENABLED: true, // habilitar/deshabilitar autosave
 }
 
+export const SERIALIZE_CONFIG = {
+  STORAGE_KEY: 'SERIALIZE_CONFIG.STORAGE_KEY',
+}
+
 // === POLÍTICAS DE DIMENSIONES (escalado por eje) ===
 // Nota: Reusar constantes existentes; no duplicar conversiones.
 export const DIMENSIONS = {

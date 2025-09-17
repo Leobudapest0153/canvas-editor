@@ -11,6 +11,8 @@
  * - Manejo de errores en operaciones de persistencia
  */
 
+import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG } from "../utils/constants"
+
 export const useStatePersistence = () => {
   /**
    * Serializa el estado completo del canvas a JSON
@@ -36,7 +38,7 @@ export const useStatePersistence = () => {
     const serializedState = {
       // Información básica del canvas
       meta: {
-        version: '1.1.0',
+        version: EXPORT_FORMAT_VERSION,
         timestamp: new Date().toISOString(),
         app: 'inventory-smart',
         ...(includeMetrics && {
@@ -505,7 +507,7 @@ export const useStatePersistence = () => {
    * @param {string} key - Clave de almacenamiento (opcional)
    * @returns {boolean} true si la persistencia fue exitosa
    */
-  const persist = (serializedData, key = 'canvas-data') => {
+  const persist = (serializedData, key = SERIALIZE_CONFIG.STORAGE_KEY) => {
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(key, serializedData)
@@ -524,7 +526,7 @@ export const useStatePersistence = () => {
    * @param {string} key - Clave de almacenamiento (opcional)
    * @returns {string|null} Datos serializados o null si no existen
    */
-  const load = (key = 'canvas-data') => {
+  const load = (key = SERIALIZE_CONFIG.STORAGE_KEY) => {
     try {
       if (typeof localStorage !== 'undefined') {
         return localStorage.getItem(key)
@@ -541,7 +543,7 @@ export const useStatePersistence = () => {
    * @param {string} key - Clave de almacenamiento (opcional)
    * @returns {boolean} true si la eliminación fue exitosa
    */
-  const clear = (key = 'canvas-data') => {
+  const clear = (key = SERIALIZE_CONFIG.STORAGE_KEY) => {
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(key)
@@ -563,7 +565,6 @@ export const useStatePersistence = () => {
   const validateStructure = (jsonString, strict = false) => {
     try {
       const data = JSON.parse(jsonString)
-
       // === VALIDACIONES BÁSICAS REQUERIDAS ===
       const validationResult = {
         valid: true,

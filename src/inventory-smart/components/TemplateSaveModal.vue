@@ -34,7 +34,7 @@
           </div>
         </div>
         <div class="template-modal__row">
-          <label for="templateNotes" class="template-modal__label">Notas</label>
+          <label for="templateNotes" class="template-modal__label">Descripción</label>
           <textarea
             id="templateNotes"
             v-model="templateNotes"

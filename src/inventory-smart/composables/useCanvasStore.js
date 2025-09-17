@@ -636,7 +636,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (el) {
         el.updatedAt = new Date().toISOString()
       }
-      persist()
+      // persist()
     }
     return ok
   }
@@ -821,7 +821,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const res = v(element, candidate)
       if (res.valid === false) {
         const msg = errorsPlacement[res.code] || 'Posición inválida'
-        window?.__toasts?.show?.(msg, { type: 'error' })
+        showToast(msg, 'error')
         return false
       }
     }
@@ -1065,7 +1065,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     try {
       const parsed = JSON.parse(jsonStr)
       if (state.templates.length > 0) {
-        parsed.plantillasCatalogo = exportTemplatesToDTO(state.templates)
+        parsed.plantillas = exportTemplatesToDTO(state.templates)
         if (parsed.meta) {
           parsed.meta.version = '1.1.0'
           if (!parsed.meta.metrics) parsed.meta.metrics = {}
@@ -1074,7 +1074,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       } // si no hay plantillas mantenemos formato legacy (sin campo y version 1.0.0)
       return JSON.stringify(parsed, null, 2)
     } catch (e) {
-      console.warn('No se pudo post-procesar JSON para plantillasCatalogo', e)
+      console.warn('No se pudo post-procesar JSON para plantillas', e)
       return jsonStr
     }
   }
@@ -1125,14 +1125,14 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     const ok = _deserialize(jsonString, storeActions)
 
-    // Importar plantillasCatalogo si existen (retrocompatible)
+    // Importar plantillas si existen (retrocompatible)
     try {
       const parsed = JSON.parse(jsonString)
-      if (Array.isArray(parsed.plantillasCatalogo) && parsed.plantillasCatalogo.length > 0) {
-        importTemplatesFromDTO(parsed.plantillasCatalogo)
+      if (Array.isArray(parsed.plantillas) && parsed.plantillas.length > 0) {
+        importTemplatesFromDTO(parsed.plantillas)
       }
     } catch (e) {
-      console.warn('No se pudieron importar plantillasCatalogo', e)
+      console.warn('No se pudieron importar plantillas', e)
     }
 
     return ok
@@ -1373,15 +1373,15 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Navegación jerárquica - Getters
     contextoActual,
     estaEnPlanta,
-  estaEnCuarto,
-  estaEnPiso,
+    estaEnCuarto,
+    estaEnPiso,
     estaEnElemento,
     estaEnContenedor,
     estructuraContenedorActual,
     breadcrumbs,
     puedeNavegar,
     contextoNavegacion,
-  nodoActual,
+    nodoActual,
     canvasAdaptativo,
 
     // Actions - Canvas

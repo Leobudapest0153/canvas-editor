@@ -774,7 +774,7 @@ const runCanvasSyncSequence = async () => {
 
 const guardarPlanta = async () => {
   if (!formularioPlanta.value.nombre.trim()) {
-    showToast('El nombre de la planta es requerido', { type: 'error' })
+    showToast('El nombre de la planta es requerido', 'error')
     return
   }
 
@@ -882,7 +882,7 @@ const guardarPlanta = async () => {
           }
           el.rotation = p.rotation
         }
-        showToast(`Se reacomodaron ${moved} elementos`, { type: 'warn' })
+        showToast(`Se reacomodaron ${moved} elementos`, 'warn')
         canvasStore.saveToHistory('Auto-adjust after resize (post-apply)')
       } else {
         // No ajustes requeridos
@@ -907,7 +907,7 @@ const guardarPlanta = async () => {
     cerrarModales()
   } catch (error) {
     console.error('Error al guardar planta:', error)
-    showToast('Error al guardar la planta', { type: 'error' })
+    showToast('Error al guardar la planta', 'error')
   }
 }
 

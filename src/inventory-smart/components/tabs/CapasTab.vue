@@ -280,7 +280,8 @@ import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import {useDeleteElement} from '@/inventory-smart/composables/useDeleteElement'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
-
+import { useToast } from '@/inventory-smart/composables/useToast'
+const { showToast } = useToast()
 // Composables
 const canvasStore = useCanvasStore()
 
@@ -370,7 +371,7 @@ const onDelete = async (id) => {
   if (el && (el.bloqueado === true || el.locked === true)) {
     try {
       if (typeof window !== 'undefined' && window.__toasts?.show) {
-        window.__toasts.show('Elemento bloqueado — desbloquéalo para eliminar', { type: 'warning', timeout: 3000 })
+        showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
       } else {
         await confirmDialog.confirm({ title: 'Elemento bloqueado', message: 'Elemento bloqueado — desbloquéalo para eliminar', confirmLabel: 'Entendido', cancelLabel: 'Cerrar' })
       }

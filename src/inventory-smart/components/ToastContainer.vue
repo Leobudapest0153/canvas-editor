@@ -3,7 +3,7 @@
     <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type">
       <span class="msg">{{ t.message }}</span>
       <button v-if="t.cta" class="cta" @click="handleCta(t)">{{ t.cta.label }}</button>
-      <button class="close" @click="remove(t.id)">×</button>
+      <button class="close" @click="remove(t.id)">x</button>
     </div>
   </div>
 </template>

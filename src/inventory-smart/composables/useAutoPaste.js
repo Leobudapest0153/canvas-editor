@@ -551,7 +551,7 @@ export function useAutoPaste() {
   const handlePaste = async () => {
     // Verificar si ya hay una operación de pegado en progreso
     if (isOperationInProgress('paste')) {
-      showToast('Ya hay una operación de pegado en curso. Espera a que termine.', { type: 'warning' })
+      showToast('Ya hay una operación de pegado en curso. Espera a que termine.', 'warning')
       return false
     }
 
@@ -560,7 +560,7 @@ export function useAutoPaste() {
     try {
       // Verificar que hay elementos en el buffer
       if (!buffer.hasItems.value) {
-        showToast('No hay elementos en el portapapeles para pegar.', { type: 'warning' })
+        showToast('No hay elementos en el portapapeles para pegar.', 'warning')
         return false
       }
 
@@ -569,7 +569,7 @@ export function useAutoPaste() {
       const firstItem = bufferItems[0]
 
       if (!firstItem) {
-        showToast('No fue posible leer el elemento del portapapeles.', { type: 'error' })
+        showToast('No fue posible leer el elemento del portapapeles.', 'error')
         return false
       }
 
@@ -583,7 +583,7 @@ export function useAutoPaste() {
       )
 
       if (!loadingId) {
-        showToast('No fue posible iniciar la operación de pegado.', { type: 'error' })
+        showToast('No fue posible iniciar la operación de pegado.', 'error')
         return false
       }
 
@@ -594,7 +594,7 @@ export function useAutoPaste() {
       const areaBounds = getAreaBounds()
 
       if (areaBounds.maxX === 0 || areaBounds.maxY === 0) {
-        showToast('No se pudieron determinar los límites del área actual.', { type: 'error' })
+        showToast('No se pudieron determinar los límites del área actual.', 'error')
         return false
       }
 
@@ -605,7 +605,7 @@ export function useAutoPaste() {
         const elementType = elemento.ubicacion === 'pared' ? 'de pared' : 'de suelo'
         showToast(
           `No se encontró espacio disponible para ${elementType} "${elemento.nombre || elemento.tipo}". Intenta mover otros elementos o ajustar el tamaño.`,
-          { type: 'error', timeout: 4000 }
+          'error',{ timeout: 4000 }
         )
         return false
       }
@@ -618,7 +618,7 @@ export function useAutoPaste() {
       if (!validation.valid) {
         showToast(
           `No se pudo pegar: ${validation.reason}`,
-          { type: 'error', timeout: 4000 }
+          'error', { timeout: 4000 }
         )
         return false
       }
@@ -630,7 +630,7 @@ export function useAutoPaste() {
         const nombreElemento = elemento.nombre || elemento.tipo
         showToast(
           `"${nombreElemento}" pegado correctamente.`,
-          { type: 'success', timeout: 3000 }
+          'success', { timeout: 3000 }
         )
 
         // Seleccionar el elemento recién pegado
@@ -639,14 +639,14 @@ export function useAutoPaste() {
 
         return true
       } else {
-        showToast('Error al pegar el elemento', { type: 'error' })
+        showToast('Error al pegar el elemento', 'error')
         return false
       }
 
     } catch (error) {
       showToast(
         `Error al pegar automáticamente: ${error.message}`,
-        { type: 'error', timeout: 4000 }
+        'error', { timeout: 4000 }
       )
       return false
     } finally {
@@ -663,12 +663,12 @@ export function useAutoPaste() {
   const handlePasteAll = async () => {
     // Verificar si ya hay una operación de pegado en progreso
     if (isOperationInProgress('paste') || isOperationInProgress('pasteAll')) {
-      showToast('Ya hay una operación de pegado en progreso', { type: 'warning' })
+      showToast('Ya hay una operación de pegado en progreso', 'warning')
       return
     }
 
     if (!buffer.hasItems.value) {
-      showToast('No hay elementos en el buffer para pegar', { type: 'warning' })
+      showToast('No hay elementos en el buffer para pegar', 'warning')
       return
     }
 
@@ -684,7 +684,7 @@ export function useAutoPaste() {
       )
 
       if (!loadingId) {
-        showToast('No se puede iniciar operación de pegado múltiple', { type: 'error' })
+        showToast('No se puede iniciar operación de pegado múltiple', 'error')
         return
       }
 
@@ -753,21 +753,21 @@ export function useAutoPaste() {
       if (successCount > 0) {
         showToast(
           `${successCount} elemento(s) pegado(s) automáticamente`,
-          { type: 'success' }
+          'success'
         )
       }
 
       if (failCount > 0) {
         showToast(
           `${failCount} elemento(s) no pudieron ser pegados`,
-          { type: 'warning' }
+          'warning'
         )
       }
 
     } catch (error) {
       showToast(
         `Error en pegado múltiple: ${error.message}`,
-        { type: 'error', timeout: 4000 }
+        'error', { timeout: 4000 }
       )
     } finally {
       // Siempre detener el loader al finalizar

@@ -586,7 +586,7 @@ function onSave() {
     if (local.maxWeight > 0 && pesoTotalHijos > local.maxWeight) {
       showToast(
         `La capacidad de carga de la planta (${local.maxWeight} kg) es menor a la capacidad de carga total requerida por los elementos contenidos (${Math.round(pesoTotalHijos * 100) / 100} kg).`,
-        { type: 'error' },
+        'error',
       )
       return
     }
@@ -610,7 +610,7 @@ function onSave() {
     console.log('Editando planta')
     canvasStore.editarPlanta(plantaData.id, plantaData)
     canvasStore.calcularCanvasAdaptativoPlanta(plantaData)
-    showToast('Planta actualizada correctamente.', { type: 'success' })
+    showToast('Planta actualizada correctamente.', 'success')
   } else {
     delete plantaData.id
     canvasStore.agregarPlanta(plantaData)
