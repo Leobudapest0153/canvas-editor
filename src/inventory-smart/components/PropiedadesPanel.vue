@@ -42,7 +42,8 @@
                 />
               </div>
             </div>
-            <div>
+
+            <div v-if="!esPasillo">
               <label class="block text-xs font-medium text-gray-600 mb-1">Color</label>
               <div class="flex items-center gap-3">
                 <input
