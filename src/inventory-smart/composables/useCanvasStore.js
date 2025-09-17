@@ -829,6 +829,86 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   // Actions para elementos
+  /**
+   * Crear un elemento desde los datos del formulario de AgregarCuartoModal
+   * - Mapea tipo => 'cuartos' | 'elementos'
+   * - Coloca el tipo seleccionado en categoria
+   * - Convierte metros a centímetros para dimensiones del modelo
+   * - Inserta el elemento creado al catálogo para que sea visible junto a los predefinidos
+   */
+  const crearDesdeFormulario = (payload) => {
+    try {
+      if (!payload || typeof payload !== 'object') throw new Error('Payload inválido')
+      const { tipo, datosGenerales, dimensiones, pisosNiveles } = payload
+      if (!tipo || !datosGenerales || !dimensiones || !Array.isArray(pisosNiveles)) {
+        throw new Error('Estructura de datos incompleta')
+      }
+
+      // Validación mínima (la UI ya valida, esto es cinturón y tirantes)
+      const reqGeneral = datosGenerales?.nombre && datosGenerales?.tipoSeleccionado && datosGenerales?.color && datosGenerales?.orientacion !== ''
+      const reqDims = dimensiones?.forma && dimensiones?.largo > 0 && dimensiones?.alto > 0 && dimensiones?.ancho > 0 && dimensiones?.capacidadCarga > 0
+      const reqLevels = pisosNiveles.length > 0 && pisosNiveles.every((p) => p?.nombre && p?.largo > 0 && p?.alto > 0 && p?.ancho > 0 && p?.capacidadCarga > 0 && p?.tipoZona)
+      if (!reqGeneral || !reqDims || !reqLevels) throw new Error('Formulario incompleto')
+
+      // Construcción del item para catálogo y para canvas
+      const id = `${tipo === 'cuarto' ? 'cuarto' : 'espacio'}_${Date.now()}`
+      const tipoElemento = tipo === 'cuarto' ? 'cuartos' : 'elementos'
+      const categoria = datosGenerales.tipoSeleccionado || (tipo === 'cuarto' ? 'cuartos' : 'elementos')
+      const colorBase = datosGenerales.color || '#3B82F6'
+      const icono = tipo === 'cuarto' ? 'home' : 'box'
+
+      // El formulario está en metros, convertimos a cm para el modelo
+      const toCm = (m) => Math.round(Number(m || 0) * 100)
+      const dimsCm = {
+        ancho: toCm(dimensiones.ancho),
+        largo: toCm(dimensiones.largo),
+        alto: toCm(dimensiones.alto),
+      }
+
+      const nuevoItemCatalogo = {
+        id,
+        nombre: datosGenerales.nombre,
+        tipo: tipoElemento,
+        categoria,
+        forma: dimensiones.forma,
+        colorBase,
+        dimensiones: dimsCm,
+        pesoMaximo: Number(dimensiones.capacidadCarga) || 0,
+        ubicacion: 'suelo',
+        descripcion: datosGenerales.descripcion || '',
+        icono,
+        props: { system: true, catalogVisible: true },
+        meta: {
+          orientacion: datosGenerales.orientacion,
+          niveles: pisosNiveles.map((p, idx) => ({
+            index: idx + 1,
+            nombre: p.nombre,
+            dimensiones: { ancho: toCm(p.ancho), largo: toCm(p.largo), alto: toCm(p.alto) },
+            capacidadCarga: Number(p.capacidadCarga) || 0,
+            tiposProductos: Array.isArray(p.tiposProductos) ? p.tiposProductos.slice() : [],
+            tipoZona: p.tipoZona,
+            permiteFragiles: !!p.permiteFragiles,
+          })),
+        },
+      }
+
+      // Insertar en catálogo y forzar catálogo 'elementos' para visibilidad inmediata
+      if (Array.isArray(catalogStore.items)) {
+        catalogStore.items.push(nuevoItemCatalogo)
+        catalogStore.setSelectedCatalog?.('elementos')
+      }
+
+      // También devolver por si el caller lo quiere usar
+      return nuevoItemCatalogo
+    } catch (e) {
+      console.error('crearDesdeFormulario error:', e)
+      throw e
+    }
+  }
+
+  // Aliases solicitados: métodos explícitos por tipo
+  const agregarEspacio = (payload) => crearDesdeFormulario({ ...payload, tipo: 'espacio' })
+  const agregarCuarto = (payload) => crearDesdeFormulario({ ...payload, tipo: 'cuarto' })
   const agregarElemento = (nuevoElemento) => {
     console.log('Agregando elemento al store:', nuevoElemento)
 
@@ -1406,6 +1486,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     agregarElemento,
     eliminarElemento,
     toggleElementoVisibilidad,
+  crearDesdeFormulario,
+    agregarEspacio,
+    agregarCuarto,
 
     // Navegación jerárquica - Actions
     navegarAElemento,

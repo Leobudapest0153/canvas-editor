@@ -1,6 +1,6 @@
 <template>
   <div class="toasts">
-    <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type">
+    <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type" role="alert" :data-toast-id="t.id">
       <span class="msg">{{ t.message }}</span>
       <button v-if="t.cta" class="cta" @click="handleCta(t)">{{ t.cta.label }}</button>
       <button class="close" @click="remove(t.id)">x</button>
@@ -15,13 +15,14 @@ let idSeq = 0
 const toasts = ref([])
 
 function show(message, options = {}) {
-  const id = ++idSeq
+  const id = options.id ?? ++idSeq
   const toast = {
     id,
     message,
     type: options.type || 'info',
     cta: options.cta || null,
     timeout: options.timeout ?? 5000,
+    onDismiss: options.onDismiss || null,
   }
   toasts.value.push(toast)
   if (toast.timeout > 0) {
@@ -31,7 +32,11 @@ function show(message, options = {}) {
 
 function remove(id) {
   const i = toasts.value.findIndex((t) => t.id === id)
-  if (i !== -1) toasts.value.splice(i, 1)
+  if (i !== -1) {
+    const [t] = toasts.value.splice(i, 1)
+    // Notificar a quien abrió el toast que ya fue cerrado
+    try { t?.onDismiss?.() } catch (e) { /* no-op */ }
+  }
 }
 
 function handleCta(t) {
@@ -41,7 +46,7 @@ function handleCta(t) {
 
 // expose API globally via window for quick use
 if (typeof window !== 'undefined') {
-  window.__toasts = { show }
+  window.__toasts = { show, remove }
 }
 </script>
 
@@ -79,6 +84,9 @@ if (typeof window !== 'undefined') {
 }
 .toast .msg {
   font-size: 14px;
+  /* Preserve line breaks and allow wrapping for long messages */
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 .toast .cta {
   background: #3b82f6;
