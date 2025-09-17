@@ -8,12 +8,12 @@
   <div class="buffer-tab">
     <!-- Header del tab -->
     <div class="tab-header">
-      <div class="header-info">
+      <!-- <div class="header-info">
         <h3 class="tab-title">Portapapeles de Estructuras</h3>
         <div class="tab-subtitle">
           {{ itemCount }} estructura{{ itemCount !== 1 ? 's' : '' }} en portapapeles
         </div>
-      </div>
+      </div> -->
       <div class="header-actions">
         <UiTooltip
           label="Limpiar portapapeles"
@@ -58,6 +58,7 @@
 
         <div class="shortcuts">
           <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>C</kbd> <span>Copiar estructura al portapapeles</span></div>
+          <div class="shortcut"><kbd>Ctrl</kbd> + <kbd>V</kbd> <span>Pegar estructura en el canvas</span></div>
         </div>
       </div>
 
@@ -214,10 +215,10 @@ const handleDragEnd = () => {
 
 .tab-header {
   padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f9fafb;
+  /* border-bottom: 1px solid #e5e7eb; */
+  /* background: #f9fafb; */
   display: flex;
-  justify-content: space-between;
+  justify-content: end;
   align-items: flex-start;
 }
 
