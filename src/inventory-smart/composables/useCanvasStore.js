@@ -108,6 +108,9 @@ export const useCanvasStore = defineStore('canvas', () => {
   const idsElementosFiltrados = ref(null)
   const elementoAura = ref(null)
 
+  // Edición de niveles
+  const nivelAEditar = ref(null);
+
   const isDraggable = ref(true)
   // Configuración de grilla y snap
   // Por defecto desactivamos la cuadrícula (0 = sin cuadricula visual ni snap a grilla)
@@ -1244,12 +1247,17 @@ export const useCanvasStore = defineStore('canvas', () => {
     plantaEnEdicion.value = null
   }
 
-  const abrirCuartoNivelesPropiedades = () => {
+  const abrirCuartoNivelesPropiedades = (idNivel) => {
+    // Solo es para edición
+    if (idNivel) {
+      nivelAEditar.value = elementos.value.find((e) => e.id === idNivel);
+    }
     gestionPisosPropiedadesModal.value = true;
   }
 
   const cerrarCuartoNivelesPropiedades = () => {
     gestionPisosPropiedadesModal.value = false;
+    nivelAEditar.value = null;
   }
 
   /* Funciones de filtros*/
@@ -1453,6 +1461,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     isDraggable,
     cambiosNoAplicados,
     gestionPisosPropiedadesModal,
+    nivelAEditar,
 
     // Getters
     elementosVisibles,
