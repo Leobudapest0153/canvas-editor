@@ -8,35 +8,75 @@
       <div class="space-y-4">
         <!-- Información general -->
         <details open class="bg-gray-50 rounded-lg p-4">
-          <summary class="text-sm font-medium text-gray-700 cursor-pointer">Información general</summary>
+          <summary class="text-sm font-medium text-gray-700 cursor-pointer">
+            Información general
+          </summary>
           <div class="mt-3 space-y-3">
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
-              <input v-model="edited.nombre" type="text"
+              <input
+                v-model="edited.nombre"
+                type="text"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Nombre del elemento" :disabled="isSaving" />
+                placeholder="Nombre del elemento"
+                :disabled="isSaving"
+              />
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-                <input :value="getTipoNombre(elementoSeleccionado.tipo)" type="text" disabled
-                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed" />
+                <input
+                  :value="getTipoNombre(elementoSeleccionado.tipo)"
+                  type="text"
+                  disabled
+                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed"
+                />
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Categoría</label>
-                <input :value="getCategoriaDisplay(elementoSeleccionado.categoria)" type="text" disabled
-                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed capitalize" />
+                <input
+                  :value="getCategoriaDisplay(elementoSeleccionado.categoria)"
+                  type="text"
+                  disabled
+                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed capitalize"
+                />
               </div>
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Color</label>
               <div class="flex items-center gap-3">
-                <input v-model="edited.color" type="color"
-                  class="!w-12 h-10 border border-gray-300 rounded-lg cursor-pointer" :disabled="isSaving" />
-                <input v-model="edited.color" type="text"
+                <input
+                  v-model="edited.color"
+                  type="color"
+                  class="!w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
+                  :disabled="isSaving"
+                />
+                <input
+                  v-model="edited.color"
+                  type="text"
                   class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="#3B82F6" :disabled="isSaving" />
+                  placeholder="#3B82F6"
+                  :disabled="isSaving"
+                />
               </div>
+            </div>
+
+            <!-- Orientación (oculta para pasillos y circulares) -->
+            <div v-if="!esPasillo && !esCircular">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Orientación</label>
+              <select
+                v-model.number="edited.orientacion"
+                :disabled="isSaving"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option :value="0">0°</option>
+                <option :value="90">90°</option>
+                <option :value="180">180°</option>
+                <option :value="270">270°</option>
+              </select>
+              <p class="text-xs text-gray-500 mt-1">
+                Indica el lado de referencia del elemento para su orientación visual.
+              </p>
             </div>
 
             <!-- Etiquetas -->
@@ -122,27 +162,39 @@
         </details>
         <!-- Dimensiones -->
         <details v-if="mostrarDimensiones" open class="bg-gray-50 rounded-lg p-4">
-          <summary class="text-sm font-medium text-gray-700 cursor-pointer">Dimensiones ({{ t('units.cm') }})</summary>
+          <summary class="text-sm font-medium text-gray-700 cursor-pointer">
+            Dimensiones ({{ t('units.cm') }})
+          </summary>
           <div class="mt-3 space-y-3">
             <!-- Para formas no circulares, mostrar ancho/largo -->
             <div v-if="!ocultarAnchoLargo" class="grid grid-cols-2 gap-3">
               <div>
                 <label class="text-sm text-gray-500">Ancho</label>
                 <div class="flex items-center">
-                  <input type="number" min="0" step="any" v-model.number="edited.dimensiones.ancho"
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    v-model.number="edited.dimensiones.ancho"
                     @change="validarDimension('ancho')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    :disabled="isSaving" />
+                    :disabled="isSaving"
+                  />
                   <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
                 </div>
               </div>
               <div>
                 <label class="text-sm text-gray-500">Largo</label>
                 <div class="flex items-center">
-                  <input type="number" min="0" step="any" v-model.number="edited.dimensiones.largo"
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    v-model.number="edited.dimensiones.largo"
                     @change="validarDimension('largo')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    :disabled="isSaving" />
+                    :disabled="isSaving"
+                  />
                   <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
                 </div>
               </div>
@@ -150,46 +202,73 @@
             <div v-if="!esCircular">
               <label class="text-sm text-gray-500">Alto</label>
               <div class="flex items-center">
-                <input type="number" min="0" step="any" v-model.number="edited.dimensiones.alto" @change="validarDimension('alto')"
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  v-model.number="edited.dimensiones.alto"
+                  @change="validarDimension('alto')"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  :disabled="isSaving || esPasillo" />
+                  :disabled="isSaving || esPasillo"
+                />
                 <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
-              <p v-if="esPasillo" class="text-xs text-gray-500 mt-1">El alto del pasillo se ajusta a la altura de la planta.</p>
+              <p v-if="esPasillo" class="text-xs text-gray-500 mt-1">
+                El alto del pasillo se ajusta a la altura de la planta.
+              </p>
             </div>
             <!-- Diámetro para circulares -->
             <div v-if="esCircular">
               <label class="text-sm text-gray-500">Diámetro</label>
               <div class="flex items-center">
-                <input type="number" min="1" step="any" :max="maxDiametroPlanta" v-model.number="edited.diametroCm"
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  :max="maxDiametroPlanta"
+                  v-model.number="edited.diametroCm"
                   @change="validarDiametro"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  :disabled="isSaving" />
+                  :disabled="isSaving"
+                />
                 <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
-              <p v-if="advertenciaDiametroLimite" class="text-xs text-amber-600">{{ advertenciaDiametroLimite }}</p>
-              <p v-if="advertenciaDiametroContencion" class="text-xs text-amber-600">{{ advertenciaDiametroContencion }}
+              <p v-if="advertenciaDiametroLimite" class="text-xs text-amber-600">
+                {{ advertenciaDiametroLimite }}
+              </p>
+              <p v-if="advertenciaDiametroContencion" class="text-xs text-amber-600">
+                {{ advertenciaDiametroContencion }}
               </p>
             </div>
             <p v-if="advertenciaAltura" class="text-xs text-amber-600">{{ advertenciaAltura }}</p>
             <p v-if="dimensionError" class="text-xs text-red-600">{{ dimensionError }}</p>
-            <ul v-if="dimensionSugerencias && dimensionSugerencias.length" class="list-disc ml-5 text-xs text-gray-600">
-              <li v-for="(s,i) in dimensionSugerencias" :key="i">{{ s }}</li>
+            <ul
+              v-if="dimensionSugerencias && dimensionSugerencias.length"
+              class="list-disc ml-5 text-xs text-gray-600"
+            >
+              <li v-for="(s, i) in dimensionSugerencias" :key="i">{{ s }}</li>
             </ul>
           </div>
         </details>
 
         <!-- Posicionamiento en pared -->
         <details v-if="estaUbicadoEnPared" open class="bg-gray-50 rounded-lg p-4">
-          <summary class="text-sm font-medium text-gray-700 cursor-pointer">Posicionamiento en pared</summary>
+          <summary class="text-sm font-medium text-gray-700 cursor-pointer">
+            Posicionamiento en pared
+          </summary>
           <div class="mt-3 space-y-3">
             <div>
               <label class="text-sm text-gray-500">Altura sobre el suelo</label>
               <div class="flex items-center">
-                <input type="number" :min="0" :max="maxAlturaSobreSuelo" v-model.number="edited.alturaSobreSueloCm"
+                <input
+                  type="number"
+                  :min="0"
+                  :max="maxAlturaSobreSuelo"
+                  v-model.number="edited.alturaSobreSueloCm"
                   @change="validarAlturaSobreSuelo"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  :disabled="isSaving || !estaUbicadoEnPared" />
+                  :disabled="isSaving || !estaUbicadoEnPared"
+                />
                 <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
               <p v-if="advertenciaZBase" class="text-xs text-amber-600">{{ advertenciaZBase }}</p>
@@ -205,9 +284,14 @@
             <div>
               <label class="text-sm text-gray-500">Capacidad de carga</label>
               <div class="flex items-center">
-                <input type="number" min="0" v-model.number="edited.pesoMaximo" @change="validarPeso"
+                <input
+                  type="number"
+                  min="0"
+                  v-model.number="edited.pesoMaximo"
+                  @change="validarPeso"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  :disabled="isSaving" />
+                  :disabled="isSaving"
+                />
                 <span class="ml-1 text-sm text-gray-500">kg</span>
               </div>
               <p v-if="advertenciaPeso" class="text-xs text-amber-600">{{ advertenciaPeso }}</p>
@@ -234,8 +318,11 @@
               <div class="mb-2">
                 <label class="text-xs text-gray-500">Peso usado</label>
                 <div class="flex items-center">
-                  <input :value="usoRealPeso" disabled
-                    class="w-full px-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600" />
+                  <input
+                    :value="usoRealPeso"
+                    disabled
+                    class="w-full px-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600"
+                  />
                   <span class="ml-1 text-sm text-gray-500">kg</span>
                 </div>
                 <div v-if="usoRealPeso > 0" class="mt-1">
@@ -244,8 +331,10 @@
                     <span>{{ usoRealPeso }} / {{ edited.pesoMaximo || 0 }} kg</span>
                   </div>
                   <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="h-2 rounded-full transition-all duration-300"
-                         :style="{ width: porcentajePesoUsado + '%', backgroundColor: colorPesoUsado }"></div>
+                    <div
+                      class="h-2 rounded-full transition-all duration-300"
+                      :style="{ width: porcentajePesoUsado + '%', backgroundColor: colorPesoUsado }"
+                    ></div>
                   </div>
                 </div>
               </div>
@@ -284,16 +373,23 @@
       <div v-if="isDirty" class="space-x-2 mb-3 flex justify-end">
         <button
           class="px-3 py-1 cursor-pointer border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-          @click="revertir" :disabled="isSaving">
+          @click="revertir"
+          :disabled="isSaving"
+        >
           Revertir
         </button>
-        <button class="px-3 cursor-pointer py-1 bg-primary text-white rounded text-sm hover:bg-primary-900 disabled:opacity-50"
-          @click="guardar" :disabled="guardarDeshabilitado">
+        <button
+          class="px-3 cursor-pointer py-1 bg-primary text-white rounded text-sm hover:bg-primary-900 disabled:opacity-50"
+          @click="guardar"
+          :disabled="guardarDeshabilitado"
+        >
           Guardar
         </button>
       </div>
-      <button @click="deseleccionarElemento"
-        class="w-full cursor-pointer px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors text-sm">
+      <button
+        @click="deseleccionarElemento"
+        class="w-full cursor-pointer px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors text-sm"
+      >
         Deseleccionar
       </button>
     </div>
@@ -320,7 +416,12 @@ import { toPrecisionCm } from '../utils/fixedDimensions'
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
 const confirmDialog = useConfirmDialog()
-const { validarPesoElemento, validarPesoMaximoVsUsoReal, validarCapacidadVsHijos, calcularPesoDisponible } = useWeightValidation()
+const {
+  validarPesoElemento,
+  validarPesoMaximoVsUsoReal,
+  validarCapacidadVsHijos,
+  calcularPesoDisponible,
+} = useWeightValidation()
 const { validarDimensiones } = useDimensionValidation()
 
 const catalogStore = useCatalogStore()
@@ -343,117 +444,136 @@ onMounted(() => {
   }
 })
 
-const cargarDesdeStore = (el) => deepClone({
-  nombre: el.nombre || '',
-  color: el.color || '#3B82F6',
-  dimensiones: {
-    ancho: el.dimensiones?.ancho || 0,
-    largo: el.dimensiones?.largo || 0,
-    alto: el.dimensiones?.alto || 0,
-  },
-  pesoMaximo: el.pesoMaximo || 0,
-  alturaSobreSueloCm: el.alturaSobreSueloCm != null
-    ? Number(el.alturaSobreSueloCm)
-    : (el.alturaRespectoAlSuelo != null ? Number(el.alturaRespectoAlSuelo) : 0),
-  diametroCm: (el.forma === 'circular')
-    ? Number(el.dimensiones?.ancho ?? el.dimensiones?.largo ?? 0)
-    : 0,
-  // Buffer local de etiquetas (IDs)
-  tags: Array.isArray(el.etiquetas) ? [...el.etiquetas] : [],
-})
+const cargarDesdeStore = (el) =>
+  deepClone({
+    nombre: el.nombre || '',
+    color: el.color || '#3B82F6',
+    orientacion: Number(el.orientacion) || 0,
+    dimensiones: {
+      ancho: el.dimensiones?.ancho || 0,
+      largo: el.dimensiones?.largo || 0,
+      alto: el.dimensiones?.alto || 0,
+    },
+    pesoMaximo: el.pesoMaximo || 0,
+    alturaSobreSueloCm:
+      el.alturaSobreSueloCm != null
+        ? Number(el.alturaSobreSueloCm)
+        : el.alturaRespectoAlSuelo != null
+          ? Number(el.alturaRespectoAlSuelo)
+          : 0,
+    diametroCm:
+      el.forma === 'circular' ? Number(el.dimensiones?.ancho ?? el.dimensiones?.largo ?? 0) : 0,
+    // Buffer local de etiquetas (IDs)
+    tags: Array.isArray(el.etiquetas) ? [...el.etiquetas] : [],
+  })
 
 // Estado para trackear valores previos y evitar validaciones innecesarias
 const valorDimensionAnterior = ref({})
 const valorPesoAnterior = ref(0)
 const valorDiametroAnterior = ref(0)
 
-watch(() => elementoSeleccionado.value?.id, (id) => {
-  if (id) {
-    snapshotOriginal.value = cargarDesdeStore(elementoSeleccionado.value)
-    edited.value = deepClone(snapshotOriginal.value)
+watch(
+  () => elementoSeleccionado.value?.id,
+  (id) => {
+    if (id) {
+      snapshotOriginal.value = cargarDesdeStore(elementoSeleccionado.value)
+      edited.value = deepClone(snapshotOriginal.value)
 
-    // Inicializar valores anteriores para evitar validaciones innecesarias al cargar
-    valorDimensionAnterior.value = {
-      ancho: edited.value?.dimensiones?.ancho || 0,
-      largo: edited.value?.dimensiones?.largo || 0,
-      alto: edited.value?.dimensiones?.alto || 0
+      // Inicializar valores anteriores para evitar validaciones innecesarias al cargar
+      valorDimensionAnterior.value = {
+        ancho: edited.value?.dimensiones?.ancho || 0,
+        largo: edited.value?.dimensiones?.largo || 0,
+        alto: edited.value?.dimensiones?.alto || 0,
+      }
+      valorPesoAnterior.value = edited.value?.pesoMaximo || 0
+      valorDiametroAnterior.value = edited.value?.diametroCm || 0
+
+      // Limpiar errores al cargar nuevo elemento
+      dimensionError.value = null
+      dimensionSugerencias.value = []
+
+      // Ejecutar validación inicial para detectar errores existentes
+      // Esto se ejecuta en el siguiente tick para asegurar que el estado esté completamente inicializado
+      nextTick(() => {
+        ejecutarValidacionDimensiones()
+      })
+    } else {
+      snapshotOriginal.value = null
+      edited.value = null
+
+      // Limpiar valores anteriores
+      valorDimensionAnterior.value = {}
+      valorPesoAnterior.value = 0
+      valorDiametroAnterior.value = 0
+
+      // Limpiar errores
+      dimensionError.value = null
+      dimensionSugerencias.value = []
     }
-    valorPesoAnterior.value = edited.value?.pesoMaximo || 0
-    valorDiametroAnterior.value = edited.value?.diametroCm || 0
-
-    // Limpiar errores al cargar nuevo elemento
-    dimensionError.value = null
-    dimensionSugerencias.value = []
-
-    // Ejecutar validación inicial para detectar errores existentes
-    // Esto se ejecuta en el siguiente tick para asegurar que el estado esté completamente inicializado
-    nextTick(() => {
-      ejecutarValidacionDimensiones()
-    })
-  } else {
-    snapshotOriginal.value = null
-    edited.value = null
-
-    // Limpiar valores anteriores
-    valorDimensionAnterior.value = {}
-    valorPesoAnterior.value = 0
-    valorDiametroAnterior.value = 0
-
-    // Limpiar errores
-    dimensionError.value = null
-    dimensionSugerencias.value = []
-  }
-}, { immediate: true })
+  },
+  { immediate: true },
+)
 
 // Watch para actualizar automáticamente cuando cambian las dimensiones desde el transformer
 // Esto permite que el panel de propiedades refleje inmediatamente los cambios hechos con el transformer
-watch(() => elementoSeleccionado.value?.dimensiones, (newDimensiones) => {
-  if (!elementoSeleccionado.value || !edited.value || !newDimensiones) return
+watch(
+  () => elementoSeleccionado.value?.dimensiones,
+  (newDimensiones) => {
+    if (!elementoSeleccionado.value || !edited.value || !newDimensiones) return
 
-  // Solo actualizar si las dimensiones cambiaron realmente
-  const currentDims = edited.value.dimensiones || {}
-  const hasChanged =
-    currentDims.ancho !== newDimensiones.ancho ||
-    currentDims.largo !== newDimensiones.largo ||
-    currentDims.alto !== newDimensiones.alto
+    // Solo actualizar si las dimensiones cambiaron realmente
+    const currentDims = edited.value.dimensiones || {}
+    const hasChanged =
+      currentDims.ancho !== newDimensiones.ancho ||
+      currentDims.largo !== newDimensiones.largo ||
+      currentDims.alto !== newDimensiones.alto
 
-  if (hasChanged) {
-    console.debug('[PropiedadesPanel] Actualizando dimensiones desde transformer:', newDimensiones)
+    if (hasChanged) {
+      console.debug(
+        '[PropiedadesPanel] Actualizando dimensiones desde transformer:',
+        newDimensiones,
+      )
 
-    // Actualizar las dimensiones en el estado editado
-    edited.value.dimensiones = { ...newDimensiones }
+      // Actualizar las dimensiones en el estado editado
+      edited.value.dimensiones = { ...newDimensiones }
 
-    // Si es circular, también actualizar el diámetro
-    if (esCircular.value) {
-      edited.value.diametroCm = newDimensiones.ancho || 0
-    }
-
-    // Actualizar el snapshot original para evitar mostrar cambios no aplicados
-    // cuando los cambios vienen del transformer (ya están aplicados en el store)
-    if (elementoSeleccionado.value.dimensionLock) {
-      snapshotOriginal.value.dimensiones = { ...newDimensiones }
+      // Si es circular, también actualizar el diámetro
       if (esCircular.value) {
-        snapshotOriginal.value.diametroCm = newDimensiones.ancho || 0
+        edited.value.diametroCm = newDimensiones.ancho || 0
+      }
+
+      // Actualizar el snapshot original para evitar mostrar cambios no aplicados
+      // cuando los cambios vienen del transformer (ya están aplicados en el store)
+      if (elementoSeleccionado.value.dimensionLock) {
+        snapshotOriginal.value.dimensiones = { ...newDimensiones }
+        if (esCircular.value) {
+          snapshotOriginal.value.diametroCm = newDimensiones.ancho || 0
+        }
       }
     }
-  }
-}, { deep: true, immediate: false })
+  },
+  { deep: true, immediate: false },
+)
 
 // Watch para actualizar automáticamente las propiedades cuando se usen transformaciones
-watch([
-  () => elementoSeleccionado.value?.width,
-  () => elementoSeleccionado.value?.height,
-  () => elementoSeleccionado.value?.x,
-  () => elementoSeleccionado.value?.y
-], ([newWidth, newHeight, newX, newY]) => {
-  if (!elementoSeleccionado.value || !edited.value) return
+watch(
+  [
+    () => elementoSeleccionado.value?.width,
+    () => elementoSeleccionado.value?.height,
+    () => elementoSeleccionado.value?.x,
+    () => elementoSeleccionado.value?.y,
+  ],
+  ([newWidth, newHeight, newX, newY]) => {
+    if (!elementoSeleccionado.value || !edited.value) return
 
-  // Solo sincronizar si el elemento tiene dimensionLock (indica que fue transformado)
-  if (elementoSeleccionado.value.dimensionLock) {
-    // Las dimensiones en píxeles ya se reflejarán automáticamente en el watch de dimensiones
-    // Este watch principalmente maneja cambios de posición si es necesario en el futuro
-  }
-}, { immediate: false })
+    // Solo sincronizar si el elemento tiene dimensionLock (indica que fue transformado)
+    if (elementoSeleccionado.value.dimensionLock) {
+      // Las dimensiones en píxeles ya se reflejarán automáticamente en el watch de dimensiones
+      // Este watch principalmente maneja cambios de posición si es necesario en el futuro
+    }
+  },
+  { immediate: false },
+)
 
 // Comparación order-insensitive solo para tags
 const normalizeForCompare = (obj) => {
@@ -466,40 +586,56 @@ const normalizeForCompare = (obj) => {
   return !deepEqual(normalizeForCompare(edited.value), normalizeForCompare(snapshotOriginal.value))
 })*/
 
-const isDirty = ref(false);
-watch([() => edited.value, () => snapshotOriginal.value], () => {
-  if (!edited.value || !snapshotOriginal.value) {
-    isDirty.value = false;
-    canvasStore.setCambiosNoAplicados()
-    return;
-  }
+const isDirty = ref(false)
+watch(
+  [() => edited.value, () => snapshotOriginal.value],
+  () => {
+    if (!edited.value || !snapshotOriginal.value) {
+      isDirty.value = false
+      canvasStore.setCambiosNoAplicados()
+      return
+    }
 
-  // No marcar como dirty si los cambios vienen del transformer (dimensionLock = true)
-  // ya que estos cambios ya están aplicados en el store
-  if (elementoSeleccionado.value?.dimensionLock) {
-    const currentNormalized = normalizeForCompare(edited.value)
-    const originalNormalized = normalizeForCompare(snapshotOriginal.value)
+    // No marcar como dirty si los cambios vienen del transformer (dimensionLock = true)
+    // ya que estos cambios ya están aplicados en el store
+    if (elementoSeleccionado.value?.dimensionLock) {
+      const currentNormalized = normalizeForCompare(edited.value)
+      const originalNormalized = normalizeForCompare(snapshotOriginal.value)
 
-    // Solo comparar campos que no sean dimensiones si hay dimensionLock
-    const { dimensiones: currentDims, diametroCm: currentDiam, ...currentWithoutDims } = currentNormalized
-    const { dimensiones: originalDims, diametroCm: originalDiam, ...originalWithoutDims } = originalNormalized
+      // Solo comparar campos que no sean dimensiones si hay dimensionLock
+      const {
+        dimensiones: currentDims,
+        diametroCm: currentDiam,
+        ...currentWithoutDims
+      } = currentNormalized
+      const {
+        dimensiones: originalDims,
+        diametroCm: originalDiam,
+        ...originalWithoutDims
+      } = originalNormalized
 
-    isDirty.value = !deepEqual(currentWithoutDims, originalWithoutDims)
-  } else {
-    isDirty.value = !deepEqual(normalizeForCompare(edited.value), normalizeForCompare(snapshotOriginal.value))
-  }
+      isDirty.value = !deepEqual(currentWithoutDims, originalWithoutDims)
+    } else {
+      isDirty.value = !deepEqual(
+        normalizeForCompare(edited.value),
+        normalizeForCompare(snapshotOriginal.value),
+      )
+    }
 
-  canvasStore.setCambiosNoAplicados(isDirty.value);
-}, { deep: true });
+    canvasStore.setCambiosNoAplicados(isDirty.value)
+  },
+  { deep: true },
+)
 
-const guardarDeshabilitado = computed(() =>
-  isSaving.value ||
-  !!advertenciaAltura.value ||
-  !!advertenciaZBase.value ||
-  !!advertenciaDiametroLimite.value ||
-  !!advertenciaDiametroContencion.value ||
-  !!advertenciaPeso.value ||
-  !!dimensionError.value, // Bloquear si hay errores de dimensiones
+const guardarDeshabilitado = computed(
+  () =>
+    isSaving.value ||
+    !!advertenciaAltura.value ||
+    !!advertenciaZBase.value ||
+    !!advertenciaDiametroLimite.value ||
+    !!advertenciaDiametroContencion.value ||
+    !!advertenciaPeso.value ||
+    !!dimensionError.value, // Bloquear si hay errores de dimensiones
 )
 
 const pisos = computed(() => {
@@ -585,7 +721,7 @@ const guardar = async () => {
     const vista = canvasStore.vistaActiva || 'XY'
     const esVistaFrontal = vista === 'XZ'
     const widthPx = anchoCm * CM_TO_PX
-    const heightPx = esVistaFrontal ? (altoCm * CM_TO_PX) : (largoCm * CM_TO_PX)
+    const heightPx = esVistaFrontal ? altoCm * CM_TO_PX : largoCm * CM_TO_PX
 
     const elementoTemporal = {
       ...elementoSeleccionado.value,
@@ -594,15 +730,24 @@ const guardar = async () => {
       dimensiones: {
         ancho: anchoCm,
         largo: largoCm,
-        alto: altoCm
-      }
+        alto: altoCm,
+      },
     }
 
     // VALIDACIÓN 1: Validación de posicionamiento (colisiones y área)
-    const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementoSeleccionado.value.id)
+    const neighbors = canvasStore.elementosVisibles.filter(
+      (e) => e.id !== elementoSeleccionado.value.id,
+    )
     const layerWidth = canvasStore.canvasAdaptativo?.width || 1000
     const layerHeight = canvasStore.canvasAdaptativo?.height || 1000
-    const areaBounds = { minX: 0, minY: 0, maxX: layerWidth, maxY: layerHeight }
+    let areaBounds = { minX: 0, minY: 0, maxX: layerWidth, maxY: layerHeight, polygon: null }
+    // Si está en planta, agregar poligono a propiedades del área
+    if (canvasStore.estaEnPlanta) {
+      console.debug('[PropiedadesPanel] Validando con polígono de planta activa')
+      areaBounds.polygon = canvasStore.plantaActivaData?.poligono || null
+    } else {
+      console.debug('[PropiedadesPanel] Validando sin polígono (vista lateral)')
+    }
 
     const isValidPosition = isPlacementValid({
       pos: { x: elementoTemporal.x, y: elementoTemporal.y },
@@ -610,7 +755,7 @@ const guardar = async () => {
       neighbors,
       areaBounds,
       CM_TO_PX,
-      epsPx: 0.5
+      epsPx: 0.5,
     })
 
     if (!isValidPosition) {
@@ -618,7 +763,7 @@ const guardar = async () => {
       dimensionSugerencias.value = [
         'Reducir las dimensiones',
         'Mover el elemento a otra posición',
-        'Verificar que no haya colisiones con otros elementos'
+        'Verificar que no haya colisiones con otros elementos',
       ]
       isSaving.value = false
       return
@@ -628,7 +773,7 @@ const guardar = async () => {
     const resultadoDims = validarDimensiones(
       elementoSeleccionado.value.id,
       { ancho: anchoCm, largo: largoCm, alto: altoCm },
-      { silencioso: false, elementoTemporal }
+      { silencioso: false, elementoTemporal },
     )
     if (!resultadoDims?.valida) {
       dimensionError.value = resultadoDims?.razon || 'Dimensiones inválidas'
@@ -656,8 +801,12 @@ const guardar = async () => {
     patch.alturaRespectoAlSuelo = zBase
     patch.alturaSobreSueloCm = zBase
 
-    const alturaTechoCm = Number(canvasStore.plantaPorId(canvasStore.plantaActiva)?.dimensiones?.alto || 0)
-    const altoCm = Number(edited.value?.dimensiones?.alto || elementoSeleccionado.value?.dimensiones?.alto || 0)
+    const alturaTechoCm = Number(
+      canvasStore.plantaPorId(canvasStore.plantaActiva)?.dimensiones?.alto || 0,
+    )
+    const altoCm = Number(
+      edited.value?.dimensiones?.alto || elementoSeleccionado.value?.dimensiones?.alto || 0,
+    )
     const yTopPx = (alturaTechoCm - (zBase + altoCm)) * (CM_TO_PX || 10)
     if (Number.isFinite(yTopPx)) {
       if (canvasStore.vistaActiva === 'XZ') {
@@ -677,10 +826,12 @@ const guardar = async () => {
     // No contaminar el store con la propiedad auxiliar
     delete patch.diametroCm
   }
-  const diamChanged = esCircular.value && (snapshotOriginal.value?.diametroCm !== edited.value?.diametroCm)
+  const diamChanged =
+    esCircular.value && snapshotOriginal.value?.diametroCm !== edited.value?.diametroCm
 
   // 3) Validación de peso solo si cambió
-  const pesoCambio = Math.abs((valorPesoAnterior.value || 0) - (Number(edited.value?.pesoMaximo) || 0)) > 0.01
+  const pesoCambio =
+    Math.abs((valorPesoAnterior.value || 0) - (Number(edited.value?.pesoMaximo) || 0)) > 0.01
   if (pesoCambio && advertenciaPeso.value) {
     showWarning(advertenciaPeso.value)
     isSaving.value = false
@@ -695,7 +846,7 @@ const guardar = async () => {
     valorDimensionAnterior.value = {
       ancho: anchoCm,
       largo: largoCm,
-      alto: altoCm
+      alto: altoCm,
     }
     valorPesoAnterior.value = Number(edited.value?.pesoMaximo) || 0
     valorDiametroAnterior.value = esCircular.value ? anchoCm : 0
@@ -735,7 +886,7 @@ const ejecutarValidacionDimensiones = () => {
   const vista = canvasStore.vistaActiva || 'XY'
   const esVistaFrontal = vista === 'XZ'
   const widthPx = anchoCm * CM_TO_PX
-  const heightPx = esVistaFrontal ? (altoCm * CM_TO_PX) : (largoCm * CM_TO_PX)
+  const heightPx = esVistaFrontal ? altoCm * CM_TO_PX : largoCm * CM_TO_PX
 
   // Crear elemento temporal con las nuevas dimensiones para validación (similar a useTransformer)
   const elementoTemporal = {
@@ -745,15 +896,24 @@ const ejecutarValidacionDimensiones = () => {
     dimensiones: {
       ancho: anchoCm,
       largo: largoCm,
-      alto: altoCm
-    }
+      alto: altoCm,
+    },
   }
 
   // VALIDACIÓN 1: Validación de posicionamiento (colisiones y área) - similar a useTransformer
-  const neighbors = canvasStore.elementosVisibles.filter(e => e.id !== elementoSeleccionado.value.id)
+  const neighbors = canvasStore.elementosVisibles.filter(
+    (e) => e.id !== elementoSeleccionado.value.id,
+  )
   const layerWidth = canvasStore.canvasAdaptativo?.width || 1000
   const layerHeight = canvasStore.canvasAdaptativo?.height || 1000
-  const areaBounds = { minX: 0, minY: 0, maxX: layerWidth, maxY: layerHeight }
+  let areaBounds = { minX: 0, minY: 0, maxX: layerWidth, maxY: layerHeight, polygon: null }
+  // Si está en planta, agregar poligono a propiedades del área
+  if (canvasStore.estaEnPlanta) {
+    console.debug('[PropiedadesPanel] Validando con polígono de planta activa')
+    areaBounds.polygon = canvasStore.plantaActivaData?.poligono || null
+  } else {
+    console.debug('[PropiedadesPanel] Validando sin polígono (vista lateral)')
+  }
 
   const isValidPosition = isPlacementValid({
     pos: { x: elementoTemporal.x, y: elementoTemporal.y },
@@ -761,7 +921,7 @@ const ejecutarValidacionDimensiones = () => {
     neighbors,
     areaBounds,
     CM_TO_PX,
-    epsPx: 0.5
+    epsPx: 0.5,
   })
 
   if (!isValidPosition) {
@@ -769,7 +929,7 @@ const ejecutarValidacionDimensiones = () => {
     dimensionSugerencias.value = [
       'Reducir las dimensiones',
       'Mover el elemento a otra posición',
-      'Verificar que no haya colisiones con otros elementos'
+      'Verificar que no haya colisiones con otros elementos',
     ]
     return
   }
@@ -778,7 +938,7 @@ const ejecutarValidacionDimensiones = () => {
   const resultadoDims = validarDimensiones(
     elementoSeleccionado.value.id,
     { ancho: anchoCm, largo: largoCm, alto: altoCm },
-    { silencioso: true, elementoTemporal }
+    { silencioso: true, elementoTemporal },
   )
 
   // Actualizar UI con los resultados
@@ -837,14 +997,15 @@ const padreContext = computed(() => {
 
 const infoPesoPadre = computed(() => {
   const { padreId, padreType } = padreContext.value
-  if (!padreId || !padreType) return { limiteDePeso: false, usado: 0, maximo: 0, disponible: Infinity, porcentajeUsado: 0 }
+  if (!padreId || !padreType)
+    return { limiteDePeso: false, usado: 0, maximo: 0, disponible: Infinity, porcentajeUsado: 0 }
   return calcularPesoDisponible(padreId, padreType)
 })
 
 const capacidadContextoTexto = computed(() => {
   const info = infoPesoPadre.value
   return `Actualmente la bodega tiene ${info.usado} kg ocupados (${toPrecisionCm(info.porcentajeUsado)}% de su capacidad).
-  Todavía puedes ocupar ${info.disponible} kg sin problemas.`;
+  Todavía puedes ocupar ${info.disponible} kg sin problemas.`
 })
 
 const validarPeso = () => {
@@ -870,11 +1031,11 @@ const validarPeso = () => {
 }
 
 const getTipoNombre = (tipo) => {
-  return TIPOS_ENTIDAD.find(t => t.id === tipo)?.nombre || tipo
+  return TIPOS_ENTIDAD.find((t) => t.id === tipo)?.nombre || tipo
 }
 
 const getCategoriaDisplay = (categoria) => {
-  return TODAS_LAS_CATEGORIAS.find(c => c.id === categoria)?.nombre || categoria
+  return TODAS_LAS_CATEGORIAS.find((c) => c.id === categoria)?.nombre || categoria
 }
 
 const esEstructura = computed(() => {
@@ -882,7 +1043,9 @@ const esEstructura = computed(() => {
   return cat !== 'contenedores' && cat !== 'pasillos'
 })
 
-const estaUbicadoEnPared = computed(() => (elementoSeleccionado.value?.ubicacion || '').toLowerCase() === 'pared')
+const estaUbicadoEnPared = computed(
+  () => (elementoSeleccionado.value?.ubicacion || '').toLowerCase() === 'pared',
+)
 
 const esContenedor = computed(() => {
   const el = elementoSeleccionado.value
@@ -891,9 +1054,15 @@ const esContenedor = computed(() => {
 
 const mostrarCapacidad = computed(() => esEstructura.value || esContenedor.value)
 const mostrarDimensiones = computed(() => true)
-const esCircular = computed(() => (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circular' || (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circle')
+const esCircular = computed(
+  () =>
+    (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circular' ||
+    (elementoSeleccionado.value?.forma || '').toLowerCase() === 'circle',
+)
 const ocultarAnchoLargo = computed(() => esCircular.value)
-const esPasillo = computed(() => (elementoSeleccionado.value?.tipo || '').toLowerCase() === 'pasillos')
+const esPasillo = computed(
+  () => (elementoSeleccionado.value?.tipo || '').toLowerCase() === 'pasillos',
+)
 
 // const volumen = computed(() => {
 //   if (!esContenedor.value) return null
@@ -1050,12 +1219,16 @@ const colorPesoUsado = computed(() => {
 //   return '#ef4444' // Rojo
 // })
 
-const alturaPlanta = computed(() => canvasStore.plantaPorId(canvasStore.plantaActiva)?.dimensiones?.alto || 0)
+const alturaPlanta = computed(
+  () => canvasStore.plantaPorId(canvasStore.plantaActiva)?.dimensiones?.alto || 0,
+)
 const advertenciaAltura = computed(() => {
   if (!esEstructura.value) return null
-  const max = alturaPlanta.value;
+  const max = alturaPlanta.value
   const actual = edited.value?.dimensiones?.alto || 0
-  return actual > max ? `La altura no debe superar ${max} cm (debido a la altura de planta o un elemento situado encima)` : null
+  return actual > max
+    ? `La altura no debe superar ${max} cm (debido a la altura de planta o un elemento situado encima)`
+    : null
 })
 
 // Advertencia de peso por límite del contexto padre (bloquea Guardar)
@@ -1089,10 +1262,13 @@ const advertenciaPeso = computed(() => {
   if (padreId && padreType) {
     const elementoSimulado = {
       ...elementoSeleccionado.value,
-      pesoMaximo: newVal
+      pesoMaximo: newVal,
     }
 
-    const validacionTeorica = validarPesoElemento(elementoSimulado, padreId, padreType, { validacionTeorica: true, esEdicion: true })
+    const validacionTeorica = validarPesoElemento(elementoSimulado, padreId, padreType, {
+      validacionTeorica: true,
+      esEdicion: true,
+    })
 
     if (!validacionTeorica.valido && validacionTeorica.limiteDePeso) {
       return `Se excede el límite de peso del contenedor padre. Exceso: ${validacionTeorica.exceso.toFixed(2)} kg (Total: ${validacionTeorica.pesoTotal.toFixed(2)}/${validacionTeorica.pesoMaximo} kg).`
@@ -1131,7 +1307,8 @@ const advertenciaDiametroContencion = computed(() => {
   const xCm = xPx / (CM_TO_PX || 10)
   const yCm = yPx / (CM_TO_PX || 10)
   if (xCm < 0 || yCm < 0) return 'El círculo se sale del área de trabajo con el diámetro actual.'
-  if (xCm + d > plantaDims.value.ancho || yCm + d > plantaDims.value.largo) return 'El círculo se sale del área de trabajo con el diámetro actual.'
+  if (xCm + d > plantaDims.value.ancho || yCm + d > plantaDims.value.largo)
+    return 'El círculo se sale del área de trabajo con el diámetro actual.'
   return null
 })
 
@@ -1198,7 +1375,7 @@ const validarAlturaSobreSuelo = () => {
 
 const deseleccionarElemento = () => {
   canvasStore.seleccionarElemento(null)
-  canvasStore.setCambiosNoAplicados(false);
+  canvasStore.setCambiosNoAplicados(false)
 }
 
 // ====== Gestión de etiquetas (buffer local) ======
@@ -1267,7 +1444,7 @@ onBeforeRouteLeave(async (to, from, next) => {
     title: 'Cambios sin guardar',
     message: 'Hay cambios sin guardar. ¿Guardar antes de salir?',
     confirmLabel: 'Guardar y salir',
-    cancelLabel: 'Cancelar'
+    cancelLabel: 'Cancelar',
   })
   if (save) {
     await guardar()
@@ -1277,7 +1454,7 @@ onBeforeRouteLeave(async (to, from, next) => {
       title: 'Salir sin guardar',
       message: '¿Salir sin guardar?',
       confirmLabel: 'Salir',
-      cancelLabel: 'Cancelar'
+      cancelLabel: 'Cancelar',
     })
     if (exit) next()
     else next(false)

@@ -85,6 +85,16 @@ export const useStatePersistence = () => {
           plantaId: elemento.plantaId,
           etiquetas: Array.isArray(elemento.etiquetas) ? elemento.etiquetas : [],
 
+          // Orientación discreta (0,90,180,270)
+          orientacion: (() => {
+            const v = Number(elemento.orientacion)
+            if (!Number.isFinite(v)) return 0
+            const n = ((v % 360) + 360) % 360
+            // Snap a las orientaciones permitidas
+            const allowed = [0, 90, 180, 270]
+            return allowed.includes(n) ? n : 0
+          })(),
+
           alturaRespectoAlSuelo: typeof elemento.alturaRespectoAlSuelo === 'number'
             ? elemento.alturaRespectoAlSuelo : 0,
 
@@ -394,6 +404,15 @@ export const useStatePersistence = () => {
             categoria: elementoData.categoria || 'general',
             plantaId: elementoData.plantaId,
             etiquetas: Array.isArray(elementoData.etiquetas) ? elementoData.etiquetas : [],
+
+            // Orientación discreta con fallback
+            orientacion: (() => {
+              const v = Number(elementoData.orientacion)
+              if (!Number.isFinite(v)) return 0
+              const n = ((v % 360) + 360) % 360
+              const allowed = [0, 90, 180, 270]
+              return allowed.includes(n) ? n : 0
+            })(),
 
             // Posición con validación
             x: typeof elementoData.posicion.x === 'number' ? elementoData.posicion.x : 0,

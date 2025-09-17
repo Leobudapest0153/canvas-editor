@@ -34,7 +34,16 @@ export const useCatalogStore = defineStore('catalog', () => {
     let result = items.value.filter(baseSystemGuard)
 
     if (catalogContext.value.mode === 'root') {
-      result = result.filter((item) => CATALOGO.SISTEMA_BASE_KEYS.includes(item.id))
+      // En la raíz (plantas):
+      // - Si estamos viendo Elementos, mostramos los tipos permitidos para plantas (cuartos, elementos, pasillos, ...)
+      //   en lugar de restringir solo a SISTEMA_BASE_KEYS para permitir ver elementos creados por el usuario.
+      // - Para otros catálogos, mantenemos el filtro por SISTEMA_BASE_KEYS.
+      if (selectedCatalog.value === 'elementos') {
+        const allowed = allowedTypesForContext(catalogContext.value)
+        result = result.filter((item) => allowed.includes(item.tipo))
+      } else {
+        result = result.filter((item) => CATALOGO.SISTEMA_BASE_KEYS.includes(item.id))
+      }
     } else {
       const allowed = allowedTypesForContext(catalogContext.value)
       result = result.filter((item) => allowed.includes(item.tipo))
@@ -44,8 +53,10 @@ export const useCatalogStore = defineStore('catalog', () => {
       result = result.filter(match(searchText.value))
     }
 
-    if (selectedCategory.value) {
-      result = result.filter((item) => item.categoria === selectedCategory.value)
+    // Normalizar categoría seleccionada: vacío => null, y validar que exista
+    const selCat = selectedCategory.value || null
+    if (selCat) {
+      result = result.filter((item) => item.categoria === selCat)
     }
 
     return result

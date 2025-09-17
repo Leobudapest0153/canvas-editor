@@ -68,6 +68,16 @@
         </transition>
       </div>
     </div>
+    
+    <!-- Botón modal agregar espacio/cuarto -->
+    <div class="py-1 flex justify-center">
+      <button
+      @click="mostrarModalAgregarEspacio = true"
+      class="px-2 py-1 bg-primary hover:bg-primary-600 text-white rounded-xl text-xs"
+      >
+      Agregar {{ modo === 'cuarto' ? 'cuarto' : 'espacio' }}
+      </button>
+    </div>
 
     <!-- Lista de elementos -->
     <div class="elementos-lista flex-1 overflow-y-auto p-4">
@@ -175,6 +185,13 @@
       @cancel="cerrarModal"
       @save="onGuardarElemento"
     />
+
+    <AgregarCuartoModal
+      :visible="mostrarModalAgregarEspacio"
+      :tipo="modo === 'cuarto' ? 'cuarto' : 'espacio'"
+      @close="mostrarModalAgregarEspacio = false"
+      @save="onGuardarEspacio"
+    />
   </div>
 </template>
 
@@ -196,6 +213,17 @@ import { CATALOGO } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
 
 import ElementEditor from './modals/ElementEditor.vue'
+import AgregarCuartoModal from './AgregarCuartoModal.vue'
+
+// Props
+const props = defineProps({
+  modo: {
+    type: String,
+    default: 'espacio',
+    validator: (v) => ['espacio', 'cuarto'].includes(v),
+  },
+})
+const modo = computed(() => props.modo)
 
 // Stores
 const canvasStore = useCanvasStore()
@@ -238,6 +266,7 @@ const handleClickOutside = (event) => {
   }
 }
 const mostrarModalCrear = ref(false)
+const mostrarModalAgregarEspacio = ref(false)
 
 // Formulario para nuevo elemento
 const nuevoElemento = ref({
@@ -276,7 +305,14 @@ const puedeCrearElementosPersonalizados = computed(
 // Computed: categorías disponibles según el contexto
 const categoriasDisponibles = computed(() => {
   const tipos = catalogStore.allowedTypesForContext(catalogContext.value)
-  return TODAS_LAS_CATEGORIAS.filter((cat) => tipos.includes(cat.tipo))
+  let cats = TODAS_LAS_CATEGORIAS.filter((cat) => tipos.includes(cat.tipo))
+  // Ajuste por modo: en 'cuarto' solo categorías de 'cuartos'; en 'espacio' excluye 'cuartos'
+  if (modo.value === 'cuarto') {
+    cats = cats.filter((c) => c.tipo === 'cuartos')
+  } else {
+    cats = cats.filter((c) => c.tipo !== 'cuartos')
+  }
+  return cats
 })
 
 // Computed local para filtrar los elementos del catálogo (igual que en CapasTab.vue)
@@ -289,6 +325,13 @@ const elementosFiltrados = computed(() => {
     : []
 
   let out = base
+
+  // Filtro por modo: en 'cuarto' solo items tipo 'cuartos'; en 'espacio' todos menos 'cuartos'
+  if (modo.value === 'cuarto') {
+    out = out.filter((el) => el.tipo === 'cuartos')
+  } else {
+    out = out.filter((el) => el.tipo !== 'cuartos')
+  }
 
   // Filtro por texto (nombre o descripción)
   if (filtroTexto && filtroTexto.value) {
@@ -326,6 +369,29 @@ const onGuardarElemento = (elemento) => {
   categoriaSeleccionada.value = elementoNuevo.categoria
   filtroTexto.value = ''
 }
+
+const onGuardarEspacio = (datosEspacio) => {
+  try {
+    canvasStore.crearDesdeFormulario(datosEspacio)
+    // Limpiar filtros para asegurar visualización del nuevo elemento
+    categoriaSeleccionada.value = null
+    filtroTexto.value = ''
+    mostrarModalAgregarEspacio.value = false
+  } catch (e) {
+    console.error('No se pudo crear desde formulario', e)
+  }
+}
+
+// Evitar que el select quede con un valor no listado (lo deja "en blanco" y filtra a nada)
+watch([
+  () => categoriaSeleccionada.value,
+  () => categoriasDisponibles.value
+], () => {
+  const ids = new Set((categoriasDisponibles.value || []).map(c => c.id))
+  if (categoriaSeleccionada.value && !ids.has(categoriaSeleccionada.value)) {
+    categoriaSeleccionada.value = null
+  }
+})
 
 // Métodos
 const getTipoNombre = (tipo) => {

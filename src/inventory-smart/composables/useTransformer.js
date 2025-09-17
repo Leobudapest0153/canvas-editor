@@ -2,8 +2,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
-import { clampInsideArea } from '@/inventory-smart/utils/bounds'
-import { circleInPolygon, pointInPolygon } from '@/inventory-smart/utils/polygonBounds'
+import { circleInPolygon, isRectCompletelyInPolygon } from '@/inventory-smart/utils/polygonBounds'
 import { correctTransformValues } from '@/inventory-smart/utils/precision'
 import { toTransformerPrecision } from '../utils/fixedDimensions'
 
@@ -34,120 +33,6 @@ export function useTransformer({
   const editingElementId = ref(null)
   const transformInitialState = new Map()
   const transformState = new Map()
-
-  // Helper para verificar si un rectángulo está completamente dentro del polígono
-  // Usa intersección de segmentos para detectar si algún borde del rectángulo cruza el polígono
-  const isRectCompletelyInPolygon = (x, y, width, height, polygon) => {
-
-    // 1. Verificar que todas las esquinas estén dentro
-    const corners = [
-      { x, y, label: 'top-left' },
-      { x: x + width, y, label: 'top-right' },
-      { x: x + width, y: y + height, label: 'bottom-right' },
-      { x, y: y + height, label: 'bottom-left' }
-    ]
-
-    for (const corner of corners) {
-      const isInside = pointInPolygon(corner, polygon)
-      if (!isInside) {
-        return false
-      }
-    }
-
-    // 2. Verificar que ningún borde del rectángulo intersecte con los bordes del polígono
-    const rectEdges = [
-      { start: { x, y }, end: { x: x + width, y }, label: 'top' },
-      { start: { x: x + width, y }, end: { x: x + width, y: y + height }, label: 'right' },
-      { start: { x: x + width, y: y + height }, end: { x, y: y + height }, label: 'bottom' },
-      { start: { x, y: y + height }, end: { x, y }, label: 'left' }
-    ]
-
-    // Función para verificar intersección entre dos segmentos de línea
-    const doLinesIntersect = (line1Start, line1End, line2Start, line2End) => {
-      const x1 = line1Start.x, y1 = line1Start.y
-      const x2 = line1End.x, y2 = line1End.y
-      const x3 = line2Start.x, y3 = line2Start.y
-      const x4 = line2End.x, y4 = line2End.y
-
-      const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-      if (Math.abs(denom) < 1e-10) return false // Líneas paralelas
-
-      const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
-      const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom
-
-      return t >= 0 && t <= 1 && u >= 0 && u <= 1
-    }
-
-    // Verificar intersecciones con cada borde del polígono
-    for (let i = 0; i < polygon.length; i++) {
-      const polyStart = polygon[i]
-      const polyEnd = polygon[(i + 1) % polygon.length]
-
-      for (const rectEdge of rectEdges) {
-        if (doLinesIntersect(rectEdge.start, rectEdge.end, polyStart, polyEnd)) {
-          return false
-        }
-      }
-    }
-
-    // 3. Verificar puntos internos densos (especialmente cerca de ángulos)
-    const INTERNAL_SAMPLES = 20
-    for (let i = 1; i < INTERNAL_SAMPLES; i++) {
-      for (let j = 1; j < INTERNAL_SAMPLES; j++) {
-        const internalPoint = {
-          x: x + (width * i) / INTERNAL_SAMPLES,
-          y: y + (height * j) / INTERNAL_SAMPLES,
-          label: `internal-${i}-${j}`
-        }
-        const isInside = pointInPolygon(internalPoint, polygon)
-        if (!isInside) {
-          return false
-        }
-      }
-    }
-
-    // 4. Verificar puntos adicionales muy cerca de los bordes (para capturar ángulos)
-    const EDGE_SAMPLES = 25
-    const EDGE_OFFSET = 2 // píxeles hacia adentro desde el borde
-
-    // Puntos cerca del borde superior
-    for (let i = 0; i <= EDGE_SAMPLES; i++) {
-      const t = i / EDGE_SAMPLES
-      const point = { x: x + width * t, y: y + EDGE_OFFSET }
-      if (!pointInPolygon(point, polygon)) {
-        return false
-      }
-    }
-
-    // Puntos cerca del borde inferior
-    for (let i = 0; i <= EDGE_SAMPLES; i++) {
-      const t = i / EDGE_SAMPLES
-      const point = { x: x + width * t, y: y + height - EDGE_OFFSET }
-      if (!pointInPolygon(point, polygon)) {
-        return false
-      }
-    }
-
-    // Puntos cerca del borde izquierdo
-    for (let i = 0; i <= EDGE_SAMPLES; i++) {
-      const t = i / EDGE_SAMPLES
-      const point = { x: x + EDGE_OFFSET, y: y + height * t }
-      if (!pointInPolygon(point, polygon)) {
-        return false
-      }
-    }
-
-    // Puntos cerca del borde derecho
-    for (let i = 0; i <= EDGE_SAMPLES; i++) {
-      const t = i / EDGE_SAMPLES
-      const point = { x: x + width - EDGE_OFFSET, y: y + height * t }
-      if (!pointInPolygon(point, polygon)) {
-        return false
-      }
-    }
-
-    return true
-  }
 
   // Cleanup automático para prevenir memory leaks
   const cleanupStaleStates = () => {

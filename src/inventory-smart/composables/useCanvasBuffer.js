@@ -232,13 +232,27 @@ export const useCanvasBuffer = () => {
    */
   const pasteStructureRecursive = (elementoToPaste, position, allElementsMap, parentId = null) => {
     // Crear el elemento en la posición especificada
-    const newElement = {
+    const newElementBase = {
       ...elementoToPaste,
       x: position.x,
       y: position.y,
       padre: parentId,
       hijos: [] // Reiniciar hijos, se agregarán después
     }
+
+    // Si es pasillo, forzar altura dinámica según planta destino
+    let newElement = newElementBase
+    try {
+      if ((newElementBase?.tipo || '').toLowerCase() === 'pasillos') {
+        const planta = canvasStore.plantaPorId(canvasStore.plantaActiva)
+        const altoPlanta = planta?.dimensiones?.alto
+        if (Number.isFinite(altoPlanta)) {
+          const dims = { ...(newElementBase.dimensiones || {}) }
+          dims.alto = altoPlanta
+          newElement = { ...newElementBase, dimensiones: dims }
+        }
+      }
+    } catch { /* ignore */ }
 
     // Limpiar propiedades que el store manejará
     if (!parentId) {
@@ -372,9 +386,21 @@ export const useCanvasBuffer = () => {
 
     const { elemento, sourceInfo } = bufferItem
 
+    // Si es pasillo, ajustar alto al de la planta destino antes de validar
+    let elementoForValidation = elemento
+    try {
+      if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
+        const planta = canvasStore.plantaPorId(canvasStore.plantaActiva)
+        const altoPlanta = planta?.dimensiones?.alto
+        const dims = { ...(elemento.dimensiones || {}) }
+        if (Number.isFinite(altoPlanta)) dims.alto = altoPlanta
+        elementoForValidation = { ...elemento, dimensiones: dims }
+      }
+    } catch { /* ignore */ }
+
     // Validar peso máximo para el elemento principal
     const resultadoValidacionPeso = weightValidation.validarPesoElemento(
-      elemento,
+      elementoForValidation,
       canvasStore.contextoActual.id,
       canvasStore.contextoActual.tipo
     )
@@ -402,7 +428,21 @@ export const useCanvasBuffer = () => {
       // Obtener el elemento raíz con el nuevo ID
       const originalRootId = elemento.id
       const newRootId = newIdMapping.get(originalRootId)
-      const newRootElement = newElementsMap.get(newRootId)
+      let newRootElement = newElementsMap.get(newRootId)
+
+      // Ajuste de altura para pasillos (raíz) según planta destino
+      try {
+        if ((newRootElement?.tipo || '').toLowerCase() === 'pasillos') {
+          const planta = canvasStore.plantaPorId(canvasStore.plantaActiva)
+          const altoPlanta = planta?.dimensiones?.alto
+          if (Number.isFinite(altoPlanta)) {
+            const dims = { ...(newRootElement.dimensiones || {}) }
+            dims.alto = altoPlanta
+            newRootElement = { ...newRootElement, dimensiones: dims }
+            newElementsMap.set(newRootId, newRootElement)
+          }
+        }
+      } catch { /* ignore */ }
 
       if (!newRootElement) {
         console.error('⚠️ Error al regenerar IDs para el elemento raíz')
@@ -439,12 +479,25 @@ export const useCanvasBuffer = () => {
       const randomSuffix = Math.random().toString(36).substr(2, 9)
       const newId = `${elemento.tipo || elemento.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
 
+      // Forzar altura de pasillos según planta destino
+      let elementoToInsert = { ...elemento, id: newId }
+      try {
+        if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
+          const planta = canvasStore.plantaPorId(canvasStore.plantaActiva)
+          const altoPlanta = planta?.dimensiones?.alto
+          const dims = { ...(elementoToInsert.dimensiones || {}) }
+          if (Number.isFinite(altoPlanta)) dims.alto = altoPlanta
+          elementoToInsert = { ...elementoToInsert, dimensiones: dims }
+        }
+      } catch { /* ignore */ }
+
       const newElement = {
-        ...elemento,
+        ...elementoToInsert,
         id: newId, // Asignar nuevo ID único
         x: position.x,
         y: position.y,
-      }      // Limpiar propiedades que el store manejará
+      }
+      // Limpiar propiedades que el store manejará
       delete newElement.plantaId
       delete newElement.padre
 
@@ -486,7 +539,20 @@ export const useCanvasBuffer = () => {
 
     const { newElementsMap, newIdMapping } = regenerateUniqueIds(allElementsMap)
     const newRootId = newIdMapping.get(payload.rootId)
-    const newRootElement = newElementsMap.get(newRootId)
+    let newRootElement = newElementsMap.get(newRootId)
+    // Forzar altura de pasillos en plantillas
+    try {
+      if ((newRootElement?.tipo || '').toLowerCase() === 'pasillos') {
+        const planta = canvasStore.plantaPorId(canvasStore.plantaActiva)
+        const altoPlanta = planta?.dimensiones?.alto
+        if (Number.isFinite(altoPlanta)) {
+          const dims = { ...(newRootElement.dimensiones || {}) }
+          dims.alto = altoPlanta
+          newRootElement = { ...newRootElement, dimensiones: dims }
+          newElementsMap.set(newRootId, newRootElement)
+        }
+      }
+    } catch { /* ignore */ }
     if (!newRootElement) return false
 
     return pasteStructureRecursive(newRootElement, position, newElementsMap)
