@@ -53,16 +53,16 @@
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Color</label>
                     <div class="flex items-center gap-3">
-                      <input 
-                        v-model="datosGenerales.color" 
+                      <input
+                        v-model="datosGenerales.color"
                         type="color"
-                        class="!w-12 h-10 border border-gray-300 rounded-lg cursor-pointer" 
+                        class="!w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
                       />
-                      <input 
-                        v-model="datosGenerales.color" 
+                      <input
+                        v-model="datosGenerales.color"
                         type="text"
                         class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="#3B82F6" 
+                        placeholder="#3B82F6"
                       />
                     </div>
                   </div>
@@ -75,15 +75,15 @@
                   </label>
                   <select
                     v-model="datosGenerales.tipoSeleccionado"
-                            class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             :class="(touchedGeneral.tipoSeleccionado && !validTipo) ? 'border-red-400' : 'border-gray-300'"
                     @change="touchedGeneral.tipoSeleccionado = true"
                     @blur="touchedGeneral.tipoSeleccionado = true"
                   >
                     <option value="">Seleccionar tipo</option>
-                    <option 
-                      v-for="tipoItem in tiposDisponibles" 
-                      :key="tipoItem.id" 
+                    <option
+                      v-for="tipoItem in tiposDisponibles"
+                      :key="tipoItem.id"
                       :value="tipoItem.id"
                     >
                       {{ tipoItem.nombre }}
@@ -97,7 +97,7 @@
                           <label class="block text-sm font-medium text-gray-700 mb-2">Orientación*</label>
                   <select
                     v-model="datosGenerales.orientacion"
-                            class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             :class="(touchedGeneral.orientacion && !validOrientacion) ? 'border-red-400' : 'border-gray-300'"
                     @change="touchedGeneral.orientacion = true"
                     @blur="touchedGeneral.orientacion = true"
@@ -132,15 +132,15 @@
                   <label class="block text-sm font-medium text-gray-700 mb-2">Forma de la base*</label>
                   <select
                     v-model="dimensiones.forma"
-                    class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    class="w-full px-3 py-2 cursor-pointer border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     :class="(touchedGeneral.forma && !validForma) ? 'border-red-400' : 'border-gray-300'"
                     @change="touchedGeneral.forma = true"
                     @blur="touchedGeneral.forma = true"
                   >
                     <option value="">Seleccionar forma</option>
-                    <option 
-                      v-for="forma in formasDisponibles" 
-                      :key="forma.id" 
+                    <option
+                      v-for="forma in formasDisponibles"
+                      :key="forma.id"
                       :value="forma.id"
                     >
                       {{ forma.nombre }}
@@ -234,7 +234,7 @@
                     <!-- Custom inline tooltip trigger -->
                     <button
                       type="button"
-                      class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[11px] font-semibold cursor-help"
+                      class="inline-flex cursor-pointer items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[11px] font-semibold cursor-help"
                       aria-label="Información"
                       @mouseenter="openTooltip($event, 'Considere que al no definir dimensiones, estas se calcularán automáticamente')"
                       @focus="openTooltip($event, 'Considere que al no definir dimensiones, estas se calcularán automáticamente')"
@@ -244,15 +244,23 @@
                       i
                     </button>
                   </div>
-                  <button
+                  <UiTooltip
                     v-if="index > 0"
-                    @click="eliminarPisoNivel(index)"
-                    class="text-red-500 hover:text-red-700 transition-colors"
+                    class="relative"
+                    :label="'Eliminar ' + (tipo === 'cuarto' ? 'piso' : 'nivel')"
+                    position="left"
+                    :delay="300"
                   >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                    <button
+                      v-if="index > 0"
+                      @click="eliminarPisoNivel(index)"
+                      class="text-red-500 cursor-pointer hover:text-red-700 transition-colors"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </UiTooltip>
                 </div>
 
                 <div class="space-y-4">
@@ -281,8 +289,8 @@
                       <input
                         v-model.number="pisoNivel.largo"
                         type="number"
-                        min="0.1"
-                        step="0.1"
+                        min="0.10"
+                        step="any"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -291,8 +299,8 @@
                       <input
                         v-model.number="pisoNivel.alto"
                         type="number"
-                        min="0.1"
-                        step="0.1"
+                        min="0.10"
+                        step="any"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -305,8 +313,8 @@
                       <input
                         v-model.number="pisoNivel.ancho"
                         type="number"
-                        min="0.1"
-                        step="0.1"
+                        min="0.10"
+                        step="any"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -327,7 +335,7 @@
                     <h5 class="font-medium text-gray-700 mb-3">
                       Características del {{ tipo === 'cuarto' ? 'piso' : 'nivel' }}
                     </h5>
-                    
+
                     <!-- Tipos de productos admitidos (dropdown con checkboxes) -->
                     <div class="mb-4" :ref="el => setDropdownRef(pisoNivel.id, el)">
                       <label class="block text-sm font-medium text-gray-700 mb-2">Tipos de productos admitidos*</label>
@@ -364,8 +372,8 @@
                       >
                         <div class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                           <div class="p-2 border-b bg-gray-50 text-xs text-gray-600 flex justify-between">
-                            <button class="hover:text-blue-600" @click.stop="seleccionarTodosTipos(pisoNivel); ensureTouchedForLevel(pisoNivel); pisoNivel._touched.tiposProductos = true">Seleccionar todos</button>
-                            <button class="hover:text-blue-600" @click.stop="limpiarTipos(pisoNivel); ensureTouchedForLevel(pisoNivel); pisoNivel._touched.tiposProductos = true">Limpiar</button>
+                            <button class="hover:text-blue-600 cursor-pointer" @click.stop="seleccionarTodosTipos(pisoNivel); ensureTouchedForLevel(pisoNivel); pisoNivel._touched.tiposProductos = true">Seleccionar todos</button>
+                            <button class="hover:text-blue-600 cursor-pointer" @click.stop="limpiarTipos(pisoNivel); ensureTouchedForLevel(pisoNivel); pisoNivel._touched.tiposProductos = true">Limpiar</button>
                           </div>
                           <ul class="p-2 space-y-1">
                             <li
@@ -398,9 +406,9 @@
                     <div class="mb-4">
                       <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de zona*</label>
                       <div class="flex items-center gap-6 w-full">
-                        <label 
-                          v-for="(tipoZona, idx) in tiposZonaUI" 
-                          :key="tipoZona.id" 
+                        <label
+                          v-for="(tipoZona, idx) in tiposZonaUI"
+                          :key="tipoZona.id"
                           :class="['flex items-center gap-2', idx === 1 ? 'ml-auto' : '']"
                         >
                           <input
@@ -434,7 +442,7 @@
             <div class="mt-4 flex justify-center flex-shrink-0">
               <button
                 @click="agregarPisoNivel"
-                class="px-4 py-2 bg-primary text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+                class="px-4 py-2 cursor-pointer bg-primary text-white text-sm rounded-lg transition-colors flex items-center gap-2"
               >
                 Agregar un {{ tipo === 'cuarto' ? 'piso' : 'nivel' }}
               </button>
@@ -447,14 +455,14 @@
       <div class="px-6 py-4 bg-gray-50 flex justify-center gap-3 flex-shrink-0">
         <button
           @click="cerrarModal"
-          class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          class="px-4 py-2 cursor-pointer text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
         >
           Cancelar
         </button>
         <button
           @click="guardar"
           :disabled="!esFormularioValido"
-          class="bg-primary px-4 py-2 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          class="bg-primary cursor-pointer px-4 py-2 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Aceptar
         </button>
@@ -476,15 +484,16 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import { 
-  FORMAS_DISPONIBLES, 
-  TIPOS_CUARTO, 
-  TIPOS_ESPACIO, 
-  TIPOS_ZONA_CUARTO, 
+import {
+  FORMAS_DISPONIBLES,
+  TIPOS_CUARTO,
+  TIPOS_ESPACIO,
+  TIPOS_ZONA_CUARTO,
   TIPOS_ZONA_ESPACIO,
   TIPOS_PRODUCTO_ADMITIDOS,
   ORIENTACIONES,
 } from '@/inventory-smart/utils/constants'
+import UiTooltip from './ui/UiTooltip.vue'
 
 // Estado UI: dropdown multi-select por nivel
 const openDropdownId = ref(null) // id del piso/nivel con dropdown abierto
@@ -700,7 +709,7 @@ const inicializarFormulario = () => {
     descripcion: '',
     orientacion: ''
   }
-  
+
   dimensiones.value = {
     forma: '',
     largo: null,
@@ -708,7 +717,7 @@ const inicializarFormulario = () => {
     ancho: null,
     capacidadCarga: null
   }
-  
+
   // Crear el primer piso/nivel por defecto
   pisosNiveles.value = [
     {
@@ -812,4 +821,4 @@ inicializarFormulario()
 /* Estilos adicionales si son necesarios */
 </style>
 
- 
+

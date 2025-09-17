@@ -57,7 +57,7 @@
               >
               <select
                 v-model="filtroCategoria"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
+                class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
               >
                 <option value="">Todas las categorías</option>
                 <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
@@ -73,7 +73,7 @@
               >
               <select
                 v-model="filtroUbicacion"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
+                class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
               >
                 <option value="">Todas las ubicaciones</option>
                 <option value="suelo">Suelo</option>

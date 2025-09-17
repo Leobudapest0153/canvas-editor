@@ -41,7 +41,7 @@
                 <label class="block text-sm font-medium text-gray-700">Categoría</label>
                 <select
                   v-model="localElemento.categoria"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
+                  class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                   required
                 >
                   <option value="">Seleccionar</option>
@@ -54,7 +54,7 @@
                 <label class="block text-sm font-medium text-gray-700">Forma de la base</label>
                 <select
                   v-model="localElemento.forma"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
+                  class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                   required
                 >
                   <option value="">Seleccionar</option>
@@ -67,7 +67,7 @@
                 <label class="block text-sm font-medium text-gray-700">Ubicación</label>
                 <select
                   v-model="localElemento.ubicacion"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
+                  class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                   required
                 >
                   <option value="">Seleccionar</option>

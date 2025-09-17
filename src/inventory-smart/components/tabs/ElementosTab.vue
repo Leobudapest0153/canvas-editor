@@ -122,13 +122,13 @@
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Categoría</label>
-                <select v-model="filtroCategoria" class="w-full px-3 py-2 border rounded-md text-sm bg-white">
+                <select v-model="filtroCategoria" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
                   <option value="">Todas</option>
                 </select>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
-                <select v-model="filtroUbicacion" class="w-full px-3 py-2 border rounded-md text-sm bg-white">
+                <select v-model="filtroUbicacion" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
                   <option value="">Todas</option>
                 </select>
               </div>

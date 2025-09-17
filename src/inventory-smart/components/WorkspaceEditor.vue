@@ -104,7 +104,7 @@
           <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
             <h4 class="text-sm font-semibold text-gray-800 mb-3">Plantilla</h4>
             <select
-              class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+              class="w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
               v-model="local.shape"
               @change="onShapeChange"
             >
