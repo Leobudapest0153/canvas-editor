@@ -27,6 +27,7 @@ const handleConfigUpdated = (nuevaConfig) => {
     // DEV: Guardar en localStorage para simular persistencia
     localStorage.setItem(SERIALIZE_CONFIG.STORAGE_KEY, nuevaConfig)
     console.log('Configuración actualizada guardada en localStorage')
+    initialConfig.value = nuevaConfig
 
     // Al implementar aqui se enviaría a la API
   } catch (error) {

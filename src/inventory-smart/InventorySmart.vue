@@ -128,7 +128,7 @@ const applyPendingServerConfig = async () => {
     const ok = canvasStore.deserialize(pendingServerConfig)
     // Crear un backup inmediato del estado aplicado
     if (ok && instance?.performBackup) {
-      await instance.performBackup()
+      await instance.performBackup({ isServerVersion: true })
     }
     // Reanudar autosave si estaba activo
     if (wasEnabled) instance?.startAutoSave?.()
@@ -333,7 +333,7 @@ watch(
       const ok = canvasStore.deserialize(newConfig)
       // Crear un backup inmediato del estado del servidor
       if (ok && instance?.performBackup) {
-        await instance.performBackup()
+        await instance.performBackup({ isServerVersion: true })
       }
       if (wasEnabled) instance?.startAutoSave?.()
     } catch (error) {
