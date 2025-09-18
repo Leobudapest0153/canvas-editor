@@ -682,10 +682,10 @@ const getElementPixelDimensions = (elemento) => {
       const orientacion = Number(elemento.orientacion || 0)
       const orientacionNormalizada = ((orientacion % 360) + 360) % 360
       const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
-      
-      return { 
-        width: useAncho ? elemento.width : elemento.height, 
-        height: elemento.height 
+
+      return {
+        width: useAncho ? elemento.width : elemento.height,
+        height: elemento.height
       }
     }
     return { width: elemento.width, height: elemento.height }
@@ -704,9 +704,9 @@ const getElementPixelDimensions = (elemento) => {
       const orientacion = Number(elemento.orientacion || 0)
       const orientacionNormalizada = ((orientacion % 360) + 360) % 360
       const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
-      
+
       // En XZ: orientación determina si width usa ancho o largo
-      widthCm = useAncho 
+      widthCm = useAncho
         ? (elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10))
         : (elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6))
       // Height siempre es alto en XZ
@@ -1457,6 +1457,8 @@ const getOrientationBarRect = (elemento) => {
     const forma = (elemento.forma || '').toLowerCase()
     const tipo = (elemento.tipo || '').toLowerCase()
     if (forma === 'circular' || tipo === 'pasillos') return null
+    // Si la vista es XZ, no mostrar barra de orientación
+    if (canvasStore.vistaActiva === 'XZ') return null
     const w = Number(elemento.width) || 0
     const h = Number(elemento.height) || 0
     if (w <= 0 || h <= 0) return null
@@ -1489,18 +1491,13 @@ const getOrientationBarRect = (elemento) => {
   }
 }
 
-// ====== INVENTORY: Etiquetas centradas de elementos ======
-// Calcula las props del <Text> (Konva) para rotular el elemento sin interferir con eventos.
-// Regla: si el elemento es más alto que ancho (h > w), mostramos el texto en vertical (rotado -90°);
-// si no, horizontal. Esto reacciona automáticamente cuando cambian las dimensiones.
+// Si el elemento es más alto que ancho (h > w), se muestra el texto en vertical (rotado -90°);
 const computeLabelProps = (elemento) => {
   const w = getDrawWidth(elemento)
   const h = getDrawHeight(elemento)
   const minSide = Math.max(0, Math.min(w, h))
-  // Escala base: proporcional al tamaño
   const base = Math.min(280, Math.max(100, minSide * 0.22))
 
-  // Por defecto: horizontal
   let cfg = {
     x: 0,
     y: 0,
@@ -1520,14 +1517,11 @@ const computeLabelProps = (elemento) => {
     shadowOpacity: 0.6,
   }
 
-  // Si es más alto que ancho, rotar a vertical
   if (h > w && w > 0 && h > 0) {
-    // Para rotación -90° alrededor del origen (0,0), desplazar en Y por h para mantenerlo dentro del grupo.
-    // Usamos un área de texto con width = h y height = w para un centrado correcto del contenido.
     cfg = {
       ...cfg,
       x: 0,
-      y: h, // desplaza para corregir el origen tras la rotación
+      y: h,
       width: h,
       height: w,
       rotation: -90,
