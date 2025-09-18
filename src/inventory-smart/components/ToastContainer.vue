@@ -3,50 +3,27 @@
     <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type" role="alert" :data-toast-id="t.id">
       <span class="msg">{{ t.message }}</span>
       <button v-if="t.cta" class="cta" @click="handleCta(t)">{{ t.cta.label }}</button>
-      <button class="close" @click="remove(t.id)">×</button>
+      <button class="close" @click="remove(t.id)">
+        &times;
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { inject } from 'vue'
+import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 
-let idSeq = 0
-const toasts = ref([])
-
-function show(message, options = {}) {
-  const id = options.id ?? ++idSeq
-  const toast = {
-    id,
-    message,
-    type: options.type || 'info',
-    cta: options.cta || null,
-    timeout: options.timeout ?? 5000,
-    onDismiss: options.onDismiss || null,
-  }
-  toasts.value.push(toast)
-  if (toast.timeout > 0) {
-    setTimeout(() => remove(id), toast.timeout)
-  }
-}
+const toastApi = inject(ToastSymbol)
+// Fallback defensivo para pruebas fuera del árbol
+const toasts = toastApi?.toasts ?? { value: [] }
 
 function remove(id) {
-  const i = toasts.value.findIndex((t) => t.id === id)
-  if (i !== -1) {
-    const [t] = toasts.value.splice(i, 1)
-    // Notificar a quien abrió el toast que ya fue cerrado
-    try { t?.onDismiss?.() } catch (e) { /* no-op */ }
-  }
+  toastApi?.remove?.(id)
 }
 
 function handleCta(t) {
-  t.cta?.onClick?.()
-  remove(t.id)
-}
-
-// expose API globally via window for quick use
-if (typeof window !== 'undefined') {
-  window.__toasts = { show, remove }
+  try { t.cta?.onClick?.() } finally { remove(t.id) }
 }
 </script>
 
@@ -63,6 +40,7 @@ if (typeof window !== 'undefined') {
 .toast {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   padding: 10px 12px;
   background: #111827;

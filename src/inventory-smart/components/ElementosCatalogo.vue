@@ -20,21 +20,29 @@
       <div class="relative px-4 mb-1">
         <div class="flex items-center justify-between" ref="filtrosBotonRef">
           <UiTooltip label="Desplegar filtros" position="bottom" :delay="200" class="w-full">
-          <button
-            @click="toggleFiltros"
-            class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L16 11.414V16a1 1 0 01-.293.707l-2 2A1 1 0 0112 18v-1.586l-3.707-3.707A1 1 0 018 12V6.414L3.293 4.707A1 1 0 013 4z" />
-            </svg>
-            <span>Filtros</span>
-            <span v-if="hayFiltrosActivos" class="w-2 h-2 bg-blue-500 rounded-full"></span>
-          </button>
+            <button
+              @click="toggleFiltros"
+              class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L16 11.414V16a1 1 0 01-.293.707l-2 2A1 1 0 0112 18v-1.586l-3.707-3.707A1 1 0 018 12V6.414L3.293 4.707A1 1 0 013 4z"
+                />
+              </svg>
+              <span>Filtros</span>
+              <span v-if="hayFiltrosActivos" class="w-2 h-2 bg-blue-500 rounded-full"></span>
+            </button>
           </UiTooltip>
-
-    </div>
+        </div>
         <transition name="unroll">
-          <div v-if="filtrosVisibles" class="absolute top-full left-0 w-full bg-gray-50 shadow-lg z-10" ref="filtrosPanelRef">
+          <div
+            v-if="filtrosVisibles"
+            class="absolute top-full left-0 w-full bg-gray-50 shadow-lg z-10"
+            ref="filtrosPanelRef"
+          >
             <div class="p-3 grid grid-cols-1 gap-3">
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
@@ -47,40 +55,73 @@
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Categoría</label>
-                <select v-model="categoriaSeleccionada" class="w-full px-3 py-2 border rounded-md text-sm bg-white">
+                <select
+                  v-model="categoriaSeleccionada"
+                  class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white"
+                >
                   <option :value="null">Todas</option>
-                  <option v-for="c in categoriasDisponibles" :key="c.id" :value="c.id">{{ c.nombre }}</option>
+                  <option v-for="c in categoriasDisponibles" :key="c.id" :value="c.id">
+                    {{ c.nombre }}
+                  </option>
                 </select>
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
-                <select v-model="ubicacionSeleccionada" class="w-full px-3 py-2 border rounded-md text-sm bg-white">
+                <select
+                  v-model="ubicacionSeleccionada"
+                  class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white"
+                >
                   <option value="">Todas</option>
                   <option value="suelo">Suelo</option>
                   <option value="pared">Pared</option>
                 </select>
               </div>
               <div class="pt-1">
-                <button v-if="hayFiltrosActivos" @click="limpiarFiltros" class="px-3 py-2 bg-gray-100 rounded-md text-xs">Limpiar filtros</button>
+                <button
+                  v-if="hayFiltrosActivos"
+                  @click="limpiarFiltros"
+                  class="px-3 py-2 bg-gray-100 rounded-md text-xs"
+                >
+                  Limpiar filtros
+                </button>
               </div>
             </div>
           </div>
         </transition>
       </div>
     </div>
-    
+
     <!-- Botón modal agregar espacio/cuarto -->
     <div class="py-1 flex justify-center">
-      <button
-      @click="mostrarModalAgregarEspacio = true"
-      class="px-2 py-1 bg-primary hover:bg-primary-600 text-white rounded-xl text-xs"
+      <UiTooltip
+        :label="
+          'Crea y guarda un nuevo ' + (modo === 'cuarto' ? 'cuarto' : 'espacio') + ' en el catálogo'
+        "
+        position="bottom"
+        :delay="500"
       >
-      Agregar {{ modo === 'cuarto' ? 'cuarto' : 'espacio' }}
-      </button>
+        <button
+          @click="mostrarModalAgregarEspacio = true"
+          class="flex justify-center items-center flex-row px-2 py-1 cursor-pointer bg-primary hover:bg-primary-600 text-white rounded-xl text-xs"
+        >
+          <!-- icono de + -->
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+          <span class="ml-1 text-sm font-medium">
+            Agregar {{ modo === 'cuarto' ? 'cuarto' : 'espacio' }}
+          </span>
+        </button></UiTooltip
+      >
     </div>
 
     <!-- Lista de elementos -->
-    <div class="elementos-lista flex-1 overflow-y-auto p-4">
+    <div class="elementos-lista flex-1 overflow-y-auto px-4 py-2">
       <div class="grid grid-cols-1 gap-3">
         <div
           v-for="elemento in elementosFiltrados"
@@ -100,7 +141,7 @@
               :class="[
                 'preview-shape rounded flex items-center justify-center relative shadow-sm border border-white/20',
                 getShapeClass(elemento.forma),
-                elemento.forma === 'circular' ? 'w-10 h-10' : 'w-12 h-8'
+                elemento.forma === 'circular' ? 'w-10 h-10' : 'w-12 h-8',
               ]"
               :style="{
                 backgroundColor:
@@ -125,7 +166,9 @@
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Dimensiones:</span>
                 <span class="spec-value text-gray-700">
-                  {{ getCardDims(elemento).ancho }}x{{ getCardDims(elemento).largo }}x{{ getCardDims(elemento).alto }}
+                  {{ getCardDims(elemento).ancho }}x{{ getCardDims(elemento).largo }}x{{
+                    getCardDims(elemento).alto
+                  }}
                 </span>
               </div>
               <div class="spec-item flex justify-between text-xs">
@@ -154,8 +197,8 @@
         </div>
       </div>
 
-  <!-- Mensaje cuando no hay elementos -->
-  <div v-if="elementosFiltrados.length === 0" class="text-center py-12">
+      <!-- Mensaje cuando no hay elementos -->
+      <div v-if="elementosFiltrados.length === 0" class="text-center py-12">
         <svg
           class="w-12 h-12 text-gray-300 mx-auto mb-4"
           fill="none"
@@ -188,7 +231,7 @@
 
     <AgregarCuartoModal
       :visible="mostrarModalAgregarEspacio"
-      :tipo="modo === 'cuarto' ? 'cuarto' : 'espacio'"
+      :modo
       @close="mostrarModalAgregarEspacio = false"
       @save="onGuardarEspacio"
     />
@@ -214,6 +257,10 @@ import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
 
 import ElementEditor from './modals/ElementEditor.vue'
 import AgregarCuartoModal from './AgregarCuartoModal.vue'
+import {
+  buildStructureFromForm,
+  toCatalogItemFromStructure,
+} from '@/inventory-smart/composables/useStructureManager'
 
 // Props
 const props = defineProps({
@@ -285,22 +332,18 @@ const nuevoElemento = ref({
   icono: 'box',
 })
 
-// Computed: título dinámico según el contexto
-const tituloContextual = computed(() => {
-  if (catalogContext.value.mode === 'root') {
-    return ''
-  } else if (catalogContext.value.mode === 'detail-element') {
-    return 'Catálogo de Contenedores'
-  } else if (catalogContext.value.mode === 'detail-container') {
-    return 'Catálogo (Elementos + Contenedores)'
-  }
-  return 'Catálogo de Elementos'
-})
+// const tituloContextual = computed(() => {
+//   if (catalogContext.value.mode === 'root') {
+//     return ''
+//   } else if (catalogContext.value.mode === 'detail-element') {
+//     return 'Catálogo de Contenedores'
+//   } else if (catalogContext.value.mode === 'detail-container') {
+//     return 'Catálogo (Elementos + Contenedores)'
+//   }
+//   return 'Catálogo de Elementos'
+// })
 
-// Computed: determina si se pueden crear elementos personalizados
-const puedeCrearElementosPersonalizados = computed(
-  () => catalogContext.value.mode !== 'root',
-)
+// const puedeCrearElementosPersonalizados = computed(() => catalogContext.value.mode !== 'root')
 
 // Computed: categorías disponibles según el contexto
 const categoriasDisponibles = computed(() => {
@@ -321,8 +364,8 @@ const elementosFiltrados = computed(() => {
   const base = Array.isArray(filteredCatalogItems.value)
     ? filteredCatalogItems.value.slice()
     : Array.isArray(items.value)
-    ? items.value.slice()
-    : []
+      ? items.value.slice()
+      : []
 
   let out = base
 
@@ -372,28 +415,32 @@ const onGuardarElemento = (elemento) => {
 
 const onGuardarEspacio = (datosEspacio) => {
   try {
-    canvasStore.crearDesdeFormulario(datosEspacio)
-    // Limpiar filtros para asegurar visualización del nuevo elemento
+    const structure = buildStructureFromForm(datosEspacio)
+    const kind = datosEspacio.tipo === 'cuarto' ? 'room' : 'space'
+    const item = toCatalogItemFromStructure({
+      name: datosEspacio.datosGenerales?.nombre,
+      description: datosEspacio.datosGenerales?.descripcion,
+      structure,
+      kind,
+      color: datosEspacio.datosGenerales?.color,
+    })
+    items.value.push(item)
     categoriaSeleccionada.value = null
     filtroTexto.value = ''
     mostrarModalAgregarEspacio.value = false
   } catch (e) {
-    console.error('No se pudo crear desde formulario', e)
+    console.error('No se pudo crear estructura desde formulario', e)
   }
 }
 
-// Evitar que el select quede con un valor no listado (lo deja "en blanco" y filtra a nada)
-watch([
-  () => categoriaSeleccionada.value,
-  () => categoriasDisponibles.value
-], () => {
-  const ids = new Set((categoriasDisponibles.value || []).map(c => c.id))
+// Evitar que el select quede con un valor no listado
+watch([() => categoriaSeleccionada.value, () => categoriasDisponibles.value], () => {
+  const ids = new Set((categoriasDisponibles.value || []).map((c) => c.id))
   if (categoriaSeleccionada.value && !ids.has(categoriaSeleccionada.value)) {
     categoriaSeleccionada.value = null
   }
 })
 
-// Métodos
 const getTipoNombre = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.nombre || 'Desconocido'
@@ -405,7 +452,6 @@ const getCategoriaName = (categoriaId) => {
 }
 
 const getIconComponent = (iconType) => {
-  // Retornamos un componente SVG simple para el icono
   const icons = {
     rack: 'svg',
     shelf: 'svg',
@@ -428,7 +474,8 @@ const getShapeClass = (forma) => {
 }
 
 // Dims preview para elementos de sistema por defecto
-const isSystemDefaultItem = (item) => !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
+const isSystemDefaultItem = (item) =>
+  !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
 
 const getCardDims = (item) => {
   try {
@@ -448,14 +495,19 @@ const getCardDims = (item) => {
 // Drag and Drop
 const iniciarArrastre = (elemento, event) => {
   console.log('Iniciando arrastre del elemento:', elemento)
-  const datosArrastre = {
-    tipo: 'elemento-catalogo',
-    elemento: elemento,
-    offset: {
-      x: event.offsetX || 0,
-      y: event.offsetY || 0,
-    },
-  }
+  // Si el item trae payload de estructura (plantilla/room/space), arrastrar como 'plantilla-catalogo'
+  const isStructured = !!elemento?.payload?.rootId && Array.isArray(elemento?.payload?.elements)
+  const datosArrastre = isStructured
+    ? {
+        tipo: 'plantilla-catalogo',
+        payload: elemento.payload,
+        offset: { x: event.offsetX || 0, y: event.offsetY || 0 },
+      }
+    : {
+        tipo: 'elemento-catalogo',
+        elemento: elemento,
+        offset: { x: event.offsetX || 0, y: event.offsetY || 0 },
+      }
   console.log('Datos de arrastre:', datosArrastre)
 
   try {
@@ -480,7 +532,6 @@ const finalizarArrastre = (event) => {
 
 const cerrarModal = () => {
   mostrarModalCrear.value = false
-  // El formulario se resetea automáticamente al abrir el modal
 }
 
 // Cargar elementos personalizados del localStorage

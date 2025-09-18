@@ -42,7 +42,8 @@
                 />
               </div>
             </div>
-            <div>
+
+            <div v-if="!esPasillo">
               <label class="block text-xs font-medium text-gray-600 mb-1">Color</label>
               <div class="flex items-center gap-3">
                 <input
@@ -67,7 +68,7 @@
               <select
                 v-model.number="edited.orientacion"
                 :disabled="isSaving"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                class="w-full px-3 cursor-pointer py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option :value="0">0°</option>
                 <option :value="90">90°</option>

@@ -69,9 +69,17 @@
               <button
                 @click="realizarBackupManual"
                 :disabled="autoSave.isLoading.value"
-                class="px-4 py-2 cursor-pointer bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                class="px-4 py-2 cursor-pointer bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {{ autoSave.isLoading.value ? 'Guardando...' : 'Crear nueva copia' }}
+              </button>
+
+              <button
+                v-if="backups.some(b => b.isServerVersion)"
+                @click="confirmarRestauracionServidor"
+                class="px-4 py-2 cursor-pointer bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors"
+              >
+                Restaurar versión del servidor
               </button>
             </div>
           </div>
@@ -130,6 +138,9 @@
                     <div class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">
                       {{ formatearTamaño(backup.size) }}
                     </div>
+                    <div v-if="backup.isServerVersion" class="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs">
+                      Versión del servidor
+                    </div>
                   </div>
 
                   <div class="flex items-center gap-4 text-sm text-slate-600">
@@ -145,13 +156,6 @@
                   >
                     Restaurar
                   </button>
-
-                  <!-- <button
-                    @click="eliminarBackup(backup.id)"
-                    class="px-3 py-1.5 cursor-pointer bg-red-100 text-red-700 rounded text-sm font-medium hover:bg-red-200 transition-colors"
-                  >
-                    Eliminar
-                  </button> -->
                 </div>
               </div>
             </div>
@@ -295,6 +299,27 @@ const realizarBackupManual = async () => {
   } catch (error) {
     mostrarMensaje('Error: ' + error.message, 'error')
   }
+}
+
+const restaurarVersionServidor = async () => {
+  try {
+    await props.autoSave.restoreServerVersion()
+    mostrarMensaje('Versión del servidor restaurada exitosamente', 'exito')
+    cerrar()
+  } catch (error) {
+    mostrarMensaje('Error restaurando versión del servidor: ' + error.message, 'error')
+  }
+}
+
+const confirmarRestauracionServidor = () => {
+  confirmacion.value = {
+    titulo: 'Restaurar Versión del Servidor',
+    mensaje: '¿Estás seguro de que quieres restaurar la versión del servidor? Los cambios actuales se perderán.',
+    boton: 'Restaurar',
+    tipo: 'danger',
+    accion: restaurarVersionServidor,
+  }
+  mostrarConfirmacion.value = true
 }
 
 const confirmarRestauracion = (backup) => {

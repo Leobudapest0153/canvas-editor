@@ -74,7 +74,7 @@ export function useAutoSave(canvasStore, options = {}) {
   /**
    * Genera metadatos para la copia de seguridad
    */
-  function createBackupMetadata(canvasData) {
+  function createBackupMetadata(canvasData, options = {}) {
     const parsed = typeof canvasData === 'string' ? JSON.parse(canvasData) : canvasData
     const validation = validateStructure(JSON.stringify(parsed))
 
@@ -85,6 +85,8 @@ export function useAutoSave(canvasStore, options = {}) {
       elementos: validation.elementos || 0,
       size: JSON.stringify(parsed).length, // tamaño en bytes
       version: validation.version || '1.0.0',
+      // Marcas opcionales
+      isServerVersion: options.isServerVersion === true,
     }
   }
 
@@ -111,7 +113,7 @@ export function useAutoSave(canvasStore, options = {}) {
   /**
    * Realiza una copia de seguridad del estado actual
    */
-  async function performBackup() {
+  async function performBackup(options = {}) {
     if (!isEnabled.value || !canvasStore) {
       return false
     }
@@ -121,7 +123,7 @@ export function useAutoSave(canvasStore, options = {}) {
 
       // Serializar el estado actual del canvas
       const canvasData = canvasStore.serialize()
-      const metadata = createBackupMetadata(canvasData)
+      const metadata = createBackupMetadata(canvasData, options)
 
       // Cargar lista existente de copias
       const existingBackups = await loadBackupsList()
@@ -133,11 +135,20 @@ export function useAutoSave(canvasStore, options = {}) {
       }
 
       // Agregar al inicio de la lista
-      const updatedBackups = [newBackup, ...existingBackups]
+      let updatedBackups = [newBackup, ...existingBackups]
 
       // Limitar número de copias según configuración
       if (updatedBackups.length > config.maxBackups) {
-        updatedBackups.splice(config.maxBackups)
+        // Evitar eliminar la versión del servidor (pinned)
+        // Eliminamos del final (más antiguos) aquellos que NO sean serverVersion
+        let i = updatedBackups.length - 1
+        while (updatedBackups.length > config.maxBackups && i >= 0) {
+          if (!updatedBackups[i]?.isServerVersion) {
+            updatedBackups.splice(i, 1)
+          }
+          i--
+        }
+        // Si aún excede porque todos son serverVersion (caso extremo), permitimos excedente temporal
       }
 
       // Guardar lista actualizada
@@ -176,6 +187,7 @@ export function useAutoSave(canvasStore, options = {}) {
         plantaActiva: backup.plantaActiva,
         size: backup.size,
         version: backup.version,
+        isServerVersion: !!backup.isServerVersion,
         date: new Date(backup.timestamp),
         formattedDate: new Date(backup.timestamp).toLocaleString('es-ES'),
       }))
@@ -253,6 +265,30 @@ export function useAutoSave(canvasStore, options = {}) {
     } catch (error) {
       console.error('Error limpiando copias de seguridad:', error)
       return false
+    }
+  }
+
+  /**
+   * Restaura la copia marcada como versión del servidor
+   */
+  async function restoreServerVersion() {
+    try {
+      isLoading.value = true
+      const backups = await loadBackupsList()
+      // Buscar la más reciente marcada como server
+      const serverBackups = backups
+        .filter(b => b?.isServerVersion)
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      const backup = serverBackups[0]
+      if (!backup) throw new Error('No existe una copia marcada como versión del servidor')
+      const success = canvasStore.deserialize(backup.data)
+      if (!success) throw new Error('Error al deserializar la versión del servidor')
+      return true
+    } catch (error) {
+      console.error('❌ Error restaurando versión del servidor:', error)
+      throw error
+    } finally {
+      isLoading.value = false
     }
   }
 
@@ -335,6 +371,7 @@ export function useAutoSave(canvasStore, options = {}) {
     restoreBackup,
     deleteBackup,
     clearAllBackups,
+  restoreServerVersion,
 
     // Control del autosave
     startAutoSave,

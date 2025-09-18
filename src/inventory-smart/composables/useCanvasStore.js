@@ -29,6 +29,7 @@ import {
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'
+import { exportCatalogItemsToDTO, importCatalogItemsFromDTO } from '@/inventory-smart/modules/catalog/catalogItems.serializer.js'
 
 export const useCanvasStore = defineStore('canvas', () => {
   const { showToast } = useToast()
@@ -663,7 +664,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (el) {
         el.updatedAt = new Date().toISOString()
       }
-      persist()
+      // persist()
     }
     return ok
   }
@@ -848,7 +849,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const res = v(element, candidate)
       if (res.valid === false) {
         const msg = errorsPlacement[res.code] || 'Posición inválida'
-        window?.__toasts?.show?.(msg, { type: 'error' })
+        showToast(msg, 'error')
         return false
       }
     }
@@ -856,86 +857,6 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   // Actions para elementos
-  /**
-   * Crear un elemento desde los datos del formulario de AgregarCuartoModal
-   * - Mapea tipo => 'cuartos' | 'elementos'
-   * - Coloca el tipo seleccionado en categoria
-   * - Convierte metros a centímetros para dimensiones del modelo
-   * - Inserta el elemento creado al catálogo para que sea visible junto a los predefinidos
-   */
-  const crearDesdeFormulario = (payload) => {
-    try {
-      if (!payload || typeof payload !== 'object') throw new Error('Payload inválido')
-      const { tipo, datosGenerales, dimensiones, pisosNiveles } = payload
-      if (!tipo || !datosGenerales || !dimensiones || !Array.isArray(pisosNiveles)) {
-        throw new Error('Estructura de datos incompleta')
-      }
-
-      // Validación mínima (la UI ya valida, esto es cinturón y tirantes)
-      const reqGeneral = datosGenerales?.nombre && datosGenerales?.tipoSeleccionado && datosGenerales?.color && datosGenerales?.orientacion !== ''
-      const reqDims = dimensiones?.forma && dimensiones?.largo > 0 && dimensiones?.alto > 0 && dimensiones?.ancho > 0 && dimensiones?.capacidadCarga > 0
-      const reqLevels = pisosNiveles.length > 0 && pisosNiveles.every((p) => p?.nombre && p?.largo > 0 && p?.alto > 0 && p?.ancho > 0 && p?.capacidadCarga > 0 && p?.tipoZona)
-      if (!reqGeneral || !reqDims || !reqLevels) throw new Error('Formulario incompleto')
-
-      // Construcción del item para catálogo y para canvas
-      const id = `${tipo === 'cuarto' ? 'cuarto' : 'espacio'}_${Date.now()}`
-      const tipoElemento = tipo === 'cuarto' ? 'cuartos' : 'elementos'
-      const categoria = datosGenerales.tipoSeleccionado || (tipo === 'cuarto' ? 'cuartos' : 'elementos')
-      const colorBase = datosGenerales.color || '#3B82F6'
-      const icono = tipo === 'cuarto' ? 'home' : 'box'
-
-      // El formulario está en metros, convertimos a cm para el modelo
-      const toCm = (m) => Math.round(Number(m || 0) * 100)
-      const dimsCm = {
-        ancho: toCm(dimensiones.ancho),
-        largo: toCm(dimensiones.largo),
-        alto: toCm(dimensiones.alto),
-      }
-
-      const nuevoItemCatalogo = {
-        id,
-        nombre: datosGenerales.nombre,
-        tipo: tipoElemento,
-        categoria,
-        forma: dimensiones.forma,
-        orientacion: datosGenerales.orientacion,
-        colorBase,
-        dimensiones: dimsCm,
-        pesoMaximo: Number(dimensiones.capacidadCarga) || 0,
-        ubicacion: 'suelo',
-        descripcion: datosGenerales.descripcion || '',
-        icono,
-        props: { system: true, catalogVisible: true },
-        meta: {
-          niveles: pisosNiveles.map((p, idx) => ({
-            index: idx + 1,
-            nombre: p.nombre,
-            dimensiones: { ancho: toCm(p.ancho), largo: toCm(p.largo), alto: toCm(p.alto) },
-            capacidadCarga: Number(p.capacidadCarga) || 0,
-            tiposProductos: Array.isArray(p.tiposProductos) ? p.tiposProductos.slice() : [],
-            tipoZona: p.tipoZona,
-            permiteFragiles: !!p.permiteFragiles,
-          })),
-        },
-      }
-
-      // Insertar en catálogo y forzar catálogo 'elementos' para visibilidad inmediata
-      if (Array.isArray(catalogStore.items)) {
-        catalogStore.items.push(nuevoItemCatalogo)
-        catalogStore.setSelectedCatalog?.('elementos')
-      }
-
-      // También devolver por si el caller lo quiere usar
-      return nuevoItemCatalogo
-    } catch (e) {
-      console.error('crearDesdeFormulario error:', e)
-      throw e
-    }
-  }
-
-  // Aliases solicitados: métodos explícitos por tipo
-  const agregarEspacio = (payload) => crearDesdeFormulario({ ...payload, tipo: 'espacio' })
-  const agregarCuarto = (payload) => crearDesdeFormulario({ ...payload, tipo: 'cuarto' })
   const agregarElemento = (nuevoElemento) => {
     console.log('Agregando elemento al store:', nuevoElemento)
 
@@ -1167,21 +1088,30 @@ export const useCanvasStore = defineStore('canvas', () => {
       plantas: plantas.value.map(p => p?._custom?.value || p),
       elementos: elementos.value.map(e => e?._custom?.value || e),
       templates: catalogStore.templates?.map?.(t => t?._custom?.value || t) || [],
+      catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
     }
     const jsonStr = _serialize(state)
     try {
       const parsed = JSON.parse(jsonStr)
       if (state.templates.length > 0) {
-        parsed.plantillasCatalogo = exportTemplatesToDTO(state.templates)
+        parsed.plantillas = exportTemplatesToDTO(state.templates)
         if (parsed.meta) {
           parsed.meta.version = '1.1.0'
           if (!parsed.meta.metrics) parsed.meta.metrics = {}
           parsed.meta.metrics.totalPlantillas = state.templates.length
         }
       } // si no hay plantillas mantenemos formato legacy (sin campo y version 1.0.0)
+      // Exportar items estructurados del catálogo (excluye kind 'template')
+      const itemsDTO = exportCatalogItemsToDTO(state.catalogItems)
+      if (itemsDTO.length > 0) {
+        parsed.catalogItems = itemsDTO
+        if (parsed.meta) {
+          parsed.meta.metrics.totalCatalogItems = itemsDTO.length
+        }
+      }
       return JSON.stringify(parsed, null, 2)
     } catch (e) {
-      console.warn('No se pudo post-procesar JSON para plantillasCatalogo', e)
+      console.warn('No se pudo post-procesar JSON para plantillas', e)
       return jsonStr
     }
   }
@@ -1232,14 +1162,17 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     const ok = _deserialize(jsonString, storeActions)
 
-    // Importar plantillasCatalogo si existen (retrocompatible)
+    // Importar plantillas si existen (retrocompatible)
     try {
       const parsed = JSON.parse(jsonString)
-      if (Array.isArray(parsed.plantillasCatalogo) && parsed.plantillasCatalogo.length > 0) {
-        importTemplatesFromDTO(parsed.plantillasCatalogo)
+      if (Array.isArray(parsed.plantillas) && parsed.plantillas.length > 0) {
+        importTemplatesFromDTO(parsed.plantillas)
+      }
+      if (Array.isArray(parsed.catalogItems) && parsed.catalogItems.length > 0) {
+        importCatalogItemsFromDTO(parsed.catalogItems)
       }
     } catch (e) {
-      console.warn('No se pudieron importar plantillasCatalogo', e)
+      console.warn('No se pudieron importar plantillas', e)
     }
 
     return ok
@@ -1495,15 +1428,15 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Navegación jerárquica - Getters
     contextoActual,
     estaEnPlanta,
-  estaEnCuarto,
-  estaEnPiso,
+    estaEnCuarto,
+    estaEnPiso,
     estaEnElemento,
     estaEnContenedor,
     estructuraContenedorActual,
     breadcrumbs,
     puedeNavegar,
     contextoNavegacion,
-  nodoActual,
+    nodoActual,
     canvasAdaptativo,
 
     // Actions - Canvas
@@ -1528,9 +1461,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     agregarElemento,
     eliminarElemento,
     toggleElementoVisibilidad,
-  crearDesdeFormulario,
-    agregarEspacio,
-    agregarCuarto,
+
 
     // Navegación jerárquica - Actions
     navegarAElemento,

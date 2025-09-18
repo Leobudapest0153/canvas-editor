@@ -617,6 +617,7 @@ import CanvasInfo from '@/inventory-smart/components/CanvasInfo.vue'
 import { useZoom } from '@/inventory-smart/composables/useZoom'
 import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
 import { toPrecisionCm } from '../utils/fixedDimensions'
+import { instantiateStructureOnCanvas } from '@/inventory-smart/composables/useStructureManager'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -681,10 +682,10 @@ const getElementPixelDimensions = (elemento) => {
       const orientacion = Number(elemento.orientacion || 0)
       const orientacionNormalizada = ((orientacion % 360) + 360) % 360
       const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
-      
-      return { 
-        width: useAncho ? elemento.width : elemento.height, 
-        height: elemento.height 
+
+      return {
+        width: useAncho ? elemento.width : elemento.height,
+        height: elemento.height
       }
     }
     return { width: elemento.width, height: elemento.height }
@@ -703,9 +704,9 @@ const getElementPixelDimensions = (elemento) => {
       const orientacion = Number(elemento.orientacion || 0)
       const orientacionNormalizada = ((orientacion % 360) + 360) % 360
       const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
-      
+
       // En XZ: orientación determina si width usa ancho o largo
-      widthCm = useAncho 
+      widthCm = useAncho
         ? (elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10))
         : (elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6))
       // Height siempre es alto en XZ
@@ -1456,6 +1457,8 @@ const getOrientationBarRect = (elemento) => {
     const forma = (elemento.forma || '').toLowerCase()
     const tipo = (elemento.tipo || '').toLowerCase()
     if (forma === 'circular' || tipo === 'pasillos') return null
+    // Si la vista es XZ, no mostrar barra de orientación
+    if (canvasStore.vistaActiva === 'XZ') return null
     const w = Number(elemento.width) || 0
     const h = Number(elemento.height) || 0
     if (w <= 0 || h <= 0) return null
@@ -1468,11 +1471,11 @@ const getOrientationBarRect = (elemento) => {
     const margin = 0
     const thick = Math.max(2, 4 / (canvasStore.zoom || 1))
     const color = '#facc15'
-    if (o === 0) {
+    if (o === 180) {
       const width = Math.max(1, w - 2 * margin)
       return { x: margin, y: 0, width, height: thick, fill: color, listening: false, opacity: 0.95 }
     }
-    if (o === 180) {
+    if (o === 0) {
       const width = Math.max(1, w - 2 * margin)
       return { x: margin, y: Math.max(0, h - thick), width, height: thick, fill: color, listening: false, opacity: 0.95 }
     }
@@ -1488,18 +1491,13 @@ const getOrientationBarRect = (elemento) => {
   }
 }
 
-// ====== INVENTORY: Etiquetas centradas de elementos ======
-// Calcula las props del <Text> (Konva) para rotular el elemento sin interferir con eventos.
-// Regla: si el elemento es más alto que ancho (h > w), mostramos el texto en vertical (rotado -90°);
-// si no, horizontal. Esto reacciona automáticamente cuando cambian las dimensiones.
+// Si el elemento es más alto que ancho (h > w), se muestra el texto en vertical (rotado -90°);
 const computeLabelProps = (elemento) => {
   const w = getDrawWidth(elemento)
   const h = getDrawHeight(elemento)
   const minSide = Math.max(0, Math.min(w, h))
-  // Escala base: proporcional al tamaño
   const base = Math.min(280, Math.max(100, minSide * 0.22))
 
-  // Por defecto: horizontal
   let cfg = {
     x: 0,
     y: 0,
@@ -1519,14 +1517,11 @@ const computeLabelProps = (elemento) => {
     shadowOpacity: 0.6,
   }
 
-  // Si es más alto que ancho, rotar a vertical
   if (h > w && w > 0 && h > 0) {
-    // Para rotación -90° alrededor del origen (0,0), desplazar en Y por h para mantenerlo dentro del grupo.
-    // Usamos un área de texto con width = h y height = w para un centrado correcto del contenido.
     cfg = {
       ...cfg,
       x: 0,
-      y: h, // desplaza para corregir el origen tras la rotación
+      y: h,
       width: h,
       height: w,
       rotation: -90,
@@ -1619,7 +1614,8 @@ const createElementFromTemplate = (data, dropEvent) => {
     console.log('[templates-dd] drop cancelado por validación', res.reason)
     return
   }
-  const newId = buffer.pasteFromSerialized(payload, res.position)
+  // Unificar instanciación de estructuras (plantillas/cuarto/espacio)
+  const newId = instantiateStructureOnCanvas(canvasStore, payload, res.position)
   if (!newId) {
     showToast('No se pudo insertar la plantilla', 'error')
   } else {
@@ -1926,13 +1922,7 @@ const onDelete = async (id) => {
   if (!id) return
   const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
   if (el && (el.bloqueado === true || el.locked === true)) {
-    try {
-      if (typeof window !== 'undefined' && window.__toasts?.show) {
-        window.__toasts.show('Elemento bloqueado — desbloquéalo para eliminar', { type: 'warning', timeout: 3000 })
-      } else {
-        await confirmDialog.confirm({ title: 'Elemento bloqueado', message: 'Elemento bloqueado — desbloquéalo para eliminar', confirmLabel: 'Entendido', cancelLabel: 'Cerrar' })
-      }
-    } catch { /* ignore */ }
+    showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
     ctx.close()
     return
   }
