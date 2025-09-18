@@ -215,7 +215,19 @@ export function useAutoSave(canvasStore, options = {}) {
       const success = canvasStore.deserialize(backup.data)
 
       if (success) {
+        // Eliminar todas las copias posteriores (más recientes) a la que se está restaurando
+        const backupTimestamp = new Date(backup.timestamp)
+        const filteredBackups = backups.filter(b => {
+          const bTimestamp = new Date(b.timestamp)
+          return bTimestamp <= backupTimestamp
+        })
+
+        // Guardar la lista filtrada
+        await saveBackupsList(filteredBackups)
+        totalBackups.value = filteredBackups.length
+
         console.log('✅ Copia de seguridad restaurada:', backupId)
+        console.log(`🗑️ Eliminadas ${backups.length - filteredBackups.length} copias posteriores`)
         return true
       } else {
         throw new Error('Error al deserializar la copia de seguridad')
@@ -283,6 +295,11 @@ export function useAutoSave(canvasStore, options = {}) {
       if (!backup) throw new Error('No existe una copia marcada como versión del servidor')
       const success = canvasStore.deserialize(backup.data)
       if (!success) throw new Error('Error al deserializar la versión del servidor')
+
+      // Eliminar todas las copias de seguridad después de restaurar la versión del servidor
+      await clearAllBackups()
+      console.log('🗑️ Todas las copias de seguridad eliminadas tras restaurar versión del servidor')
+
       return true
     } catch (error) {
       console.error('❌ Error restaurando versión del servidor:', error)

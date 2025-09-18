@@ -92,7 +92,7 @@
     </div>
 
     <!-- Botón modal agregar espacio/cuarto -->
-    <div class="py-1 flex justify-center">
+    <div class="pb-2 flex justify-center">
       <UiTooltip
         :label="
           'Crea y guarda un nuevo ' + (modo === 'cuarto' ? 'cuarto' : 'espacio') + ' en el catálogo'

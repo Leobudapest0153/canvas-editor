@@ -21,7 +21,7 @@
           </div>
           <div>
             <h2 class="text-xl font-semibold text-slate-800">Copias de Seguridad</h2>
-            <p class="text-sm text-slate-500">Restaura versiones anteriores del canvas</p>
+            <p class="text-sm text-slate-500">Restaura versiones anteriores del área de trabajo</p>
           </div>
         </div>
 
@@ -79,7 +79,7 @@
                 @click="confirmarRestauracionServidor"
                 class="px-4 py-2 cursor-pointer bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors"
               >
-                Restaurar versión del servidor
+                Deshacer cambios locales
               </button>
             </div>
           </div>
@@ -279,22 +279,22 @@ const cargarBackups = async () => {
   }
 }
 
-const toggleAutoSave = () => {
-  props.autoSave.toggleAutoSave(!props.autoSave.isEnabled.value)
-  mostrarMensaje(
-    props.autoSave.isEnabled.value ? 'Autosave activado' : 'Autosave desactivado',
-    'exito'
-  )
-}
+// const toggleAutoSave = () => {
+//   props.autoSave.toggleAutoSave(!props.autoSave.isEnabled.value)
+//   mostrarMensaje(
+//     props.autoSave.isEnabled.value ? 'Autoguardado activado' : 'Autoguardado desactivado',
+//     'exito'
+//   )
+// }
 
 const realizarBackupManual = async () => {
   try {
     const success = await props.autoSave.performBackup()
     if (success) {
-      mostrarMensaje('Backup manual creado exitosamente', 'exito')
+      mostrarMensaje('Copia de seguridad creada exitosamente', 'exito')
       await cargarBackups()
     } else {
-      mostrarMensaje('Error creando backup manual', 'error')
+      mostrarMensaje('Error creando copia de seguridad', 'error')
     }
   } catch (error) {
     mostrarMensaje('Error: ' + error.message, 'error')
@@ -305,6 +305,8 @@ const restaurarVersionServidor = async () => {
   try {
     await props.autoSave.restoreServerVersion()
     mostrarMensaje('Versión del servidor restaurada exitosamente', 'exito')
+    // Recargar la lista de backups para reflejar que todas las copias fueron eliminadas
+    await cargarBackups()
     cerrar()
   } catch (error) {
     mostrarMensaje('Error restaurando versión del servidor: ' + error.message, 'error')
@@ -313,9 +315,9 @@ const restaurarVersionServidor = async () => {
 
 const confirmarRestauracionServidor = () => {
   confirmacion.value = {
-    titulo: 'Restaurar Versión del Servidor',
-    mensaje: '¿Estás seguro de que quieres restaurar la versión del servidor? Los cambios actuales se perderán.',
-    boton: 'Restaurar',
+    titulo: 'Deshacer cambios',
+    mensaje: 'Tienes cambios que aún no has guardado. ¿Estás seguro de que quieres deshacer todos los cambios locales y restaurar la última versión del servidor?',
+    boton: 'Deshacer',
     tipo: 'danger',
     accion: restaurarVersionServidor,
   }
@@ -337,6 +339,8 @@ const restaurarBackup = async (backupId) => {
   try {
     await props.autoSave.restoreBackup(backupId)
     mostrarMensaje('Copia de seguridad restaurada exitosamente', 'exito')
+    // Recargar la lista de backups para reflejar las copias eliminadas
+    await cargarBackups()
     cerrar()
   } catch (error) {
     mostrarMensaje('Error restaurando copia: ' + error.message, 'error')
