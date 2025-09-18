@@ -19,10 +19,10 @@
 export const TIPOS_ENTIDAD = [
   { id: 'plantas', nombre: 'Plantas', color: '#10b981', icono: '🏢', restrictions: [] },
   { id: 'cuartos', nombre: 'Cuartos', color: '#0ea5e9', icono: '🏠', restrictions: [] },
-  { id: 'pisos', nombre: 'Pisos', color: '#22c55e', icono: '🧱', restrictions: ['open-properties', 'read-only-properties', 'right-click', 'drag', 'enter'] },
+  { id: 'pisos', nombre: 'Pisos', color: '#22c55e', icono: '🧱', restrictions: ['read-only-properties', 'right-click', 'drag'] },
   { id: 'pasillos', nombre: 'Pasillos', color: '#111827', icono: '🛣️', restrictions: [] },
   { id: 'elementos', nombre: 'Elementos', color: '#3b82f6', icono: '📦', restrictions: [] },
-  { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', icono: '🗃️', restrictions: [] },
+  { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', icono: '🗃️', restrictions: ['read-only-properties', 'right-click', 'drag'] },
 ]
 
 // === REGLAS DE JERARQUÍA ===

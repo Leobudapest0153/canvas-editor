@@ -162,7 +162,7 @@
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
                   focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
                   disabled:cursor-not-allowed disabled:text-gray-500"
-                  :disabled="isSaving || esPasillo"
+                  :disabled="isSaving || isElementRestricted"
                 />
                 <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
