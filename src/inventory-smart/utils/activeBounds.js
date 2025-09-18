@@ -1,11 +1,23 @@
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
 
-// Map physical dimensions (cm) to width/height depending on active view
-// dims: {ancho, largo, alto}
-export function mapDimsByView(dims = {}, view = 'XY') {
+// Map physical dimensions (cm) to width/height depending on active view and orientation
+// dims: {ancho, largo, alto}, element: elemento con orientación
+export function mapDimsByView(dims = {}, view = 'XY', element = null) {
   const { ancho = 0, largo = 0, alto = 0 } = dims
+  
   if (view === 'XZ') {
-    // Front view: width -> ancho, height -> alto
+    // Front view: considerar orientación del elemento
+    if (element && element.orientacion !== undefined) {
+      const orientacion = Number(element.orientacion || 0)
+      const orientacionNormalizada = ((orientacion % 360) + 360) % 360
+      const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
+      
+      return { 
+        widthCm: useAncho ? ancho : largo, 
+        heightCm: alto 
+      }
+    }
+    // Sin orientación: usar lógica original
     return { widthCm: ancho, heightCm: alto }
   }
   if (view === 'ZY') {
@@ -23,7 +35,7 @@ export function getActiveBounds(canvasStore) {
   if (!canvasStore.estaEnPlanta) {
     const elem = canvasStore.estructuraContenedorActual || {}
     const dims = elem.dimensiones || {}
-    let { widthCm, heightCm } = mapDimsByView(dims, canvasStore.vistaActiva)
+    let { widthCm, heightCm } = mapDimsByView(dims, canvasStore.vistaActiva, elem)
 
     let widthPx = widthCm * CM_TO_PX
     let heightPx = heightCm * CM_TO_PX
