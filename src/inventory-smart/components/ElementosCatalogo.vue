@@ -94,7 +94,9 @@
     <!-- Botón modal agregar espacio/cuarto -->
     <div class="py-1 flex justify-center">
       <UiTooltip
-        :label="'Crea y guarda un nuevo ' + (modo === 'cuarto' ? 'cuarto' : 'espacio') + ' en el catálogo'"
+        :label="
+          'Crea y guarda un nuevo ' + (modo === 'cuarto' ? 'cuarto' : 'espacio') + ' en el catálogo'
+        "
         position="bottom"
         :delay="500"
       >
@@ -229,7 +231,7 @@
 
     <AgregarCuartoModal
       :visible="mostrarModalAgregarEspacio"
-      :tipo="modo === 'cuarto' ? 'cuarto' : 'espacio'"
+      :modo
       @close="mostrarModalAgregarEspacio = false"
       @save="onGuardarEspacio"
     />
@@ -255,7 +257,10 @@ import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
 
 import ElementEditor from './modals/ElementEditor.vue'
 import AgregarCuartoModal from './AgregarCuartoModal.vue'
-import { buildStructureFromForm, toCatalogItemFromStructure } from '@/inventory-smart/composables/useStructureManager'
+import {
+  buildStructureFromForm,
+  toCatalogItemFromStructure,
+} from '@/inventory-smart/composables/useStructureManager'
 
 // Props
 const props = defineProps({
@@ -327,20 +332,18 @@ const nuevoElemento = ref({
   icono: 'box',
 })
 
-// Computed: título dinámico según el contexto
-const tituloContextual = computed(() => {
-  if (catalogContext.value.mode === 'root') {
-    return ''
-  } else if (catalogContext.value.mode === 'detail-element') {
-    return 'Catálogo de Contenedores'
-  } else if (catalogContext.value.mode === 'detail-container') {
-    return 'Catálogo (Elementos + Contenedores)'
-  }
-  return 'Catálogo de Elementos'
-})
+// const tituloContextual = computed(() => {
+//   if (catalogContext.value.mode === 'root') {
+//     return ''
+//   } else if (catalogContext.value.mode === 'detail-element') {
+//     return 'Catálogo de Contenedores'
+//   } else if (catalogContext.value.mode === 'detail-container') {
+//     return 'Catálogo (Elementos + Contenedores)'
+//   }
+//   return 'Catálogo de Elementos'
+// })
 
-// Computed: determina si se pueden crear elementos personalizados
-const puedeCrearElementosPersonalizados = computed(() => catalogContext.value.mode !== 'root')
+// const puedeCrearElementosPersonalizados = computed(() => catalogContext.value.mode !== 'root')
 
 // Computed: categorías disponibles según el contexto
 const categoriasDisponibles = computed(() => {
@@ -412,9 +415,7 @@ const onGuardarElemento = (elemento) => {
 
 const onGuardarEspacio = (datosEspacio) => {
   try {
-    // 1) Construir estructura neutral desde formulario (no efectos)
     const structure = buildStructureFromForm(datosEspacio)
-    // 2) Crear entrada de catálogo unificada distinguiendo por kind (room/space)
     const kind = datosEspacio.tipo === 'cuarto' ? 'room' : 'space'
     const item = toCatalogItemFromStructure({
       name: datosEspacio.datosGenerales?.nombre,
@@ -423,9 +424,7 @@ const onGuardarEspacio = (datosEspacio) => {
       kind,
       color: datosEspacio.datosGenerales?.color,
     })
-    // 3) Insertar en catálogo
     items.value.push(item)
-    // 4) Reset de filtros para visualizarlo
     categoriaSeleccionada.value = null
     filtroTexto.value = ''
     mostrarModalAgregarEspacio.value = false
@@ -434,7 +433,7 @@ const onGuardarEspacio = (datosEspacio) => {
   }
 }
 
-// Evitar que el select quede con un valor no listado (lo deja "en blanco" y filtra a nada)
+// Evitar que el select quede con un valor no listado
 watch([() => categoriaSeleccionada.value, () => categoriasDisponibles.value], () => {
   const ids = new Set((categoriasDisponibles.value || []).map((c) => c.id))
   if (categoriaSeleccionada.value && !ids.has(categoriaSeleccionada.value)) {
@@ -442,7 +441,6 @@ watch([() => categoriaSeleccionada.value, () => categoriasDisponibles.value], ()
   }
 })
 
-// Métodos
 const getTipoNombre = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.nombre || 'Desconocido'
@@ -454,7 +452,6 @@ const getCategoriaName = (categoriaId) => {
 }
 
 const getIconComponent = (iconType) => {
-  // Retornamos un componente SVG simple para el icono
   const icons = {
     rack: 'svg',
     shelf: 'svg',
@@ -535,7 +532,6 @@ const finalizarArrastre = (event) => {
 
 const cerrarModal = () => {
   mostrarModalCrear.value = false
-  // El formulario se resetea automáticamente al abrir el modal
 }
 
 // Cargar elementos personalizados del localStorage

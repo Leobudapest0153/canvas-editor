@@ -5,16 +5,10 @@
  * - Estructuración (serializar) de elementos con hijos
  * - Desestructuración/instanciación (pegar) de estructuras en el canvas
  * - Construcción de entradas de catálogo unificadas (plantillas, cuartos, espacios)
- *
- * Contratos:
- * - Estructura serializada: { rootId: string, elements: Array<ElementoDTO> }
- * - CatalogItem: objeto mostrado en el panel con props base + payload de estructura opcional
- *   Campos clave añadidos: catalogKind ('template' | 'room' | 'space' | 'item')
  */
 
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
 
-// Util: ids únicos legibles
 const uid = (prefix) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
 
 /**
@@ -23,8 +17,8 @@ const uid = (prefix) => `${prefix}_${Date.now().toString(36)}_${Math.random().to
  */
 export function buildStructureFromForm(form) {
   if (!form || typeof form !== 'object') throw new Error('Formulario inválido')
-  const { tipo, datosGenerales, dimensiones, pisosNiveles } = form
-  if (!tipo || !datosGenerales || !dimensiones || !Array.isArray(pisosNiveles)) {
+  const { modo, datosGenerales, dimensiones, pisosNiveles } = form
+  if (!modo || !datosGenerales || !dimensiones || !Array.isArray(pisosNiveles)) {
     throw new Error('Formulario incompleto')
   }
 
@@ -35,12 +29,12 @@ export function buildStructureFromForm(form) {
     alto: toCm(dimensiones.alto),
   }
 
-  const rootId = uid(tipo === 'cuarto' ? 'cuarto' : 'espacio')
+  const rootId = uid(modo === 'cuarto' ? 'cuarto' : 'espacio')
   const root = {
     id: rootId,
     nombre: datosGenerales.nombre,
-    tipo: tipo === 'cuarto' ? 'cuartos' : 'elementos',
-    categoria: datosGenerales.tipoSeleccionado || (tipo === 'cuarto' ? 'cuartos' : 'elementos'),
+    tipo: modo === 'cuarto' ? 'cuartos' : 'elementos',
+    categoria: datosGenerales.tipoSeleccionado || (modo === 'cuarto' ? 'cuartos' : 'elementos'),
     forma: dimensiones.forma,
     orientacion: datosGenerales.orientacion,
     color: datosGenerales.color || '#3B82F6',
@@ -49,14 +43,14 @@ export function buildStructureFromForm(form) {
     pesoMaximo: Number(dimensiones.capacidadCarga) || 0,
     ubicacion: 'suelo',
     descripcion: datosGenerales.descripcion || '',
-    icono: tipo === 'cuarto' ? 'home' : 'box',
+    icono: modo === 'cuarto' ? 'home' : 'box',
     hijos: [],
-    // metadata que indica que al instanciar debe regenerar pisos
+    // Metadata que indica que al instanciar debe regenerar pisos
     meta: { tienePisosGenerados: true },
     // Calcular width/height directamente para evitar problemas de serialización
     width: dimsCm.ancho * CM_TO_PX,
     height: dimsCm.largo * CM_TO_PX, // cuartos/espacios usan vista XY (largo->height)
-    // Posición inicial (será sobrescrita al pegar, pero necesaria para serialización)
+    // Se sobrescribe al pegar
     x: 0,
     y: 0,
   }
@@ -64,12 +58,17 @@ export function buildStructureFromForm(form) {
   // Hijos: pisos/niveles — calcular posiciones básicas para evitar superposición
   const children = []
   pisosNiveles.forEach((p, idx) => {
-    const pisoId = uid('piso')
+    // Determinar tipo y categoría según si es cuarto o espacio
+    const esEspacio = modo === 'espacio'
+    const childType = esEspacio ? 'contenedores' : 'pisos'
+    const childCategory = esEspacio ? 'nivel' : 'piso'
+    const childId = uid(esEspacio ? 'nivel' : 'piso')
+
     children.push({
-      id: pisoId,
-      nombre: p.nombre || `${tipo === 'cuarto' ? 'Piso' : 'Nivel'} ${idx + 1}`,
-      tipo: 'pisos',
-      categoria: 'piso',
+      id: childId,
+      nombre: p.nombre || `${modo === 'cuarto' ? 'Piso' : 'Nivel'} ${idx + 1}`,
+      tipo: childType,
+      categoria: childCategory,
       padre: rootId,
       color: root.color,
       colorBase: root.colorBase,
@@ -82,22 +81,25 @@ export function buildStructureFromForm(form) {
         alto: toCm(p.alto),
       },
       width: toCm(p.ancho) * CM_TO_PX,
-      height: toCm(p.alto) * CM_TO_PX, // pisos usan vista XZ (alto->height)
+      height: toCm(p.alto) * CM_TO_PX, // pisos/niveles usan vista XZ (alto->height)
       capacidadCarga: Number(p.capacidadCarga) || 0,
       tiposProductos: Array.isArray(p.tiposProductos) ? p.tiposProductos.slice() : [],
       tipoZona: p.tipoZona,
       permiteFragiles: !!p.permiteFragiles,
       props: { catalogVisible: false },
-      meta: { esPisoInterno: true, indicePiso: idx + 1 },
+      // Metadatos diferentes según tipo
+      meta: esEspacio
+        ? { esNivelInterno: true, indiceNivel: idx + 1 }
+        : { esPisoInterno: true, indicePiso: idx + 1 },
     })
-    root.hijos.push(pisoId)
+    root.hijos.push(childId)
   })
 
   return {
     root,
     payload: { rootId, elements: [root, ...children] },
     meta: {
-      kind: tipo === 'cuarto' ? 'room' : 'space',
+      kind: modo === 'cuarto' ? 'room' : 'space',
       childrenCount: children.length,
     },
   }
@@ -154,11 +156,11 @@ export function toCatalogItemFromStructure({
 export function instantiateStructureOnCanvas(canvasStore, payload, position) {
   if (!canvasStore || !payload?.rootId || !Array.isArray(payload.elements)) return false
 
-  // 1) Mapear elementos por id
+  // Mapear elementos por id
   const allElementsMap = new Map()
   for (const el of payload.elements) allElementsMap.set(el.id, JSON.parse(JSON.stringify(el)))
 
-  // 2) Regenerar IDs únicos (similar a useCanvasBuffer)
+  // Regenerar IDs únicos (similar a useCanvasBuffer)
   const newIdMap = new Map()
   const newMap = new Map()
   let counter = 0
@@ -178,7 +180,7 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
   let root = newMap.get(newRootId)
   if (!root) return false
 
-  // 3) Ajuste especial para pasillos (altura = alto planta)
+  // Ajuste especial para pasillos (altura = alto planta)
   try {
     if ((root?.tipo || '').toLowerCase() === 'pasillos') {
       const planta = canvasStore.plantaPorId(canvasStore.plantaActiva)
@@ -191,10 +193,10 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
       }
     }
   } catch (e) {
-    // ignore adjustments for aisle height
+    console.warn('Error ajustando dimensiones de pasillo:', e)
   }
 
-  // 4) Pegado recursivo con reposicionamiento de pisos internos si aplica
+  // Pegado recursivo con reposicionamiento de pisos internos si aplica
   const computeCanvasSize = (el) => {
     const dims = el?.dimensiones || {}
     const hasDims = Number.isFinite(dims.ancho) && (Number.isFinite(dims.largo) || Number.isFinite(dims.alto))
@@ -284,14 +286,14 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     const isRootWithFloors = base.meta?.tienePisosGenerados === true && !parentId
     const hasChildren = Array.isArray(elem.hijos) && elem.hijos.length > 0
 
-    // Decidir si regenerar pisos basándose en si vienen de plantilla o formulario
-    const childFloors = elem.hijos?.map((hid) => newMap.get(hid))?.filter((h) => h && h.meta?.esPisoInterno) || []
+    // Decidir si regenerar pisos/niveles basándose en si vienen de plantilla o formulario
+    const childFloors = elem.hijos?.map((hid) => newMap.get(hid))?.filter((h) => h && (h.meta?.esPisoInterno || h.meta?.esNivelInterno)) || []
     const hasFloorChildren = childFloors.length > 0
 
     // Regenerar solo si:
-    // 1. Es root con pisos generados automáticamente
-    // 2. Tiene pisos como hijos
-    // 3. Los pisos parecen venir del formulario (posiciones básicas) NO de plantilla (posiciones complejas)
+    // 1. Es root con pisos/niveles generados automáticamente
+    // 2. Tiene pisos/niveles como hijos
+    // 3. Los pisos/niveles parecen venir del formulario (posiciones básicas) NO de plantilla (posiciones complejas)
     const shouldRegenerate = isRootWithFloors && hasFloorChildren && childFloors.every((f, idx) => {
       // Si no tiene posición definida, es del formulario
       if (!(Number.isFinite(f?.x) && Number.isFinite(f?.y))) return true
@@ -365,13 +367,18 @@ function addChildDirect(canvasStore, elemento, parentId) {
   } catch { return null }
 }
 
-// Reposición de pisos internos al instanciar estructura
+// Reposición de pisos/niveles internos al instanciar estructura
 function regenerateFloors(canvasStore, originalParent, allMap, newParentId, parentDims) {
   try {
+    // Buscar tanto pisos como niveles internos
     const floors = (originalParent.hijos || [])
       .map((hid) => allMap.get(hid))
-      .filter((h) => h && h.meta?.esPisoInterno)
-      .sort((a, b) => (a.meta?.indicePiso || 0) - (b.meta?.indicePiso || 0))
+      .filter((h) => h && (h.meta?.esPisoInterno || h.meta?.esNivelInterno))
+      .sort((a, b) => {
+        const indexA = a.meta?.indicePiso || a.meta?.indiceNivel || 0
+        const indexB = b.meta?.indicePiso || b.meta?.indiceNivel || 0
+        return indexA - indexB
+      })
 
     let acum = 0
     for (const piso of floors) {
