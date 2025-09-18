@@ -81,6 +81,7 @@
             </div>
 
             <!-- Etiquetas -->
+            <!--
             <div>
               <TagFilter
                 class="pb-3"
@@ -96,10 +97,10 @@
                 @save="onTagCreateSave"
               />
             </div>
+            -->
           </div>
         </details>
 
-        <!-- Dimensiones -->
         <details v-if="mostrarDimensiones" open class="bg-gray-50 rounded-lg p-4">
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">
             Dimensiones ({{ t('units.cm') }})
@@ -305,6 +306,104 @@
             </div>
           </div>
         </details>
+        <!-- Edición de niveles (Solo para cuartos)-->
+        <details
+          v-if="elementoSeleccionado.tipo === 'cuartos'"
+          open
+          class="bg-gray-50 rounded-lg p-4"
+        >
+          <summary class="text-sm font-medium text-gray-700 cursor-pointer">
+            <div class="flex justify-between items-center w-full -mt-6 pl-4">
+              Pisos
+              <button
+                @click="canvasStore.abrirCuartoNivelesPropiedades()"
+                class="bg-primary-700 text-white p-1 rounded-full cursor-pointer">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/>
+                </svg>
+              </button>
+            </div>
+          </summary>
+          <div class="mt-3 space-y-3">
+            <div
+              v-if="pisos.length > 0"
+              v-for="(piso, index) in pisos"
+              :key="index"
+              class="bg-white p-3 flex items-center justify-between rounded-md shadow-sm relative"
+              >
+              <div class="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" class="text-[#1C1E4D] mr-2">
+                  <path fill="currentColor" d="M11.325 11.5q-.825 0-1.412-.587T9.325 9.5V7q0-.825.588-1.412T11.325 5H19q.825 0 1.413.588T21 7v2.5q0 .825-.587 1.413T19 11.5zm6.35 7.5q-.825 0-1.412-.587T15.675 17v-2.5q0-.825.588-1.412t1.412-.588H19q.825 0 1.413.588T21 14.5V17q0 .825-.587 1.413T19 19zm-6.35 0q-.825 0-1.412-.587T9.325 17v-2.5q0-.825.588-1.412t1.412-.588h1.35q.825 0 1.413.588t.587 1.412V17q0 .825-.587 1.413T12.675 19zM5 19q-.825 0-1.413-.587T3 17V7q0-.825.588-1.412T5 5h1.325q.825 0 1.413.588T8.325 7v10q0 .825-.587 1.413T6.325 19z"/>
+                </svg>
+              <span class="text-[14px] text-[#637381]">{{ piso.nombre }}</span>
+              </div>
+
+              <div>
+                <button @click="toggleMenu(index)" class="p-1 rounded-full hover:bg-gray-100
+                  menu-trigger-button cursor-pointer">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
+                    <path fill="currentColor" d="M12 3a2 2 0 1 0 0 4a2 2 0 0 0 0-4m-2 9a2 2 0 1 1 4 0a2 2 0 0 1-4 0m0 7a2 2 0 1 1 4 0a2 2 0 0 1-4 0"/>
+                  </svg>
+                </button>
+
+                <div v-if="openMenuIndex === index" class="absolute right-0 mt-2 bg-white rounded-md shadow-lg z-20 border border-gray-100 dropdown-menu">
+                  <ul class="py-1">
+                    <li>
+                      <button class="flex items-center justify-center px-4 py-2 text-sm
+                        text-primary-700 cursor-pointer">
+                        Eliminar
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="ml-2">
+                          <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/>
+                        </svg>
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        @click="canvasStore.abrirCuartoNivelesPropiedades(piso.id)"
+                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-700
+                        w-full cursor-pointer"
+                      >
+                        Editar
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="ml-2">
+                          <path
+                            fill="currentColor"
+                            d="m14.06 9l.94.94L5.92 19H5v-.92zM17.66 3c-.26 0-.51.1-.7.29l-1.83 1.83l3.75 3.75l1.83-1.83c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29m-3.6 3.19L3 17.25V21h3.75L17.81 9.94z"/>
+                        </svg>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div
+              v-else
+              class="text-sm text-gray-500"
+            >
+            Sin pisos registrados
+            </div>
+          </div>
+        </details>
+        <details open class="bg-gray-50 rounded-lg p-4">
+          <summary class="text-sm font-medium text-gray-700 cursor-pointer">
+            Propiedades de ESL
+          </summary>
+          <div class="mt-3 space-y-3">
+            <div>
+              <label class="text-sm text-[#111928] font-medium">Código</label>
+              <div class="flex items-center">
+                <input
+                  type="text"
+                  min="0"
+                  placeholder="B123456789ABCD"
+                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                />
+                <button class="text-[#364153] text-sm bg-gray-200 px-3 py-2 rounded-[6px] ml-1">
+                  Configurar
+                </button>
+              </div>
+            </div>
+          </div>
+        </details>
       </div>
     </div>
 
@@ -372,6 +471,9 @@ const edited = ref(null)
 const isSaving = ref(false)
 const dimensionError = ref(null)
 const dimensionSugerencias = ref([])
+
+const openMenuIndex = ref(null);
+
 
 // Forzar el catálogo de elementos cuando se abre el detalle (monta el panel)
 onMounted(() => {
@@ -574,12 +676,41 @@ const guardarDeshabilitado = computed(
     !!dimensionError.value, // Bloquear si hay errores de dimensiones
 )
 
+const pisos = computed(() => {
+  const hijos = elementoSeleccionado.value.hijos ?? [];
+
+  return canvasStore.elementos.filter((e) => hijos.includes(e.id));
+})
+
 const revertir = () => {
   edited.value = deepClone(snapshotOriginal.value)
   // Limpiar todos los errores de validación
   dimensionError.value = null
   dimensionSugerencias.value = []
 }
+
+const toggleMenu = (index) => {
+  // El .stop en @click.stop previene que el clic se propague y active
+  // el listener de cierre inmediatamente.
+  openMenuIndex.value = openMenuIndex.value === index ? null : index;
+};
+
+// 4. Función que se ejecuta en cada clic en la página
+const handleClickOutside = (event) => {
+  if (openMenuIndex.value === null) return;
+
+  const target = event.target;
+
+  // Verificamos si el clic fue en un botón que abre menús O dentro de un menú abierto.
+  // El método .closest() busca el elemento o sus padres hasta encontrar el selector.
+  const isClickOnTrigger = target.closest('.menu-trigger-button');
+  const isClickInMenu = target.closest('.dropdown-menu');
+
+  // Si el clic NO fue en un trigger Y TAMPOCO fue dentro del menú, lo cerramos.
+  if (!isClickOnTrigger && !isClickInMenu) {
+    openMenuIndex.value = null;
+  }
+};
 
 const guardar = async () => {
   if (!elementoSeleccionado.value) return
@@ -1332,10 +1463,12 @@ const onKeydown = (e) => {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
+  document.addEventListener('click', handleClickOutside);
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('keydown', onKeydown);
+  document.removeEventListener('click', handleClickOutside);
 })
 
 onBeforeRouteLeave(async (to, from, next) => {

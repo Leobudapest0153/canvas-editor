@@ -108,8 +108,8 @@
               id: elemento.id,
               x: elemento.x,
               y: elemento.y,
-              width: elemento.width,
-              height: elemento.height,
+              width: getDrawWidth(elemento),
+              height: getDrawHeight(elemento),
               draggable: canDragElement(elemento.id),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
@@ -131,8 +131,8 @@
               :config="{
                 x: 0,
                 y: 0,
-                width: elemento.width,
-                height: elemento.height,
+                width: getDrawWidth(elemento),
+                height: getDrawHeight(elemento),
                 stroke: undefined,
                 strokeWidth: 0,
                 fill: 'transparent',
@@ -144,8 +144,8 @@
               :config="{
                 x: 0,
                 y: 0,
-                width: elemento.width,
-                height: elemento.height,
+                width: getDrawWidth(elemento),
+                height: getDrawHeight(elemento),
                 fill: elemento.tipo === 'pasillos' ? '#ffffff' : elemento.color,
                 stroke: elemento.tipo === 'pasillos'
                   ? '#959799'
@@ -169,8 +169,8 @@
             :config="{
               x: elemento.x,
               y: elemento.y,
-              width: elemento.width,
-              height: elemento.height,
+              width: getDrawWidth(elemento),
+              height: getDrawHeight(elemento),
               listening: false,
               rotation: elemento.rotation || 0,
               opacity: 0.35,
@@ -180,8 +180,8 @@
               :config="{
                 x: 0,
                 y: 0,
-                width: elemento.width,
-                height: elemento.height,
+                width: getDrawWidth(elemento),
+                height: getDrawHeight(elemento),
                 fill: '#000',
                 opacity: 0.12,
                 cornerRadius: 8,
@@ -192,8 +192,8 @@
               <v-text
                 v-if="canvasStore.zoom > 0.8"
                 :config="{
-                  width: elemento.width,
-                  height: elemento.height,
+                  width: getDrawWidth(elemento),
+                  height: getDrawHeight(elemento),
                   verticalAlign: 'middle',
                   align: 'center',
                   text: '🔒',
@@ -212,8 +212,8 @@
               id: elemento.id,
               x: elemento.x,
               y: elemento.y,
-              width: elemento.width,
-              height: elemento.height,
+              width: getDrawWidth(elemento),
+              height: getDrawHeight(elemento),
               draggable: canDragElement(elemento.id),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
@@ -235,8 +235,8 @@
               :config="{
                 x: 0,
                 y: 0,
-                width: elemento.width,
-                height: elemento.height,
+                width: getDrawWidth(elemento),
+                height: getDrawHeight(elemento),
                 strokeEnabled: false,
                 fillEnabled: false,
                 listening: false,
@@ -245,9 +245,9 @@
             />
             <v-circle
               :config="{
-                x: elemento.width / 2,
-                y: elemento.height / 2,
-                radius: Math.min(elemento.width, elemento.height) / 2,
+                x: getDrawWidth(elemento) / 2,
+                y: getDrawHeight(elemento) / 2,
+                radius: Math.min(getDrawWidth(elemento), getDrawHeight(elemento)) / 2,
                 fill: elemento.color,
                 opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
                 shadowColor: getElementShadow(elemento).color,
@@ -268,8 +268,8 @@
               id: elemento.id,
               x: elemento.x,
               y: elemento.y,
-              width: elemento.width,
-              height: elemento.height,
+              width: getDrawWidth(elemento),
+              height: getDrawHeight(elemento),
               draggable: canDragElement(elemento.id),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
@@ -291,8 +291,8 @@
               :config="{
                 x: 0,
                 y: 0,
-                width: elemento.width,
-                height: elemento.height,
+                width: getDrawWidth(elemento),
+                height: getDrawHeight(elemento),
                 stroke: undefined,
                 strokeWidth: 0,
                 fill: 'transparent',
@@ -304,8 +304,8 @@
               :config="{
                 x: 0,
                 y: 0,
-                width: elemento.width,
-                height: elemento.height,
+                width: getDrawWidth(elemento),
+                height: getDrawHeight(elemento),
                 fill: elemento.color,
                 opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
                 shadowColor: 'black',
@@ -322,8 +322,8 @@
             :config="{
               x: elemento.x,
               y: elemento.y,
-              width: elemento.width,
-              height: elemento.height,
+              width: getDrawWidth(elemento),
+              height: getDrawHeight(elemento),
               listening: false,
               rotation: elemento.rotation || 0,
               opacity: 0.35,
@@ -331,9 +331,9 @@
           >
             <v-circle
               :config="{
-                x: elemento.width / 2,
-                y: elemento.height / 2,
-                radius: Math.min(elemento.width, elemento.height) / 2,
+                x: getDrawWidth(elemento) / 2,
+                y: getDrawHeight(elemento) / 2,
+                radius: Math.min(getDrawWidth(elemento), getDrawHeight(elemento)) / 2,
                 fill: '#000',
                 opacity: 0.12,
                 listening: false,
@@ -343,8 +343,8 @@
             <v-text
               v-if="canvasStore.zoom > 0.8"
               :config="{
-                width: elemento.width,
-                height: elemento.height,
+                width: getDrawWidth(elemento),
+                height: getDrawHeight(elemento),
                 align: 'center',
                 verticalAlign: 'center',
                 text: '🔒',
@@ -362,8 +362,8 @@
             :config="{
               x: elemento.x,
               y: elemento.y,
-              width: elemento.width,
-              height: elemento.height,
+              width: getDrawWidth(elemento),
+              height: getDrawHeight(elemento),
               listening: false,
               rotation: elemento.rotation || 0,
               opacity: 0.35,
@@ -373,8 +373,8 @@
               :config="{
                 x: 0,
                 y: 0,
-                width: elemento.width,
-                height: elemento.height,
+                width: getDrawWidth(elemento),
+                height: getDrawHeight(elemento),
                 fill: '#000',
                 opacity: 0.12,
                 cornerRadius: 8,
@@ -384,8 +384,8 @@
             <v-text
               v-if="canvasStore.zoom > 0.8"
               :config="{
-                width: elemento.width,
-                height: elemento.height,
+                width: getDrawWidth(elemento),
+                height: getDrawHeight(elemento),
                 verticalAlign: 'middle',
                 align: 'center',
                 text: '🔒',
@@ -677,6 +677,17 @@ const getElementPixelDimensions = (elemento) => {
   // Si ya tiene width/height en píxeles, usarlos solo si no tiene dimensiones en cm
   // Esto es para compatibilidad con elementos legacy que solo tienen width/height
   if (!elemento.dimensiones && elemento.width && elemento.height) {
+    // Para elementos legacy, aplicar orientación en vista XZ
+    if (canvasStore.vistaActiva === 'XZ') {
+      const orientacion = Number(elemento.orientacion || 0)
+      const orientacionNormalizada = ((orientacion % 360) + 360) % 360
+      const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
+      
+      return { 
+        width: useAncho ? elemento.width : elemento.height, 
+        height: elemento.height 
+      }
+    }
     return { width: elemento.width, height: elemento.height }
   }
 
@@ -689,8 +700,16 @@ const getElementPixelDimensions = (elemento) => {
       widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
       heightCm = elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else if (canvasStore.vistaActiva === 'XZ') {
-      // Vista de frente (XZ): width = ancho, height = alto
-      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      // Vista de frente (XZ): considerar orientación para el width
+      const orientacion = Number(elemento.orientacion || 0)
+      const orientacionNormalizada = ((orientacion % 360) + 360) % 360
+      const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
+      
+      // En XZ: orientación determina si width usa ancho o largo
+      widthCm = useAncho 
+        ? (elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10))
+        : (elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6))
+      // Height siempre es alto en XZ
       heightCm = elemento.dimensiones.alto || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else {
       // Fallback a vista aérea (XY)
@@ -707,6 +726,11 @@ const getElementPixelDimensions = (elemento) => {
   // Fallback a valores por defecto (solo para elementos sin dimensiones definidas)
   return { width: 100, height: 60 }
 }
+
+// Funciones helper para obtener dimensiones con orientación
+const getDrawWidth = (elemento) => getElementPixelDimensions(elemento).width
+const getDrawHeight = (elemento) => getElementPixelDimensions(elemento).height
+
 const conflictsApi = useConflicts()
 
 // === BLOQUEO DE ELEMENTOS ===
@@ -765,10 +789,11 @@ const floorBoundary = computed(() => activeBounds.value.boundsPx)
 // Configuración del layer - SIEMPRE USA CANVAS ADAPTATIVO
 const layerConfig = computed(() => {
   // Usar siempre canvasAdaptativo como fuente única de verdad
-  return {
+  const config = {
     width: canvasStore.canvasAdaptativo.width,
     height: canvasStore.canvasAdaptativo.height,
   }
+  return config
 })
 
 // Composable para zoom (después de declarar stageSize y layerConfig)
@@ -782,7 +807,8 @@ const {
 
 // Elementos visibles en el canvas (excluye elementos ocultos)
 const elementosVisiblesEnCanvas = computed(() => {
-  return canvasStore.elementosVisibles.filter((elemento) => elemento.visible !== false)
+  const visibles = canvasStore.elementosVisibles.filter((elemento) => elemento.visible !== false)
+  return visibles
 })
 
 // Grid de referencia - BASADO EN LAS DIMENSIONES DEL LAYER
@@ -1468,8 +1494,8 @@ const getOrientationBarRect = (elemento) => {
 // Regla: si el elemento es más alto que ancho (h > w), mostramos el texto en vertical (rotado -90°);
 // si no, horizontal. Esto reacciona automáticamente cuando cambian las dimensiones.
 const computeLabelProps = (elemento) => {
-  const w = Number(elemento.width) || 0
-  const h = Number(elemento.height) || 0
+  const w = getDrawWidth(elemento)
+  const h = getDrawHeight(elemento)
   const minSide = Math.max(0, Math.min(w, h))
   // Escala base: proporcional al tamaño
   const base = Math.min(280, Math.max(100, minSide * 0.22))

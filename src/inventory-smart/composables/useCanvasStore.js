@@ -109,6 +109,9 @@ export const useCanvasStore = defineStore('canvas', () => {
   const idsElementosFiltrados = ref(null)
   const elementoAura = ref(null)
 
+  // Edición de niveles
+  const nivelAEditar = ref(null);
+
   const isDraggable = ref(true)
   // Configuración de grilla y snap
   // Por defecto desactivamos la cuadrícula (0 = sin cuadricula visual ni snap a grilla)
@@ -141,6 +144,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     height: 600,
     escala: 1,
   })
+
+  // Edición de pisos (cuartos) desde las propiedades
+  const gestionPisosPropiedadesModal = ref(false);
 
   // Getters
   const elementosVisibles = computed(() => {
@@ -494,15 +500,36 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (['pisos'].includes(elemento.tipo)) {
         elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
         elementHeightPx = elemento.dimensiones.largo * CM_TO_PX
+      } else if (['elementos', 'cuartos'].includes(elemento.tipo)) {
+        // Vista XZ para elementos y cuartos - considerar orientación
+        const orientacion = Number(elemento.orientacion || 0)
+        const orientacionNormalizada = ((orientacion % 360) + 360) % 360
+        const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
+        
+        // En vista XZ: orientación determina qué usar como ancho
+        elementWidthPx = useAncho 
+          ? elemento.dimensiones.ancho * CM_TO_PX
+          : elemento.dimensiones.largo * CM_TO_PX
+        elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
       } else {
+        // Para otros tipos (pasillos)
         elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
         elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
       }
     } else if (elemento.width && elemento.height) {
       // Fallback a dimensiones legacy en píxeles
-      elementWidthPx = elemento.width
-      elementHeightPx = elemento.height
-      console.log('Usando dimensiones legacy en px')
+      if (['elementos', 'cuartos'].includes(elemento.tipo)) {
+        // Para elementos y cuartos legacy, también aplicar orientación
+        const orientacion = Number(elemento.orientacion || 0)
+        const orientacionNormalizada = ((orientacion % 360) + 360) % 360
+        const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
+        
+        elementWidthPx = useAncho ? elemento.width : elemento.height
+        elementHeightPx = elemento.height // Altura siempre es height en legacy
+      } else {
+        elementWidthPx = elemento.width
+        elementHeightPx = elemento.height
+      }
     } else {
       // Fallback final - tamaño mínimo para contenedores pequeños
       const defaultWidth = elemento.tipo === 'contenedores' ? 30 : 100 // contenedores más pequeños
@@ -1174,6 +1201,19 @@ export const useCanvasStore = defineStore('canvas', () => {
     plantaEnEdicion.value = null
   }
 
+  const abrirCuartoNivelesPropiedades = (idNivel) => {
+    // Solo es para edición
+    if (idNivel) {
+      nivelAEditar.value = elementos.value.find((e) => e.id === idNivel);
+    }
+    gestionPisosPropiedadesModal.value = true;
+  }
+
+  const cerrarCuartoNivelesPropiedades = () => {
+    gestionPisosPropiedadesModal.value = false;
+    nivelAEditar.value = null;
+  }
+
   /* Funciones de filtros*/
   const getEtiquetaPorId = computed(() => {
     return (id) => etiquetas.value.find((etiqueta) => etiqueta.id === id)
@@ -1374,6 +1414,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     elementoAura,
     isDraggable,
     cambiosNoAplicados,
+    gestionPisosPropiedadesModal,
+    nivelAEditar,
 
     // Getters
     elementosVisibles,
@@ -1466,5 +1508,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     setDraggableMode,
 
+    // == Edición de plantas desde las propiedades
+    abrirCuartoNivelesPropiedades,
+    cerrarCuartoNivelesPropiedades,
   }
 })

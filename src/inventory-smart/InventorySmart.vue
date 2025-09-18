@@ -32,6 +32,7 @@
     <ConfirmModal />
     <!-- Loader global -->
     <LoaderOverlay />
+    <!-- Gestión de plantas -->
     <WorkspaceEditor />
 
     <!-- Modal de aviso: el servidor trae cambios más recientes; se descartarán locales -->
@@ -45,6 +46,8 @@
       @confirmar="applyPendingServerConfig"
       @cerrar="applyPendingServerConfig"
     />
+    <!-- Gestión de pisos de cuartos desde las propiedades -->
+    <ManagmentFloorRoomPropertiesModal/>
   </div>
 </template>
 
@@ -56,6 +59,7 @@ import PlantasPanel from './components/PlantasPanel.vue'
 import PropiedadesPanel from './components/PropiedadesPanel.vue'
 import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import WorkspaceEditor from './components/WorkspaceEditor.vue'
+import ManagmentFloorRoomPropertiesModal from './components/ManagmentFloorRoomPropertiesModal.vue'
 import { useCanvasImportExport } from './composables/useCanvasImportExport'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
