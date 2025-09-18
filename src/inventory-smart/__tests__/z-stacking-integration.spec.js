@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, config } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import CanvasView from '@/inventory-smart/components/CanvasView.vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 import { errorsPlacement } from '@/inventory-smart/validation/placementOrchestrator'
 
 describe('z stacking integration', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    globalThis.window = globalThis.window || {}
-    window.__toasts = { show: vi.fn() }
+    const toastMock = { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 }
+    config.global.provide = { ...(config.global.provide || {}), [ToastSymbol]: toastMock }
   })
 
   const mountWithElements = (elements) => {
@@ -69,7 +70,7 @@ describe('z stacking integration', () => {
 
     expect(shape.position()).toEqual({ x: 20, y: 0 })
     expect(spy).not.toHaveBeenCalled()
-    expect(window.__toasts.show).toHaveBeenCalledWith(
+  expect(config.global.provide[ToastSymbol].show).toHaveBeenCalledWith(
       errorsPlacement.Z_STACK_CONFLICT,
       { type: 'error' },
     )
@@ -123,7 +124,7 @@ describe('z stacking integration', () => {
     wrapper.vm.onShapeDragEnd({ target: shape }, store.elementos[1])
 
     expect(shape.position()).toEqual({ x: 0, y: 0 })
-    expect(window.__toasts.show).not.toHaveBeenCalled()
+  expect(config.global.provide[ToastSymbol].show).not.toHaveBeenCalled()
   })
 
   it('allows drag when XY does not overlap', () => {
@@ -174,6 +175,6 @@ describe('z stacking integration', () => {
     wrapper.vm.onShapeDragEnd({ target: shape }, store.elementos[1])
 
     expect(shape.position()).toEqual({ x: 40, y: 0 })
-    expect(window.__toasts.show).not.toHaveBeenCalled()
+  expect(config.global.provide[ToastSymbol].show).not.toHaveBeenCalled()
   })
 })

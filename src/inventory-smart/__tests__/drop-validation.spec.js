@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, config } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import CanvasView from '@/inventory-smart/components/CanvasView.vue'
 import { detectConflictsFor } from '@/inventory-smart/utils/collision'
@@ -72,11 +72,11 @@ vi.mock('@/inventory-smart/composables/useConflicts', () => ({
   })
 }))
 
-// Mock del sistema de toast
-globalThis.window = {
-  __toasts: {
-    show: vi.fn()
-  }
+// Mock del sistema de toast (vía provide)
+import { ToastSymbol } from '@/inventory-smart/plugins/toast'
+config.global.provide = {
+  ...(config.global.provide || {}),
+  [ToastSymbol]: { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 },
 }
 
 describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
@@ -86,7 +86,7 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
   beforeEach(() => {
     pinia = createPinia()
     setActivePinia(pinia)
-    
+
     wrapper = mount(CanvasView, {
       global: {
         plugins: [pinia]
@@ -94,15 +94,15 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
     })
 
     // Mock de las referencias del componente
-    wrapper.vm.stageRef = { 
-      value: { 
-        getNode: () => mockStage 
-      } 
+    wrapper.vm.stageRef = {
+      value: {
+        getNode: () => mockStage
+      }
     }
-    wrapper.vm.containerRef = { 
-      value: { 
-        getBoundingClientRect: () => ({ left: 0, top: 0 }) 
-      } 
+    wrapper.vm.containerRef = {
+      value: {
+        getBoundingClientRect: () => ({ left: 0, top: 0 })
+      }
     }
   })
 
@@ -161,7 +161,7 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
       await wrapper.vm.createElementFromDrop(dropData, dropEvent)
 
       // Verificar que se mostró el toast de error
-      expect(window.__toasts.show).toHaveBeenCalledWith(
+      expect(config.global.provide[ToastSymbol].show).toHaveBeenCalledWith(
         'No hay espacio aquí para colocar el elemento',
         { type: 'error', timeout: 4000 }
       )
@@ -190,10 +190,10 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
         .mockReturnValue([])
 
       // nudgePlace encuentra una posición válida
-      vi.mocked(nudgePlace).mockReturnValue({ 
-        found: true, 
-        x: 200, 
-        y: 200 
+      vi.mocked(nudgePlace).mockReturnValue({
+        found: true,
+        x: 200,
+        y: 200
       })
 
       const dropData = {
@@ -225,7 +225,7 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
       )
 
       // Verificar que NO se mostró toast de error
-      expect(window.__toasts.show).not.toHaveBeenCalled()
+  expect(config.global.provide[ToastSymbol].show).not.toHaveBeenCalled()
     })
   })
 
@@ -309,7 +309,7 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
 
       // Verificar que snapToGrid fue llamado antes que detectConflictsFor
       expect(snapToGrid).toHaveBeenCalledWith(57, 53, GRID_SIZE) // 97-40, 83-30 (mitad del elemento)
-      
+
       // Verificar que detectConflictsFor recibió las coordenadas snapeadas
       expect(detectConflictsFor).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -372,7 +372,7 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
       )
 
       // Verificar que se mostró el toast de error
-      expect(window.__toasts.show).toHaveBeenCalledWith(
+      expect(config.global.provide[ToastSymbol].show).toHaveBeenCalledWith(
         'No hay espacio aquí para colocar el elemento',
         { type: 'error', timeout: 4000 }
       )
@@ -413,7 +413,7 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
       await wrapper.vm.createElementFromBuffer(dropData, dropEvent)
 
       // Verificar toast específico para buffer
-      expect(window.__toasts.show).toHaveBeenCalledWith(
+      expect(config.global.provide[ToastSymbol].show).toHaveBeenCalledWith(
         'No hay espacio aquí para pegar el elemento',
         { type: 'error', timeout: 4000 }
       )

@@ -41,7 +41,7 @@
                 <label class="block text-sm font-medium text-gray-700">Categoría</label>
                 <select
                   v-model="localElemento.categoria"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
+                  class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                   required
                 >
                   <option value="">Seleccionar</option>
@@ -54,7 +54,7 @@
                 <label class="block text-sm font-medium text-gray-700">Forma de la base</label>
                 <select
                   v-model="localElemento.forma"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
+                  class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                   required
                 >
                   <option value="">Seleccionar</option>
@@ -67,7 +67,7 @@
                 <label class="block text-sm font-medium text-gray-700">Ubicación</label>
                 <select
                   v-model="localElemento.ubicacion"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
+                  class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                   required
                 >
                   <option value="">Seleccionar</option>
@@ -378,19 +378,19 @@ const onCancel = () => {
 const validarFormulario = () => {
   const elemento = localElemento.value
   if (!elemento.nombre.trim()) {
-    showToast('El nombre es requerido', { type: 'error' })
+    showToast('El nombre es requerido', 'error')
     return false
   }
   if (!elemento.categoria) {
-    showToast('La categoría es requerida', { type: 'error' })
+    showToast('La categoría es requerida', 'error')
     return false
   }
   if (!elemento.forma) {
-    showToast('La forma es requerida', { type: 'error' })
+    showToast('La forma es requerida', 'error')
     return false
   }
   if (!elemento.ubicacion) {
-    showToast('La ubicación es requerida', { type: 'error' })
+    showToast('La ubicación es requerida', 'error')
     return false
   }
   if (
@@ -398,11 +398,11 @@ const validarFormulario = () => {
     elemento.dimensiones.largo <= 0 ||
     elemento.dimensiones.alto <= 0
   ) {
-    showToast('Las dimensiones deben ser mayores a 0', { type: 'error' })
+    showToast('Las dimensiones deben ser mayores a 0', 'error')
     return false
   }
   if (elemento.pesoMaximo <= 0) {
-    showToast('La capacidad de carga debe ser mayor a 0', { type: 'error' })
+    showToast('La capacidad de carga debe ser mayor a 0', 'error')
     return false
   }
   const ctx = {
@@ -411,7 +411,7 @@ const validarFormulario = () => {
   for (const v of [validateWallZBaseRequired, validateHeightWithinWarehouse]) {
     const res = v(null, elemento, ctx)
     if (res.valid === false) {
-      showToast(errorsPlacement[res.code], { type: 'error' })
+      showToast(errorsPlacement[res.code], 'error')
       return false
     }
   }
@@ -433,7 +433,7 @@ const handleSubmit = () => {
 
     // Si el nuevo peso máximo es menor que el peso actual de los hijos, mostrar error
     if (resultado.limiteDePeso && nuevoPesoMaximo < pesoActualHijos) {
-  showToast(`La capacidad debe ser al menos ${pesoActualHijos} kg para soportar los elementos que contiene.`, { type: 'error' });
+      showToast(`La capacidad debe ser al menos ${pesoActualHijos} kg para soportar los elementos que contiene.`, 'error');
       return;
     }
   }

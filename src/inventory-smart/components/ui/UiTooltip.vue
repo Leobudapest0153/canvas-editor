@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="containerRef"
     class="relative inline-block"
     @mouseenter="onEnter"
     @mouseleave="onLeave"
@@ -9,7 +10,7 @@
     <slot />
     <transition name="fade">
       <div
-        v-if="visible"
+        v-if="visible && !isDestroyed"
         :class="customPosition"
         class="pointer-events-none absolute z-50 px-2 py-1 rounded-md bg-slate-900 text-white text-xs shadow text-nowrap"
         role="tooltip"
@@ -21,7 +22,7 @@
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount, computed, onUnmounted } from 'vue'
+import { ref, onBeforeUnmount, onUnmounted, computed } from 'vue'
 defineOptions({ name: 'UiTooltip' })
 
 const props = defineProps({
@@ -30,42 +31,57 @@ const props = defineProps({
   position: { type: String, default: 'top' }
 })
 
+const containerRef = ref(null)
+const visible = ref(false)
+const isDestroyed = ref(false)
+let timer
+
 const customPosition = computed(() => {
   switch(props.position) {
     case 'top':
-      return '-top-2 left-1/2 -translate-x-1/2 -translate-y-full';
+      return '-top-2 left-1/2 -translate-x-1/2 -translate-y-full'
     case 'bottom':
-      return '-bottom-2 left-1/2 -translate-x-1/2 translate-y-full';
+      return '-bottom-2 left-1/2 -translate-x-1/2 translate-y-full'
     case 'left':
-      return '-left-2 top-1/2 -translate-y-1/2 -translate-x-full';
+      return '-left-2 top-1/2 -translate-y-1/2 -translate-x-full'
     case 'right':
-      return '-right-2 top-1/2 -translate-y-1/2 translate-x-full';
+      return '-right-2 top-1/2 -translate-y-1/2 translate-x-full'
     default:
-      return '-top-2 left-1/2 -translate-x-1/2 -translate-y-full';
+      return '-top-2 left-1/2 -translate-x-1/2 -translate-y-full'
   }
-});
-
-const visible = ref(false)
-let timer
+})
 
 function onEnter() {
+  if (isDestroyed.value) return
+
+  clearTimeout(timer)
   timer = setTimeout(() => {
-    visible.value = true
+    if (!isDestroyed.value && timer) {
+      visible.value = true
+    }
   }, props.delay)
 }
 
 function onLeave() {
   clearTimeout(timer)
+  timer = null
   visible.value = false
 }
 
 function cleanup() {
+  isDestroyed.value = true
   clearTimeout(timer)
+  timer = null
   visible.value = false
 }
 
-onBeforeUnmount(cleanup)
-onUnmounted(cleanup)
+onBeforeUnmount(() => {
+  cleanup()
+})
+
+onUnmounted(() => {
+  cleanup()
+})
 </script>
 
 <style>

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { mount, config } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { pointInPolygon } from '@/inventory-smart/utils/polygonBounds'
 
@@ -16,10 +16,12 @@ vi.mock('@/inventory-smart/utils/collision', () => ({
 }))
 
 import CanvasView from '@/inventory-smart/components/CanvasView.vue'
+import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 
 beforeEach(() => {
   setActivePinia(createPinia())
-  window.__toasts = { show: vi.fn() }
+  const toastMock = { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 }
+  config.global.provide = { ...(config.global.provide || {}), [ToastSymbol]: toastMock }
 })
 
 describe('drop outside polygon', () => {
@@ -66,7 +68,7 @@ describe('drop outside polygon', () => {
 
     wrapper.vm.createElementFromDrop(data, dropEvent)
 
-    expect(window.__toasts.show).not.toHaveBeenCalled()
+    expect(config.global.provide[ToastSymbol].show).not.toHaveBeenCalled()
     expect(mockStore.agregarElemento).toHaveBeenCalled()
     const added = mockStore.agregarElemento.mock.calls[0][0]
     const inside = pointInPolygon({ x: added.x, y: added.y }, mockStore.plantaActivaData.poligono)
