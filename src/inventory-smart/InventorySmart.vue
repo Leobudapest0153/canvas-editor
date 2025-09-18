@@ -285,11 +285,12 @@ onUnmounted(() => {
 
 watch(
   () => props.configCanvas,
-  async (newConfig) => {
+  async (newConfig, oldConfig) => {
     try {
       // Si no se provee una configuracion inicial
       if (!newConfig) {
-        showToast('Iniciando área de trabajo', 'info')
+        const mensaje = oldConfig ? null : 'Iniciando área de trabajo'
+        if (mensaje) showToast(mensaje, 'info' )
         const plantaInicial = canvasStore.plantas.find((p) => p.activa) || canvasStore.plantas[0]
         if (plantaInicial) {
           canvasStore.navegarAPlanta(plantaInicial.id)
@@ -329,7 +330,8 @@ watch(
       }
 
       // Caso por defecto: aplicar servidor (y limpiar backups locales)
-      showToast('Iniciando área de trabajo', 'info' )
+      const mensaje = oldConfig ? null : 'Iniciando área de trabajo'
+      if (mensaje) showToast(mensaje, 'info' )
       const instance = getAutoSaveInstance()
       const wasEnabled = instance?.isEnabled?.value === true
       instance?.stopAutoSave?.()
