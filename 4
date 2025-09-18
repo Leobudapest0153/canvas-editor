@@ -1,0 +1,95 @@
+<template>
+  <div
+    v-if="canvasStore.gestionPisosPropiedadesModal"
+    class="fixed inset-0 z-50 flex items-center justify-center"
+  >
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-[1px]"/>
+
+    <!-- Modal -->
+    <div
+      class="relative z-10 bg-white shadow-2xl flex flex-col max-h-max py-3 px-5 w-[30vw]">
+      <div class="mb-4 flex items-center">
+        <h3 class="font-bold text-lg text-[#1C1E4D]">Piso</h3>
+        <UiTooltip
+          label="Considera que al no definir dimensiones, estas se consideran como infinitas"
+          position="bottom"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 20 20"
+            class="p-0.5 rounded-full bg-primary-700 text-white ml-8"
+          >
+            <g fill="currentColor">
+              <path
+                fill-rule="evenodd"
+                d="M10 7a2 2 0 0 1 2 2v7a2 2 0 1 1-4 0V9a2 2 0 0 1 2-2"
+                clip-rule="evenodd"
+                />
+              <path d="M12 4a2 2 0 1 1-4 0a2 2 0 0 1 4 0"/>
+            </g>
+          </svg>
+        </UiTooltip>
+      </div>
+      <div class="grid col-span-2 gap-x-6 gap-y-4 mb-7 w-[200%]">
+        <div class="col-span-2 flex flex-col gap-y-2">
+          <label class="font-normal text-medium text-[#111928]" for="codigo_piso">Código del piso</label>
+          <input
+          type="text"
+          placeholder="01"
+          class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
+        </div>
+        <div class="col-span-2 flex flex-col gap-y-2">
+          <label class="font-normal text-medium text-[#111928]" for="nombre_piso">Nombre del piso</label>
+          <input
+          type="text"
+          placeholder="01"
+          class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
+        </div>
+        <div class="flex flex-col gap-y-2">
+          <label class="font-normal text-medium text-[#111928]" for="largo">Largo(m)</label>
+          <input
+          type="text"
+          placeholder="01"
+          class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
+        </div>
+
+        <div class="flex flex-col gap-y-2">
+          <label class="font-normal text-medium text-[#111928]" for="alto">Alto (m)</label>
+          <input
+          type="text"
+          placeholder="01"
+          class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
+        </div>
+        <div class="flex flex-col gap-y-2">
+          <label class="font-normal text-medium text-[#111928]" for="ancho">Ancho (m)</label>
+          <input
+          type="text"
+          placeholder="01"
+          class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
+        </div>
+        <div class="flex flex-col gap-y-2">
+          <label class="font-normal text-medium text-[#111928]" for="largo">Capacidad de carga (kg)</label>
+          <input
+          type="text"
+          placeholder="01"
+          class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
+        </div>
+      </div>
+      <h3 class="font-semibold text-medium text-primary-800">Características del piso</h3>
+      <div class="mt-4">
+        <input type="radio" name="caracteristicas-piso" id="Zona de Cross-docking" value="Zona de
+        Cross-docking"/>
+        <label for="Zona de Cross-docking">Zona de Cross-docking</label>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
+import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore';
+
+const canvasStore = useCanvasStore();
+</script>
