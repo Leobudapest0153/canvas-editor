@@ -110,15 +110,15 @@
               y: elemento.y,
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
-              draggable: canDragElement(elemento.id),
+              draggable: canDragElement(elemento),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
-            @click="() => selectElement(elemento.id)"
+            @click="() => selectElement(elemento)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
-            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
-            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
+            @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id)"
@@ -214,15 +214,15 @@
               y: elemento.y,
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
-              draggable: canDragElement(elemento.id),
+              draggable: canDragElement(elemento),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
-            @click="() => selectElement(elemento.id)"
+            @click="() => selectElement(elemento)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
-            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
-            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
+            @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id)"
@@ -270,15 +270,15 @@
               y: elemento.y,
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
-              draggable: canDragElement(elemento.id),
+              draggable: canDragElement(elemento),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
-            @click="() => selectElement(elemento.id)"
+            @click="() => selectElement(elemento)"
             @dblclick="() => handleElementDoubleClick(elemento)"
-            @dragstart="(e) => canDragElement(elemento.id) && onShapeDragStart(e, elemento)"
-            @dragmove="(e) => canDragElement(elemento.id) && onShapeDragMove(e, elemento)"
-            @dragend="(e) => canDragElement(elemento.id) && onShapeDragEnd(e, elemento)"
+            @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
+            @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
+            @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id)"
@@ -495,7 +495,8 @@
         />
 
         <v-transformer
-          v-if="isEditingSelected && canvasStore.elementoSeleccionado && !selectedElementLocked"
+          v-if="isEditingSelected && canvasStore.elementoSeleccionado && !selectedElementLocked &&
+          !isRestricted"
           ref="transformerRef"
           :config="{
             rotateEnabled: false,
@@ -974,18 +975,20 @@ const handleStageClick = (e) => {
 }
 
 // === FUNCIONES DE ELEMENTOS ===
-const selectElement = (elementId) => {
-  console.log('Seleccionando elemento:', elementId)
-  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elementId;
+const selectElement = (element) => {
+  // Check restrictions
+  if (element?.restrictions && element?.restrictions.includes('open-properties')) return;
+  console.log('Seleccionando elemento:', element.id)
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== element.id;
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado && isNotCurrentElement) {
     const msg = "No puedes seleccionar un nuevo elemento con cambios pendientes de guardar";
     showToast(msg, 'warn');
     return;
   }
-  canvasStore.seleccionarElemento(elementId)
+  canvasStore.seleccionarElemento(element.id)
   // Si el modo arrastre global está activado y el elemento NO está bloqueado, activar edición (transformer)
-  if (dragModeGlobal.value && elementId && !isElementLocked(elementId)) {
-    editingElementId.value = elementId
+  if (dragModeGlobal.value && element.id && !isElementLocked(element.id)) {
+    editingElementId.value = element.id;
     nextTick(setupTransformer)
   } else {
     editingElementId.value = null
@@ -993,6 +996,7 @@ const selectElement = (elementId) => {
 }
 
 const handleElementDoubleClick = (elemento) => {
+  if (elemento?.restrictions && elemento.restrictions.includes('enter')) return;
   console.log('Double-click en elemento:', elemento.nombre)
 
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
@@ -1130,6 +1134,7 @@ const {
   isInteractingWithTransformer,
   isEditingSelected,
   selectedElementLocked,
+  isRestricted,
   setupTransformer,
   handleTransformStart,
   handleTransformMove,
@@ -1673,11 +1678,12 @@ const toggleSnapping = () => {
   }
 }
 
-const canDragElement = (id) => {
+const canDragElement = (elemento) => {
   // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
   // Y si no hay cambios sin aplicar de otro elemento
-  const isNotCurrentElement = canvasStore.elementoSeleccionado != id;
-  if (isElementLocked(id) || (canvasStore.cambiosNoAplicados && isNotCurrentElement)) return false
+  const isNotCurrentElement = canvasStore.elementoSeleccionado != elemento.id;
+  if (isElementLocked(elemento.id) || (canvasStore.cambiosNoAplicados && isNotCurrentElement) ||
+  (elemento?.restrictions && elemento.restrictions.includes('drag'))) return false
   return dragModeGlobal.value
 }
 
@@ -1868,6 +1874,7 @@ const getClientXY = (e) => {
 }
 
 const onShapeContextMenu = (evt, elemento) => {
+  if (elemento?.restrictions && elemento.restrictions.includes('right-click')) return;
   try { (evt?.evt || evt)?.preventDefault?.() } catch { /* ignore */ }
   // No abrir si hay drag activo
   if (isElementDragging.value || (typeof window !== 'undefined' && window.__dvCanvasDragActive)) {
