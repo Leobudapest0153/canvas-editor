@@ -3,17 +3,10 @@
  * Composable para consumir el servicio global de toasts.
  */
 
-import { getCurrentInstance, inject } from 'vue'
+import { getToastApi } from '@/inventory-smart/plugins/toast'
 
 export function useToast() {
-  // Preferir inject en composición
-  let toastApi = null
-
-  // Fallback: acceder por this.$toast si es Options API o fuera del árbol
-  if (!toastApi) {
-    const inst = getCurrentInstance()
-    toastApi = inst?.appContext?.config?.globalProperties?.$toast ?? null
-  }
+  let toastApi = getToastApi()
 
   const showToast = (message, type = 'error', options = {}) => {
     if (!toastApi || typeof toastApi.show !== 'function') {
