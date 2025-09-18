@@ -1,7 +1,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
-import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { circleInPolygon, isRectCompletelyInPolygon } from '@/inventory-smart/utils/polygonBounds'
 import { correctTransformValues } from '@/inventory-smart/utils/precision'
 import { toTransformerPrecision } from '../utils/fixedDimensions'
@@ -63,6 +63,12 @@ export function useTransformer({
     const id = canvasStore.elementoSeleccionado
     return id ? isElementLocked(id) : false
   })
+
+  const isRestricted = computed(() => {
+    const elementSelected = canvasStore.elementoSeleccionadoCompleto;
+    const entityType = TIPOS_ENTIDAD.find((te) => te.id == elementSelected.tipo);
+    return entityType && entityType.restrictions.includes('drag');
+  });
 
   // Throttle para feedback visual
   const throttleTransform = throttleEveryNFrames(3)
@@ -228,7 +234,8 @@ export function useTransformer({
   }
 
   // Inicio de transformación - guardar estado inicial
-  const handleTransformStart = (e, elementId) => {
+  const handleTransformStart = (e, element) => {
+    if (element?.restrictions && element.restrictions.include('drag')) return;
     isInteractingWithTransformer.value = true
     try {
       const node = e.target
@@ -241,13 +248,13 @@ export function useTransformer({
       const width = node.width() * node.scaleX()
       const height = node.height() * node.scaleY()
       const state = { x, y, width, height, rotation: node.rotation?.() || 0 }
-      transformInitialState.set(elementId, state)
+      transformInitialState.set(element.id, state)
 
       // Mostrar guías de snapping al iniciar transform si está habilitado
       if (isSnappingEnabled?.value && typeof performSnap === 'function') {
         try {
-          const elemento = canvasStore.elementosVisibles.find((e) => e.id === elementId)
-          const neighbors = canvasStore.elementosVisibles.filter((el) => el.id !== elementId)
+          const elemento = canvasStore.elementosVisibles.find((e) => e.id === element.id)
+          const neighbors = canvasStore.elementosVisibles.filter((el) => el.id !== element.id)
           const pageBounds = layerConfig?.value
             ? { width: layerConfig.value.width, height: layerConfig.value.height }
             : null
@@ -806,6 +813,7 @@ export function useTransformer({
     // Computeds
     isEditingSelected,
     selectedElementLocked,
+    isRestricted,
 
     // Methods
     setupTransformer,
