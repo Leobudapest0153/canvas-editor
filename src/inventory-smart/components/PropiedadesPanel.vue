@@ -17,9 +17,11 @@
               <input
                 v-model="edited.nombre"
                 type="text"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2
+                focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
+                disabled:cursor-not-allowed disabled:text-gray-500"
                 placeholder="Nombre del elemento"
-                :disabled="isSaving"
+                :disabled="isSaving || isElementRestricted"
               />
             </div>
             <div class="grid grid-cols-2 gap-3">
@@ -48,15 +50,18 @@
                 <input
                   v-model="edited.color"
                   type="color"
-                  class="!w-12 h-10 border border-gray-300 rounded-lg cursor-pointer"
-                  :disabled="isSaving"
+                  class="!w-12 h-10 border border-gray-300 rounded-lg cursor-pointer
+                  disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                  :disabled="isSaving || isElementRestricted"
                 />
                 <input
                   v-model="edited.color"
                   type="text"
-                  class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2
+                  focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
+                  disabled:cursor-not-allowed disabled:text-gray-500"
                   placeholder="#3B82F6"
-                  :disabled="isSaving"
+                  :disabled="isSaving || isElementRestricted"
                 />
               </div>
             </div>
@@ -66,8 +71,10 @@
               <label class="block text-xs font-medium text-gray-600 mb-1">Orientación</label>
               <select
                 v-model.number="edited.orientacion"
-                :disabled="isSaving"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                :disabled="isSaving || isElementRestricted"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2
+                focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
+                disabled:cursor-not-allowed disabled:text-gray-500"
               >
                 <option :value="0">0°</option>
                 <option :value="90">90°</option>
@@ -116,8 +123,10 @@
                     step="any"
                     v-model.number="edited.dimensiones.ancho"
                     @change="validarDimension('ancho')"
-                    class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    :disabled="isSaving"
+                    class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
+                    focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
+                    disabled:cursor-not-allowed disabled:text-gray-500"
+                    :disabled="isSaving || isElementRestricted"
                   />
                   <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
                 </div>
@@ -131,8 +140,10 @@
                     step="any"
                     v-model.number="edited.dimensiones.largo"
                     @change="validarDimension('largo')"
-                    class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                    :disabled="isSaving"
+                    class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
+                    focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
+                    disabled:cursor-not-allowed disabled:text-gray-500"
+                    :disabled="isSaving || isElementRestricted"
                   />
                   <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
                 </div>
@@ -147,7 +158,9 @@
                   step="any"
                   v-model.number="edited.dimensiones.alto"
                   @change="validarDimension('alto')"
-                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
+                  focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
+                  disabled:cursor-not-allowed disabled:text-gray-500"
                   :disabled="isSaving || esPasillo"
                 />
                 <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
@@ -167,8 +180,10 @@
                   :max="maxDiametroPlanta"
                   v-model.number="edited.diametroCm"
                   @change="validarDiametro"
-                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  :disabled="isSaving"
+                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
+                  focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
+                  disabled:cursor-not-allowed disabled:text-gray-500"
+                  :disabled="isSaving || isElementRestricted"
                 />
                 <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
@@ -205,7 +220,9 @@
                   :max="maxAlturaSobreSuelo"
                   v-model.number="edited.alturaSobreSueloCm"
                   @change="validarAlturaSobreSuelo"
-                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
+                  focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
+                  disabled:cursor-not-allowed disabled:text-gray-500"
                   :disabled="isSaving || !estaUbicadoEnPared"
                 />
                 <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
@@ -228,8 +245,10 @@
                   min="0"
                   v-model.number="edited.pesoMaximo"
                   @change="validarPeso"
-                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                  :disabled="isSaving"
+                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
+                  focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
+                  disabled:cursor-not-allowed disabled:text-gray-500"
+                  :disabled="isSaving || isElementRestricted"
                 />
                 <span class="ml-1 text-sm text-gray-500">kg</span>
               </div>
@@ -315,8 +334,10 @@
             <div class="flex justify-between items-center w-full -mt-6 pl-4">
               Pisos
               <button
+                :disabled="isSaving || isElementRestricted"
                 @click="canvasStore.abrirCuartoNivelesPropiedades()"
-                class="bg-primary-700 text-white p-1 rounded-full cursor-pointer">
+                class="bg-primary-700 text-white p-1 rounded-full cursor-pointer
+                disabled:bg-gray-400 disabled:cursor-not-allowed">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/>
                 </svg>
@@ -393,10 +414,16 @@
                 <input
                   type="text"
                   min="0"
+                  :disabled="isSaving || isElementRestricted"
                   placeholder="B123456789ABCD"
-                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                  class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
+                  focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
+                  disabled:cursor-not-allowed disabled:text-gray-500"
                 />
-                <button class="text-[#364153] text-sm bg-gray-200 px-3 py-2 rounded-[6px] ml-1">
+                <button
+                  :disabled="isSaving || isElementRestricted"
+                  class="text-[#364153] text-sm bg-gray-200 px-3 py-2 rounded-[6px] ml-1
+                  disabled:opacity-50 hover:bg-gray-300 disabled:cursor-not-allowed">
                   Configurar
                 </button>
               </div>
@@ -411,7 +438,7 @@
         <button
           class="px-3 py-1 cursor-pointer border border-gray-300 rounded text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
           @click="revertir"
-          :disabled="isSaving"
+          :disabled="isSaving || isElementRestricted"
         >
           Revertir
         </button>
@@ -1459,6 +1486,12 @@ const onKeydown = (e) => {
     }
   }
 }
+
+const isElementRestricted = computed(() => {
+   const type = elementoSeleccionado.value?.tipo;
+   const restrictions = TIPOS_ENTIDAD.find(t => t.id === type)?.restrictions || [];
+   return restrictions.includes('read-only-properties');
+})
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)

@@ -16,7 +16,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
@@ -147,6 +147,16 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Edición de pisos (cuartos) desde las propiedades
   const gestionPisosPropiedadesModal = ref(false);
 
+  const withRestrinctions = (el) => {
+    if (!el) return null;
+
+    const tipo = TIPOS_MAP[el.tipo];
+    const restrictions = tipo?.restrictions ?? [];
+    return { ...el, restrictions };
+  }
+
+  const TIPOS_MAP = Object.fromEntries(TIPOS_ENTIDAD.map(t => [t.id, t])
+  )
   // Getters
   const elementosVisibles = computed(() => {
     const t = contextoNavegacion.value.tipo
@@ -154,7 +164,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     if (t === 'plantas') {
       const enPlanta = elementos.value.filter((el) => el.plantaId === id && !el.padre)
-      return enPlanta.filter((el) => ['cuartos', 'elementos', 'pasillos'].includes(el.tipo))
+      return enPlanta.filter((el) => ['cuartos', 'elementos', 'pasillos'].includes(el.tipo)).map(withRestrinctions);
     }
 
     if (t === 'cuartos') {
@@ -162,7 +172,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (padre?.hijos) {
         return padre.hijos
           .map((hid) => elementos.value.find((e) => e.id === hid))
-          .filter((h) => h && h.tipo === 'pisos')
+          .filter((h) => h && h.tipo === 'pisos').map(withRestrinctions);
       }
     }
 
@@ -171,7 +181,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (padre?.hijos) {
         return padre.hijos
           .map((hid) => elementos.value.find((e) => e.id === hid))
-          .filter((h) => h && h.tipo === 'elementos')
+          .filter((h) => h && h.tipo === 'elementos').map(withRestrinctions);
       }
     }
 
@@ -180,7 +190,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (padre?.hijos) {
         return padre.hijos
           .map((hid) => elementos.value.find((e) => e.id === hid))
-          .filter((h) => h && h.tipo === 'contenedores')
+          .filter((h) => h && h.tipo === 'contenedores').map(withRestrinctions);
       }
     }
 
