@@ -325,6 +325,7 @@
           </summary>
           <div class="mt-3 space-y-3">
             <div
+              v-if="pisos.length > 0"
               v-for="(piso, index) in pisos"
               :key="index"
               class="bg-white p-3 flex items-center justify-between rounded-md shadow-sm relative"
@@ -372,6 +373,12 @@
                   </ul>
                 </div>
               </div>
+            </div>
+            <div
+              v-else
+              class="text-sm text-gray-500"
+            >
+            Sin pisos registrados
             </div>
           </div>
         </details>
