@@ -617,6 +617,7 @@ import CanvasInfo from '@/inventory-smart/components/CanvasInfo.vue'
 import { useZoom } from '@/inventory-smart/composables/useZoom'
 import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
 import { toPrecisionCm } from '../utils/fixedDimensions'
+import { instantiateStructureOnCanvas } from '@/inventory-smart/composables/useStructureManager'
 
 // Nuevo: espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -1593,7 +1594,8 @@ const createElementFromTemplate = (data, dropEvent) => {
     console.log('[templates-dd] drop cancelado por validación', res.reason)
     return
   }
-  const newId = buffer.pasteFromSerialized(payload, res.position)
+  // Unificar instanciación de estructuras (plantillas/cuarto/espacio)
+  const newId = instantiateStructureOnCanvas(canvasStore, payload, res.position)
   if (!newId) {
     showToast('No se pudo insertar la plantilla', 'error')
   } else {
@@ -1900,13 +1902,7 @@ const onDelete = async (id) => {
   if (!id) return
   const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
   if (el && (el.bloqueado === true || el.locked === true)) {
-    try {
-      if (typeof window !== 'undefined' && window.__toasts?.show) {
-        showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
-      } else {
-        await confirmDialog.confirm({ title: 'Elemento bloqueado', message: 'Elemento bloqueado — desbloquéalo para eliminar', confirmLabel: 'Entendido', cancelLabel: 'Cerrar' })
-      }
-    } catch { /* ignore */ }
+    showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
     ctx.close()
     return
   }

@@ -310,7 +310,7 @@ watch(
         const restored = canvasStore.deserialize(latestBackup.data)
         if (restored) {
           showToast(
-            `Se restauró la copia de seguridad local más reciente (${fmtDate(latestBackup.timestamp)}).`,
+            `Restaurando tus últimos cambios guardados (${fmtDate(latestBackup.timestamp)}).`,
             'info',
           )
           return

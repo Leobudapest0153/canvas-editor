@@ -127,8 +127,20 @@ export const useStatePersistence = () => {
 
           // Canvas representacion
           canvas: {
-            width: Math.max(1, elemento.width || elemento.dimensiones?.ancho * 2 || 20),
-            height: Math.max(1, elemento.height || elemento.dimensiones?.alto * 2 || 20)
+            width: Math.max(1, elemento.width || (() => {
+              // Si no hay width, calcular desde dimensiones
+              const dims = elemento.dimensiones || {}
+              return (dims.ancho || 10) * 10 // CM_TO_PX = 10
+            })()),
+            height: Math.max(1, elemento.height || (() => {
+              // Si no hay height, calcular según tipo de elemento
+              const dims = elemento.dimensiones || {}
+              const tipo = (elemento.tipo || '').toLowerCase()
+              const isFloor = tipo === 'pisos'
+              if (isFloor) return (dims.alto || 10) * 10 // pisos en XZ: alto
+              if (tipo === 'cuartos' || tipo === 'pasillos') return (dims.largo || 10) * 10 // XY
+              return (dims.alto || 10) * 10 // elementos/contenedores en XZ
+            })())
           },
 
           // Uso real
@@ -449,10 +461,18 @@ export const useStatePersistence = () => {
             // Canvas representación con validación
             width: (elementoData.canvas?.width && elementoData.canvas.width > 0)
               ? elementoData.canvas.width
-              : elementoData.dimensiones.ancho * 2, // Fallback basado en dimensiones
+              : elementoData.dimensiones.ancho * 10, // Fallback usando CM_TO_PX
             height: (elementoData.canvas?.height && elementoData.canvas.height > 0)
               ? elementoData.canvas.height
-              : elementoData.dimensiones.alto * 2,
+              : (() => {
+                // Calcular height según el tipo de elemento
+                const tipo = (elementoData.tipo || '').toLowerCase()
+                const dims = elementoData.dimensiones
+                const isFloor = tipo === 'pisos'
+                if (isFloor) return dims.alto * 10 // pisos en XZ: alto
+                if (tipo === 'cuartos' || tipo === 'pasillos') return dims.largo * 10 // XY
+                return dims.alto * 10 // elementos/contenedores en XZ
+              })(),
 
             // Uso real
             uso: {

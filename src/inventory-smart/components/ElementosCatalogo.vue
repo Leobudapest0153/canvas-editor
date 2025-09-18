@@ -255,6 +255,7 @@ import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
 
 import ElementEditor from './modals/ElementEditor.vue'
 import AgregarCuartoModal from './AgregarCuartoModal.vue'
+import { buildStructureFromForm, toCatalogItemFromStructure } from '@/inventory-smart/composables/useStructureManager'
 
 // Props
 const props = defineProps({
@@ -411,13 +412,25 @@ const onGuardarElemento = (elemento) => {
 
 const onGuardarEspacio = (datosEspacio) => {
   try {
-    canvasStore.crearDesdeFormulario(datosEspacio)
-    // Limpiar filtros para asegurar visualización del nuevo elemento
+    // 1) Construir estructura neutral desde formulario (no efectos)
+    const structure = buildStructureFromForm(datosEspacio)
+    // 2) Crear entrada de catálogo unificada distinguiendo por kind (room/space)
+    const kind = datosEspacio.tipo === 'cuarto' ? 'room' : 'space'
+    const item = toCatalogItemFromStructure({
+      name: datosEspacio.datosGenerales?.nombre,
+      description: datosEspacio.datosGenerales?.descripcion,
+      structure,
+      kind,
+      color: datosEspacio.datosGenerales?.color,
+    })
+    // 3) Insertar en catálogo
+    items.value.push(item)
+    // 4) Reset de filtros para visualizarlo
     categoriaSeleccionada.value = null
     filtroTexto.value = ''
     mostrarModalAgregarEspacio.value = false
   } catch (e) {
-    console.error('No se pudo crear desde formulario', e)
+    console.error('No se pudo crear estructura desde formulario', e)
   }
 }
 
@@ -485,14 +498,19 @@ const getCardDims = (item) => {
 // Drag and Drop
 const iniciarArrastre = (elemento, event) => {
   console.log('Iniciando arrastre del elemento:', elemento)
-  const datosArrastre = {
-    tipo: 'elemento-catalogo',
-    elemento: elemento,
-    offset: {
-      x: event.offsetX || 0,
-      y: event.offsetY || 0,
-    },
-  }
+  // Si el item trae payload de estructura (plantilla/room/space), arrastrar como 'plantilla-catalogo'
+  const isStructured = !!elemento?.payload?.rootId && Array.isArray(elemento?.payload?.elements)
+  const datosArrastre = isStructured
+    ? {
+        tipo: 'plantilla-catalogo',
+        payload: elemento.payload,
+        offset: { x: event.offsetX || 0, y: event.offsetY || 0 },
+      }
+    : {
+        tipo: 'elemento-catalogo',
+        elemento: elemento,
+        offset: { x: event.offsetX || 0, y: event.offsetY || 0 },
+      }
   console.log('Datos de arrastre:', datosArrastre)
 
   try {

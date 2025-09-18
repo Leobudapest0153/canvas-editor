@@ -14,10 +14,8 @@
 import { ref, computed } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
 import { useWeightValidation } from './useWeightValidation'
-import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { buildStructureFromCanvasElement, instantiateStructureOnCanvas } from '@/inventory-smart/composables/useStructureManager'
 import { useToast } from './useToast'
-import { toPrecisionCm } from '@/inventory-smart/utils/fixedDimensions'
-
 
 // Estado global del buffer (singleton)
 const bufferItems = ref([])
@@ -58,82 +56,13 @@ export const useCanvasBuffer = () => {
     }
   }
 
-  /**
-   * Serializar un elemento con todos sus hijos recursivamente.
-   * Genera copias profundas y nuevos IDs únicos para evitar conflictos.
-   * Retorna un objeto con el elemento raíz y un mapa de todos los elementos.
-   */
+  // Delegar la serialización de estructuras al StructureManager
   const serializeElementForTemplate = (elementoId, offsetX = 0, offsetY = 0) => {
-    const elemento = canvasStore.elementoPorId(elementoId)
-    if (!elemento) {
-      console.warn('⚠️ Elemento no encontrado para clonar:', elementoId)
-      return null
-    }
-
-    // Mapeo de IDs originales a nuevos IDs y elementos clonados
-    const idMapping = new Map()
-    const allClonedElements = new Map() // ID clonado -> elemento clonado
-    const baseTimestamp = Date.now()
-    let counter = 0
-
-    // Función recursiva para clonar un elemento y sus hijos
-    const cloneElementRecursive = (elem, parentNewId = null, level = 0) => {
-      // Generar nuevo ID único con timestamp incremental y sufijo aleatorio
-      const uniqueTimestamp = baseTimestamp + counter
-      const randomSuffix = Math.random().toString(36).substr(2, 9)
-      const newId = `${elem.tipo || elem.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
-      idMapping.set(elem.id, newId)
-      counter++
-
-      // Clonar el elemento
-      const clonedElement = {
-        ...JSON.parse(JSON.stringify(elem)), // Deep clone
-        id: newId,
-        x: elem.x + offsetX,
-        y: elem.y + offsetY,
-        padre: parentNewId, // Asignar nuevo padre si corresponde
-        hijos: [], // Se llenará después con los nuevos IDs
-      }
-
-      // Limpiar propiedades que se manejarán según el contexto
-      if (level === 0) {
-        // Solo para el elemento raíz, limpiar plantaId y padre
-        delete clonedElement.plantaId
-        clonedElement.padre = null
-      }
-
-      // Guardar elemento clonado usando ID clonado como clave
-      allClonedElements.set(newId, clonedElement)
-
-      // Si el elemento tiene hijos, clonarlos recursivamente
-      if (elem.hijos && elem.hijos.length > 0) {
-        console.log(`📋 Clonando ${elem.hijos.length} hijos para ${elem.nombre || elem.tipo}`)
-
-        for (const hijoId of elem.hijos) {
-          const hijo = canvasStore.elementoPorId(hijoId)
-          if (hijo) {
-            const clonedChild = cloneElementRecursive(hijo, newId, level + 1)
-            if (clonedChild) {
-              clonedElement.hijos.push(clonedChild.id)
-            }
-          }
-        }
-      }
-
-      return clonedElement
-    }    // Iniciar clonado recursivo
-    const rootClonedElement = cloneElementRecursive(elemento, null, 0)
-
-    if (rootClonedElement) {
-
-      return {
-        rootElement: rootClonedElement,
-        allElements: allClonedElements,
-        idMapping: idMapping
-      }
-    }
-
-    return null
+    const struct = buildStructureFromCanvasElement(canvasStore, elementoId, { offsetX, offsetY })
+    if (!struct) return null
+    // Adaptar a la forma antes usada por el buffer para no romper tests/consumidores
+    const all = new Map(struct.payload.elements.map(e => [e.id, e]))
+    return { rootElement: struct.root, allElements: all, idMapping: new Map() }
   }
 
   /**
@@ -193,15 +122,11 @@ export const useCanvasBuffer = () => {
     const success = addToBuffer(clonedStructure.rootElement, sourceInfo)
     if (success) {
       const totalElements = countElementsInStructure(elemento)
-
-      // Mostrar mensaje de éxito
-      if (typeof window !== 'undefined' && window.__toasts?.show) {
-          const nombreElemento = elemento.nombre || elemento.tipo
-          const mensaje = totalElements > 1
-            ? `Estructura "${nombreElemento}" copiada (${totalElements} elementos)`
-            : `Elemento "${nombreElemento}" copiado al portapapeles`
-          showToast(mensaje, 'info')
-      }
+      const nombreElemento = elemento.nombre || elemento.tipo
+      const mensaje = totalElements > 1
+        ? `Estructura "${nombreElemento}" copiada (${totalElements} elementos)`
+        : `Elemento "${nombreElemento}" copiado al portapapeles`
+      showToast(mensaje, 'info')
     } else {
       console.error('⚠️ Error al copiar la estructura al buffer')
     }
@@ -229,150 +154,32 @@ export const useCanvasBuffer = () => {
 
   /**
    * Pegar estructura de forma recursiva respetando la jerarquía
+   * NUEVO: Incluye lógica especial para elementos con pisos generados automáticamente
    */
+  // Reemplazar pegado recursivo por la función centralizada
   const pasteStructureRecursive = (elementoToPaste, position, allElementsMap, parentId = null) => {
-    // Crear el elemento en la posición especificada
-    const newElementBase = {
-      ...elementoToPaste,
-      x: position.x,
-      y: position.y,
-      padre: parentId,
-      hijos: [] // Reiniciar hijos, se agregarán después
-    }
-
-    // Si es pasillo, forzar altura dinámica según planta destino
-    let newElement = newElementBase
-    try {
-      if ((newElementBase?.tipo || '').toLowerCase() === 'pasillos') {
-        const planta = canvasStore.plantaPorId(canvasStore.plantaActiva)
-        const altoPlanta = planta?.dimensiones?.alto
-        if (Number.isFinite(altoPlanta)) {
-          const dims = { ...(newElementBase.dimensiones || {}) }
-          dims.alto = altoPlanta
-          newElement = { ...newElementBase, dimensiones: dims }
-        }
-      }
-    } catch { /* ignore */ }
-
-    // Limpiar propiedades que el store manejará
-    if (!parentId) {
-      // Solo para el elemento raíz
-      delete newElement.plantaId
-      newElement.padre = null
-    }
-
-    let newElementId
-
-    if (!parentId) {
-      // Para el elemento raíz, usar agregarElemento normal que respeta el contexto
-      newElementId = canvasStore.agregarElemento(newElement)
-    } else {
-      // Para los hijos, agregar directamente sin depender del contexto
-      newElementId = addElementDirectly(newElement, parentId)
-    }
-
-    if (!newElementId) {
-      console.error('⚠️ Error al agregar elemento al canvas:', newElement)
-      return null
-    }
-
-    // Agregar hijos recursivamente
-    if (elementoToPaste.hijos && elementoToPaste.hijos.length > 0) {
-
-      for (const hijoId of elementoToPaste.hijos) {
-        const hijoElement = allElementsMap.get(hijoId)
-        if (hijoElement) {
-          // Calcular posición del hijo (mantener posición relativa)
-          const childPosition = {
-            x: hijoElement.x,
-            y: hijoElement.y
-          }
-
-          pasteStructureRecursive(hijoElement, childPosition, allElementsMap, newElementId)
-        } else {
-          console.warn('⚠️ Elemento hijo no encontrado en mapa:', hijoId)
-        }
-      }
-    }
-
-    return newElementId
+    const payload = { rootId: elementoToPaste.id, elements: Array.from(allElementsMap.values()) }
+    return instantiateStructureOnCanvas(canvasStore, payload, position)
   }
+
+  /**
+   * Regenera las posiciones de los pisos internos cuando se instancia una plantilla
+   * con un elemento que tiene pisos generados automáticamente
+   */
+  // Ya no es necesario: la regeneración de pisos la gestiona instantiateStructureOnCanvas
+  const regenerarPisosEnPlantilla = () => {}
 
   /**
    * Agregar elemento directamente sin depender del contexto de navegación
    */
-  const addElementDirectly = (elemento, parentId) => {
-    // Configurar relación padre-hijo
-    if (parentId) {
-
-      // Buscar el padre directamente en el array de elementos del store
-      if (!canvasStore.elementos) {
-        console.error('⚠️ canvasStore.elementos es undefined')
-        return null
-      }
-
-      const padreIndex = canvasStore.elementos.findIndex(el => el.id === parentId)
-      if (padreIndex === -1) {
-        console.error('⚠️ Padre no encontrado:', parentId)
-        return null
-      }
-
-      const padre = canvasStore.elementos[padreIndex]
-
-      // Configurar elemento hijo
-      elemento.padre = parentId
-      elemento.plantaId = padre.plantaId // Hereda la planta del padre
-
-      // Agregar al array de elementos globales
-      canvasStore.elementos.push(elemento)
-
-      // Inicializar array de hijos si no existe
-      if (!padre.hijos) {
-        padre.hijos = []
-      }
-
-      // Agregar al array de hijos del padre
-      padre.hijos.push(elemento.id)
-
-      return elemento.id
-    }
-
-    return null
-  }
+  // Ya no se expone inserción directa; lo maneja instantiateStructureOnCanvas
+  const addElementDirectly = () => null
 
   /**
    * Regenerar IDs únicos para una estructura antes del pegado
    */
-  const regenerateUniqueIds = (allElementsMap) => {
-    const newIdMapping = new Map()
-    const newElementsMap = new Map()
-    const baseTimestamp = Date.now()
-    let counter = 0
-
-    // Primero, generar todos los nuevos IDs únicos
-    for (const [oldId, element] of allElementsMap) {
-      const uniqueTimestamp = baseTimestamp + counter
-      const randomSuffix = Math.random().toString(36).substr(2, 9)
-      const newId = `${element.tipo || element.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
-      newIdMapping.set(oldId, newId)
-      counter++
-    }
-
-    // Luego, crear los elementos con los nuevos IDs y referencias actualizadas
-    for (const [oldId, element] of allElementsMap) {
-      const newId = newIdMapping.get(oldId)
-      const newElement = {
-        ...JSON.parse(JSON.stringify(element)), // Deep clone
-        id: newId,
-        hijos: element.hijos ? element.hijos.map(hijoId => newIdMapping.get(hijoId)).filter(Boolean) : [],
-        padre: element.padre ? newIdMapping.get(element.padre) : null
-      }
-
-      newElementsMap.set(newId, newElement)
-    }
-
-    return { newElementsMap, newIdMapping }
-  }
+  // Regeneración de IDs ahora la realiza instantiateStructureOnCanvas internamente
+  const regenerateUniqueIds = (allElementsMap) => ({ newElementsMap: allElementsMap, newIdMapping: new Map() })
 
   /**
    * Pegar estructura completa desde buffer al canvas actual
@@ -407,71 +214,30 @@ export const useCanvasBuffer = () => {
 
     if (!resultadoValidacionPeso.valido) {
       console.warn('⚠️ No se puede pegar: excedería el peso máximo soportado', resultadoValidacionPeso)
-
-      if (typeof window !== 'undefined' && window.__toasts?.show) {
-        showToast(
-          `No se puede pegar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
-          'error', { timeout: 3000 }
-        )
-      }
-
+      showToast(
+        `No se puede pegar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
+        'error', { timeout: 3000 }
+      )
       return false
     }
 
     // Verificar si es una estructura con elementos hijos
     if (sourceInfo.isStructure && sourceInfo.allElements) {
       console.log('📋 Pegando estructura completa con', sourceInfo.allElements.size, 'elementos')
-
-      // REGENERAR IDs únicos para cada pegado
-      const { newElementsMap, newIdMapping } = regenerateUniqueIds(sourceInfo.allElements)
-
-      // Obtener el elemento raíz con el nuevo ID
-      const originalRootId = elemento.id
-      const newRootId = newIdMapping.get(originalRootId)
-      let newRootElement = newElementsMap.get(newRootId)
-
-      // Ajuste de altura para pasillos (raíz) según planta destino
-      try {
-        if ((newRootElement?.tipo || '').toLowerCase() === 'pasillos') {
-          const planta = canvasStore.plantaPorId(canvasStore.plantaActiva)
-          const altoPlanta = planta?.dimensiones?.alto
-          if (Number.isFinite(altoPlanta)) {
-            const dims = { ...(newRootElement.dimensiones || {}) }
-            dims.alto = altoPlanta
-            newRootElement = { ...newRootElement, dimensiones: dims }
-            newElementsMap.set(newRootId, newRootElement)
-          }
-        }
-      } catch { /* ignore */ }
-
-      if (!newRootElement) {
-        console.error('⚠️ Error al regenerar IDs para el elemento raíz')
-        return false
+      const payload = {
+        rootId: elemento.id,
+        elements: Array.from(sourceInfo.allElements.values()).map(e => ({ ...JSON.parse(JSON.stringify(e)) })),
       }
-
-      // Pegar la estructura de forma recursiva, respetando la jerarquía
-      const rootElementId = pasteStructureRecursive(newRootElement, position, newElementsMap)
-
+      const rootElementId = instantiateStructureOnCanvas(canvasStore, payload, position)
       if (rootElementId) {
-        console.log('📋 Estructura completa pegada con nuevos IDs únicos:', {
-          elementoRaiz: elemento.nombre || elemento.tipo,
-          nuevoId: rootElementId,
-          elementosRegenerados: newElementsMap.size
-        })
-
-        // Mostrar mensaje de éxito para estructura
-        if (typeof window !== 'undefined' && window.__toasts?.show) {
-          const nombreElemento = elemento.nombre || elemento.tipo
-          const totalElements = newElementsMap.size
-          const mensaje = totalElements > 1
-            ? `Estructura "${nombreElemento}" pegada (${totalElements} elementos)`
-            : `Elemento "${nombreElemento}" pegado correctamente`
-          showToast(mensaje, 'info')
-        }
-
+        const nombreElemento = elemento.nombre || elemento.tipo
+        const totalElements = payload.elements.length
+        const mensaje = totalElements > 1
+          ? `Estructura "${nombreElemento}" pegada (${totalElements} elementos)`
+          : `Elemento "${nombreElemento}" pegado correctamente`
+        showToast(mensaje, 'info')
         return rootElementId
       }
-
       return false
     } else {
       // Pegar elemento simple (sin hijos) - generar nuevo ID único
@@ -509,13 +275,8 @@ export const useCanvasBuffer = () => {
           nuevo: finalElementId,
           nombre: elemento.nombre || elemento.tipo
         })
-
-        // Mostrar mensaje de éxito para elemento simple
-        if (typeof window !== 'undefined' && window.__toasts?.show) {
-          const nombreElemento = elemento.nombre || elemento.tipo
-          showToast(`Elemento "${nombreElemento}" pegado correctamente`, 'info')
-        }
-
+        const nombreElemento = elemento.nombre || elemento.tipo
+        showToast(`Elemento "${nombreElemento}" pegado correctamente`, 'info')
         return finalElementId
       }
     }
@@ -531,31 +292,7 @@ export const useCanvasBuffer = () => {
       console.warn('⚠️ Payload de plantilla inválido')
       return false
     }
-
-    const allElementsMap = new Map()
-    for (const el of payload.elements) {
-      allElementsMap.set(el.id, { ...JSON.parse(JSON.stringify(el)) })
-    }
-
-    const { newElementsMap, newIdMapping } = regenerateUniqueIds(allElementsMap)
-    const newRootId = newIdMapping.get(payload.rootId)
-    let newRootElement = newElementsMap.get(newRootId)
-    // Forzar altura de pasillos en plantillas
-    try {
-      if ((newRootElement?.tipo || '').toLowerCase() === 'pasillos') {
-        const planta = canvasStore.plantaPorId(canvasStore.plantaActiva)
-        const altoPlanta = planta?.dimensiones?.alto
-        if (Number.isFinite(altoPlanta)) {
-          const dims = { ...(newRootElement.dimensiones || {}) }
-          dims.alto = altoPlanta
-          newRootElement = { ...newRootElement, dimensiones: dims }
-          newElementsMap.set(newRootId, newRootElement)
-        }
-      }
-    } catch { /* ignore */ }
-    if (!newRootElement) return false
-
-    return pasteStructureRecursive(newRootElement, position, newElementsMap)
+    return instantiateStructureOnCanvas(canvasStore, payload, position)
   }
 
   /**

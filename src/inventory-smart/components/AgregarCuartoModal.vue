@@ -234,7 +234,7 @@
                     <!-- Custom inline tooltip trigger -->
                     <button
                       type="button"
-                      class="inline-flex cursor-pointer items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[11px] font-semibold cursor-help"
+                      class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[11px] font-semibold cursor-help"
                       aria-label="Información"
                       @mouseenter="openTooltip($event, 'Considere que al no definir dimensiones, estas se calcularán automáticamente')"
                       @focus="openTooltip($event, 'Considere que al no definir dimensiones, estas se calcularán automáticamente')"

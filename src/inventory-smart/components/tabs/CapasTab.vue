@@ -369,13 +369,7 @@ const onDelete = async (id) => {
   if (!id) return
   const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
   if (el && (el.bloqueado === true || el.locked === true)) {
-    try {
-      if (typeof window !== 'undefined' && window.__toasts?.show) {
-        showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
-      } else {
-        await confirmDialog.confirm({ title: 'Elemento bloqueado', message: 'Elemento bloqueado — desbloquéalo para eliminar', confirmLabel: 'Entendido', cancelLabel: 'Cerrar' })
-      }
-    } catch { /* ignore */ }
+    showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
     return
   }
   // Si no está seleccionado, seleccionarlo primero

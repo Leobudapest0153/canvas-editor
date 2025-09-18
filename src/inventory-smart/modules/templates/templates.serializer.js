@@ -8,15 +8,17 @@ export const exportTemplatesToDTO = (rawTemplates = []) => {
     const payload = tpl.payload || { rootId: undefined, elements: [] }
     const elements = Array.isArray(payload.elements) ? payload.elements : []
     const root = elements.find((e) => e.id === payload.rootId) || elements[0]
-    const rootX = root?.x || 0
-    const rootY = root?.y || 0
     const nodos = elements.map((el) => ({
       id: el.id,
       tipo: el.tipo || 'elementos',
       categoria: el.categoria,
       nombre: el.nombre,
       dimensiones: el.dimensiones ? { ...el.dimensiones } : undefined,
-      offsets: { dx: (el.x || 0) - rootX, dy: (el.y || 0) - rootY },
+      // Para plantillas: guardar coordenadas absolutas (los hijos se renderizan en canvas del padre)
+      coordenadas: {
+        x: typeof el.x === 'number' ? el.x : 0,
+        y: typeof el.y === 'number' ? el.y : 0
+      },
       canvas: { width: el.width || el.canvas?.width || 0, height: el.height || el.canvas?.height || 0 },
       padre: el.padre || null,
       hijos: Array.isArray(el.hijos) ? el.hijos.slice() : [],
@@ -26,6 +28,8 @@ export const exportTemplatesToDTO = (rawTemplates = []) => {
       alturaRespectoAlSuelo: el.alturaRespectoAlSuelo,
       pesoMaximo: el.pesoMaximo,
       volumenMaximo: el.volumenMaximo,
+      // Nuevo: persistimos metadatos por nodo relevantes para estructura
+      meta: el.meta ? { ...el.meta } : undefined,
     }))
     return {
       id: tpl.id,
@@ -63,20 +67,16 @@ export const importTemplatesFromDTO = (dtos = []) => {
       const nodos = dto.estructura.nodos
       const root = nodos.find(n => n.id === rootId) || nodos[0]
 
-      // Encontrar coordenadas del root en los offsets para reconstruir coordenadas absolutas
-      const rootNode = nodos.find(n => n.id === rootId)
-      const rootOffsetX = rootNode?.offsets.dx || 0
-      const rootOffsetY = rootNode?.offsets.dy || 0
-
       const elements = nodos.map(n => ({
         id: n.id,
         tipo: n.tipo,
         categoria: n.categoria,
         nombre: n.nombre,
         dimensiones: n.dimensiones ? { ...n.dimensiones } : undefined,
-        // CORREGIDO: reconstruir coordenadas absolutas a partir de offsets relativos
-        x: n.offsets.dx - rootOffsetX, // offset relativo al root normalizado
-        y: n.offsets.dy - rootOffsetY, // offset relativo al root normalizado
+        // Para plantillas: usar coordenadas absolutas directamente
+        // (los hijos se renderizan en canvas del padre, no necesitan ser relativos al root)
+        x: n.coordenadas?.x || 0,
+        y: n.coordenadas?.y || 0,
         width: n.canvas.width,
         height: n.canvas.height,
         padre: n.padre || null,
@@ -88,6 +88,8 @@ export const importTemplatesFromDTO = (dtos = []) => {
         alturaRespectoAlSuelo: n.alturaRespectoAlSuelo,
         pesoMaximo: n.pesoMaximo,
         volumenMaximo: n.volumenMaximo,
+        // Reconstruir metadatos por nodo (tienePisosGenerados, esPisoInterno, indicePiso, etc.)
+        meta: n.meta ? { ...n.meta } : undefined,
       }))
       const now = new Date().toISOString()
       const templateInternal = {
