@@ -1,6 +1,37 @@
+// Epsilon para tratar puntos en borde como "dentro"
+const PIP_EPS = 1e-9
+
+function _toXY(p) {
+  return { x: p.x ?? p[0], y: p.y ?? p[1] }
+}
+
+function isPointOnSegment(p, a, b, eps = PIP_EPS) {
+  const P = _toXY(p)
+  const A = _toXY(a)
+  const B = _toXY(b)
+  const abx = B.x - A.x
+  const aby = B.y - A.y
+  const apx = P.x - A.x
+  const apy = P.y - A.y
+  // Producto cruzado ~ 0 para colinealidad
+  const cross = abx * apy - aby * apx
+  if (Math.abs(cross) > eps) return false
+  // Proyección dentro del segmento
+  const dot = apx * abx + apy * aby
+  if (dot < -eps) return false
+  const ab2 = abx * abx + aby * aby
+  if (dot - ab2 > eps) return false
+  return true
+}
+
 export function pointInPolygon(pt, poly) {
   const x = pt.x ?? pt[0]
   const y = pt.y ?? pt[1]
+  // 1) Borde cuenta como dentro
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    if (isPointOnSegment({ x, y }, poly[j], poly[i], PIP_EPS)) return true
+  }
+  // 2) Ray casting estándar
   let inside = false
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const xi = poly[i].x ?? poly[i][0]
@@ -142,12 +173,13 @@ export const isRectCompletelyInPolygon = (x, y, width, height, polygon) => {
       y4 = line2End.y
 
     const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-    if (Math.abs(denom) < 1e-10) return false // Líneas paralelas
+    if (Math.abs(denom) < 1e-10) return false // Paralelas o colineales: no contar como cruce
 
     const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom
     const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom
 
-    return t >= 0 && t <= 1 && u >= 0 && u <= 1
+    // Considerar intersección solo si ocurre estrictamente dentro de ambos segmentos (excluye tocar en extremos)
+    return t > 0 && t < 1 && u > 0 && u < 1
   }
 
   // Verificar intersecciones con cada borde del polígono
@@ -302,7 +334,7 @@ export function clampCircleToPolygonSmooth(circle, poly, previousPos = null) {
     }
 
     // Para movimientos más grandes, hacer interpolación suave
-    const maxStep = radius * 0.3 // Reducir el paso máximo para más suavidad
+    const maxStep = radius * 0.3 // Paso máximo por iteración para suavidad
     if (movementDistance > maxStep) {
       const steps = Math.ceil(movementDistance / maxStep)
       const stepX = dx / steps
@@ -322,7 +354,35 @@ export function clampCircleToPolygonSmooth(circle, poly, previousPos = null) {
           lastValidX = currentX
           lastValidY = currentY
         } else {
-          // Se salió, retornar la última posición válida
+          // Intentar corrección mínima hacia adentro (slide along edge)
+          let minDist = Infinity
+          let bestNormal = { x: 0, y: 0 }
+          for (let k = 0; k < poly.length; k++) {
+            const a = poly[k]
+            const b = poly[(k + 1) % poly.length]
+            const d = distancePointToSegment({ x: currentX, y: currentY }, a, b)
+            if (d < minDist) {
+              minDist = d
+              const segLen = Math.hypot(b.x - a.x, b.y - a.y)
+              if (segLen > 0) {
+                // Normal hacia adentro (perpendicular a la arista)
+                bestNormal = { x: -(b.y - a.y) / segLen, y: (b.x - a.x) / segLen }
+              }
+            }
+          }
+          const pushDist = Math.max(0, radius - minDist) + 0.5
+          const correctedX = currentX + bestNormal.x * pushDist
+          const correctedY = currentY + bestNormal.y * pushDist
+          const correctedCircle = { x: correctedX, y: correctedY, radius }
+          if (circleInPolygon(correctedCircle, poly)) {
+            // Aceptar corrección y continuar iteración
+            lastValidX = correctedX
+            lastValidY = correctedY
+            currentX = correctedX
+            currentY = correctedY
+            continue
+          }
+          // Si no pudimos corregir, volver a última válida
           return { x: lastValidX, y: lastValidY }
         }
       }

@@ -30,8 +30,8 @@ export function insideAreaModel(pos, movingEl, areaBounds, epsPx = 0.5) {
      const poly = areaBounds.polygon
     //  const rect = { x: pos.x, y: pos.y, width: w, height: h }
      // Pasar información de si es circular a la función de validación
-     if (!isCirc) return isRectCompletelyInPolygon(pos.x, pos.y, w, h, poly)
-     else return circleInPolygon(pos.x + w / 2, pos.y + h / 2, Math.min(w, h) / 2, poly)
+  if (!isCirc) return isRectCompletelyInPolygon(pos.x, pos.y, w, h, poly)
+  else return circleInPolygon({ x: pos.x + w / 2, y: pos.y + h / 2, radius: Math.min(w, h) / 2 }, poly)
    }
 
    // Para circulares en bounds rectangulares, usar su AABB del modelo (diámetro mínimo)
