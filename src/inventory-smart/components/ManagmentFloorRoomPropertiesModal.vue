@@ -38,6 +38,7 @@
           <input
             type="text"
             placeholder="01"
+            :value="canvasStore.nivelAEditar?.codigo ?? ''"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
         <div class="col-span-2 flex flex-col gap-y-2">
@@ -45,12 +46,14 @@
           <input
             type="text"
             placeholder="piso bajo"
+            :value="canvasStore.nivelAEditar?.nombre ?? ''"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
         <div class="flex flex-col gap-y-2">
           <label class="font-normal text-medium text-[#111928]" for="largo">Largo (m)</label>
           <input
             type="text"
+            :value="canvasStore.nivelAEditar?.dimensiones?.largo ?? ''"
             placeholder="30"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
@@ -60,6 +63,7 @@
           <input
             type="text"
             placeholder="30"
+            :value="canvasStore.nivelAEditar?.dimensiones?.alto ?? ''"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
         <div class="flex flex-col gap-y-2">
@@ -67,6 +71,7 @@
           <input
             type="text"
             placeholder="30"
+            :value="canvasStore.nivelAEditar?.dimensiones?.ancho ?? ''"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
         <div class="flex flex-col gap-y-2">
@@ -74,9 +79,10 @@
           <input
             type="text"
             placeholder="30"
+            :value="canvasStore.nivelAEditar?.pesoMaximo"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
-      <h3 class="font-semibold text-medium text-primary-800 col-span-2 pt-4 pb-3">Características del piso</h3>
+      <h3 class="font-semibold text-medium text-primary-800 col-span-2">Características del piso</h3>
       <div class="flex">
         <div class="relative max-w-max mr-2 flex items-center">
           <input

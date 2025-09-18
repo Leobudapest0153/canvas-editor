@@ -305,7 +305,12 @@
             </div>
           </div>
         </details>
-        <details open class="bg-gray-50 rounded-lg p-4">
+        <!-- Edición de niveles (Solo para cuartos)-->
+        <details
+          v-if="elementoSeleccionado.tipo === 'cuartos'"
+          open
+          class="bg-gray-50 rounded-lg p-4"
+        >
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">
             <div class="flex justify-between items-center w-full -mt-6 pl-4">
               Pisos
@@ -352,7 +357,7 @@
                     </li>
                     <li>
                       <button
-                        @click="canvasStore.abrirCuartoNivelesPropiedades()"
+                        @click="canvasStore.abrirCuartoNivelesPropiedades(piso.id)"
                         class="flex items-center justify-center px-4 py-2 text-sm text-primary-700
                         w-full cursor-pointer"
                       >
@@ -664,11 +669,9 @@ const guardarDeshabilitado = computed(
 )
 
 const pisos = computed(() => {
-  return [
-  { id: 1, nombre: 'Piso 1' },
-  { id: 2, nombre: 'Piso 2' },
-  { id: 3, nombre: 'Piso 3' },
-];
+  const hijos = elementoSeleccionado.value.hijos ?? [];
+
+  return canvasStore.elementos.filter((e) => hijos.includes(e.id));
 })
 
 const revertir = () => {
