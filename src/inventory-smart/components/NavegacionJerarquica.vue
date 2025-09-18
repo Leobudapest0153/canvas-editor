@@ -9,9 +9,19 @@
   <div class="navegacion-jerarquica">
     <!-- Breadcrumbs -->
     <div class="breadcrumbs">
-      <template v-for="(crumb, index) in canvasStore.breadcrumbs" :key="`${crumb.tipo}-${crumb.id}`">
+      <template
+        v-for="(crumb, index) in canvasStore.breadcrumbs"
+        :key="`${crumb.tipo}-${crumb.id}`"
+      >
         <span class="crumb-group">
-          <UiTooltip :label="index === canvasStore.breadcrumbs.length - 1 ? `Contexto actual` : `Ir a ${crumb.nombre}`" position="top">
+          <UiTooltip
+            :label="
+              index === canvasStore.breadcrumbs.length - 1
+                ? `Contexto actual`
+                : `Ir a ${crumb.nombre}`
+            "
+            position="top"
+          >
             <button
               class="breadcrumb-item"
               :class="{ active: index === canvasStore.breadcrumbs.length - 1 }"
@@ -30,24 +40,39 @@
             viewBox="0 0 24 24"
             aria-hidden="true"
           >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5l7 7-7 7"
+            />
           </svg>
         </span>
       </template>
 
       <!-- Botón "Regresar" con texto e icono -->
-      <UiTooltip :label="previousCrumb ? `Volver a ${previousCrumb.nombre}` : 'Volver al nivel anterior'" position="top">
-        <button
-          v-if="canvasStore.puedeNavegar"
-          class="breadcrumb-item breadcrumb-back"
-          @click="canvasStore.navegarAlPadre()"
-        >
-          <svg class="crumb-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      <UiTooltip
+        v-if="canvasStore.puedeNavegar"
+        :label="previousCrumb ? `Volver a ${previousCrumb.nombre}` : 'Volver al nivel anterior'"
+        position="top"
+      >
+        <button class="breadcrumb-item breadcrumb-back" @click="canvasStore.navegarAlPadre()">
+          <svg
+            class="crumb-back-icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
         </button>
       </UiTooltip>
-
     </div>
 
     <!-- Controles de navegación -->
@@ -118,7 +143,7 @@ const navegarACrumb = (crumb, index) => {
 
   if (crumb.tipo === 'plantas') {
     canvasStore.navegarAPlanta(crumb.id)
-  } else if (['cuartos','pisos','elementos','contenedores'].includes(crumb.tipo)) {
+  } else if (['cuartos', 'pisos', 'elementos', 'contenedores'].includes(crumb.tipo)) {
     // Usar la función del store para navegar a un elemento/contenedor
     // Esto asegura que zoom/pan, selección y canvas adaptativo se actualicen correctamente
     // Reconstruir el path hasta este elemento y usar navegarAContexto para reemplazarlo
@@ -137,7 +162,6 @@ const previousCrumb = computed(() => {
   if (!crumbs || crumbs.length < 2) return null
   return crumbs[crumbs.length - 2]
 })
-
 </script>
 
 <style scoped>
@@ -182,7 +206,7 @@ const previousCrumb = computed(() => {
   border: 1px solid var(--color-primary-300);
   color: #1d1e4c;
   font-weight: 600;
-  box-shadow: 0 2px 6px rgba(6,95,70,0.08);
+  box-shadow: 0 2px 6px rgba(6, 95, 70, 0.08);
   width: 36px;
   height: 36px;
   padding: 0;
@@ -192,11 +216,14 @@ const previousCrumb = computed(() => {
   justify-content: center;
 }
 
-.crumb-back-icon { width: 1.125rem; height: 1.125rem }
+.crumb-back-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
 
 .breadcrumb-back:focus {
   outline: none;
-  box-shadow: 0 0 0 4px rgba(6,95,70,0.12);
+  box-shadow: 0 0 0 4px rgba(6, 95, 70, 0.12);
 }
 
 /* Estilos del chip creativo */
@@ -204,13 +231,20 @@ const previousCrumb = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  background: linear-gradient(90deg,#ecfdf5 0%, #ffffff 100%);
+  background: linear-gradient(90deg, #ecfdf5 0%, #ffffff 100%);
   padding: 0.25rem 0.6rem;
   border-radius: 999px;
-  border: 1px solid rgba(6,95,70,0.08);
+  border: 1px solid rgba(6, 95, 70, 0.08);
 }
-.chip-icon { width: 1rem; height: 1rem; color: #047857 }
-.chip-text { font-weight: 600; color: #065f46 }
+.chip-icon {
+  width: 1rem;
+  height: 1rem;
+  color: #047857;
+}
+.chip-text {
+  font-weight: 600;
+  color: #065f46;
+}
 
 .breadcrumb-item:hover:not(.active) {
   background: #f3f4f6;
@@ -240,8 +274,16 @@ const previousCrumb = computed(() => {
   flex-shrink: 0;
 }
 
-.crumb-group { display: inline-flex; align-items: center; gap: 0.5rem; }
-.breadcrumb-separator { display: inline-block; vertical-align: middle; pointer-events: none; }
+.crumb-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.breadcrumb-separator {
+  display: inline-block;
+  vertical-align: middle;
+  pointer-events: none;
+}
 
 /* Controles de navegación */
 .nav-controls {
