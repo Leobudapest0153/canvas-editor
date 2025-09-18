@@ -34,7 +34,7 @@
           </div>
         </div>
         <div class="template-modal__row">
-          <label for="templateNotes" class="template-modal__label">Notas</label>
+          <label for="templateNotes" class="template-modal__label">Descripción</label>
           <textarea
             id="templateNotes"
             v-model="templateNotes"
@@ -56,9 +56,9 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
-import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import { buildStructureFromCanvasElement } from '@/inventory-smart/composables/useStructureManager'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -67,7 +67,6 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 const { store: canvasStore } = useCanvasWithHistory()
-const buffer = useCanvasBuffer()
 const catalogStore = useCatalogStore()
 const { showToast } = useToast()
 
@@ -91,18 +90,19 @@ function resetState() {
 function initFromElement(id) {
   const el = canvasStore.elementoPorId(id)
   if (!el) return
-  const serialized = buffer.serializeElementForTemplate(id)
-  if (!serialized) return
-  const elementsArr = Array.from(serialized.allElements.values())
+  // Unificar serialización vía StructureManager
+  const struct = buildStructureFromCanvasElement(canvasStore, id)
+  if (!struct) return
+  const elementsArr = struct.payload.elements
   templatePayload.value = {
-    rootId: serialized.rootElement.id,
+    rootId: struct.payload.rootId,
     elements: elementsArr,
   }
   templateSummary.value = {
-    elementType: serialized.rootElement.tipo || '',
-    width: serialized.rootElement.dimensiones?.ancho || 0,
-    depth: serialized.rootElement.dimensiones?.largo || 0,
-    height: serialized.rootElement.dimensiones?.alto || 0,
+    elementType: elementsArr.find(e => e.id === struct.payload.rootId)?.tipo || '',
+    width: elementsArr.find(e => e.id === struct.payload.rootId)?.dimensiones?.ancho || 0,
+    depth: elementsArr.find(e => e.id === struct.payload.rootId)?.dimensiones?.largo || 0,
+    height: elementsArr.find(e => e.id === struct.payload.rootId)?.dimensiones?.alto || 0,
     childrenCount: elementsArr.length - 1,
   }
   templateName.value = el.nombre || ''
@@ -117,31 +117,39 @@ function saveTemplate() {
   if (isSaving.value) return
   const name = templateName.value.trim()
   if (!name) { templateError.value = 'El nombre es obligatorio'; return }
-  if (catalogStore.getTemplateByName(name)) { templateError.value = 'Ya existe una plantilla con ese nombre'; return }
+  // Evitar duplicados SOLO en plantillas
+  const existsLegacy = typeof catalogStore.getTemplateByName === 'function' && catalogStore.getTemplateByName(name)
+  if (existsLegacy) { templateError.value = 'Ya existe una plantilla con ese nombre'; return }
   isSaving.value = true
   const now = new Date().toISOString()
   const root = templatePayload.value?.elements?.find(e => e.id === templatePayload.value?.rootId) || {}
-  const template = {
-    id: `tpl_${Date.now().toString(36)}`,
-    name,
-    createdAt: now,
-    updatedAt: now,
-    meta: {
-      elementType: templateSummary.value.elementType,
-      width: templateSummary.value.width,
-      height: templateSummary.value.height,
-      depth: templateSummary.value.depth,
-      childrenCount: templateSummary.value.childrenCount,
-      weight: root.pesoMaximo,
-      location: root.ubicacion,
-    },
-    payload: templatePayload.value,
-    notes: templateNotes.value.trim() || undefined,
-    tags: [],
+
+  // Guardar en store.templates únicamente (regla actual)
+  try {
+    const legacyTemplate = {
+      id: `tpl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,6)}`,
+      name,
+      createdAt: now,
+      updatedAt: now,
+      meta: {
+        elementType: templateSummary.value.elementType,
+        width: templateSummary.value.width,
+        height: templateSummary.value.height,
+        depth: templateSummary.value.depth,
+        childrenCount: templateSummary.value.childrenCount,
+        weight: root.pesoMaximo,
+        location: root.ubicacion,
+      },
+      payload: templatePayload.value,
+      notes: templateNotes.value.trim() || undefined,
+      tags: [],
+    }
+    if (typeof catalogStore.addTemplate === 'function') catalogStore.addTemplate(legacyTemplate)
+    showToast('Plantilla guardada', 'success')
+    emit('saved', legacyTemplate)
+  } catch (e) {
+    console.warn('Fallo guardado legacy de plantilla', e)
   }
-  catalogStore.addTemplate(template)
-  showToast('Plantilla guardada', 'success')
-  emit('saved', template)
   emit('close')
   isSaving.value = false
 }

@@ -60,7 +60,7 @@
             <UiTooltip
               class="relative ml-2"
               label="Opciones de planta"
-              :delay="200"
+              :delay="500"
               position="left"
             >
               <button
@@ -500,6 +500,8 @@ const { showToast } = useToast()
 
 // Autosave
 const autoSave = useAutoSave(canvasStore)
+// Registrar instancia en el store para uso global (evita duplicar lógica de backups)
+canvasStore.setAutoSaveInstance?.(autoSave)
 
 // Estado local para modales
 const showHistorialModal = ref(false)
@@ -602,7 +604,7 @@ const closeBackupModal = () => {
   showBackupModal.value = false
 }
 
-const guardarCambios = () => {
+const guardarCambios = async () => {
   try {
     // Serializar el estado actual del canvas
     const configSerializada = canvasStore.serialize()
@@ -610,10 +612,25 @@ const guardarCambios = () => {
     // Emitir el evento al componente padre con la configuración serializada
     emit('configChanged', configSerializada)
 
+    // Reiniciar copias de seguridad: detener autosave, limpiar y crear una nueva copia desde el estado actual
+    try {
+      const wasEnabled = autoSave?.isEnabled?.value === true
+      // Pausar autosave para evitar carreras
+      autoSave?.stopAutoSave?.()
+      // Limpiar todas las copias previas
+      await autoSave?.clearAllBackups?.()
+      // Crear un backup fresco con la configuración actual
+      await autoSave?.performBackup?.()
+      // Reanudar autosave si estaba activo
+      if (wasEnabled) autoSave?.startAutoSave?.()
+    } catch (e) {
+      console.warn('No se pudo reiniciar las copias de seguridad tras guardar', e)
+    }
+
     // Mostrar mensaje de éxito
     showToast('Cambios guardados correctamente', 'success')
 
-    console.log('Configuración del canvas serializada y emitida al componente padre')
+    console.log('Configuración del canvas serializada, emitida y backups reiniciados')
   } catch (error) {
     console.error('Error al guardar cambios:', error)
     showToast('Error al guardar los cambios', 'error')
@@ -774,7 +791,7 @@ const runCanvasSyncSequence = async () => {
 
 const guardarPlanta = async () => {
   if (!formularioPlanta.value.nombre.trim()) {
-    showToast('El nombre de la planta es requerido', { type: 'error' })
+    showToast('El nombre de la planta es requerido', 'error')
     return
   }
 
@@ -882,7 +899,7 @@ const guardarPlanta = async () => {
           }
           el.rotation = p.rotation
         }
-        showToast(`Se reacomodaron ${moved} elementos`, { type: 'warn' })
+        showToast(`Se reacomodaron ${moved} elementos`, 'warn')
         canvasStore.saveToHistory('Auto-adjust after resize (post-apply)')
       } else {
         // No ajustes requeridos
@@ -907,7 +924,7 @@ const guardarPlanta = async () => {
     cerrarModales()
   } catch (error) {
     console.error('Error al guardar planta:', error)
-    showToast('Error al guardar la planta', { type: 'error' })
+    showToast('Error al guardar la planta', 'error')
   }
 }
 

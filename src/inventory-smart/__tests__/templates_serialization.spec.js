@@ -3,14 +3,14 @@ import { setActivePinia, createPinia } from 'pinia'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 
-// Prueba de integración básica del nuevo campo plantillasCatalogo en export
+// Prueba de integración básica del nuevo campo plantillas en export
 
-describe('Serialización con plantillasCatalogo v1.1.0', () => {
+describe('Serialización con plantillas v1.1.0', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
   })
 
-  it('incluye plantillasCatalogo y métricas de plantillas en export', () => {
+  it('incluye plantillas y métricas de plantillas en export', () => {
     const canvas = useCanvasStore()
     const catalog = useCatalogStore()
 
@@ -46,11 +46,11 @@ describe('Serialización con plantillasCatalogo v1.1.0', () => {
     const parsed = JSON.parse(json)
 
     expect(parsed.meta.version).toBe('1.1.0')
-    expect(Array.isArray(parsed.plantillasCatalogo)).toBe(true)
-    expect(parsed.plantillasCatalogo.length).toBe(1)
+    expect(Array.isArray(parsed.plantillas)).toBe(true)
+    expect(parsed.plantillas.length).toBe(1)
     expect(parsed.meta.metrics.totalPlantillas).toBe(1)
-    expect(parsed.plantillasCatalogo[0]).toHaveProperty('estructura')
-    expect(parsed.plantillasCatalogo[0].estructura.nodos.length).toBe(1)
+    expect(parsed.plantillas[0]).toHaveProperty('estructura')
+    expect(parsed.plantillas[0].estructura.nodos.length).toBe(1)
   })
 })
 

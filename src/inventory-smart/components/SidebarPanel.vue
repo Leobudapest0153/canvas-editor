@@ -13,75 +13,72 @@
   <div class="h-full flex flex-col bg-white">
     <!-- Header con tabs -->
     <div class="flex border-b border-slate-200 bg-slate-50">
-      <button
-        v-for="tab in tabs"
-        :key="tab.id"
-        @click="activeTab = tab.id"
-        :class="[
-          'flex-1 flex items-center justify-center gap-2 px-2 py-3 border-none bg-transparent cursor-pointer transition-all duration-200 text-slate-500 text-sm font-medium border-b-2 border-transparent',
-          'hover:bg-slate-100 hover:text-slate-600',
-          'relative',
-          {
-            'text-blue-500 bg-white border-b-blue-500': activeTab === tab.id
-          }
-        ]"
-        :title="tab.tooltip"
-      >
-        <!-- Icono Cubo para Elementos -->
-        <svg
-          v-if="tab.id === 'elementos'"
-          class="w-[18px] h-[18px] shrink-0"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+      <UiTooltip v-for="tab in tabs" :key="tab.id" :label="tab.tooltip" position="right" :delay="500">
+        <button
+          @click="activeTab = tab.id"
+          :class="[
+            'flex-1 flex items-center justify-center gap-2 px-2 py-3 border-none bg-transparent cursor-pointer transition-all duration-200 text-slate-500 text-sm font-medium border-b-2 border-transparent',
+            'hover:bg-slate-100 hover:text-slate-600',
+            {
+              'text-blue-500 bg-white border-b-blue-500': activeTab === tab.id,
+            },
+          ]"
         >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-          />
-        </svg>
+          <!-- Icono Cubo para Elementos -->
+          <svg
+            v-if="tab.id === 'elementos'"
+            class="w-[18px] h-[18px] shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+            />
+          </svg>
 
-        <!-- Icono Capas para Capas -->
-        <svg
-          v-else-if="tab.id === 'capas'"
-          class="w-[18px] h-[18px] shrink-0"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+          <!-- Icono Capas para Capas -->
+          <svg
+            v-else-if="tab.id === 'capas'"
+            class="w-[18px] h-[18px] shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+            />
+          </svg>
 
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-          />
-        </svg>
+          <!-- Icono Clipboard para Buffer -->
+          <svg
+            v-else-if="tab.id === 'buffer'"
+            class="w-[18px] h-[18px] shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+            />
+          </svg>
 
-        <!-- Icono Clipboard para Buffer -->
-        <svg
-          v-else-if="tab.id === 'buffer'"
-          class="w-[18px] h-[18px] shrink-0"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-          />
-        </svg>
-
-        <span
-          v-if="tab.id === 'capas' && activeFilters"
-          class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"
-        ></span>
-        <span class="font-medium max-[360px]:hidden">{{ tab.label }}</span>
-      </button>
+          <span
+            v-if="tab.id === 'capas' && activeFilters"
+            class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"
+          ></span>
+          <span class="font-medium max-[360px]:hidden">{{ tab.label }}</span>
+        </button>
+      </UiTooltip>
     </div>
 
     <!-- Contenido de los tabs -->
@@ -109,9 +106,10 @@ import { computed, ref } from 'vue'
 import ElementosTab from './tabs/ElementosTab.vue'
 import CapasTab from './tabs/CapasTab.vue'
 import BufferTab from './tabs/BufferTab.vue'
-import {useCanvasStore} from '@/inventory-smart/composables/useCanvasStore'
+import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import UiTooltip from './ui/UiTooltip.vue'
 
-const canvasStore = useCanvasStore();
+const canvasStore = useCanvasStore()
 
 // Estado del tab activo
 const activeTab = ref('elementos')
@@ -136,9 +134,11 @@ const tabs = [
 ]
 
 const activeFilters = computed(() => {
-  const elementsNotVisible = canvasStore.elementosVisibles.find((element) => element?.visible == false);
-  return canvasStore.elementoDestacadoId || canvasStore.idsElementosFiltrados || elementsNotVisible;
-});
+  const elementsNotVisible = canvasStore.elementosVisibles.find(
+    (element) => element?.visible == false,
+  )
+  return canvasStore.elementoDestacadoId || canvasStore.idsElementosFiltrados || elementsNotVisible
+})
 </script>
 
 <style scoped>

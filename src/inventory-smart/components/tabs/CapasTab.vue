@@ -7,7 +7,7 @@
         <UiTooltip
           label="Desplegar filtros"
           position="bottom"
-          :delay="200"
+          :delay="700"
           class="w-full"
         >
         <button
@@ -26,7 +26,7 @@
           <span v-if="hayFiltrosActivos" class="w-2 h-2 bg-blue-500 rounded-full"></span>
         </button>
         </UiTooltip>
-        <span class="text-center w-full pt-2 block -mb-2 text-gray-700 text-sm"> 
+        <span class="text-center w-full pt-2 block -mb-2 text-gray-700 text-sm">
           Elementos en la capa: {{ canvasStore.elementosVisibles?.length ?? 0 }}
         </span>
       </div>
@@ -57,7 +57,7 @@
               >
               <select
                 v-model="filtroCategoria"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
+                class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
               >
                 <option value="">Todas las categorías</option>
                 <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
@@ -73,7 +73,7 @@
               >
               <select
                 v-model="filtroUbicacion"
-                class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
+                class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
               >
                 <option value="">Todas las ubicaciones</option>
                 <option value="suelo">Suelo</option>
@@ -99,7 +99,6 @@
               v-if="hayFiltrosActivos"
               @click="limpiarFiltros"
               class="w-full flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-xs text-gray-600 cursor-pointer mt-2 hover:bg-gray-200 hover:text-gray-700 transition-colors"
-              title="Limpiar filtros"
             >
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -119,7 +118,7 @@
 
     <!-- Lista de elementos -->
     <div class="flex-1 overflow-y-auto bg-white">
-      <div v-if="elementosFiltrados.length === 0" class="py-8 px-4 text-center text-gray-600">
+      <div v-if="elementosFiltrados.length === 0 && hayFiltrosActivos" class="py-8 px-4 text-center text-gray-600">
         <div
           class="w-12 h-12 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center"
         >
@@ -134,6 +133,23 @@
         </div>
         <p class="m-0 text-sm">No hay elementos que coincidan con los filtros</p>
       </div>
+
+      <div v-else-if="elementosFiltrados.length === 0" class="py-8 px-4 text-center text-gray-600">
+        <div
+          class="w-12 h-12 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center"
+        >
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-6 h-6">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
+            />
+          </svg>
+        </div>
+        <p class="m-0 text-sm">No hay elementos en el área de trabajo. Añade algunos desde el Catálogo</p>
+      </div>
+
 
       <div v-else class="p-2">
         <div
@@ -156,7 +172,7 @@
           <!-- Info -->
           <div class="flex-1 overflow-hidden">
             <p class="text-sm font-semibold text-gray-800 truncate">{{ elemento.nombre }}</p>
-            <p class="text-xs text-gray-500 truncate">{{ elemento.tipo }}</p>
+            <p class="text-xs text-gray-500 truncate">{{ getTipoNombre(elemento.tipo) }}</p>
           </div>
           <!-- Controles -->
           <div class="flex items-center gap-2">
@@ -203,10 +219,10 @@
                 />
               </svg>
               <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <g 
-                  fill="none" 
-                  stroke="currentColor" 
-                  stroke-linecap="round" 
+                <g
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
                   stroke-width="2"
                 >
                 <path
@@ -235,7 +251,6 @@
             <button
               @click.stop="onDelete(elemento.id)"
               class="p-0 text-gray-400 hover:text-red-700 cursor-pointer"
-              title="Eliminar"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 1024 1024"><path fill="currentColor" d="M360 184h-8c4.4 0 8-3.6 8-8zh304v-8c0 4.4 3.6 8 8 8h-8v72h72v-80c0-35.3-28.7-64-64-64H352c-35.3 0-64 28.7-64 64v80h72zm504 72H160c-17.7 0-32 14.3-32 32v32c0 4.4 3.6 8 8 8h60.4l24.7 523c1.6 34.1 29.8 61 63.9 61h454c34.2 0 62.3-26.8 63.9-61l24.7-523H888c4.4 0 8-3.6 8-8v-32c0-17.7-14.3-32-32-32M731.3 840H292.7l-24.2-512h487z"/></svg>
             </button>
@@ -259,13 +274,14 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
-import { CATEGORIAS } from '@/inventory-smart/utils/constants'
+import { CATEGORIAS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import TagFilter from '@/inventory-smart/components/TagFilter.vue'
 import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import {useDeleteElement} from '@/inventory-smart/composables/useDeleteElement'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
-
+import { useToast } from '@/inventory-smart/composables/useToast'
+const { showToast } = useToast()
 // Composables
 const canvasStore = useCanvasStore()
 
@@ -286,6 +302,11 @@ const filtrosPanelRef = ref(null)
 
 // Computed properties
 const categorias = computed(() => CATEGORIAS)
+
+const getTipoNombre = (tipo) => {
+  const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
+  return tipoInfo?.nombre || 'Desconocido'
+}
 
 const elementosFiltrados = computed(() => {
   // --- CAMBIO CLAVE AQUÍ ---
@@ -348,13 +369,7 @@ const onDelete = async (id) => {
   if (!id) return
   const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
   if (el && (el.bloqueado === true || el.locked === true)) {
-    try {
-      if (typeof window !== 'undefined' && window.__toasts?.show) {
-        window.__toasts.show('Elemento bloqueado — desbloquéalo para eliminar', { type: 'warning', timeout: 3000 })
-      } else {
-        await confirmDialog.confirm({ title: 'Elemento bloqueado', message: 'Elemento bloqueado — desbloquéalo para eliminar', confirmLabel: 'Entendido', cancelLabel: 'Cerrar' })
-      }
-    } catch { /* ignore */ }
+    showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
     return
   }
   // Si no está seleccionado, seleccionarlo primero

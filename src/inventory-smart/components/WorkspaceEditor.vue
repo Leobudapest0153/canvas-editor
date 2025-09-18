@@ -91,7 +91,7 @@
         <div class="md:col-span-2 space-y-3 p-4 overflow-y-auto">
           <!-- Nombre -->
           <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
-            <h4 class="text-sm font-semibold text-gray-800 mb-1">Nombre</h4>
+            <h4 class="text-sm font-semibold text-gray-800 mb-3">Nombre</h4>
             <input
               class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-400 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
               :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.name }"
@@ -102,9 +102,9 @@
 
           <!-- Plantilla -->
           <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
-            <h4 class="text-sm font-semibold text-gray-800 mb-1">Plantilla</h4>
+            <h4 class="text-sm font-semibold text-gray-800 mb-3">Plantilla</h4>
             <select
-              class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+              class="w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
               v-model="local.shape"
               @change="onShapeChange"
             >
@@ -116,7 +116,7 @@
 
           <!-- Dimensiones -->
           <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
-            <h4 class="text-sm font-semibold text-gray-800 mb-1">Dimensiones</h4>
+            <h4 class="text-sm font-semibold text-gray-800 mb-3">Dimensiones</h4>
             <div class="grid grid-cols-2 gap-x-3 gap-y-3">
               <div>
                 <label class="mb-1 block text-xs text-slate-600">Ancho (m)</label>
@@ -145,11 +145,20 @@
                   v-model.number="localRectYMeters"
                 />
               </div>
+              <div class="col-span-2">
+                <label class="mb-1 block text-xs text-slate-600">Capacidad máxima (kg)</label>
+                <input
+                  type="number"
+                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+                  v-model.number="local.maxWeight"
+                  placeholder="Ej. 1000"
+                />
+              </div>
             </div>
           </div>
 
           <!-- Extras -->
-          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
+          <!-- <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
             <h4 class="text-sm font-semibold text-gray-800 mb-1">Extras</h4>
             <div>
               <label class="mb-1 block text-xs text-slate-600">Peso máximo (kg)</label>
@@ -160,7 +169,7 @@
                 placeholder="Ej. 1000"
               />
             </div>
-          </div>
+          </div> -->
         </div>
       </div>
 
@@ -586,7 +595,7 @@ function onSave() {
     if (local.maxWeight > 0 && pesoTotalHijos > local.maxWeight) {
       showToast(
         `La capacidad de carga de la planta (${local.maxWeight} kg) es menor a la capacidad de carga total requerida por los elementos contenidos (${Math.round(pesoTotalHijos * 100) / 100} kg).`,
-        { type: 'error' },
+        'error',
       )
       return
     }
@@ -610,7 +619,7 @@ function onSave() {
     console.log('Editando planta')
     canvasStore.editarPlanta(plantaData.id, plantaData)
     canvasStore.calcularCanvasAdaptativoPlanta(plantaData)
-    showToast('Planta actualizada correctamente.', { type: 'success' })
+    showToast('Planta actualizada correctamente.', 'success')
   } else {
     delete plantaData.id
     canvasStore.agregarPlanta(plantaData)

@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { fitsIndividually, usePlantResizeGuard } from '@/inventory-smart/composables/usePlantResizeGuard'
 import { setActivePinia, createPinia } from 'pinia'
-import { shallowMount } from '@vue/test-utils'
+import { shallowMount, config } from '@vue/test-utils'
 import PlantasPanel from '@/inventory-smart/components/PlantasPanel.vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 
 const el = (id, w, h, x = 0, y = 0, rot = 0) => ({
   id,
@@ -86,8 +87,8 @@ describe('usePlantResizeGuard - helpers', () => {
 describe('PlantasPanel - snapshot solo en confirmaciones', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    globalThis.window = globalThis.window || {}
-    window.__toasts = { show: vi.fn() }
+    const toastMock = { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 }
+    config.global.provide = { ...(config.global.provide || {}), [ToastSymbol]: toastMock }
   })
 
   it('(e) no guarda snapshot en cambios inline; sí al confirmar', () => {
