@@ -67,7 +67,7 @@
     <div class="h-6 w-px bg-white/10 mx-1.5" aria-hidden="true" />
 
     <!-- Snapping -->
-    <UiTooltip label="Ajuste automático (S)" :delay="200">
+    <UiTooltip label="Líneas de ajuste automático (S)" :delay="200">
       <div class="relative group">
         <UiIconButton
           class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-white/[.06] text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
