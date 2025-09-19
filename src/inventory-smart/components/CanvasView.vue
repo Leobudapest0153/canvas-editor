@@ -146,16 +146,20 @@
                 y: 0,
                 width: getDrawWidth(elemento),
                 height: getDrawHeight(elemento),
-                fill: elemento.tipo === 'pasillos' ? '#ffffff' : elemento.color,
-                stroke: elemento.tipo === 'pasillos'
-                  ? '#959799'
-                  : (elemento.tipo === 'pisos' ? 'rgba(0,0,0,0.3)' : undefined),
-                strokeWidth: (elemento.tipo === 'pasillos' || elemento.tipo === 'pisos') ? (1 / canvasStore.zoom) : 0,
-                dash: (elemento.tipo === 'pasillos' || elemento.tipo === 'pisos') ? [6 / canvasStore.zoom, 4 / canvasStore.zoom] : undefined,
+                fill: ((elemento.tipo || '').toLowerCase() === 'pasillos') ? '#ffffff' : elemento.color,
+                stroke: ((elemento.tipo || '').toLowerCase() === 'pasillos')
+                  ? (showPasillosDash ? '#959799' : undefined)
+                  : (((elemento.tipo || '').toLowerCase() === 'pisos') ? 'rgba(0,0,0,0.3)' : undefined),
+                strokeWidth: ((elemento.tipo || '').toLowerCase() === 'pasillos')
+                  ? (showPasillosDash ? (1 / canvasStore.zoom) : 0)
+                  : (((elemento.tipo || '').toLowerCase() === 'pisos') ? (1 / canvasStore.zoom) : 0),
+                dash: ((elemento.tipo || '').toLowerCase() === 'pasillos')
+                  ? (showPasillosDash ? [6 / canvasStore.zoom, 4 / canvasStore.zoom] : undefined)
+                  : (((elemento.tipo || '').toLowerCase() === 'pisos') ? [6 / canvasStore.zoom, 4 / canvasStore.zoom] : undefined),
                 opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
-                shadowColor: elemento.tipo === 'pasillos' ? undefined : getElementShadow(elemento).color,
-                shadowBlur: elemento.tipo === 'pasillos' ? 0 : (getElementShadow(elemento).blur / canvasStore.zoom),
-                shadowOpacity: elemento.tipo === 'pasillos' ? 0 : getElementShadow(elemento).opacity,
+                shadowColor: ((elemento.tipo || '').toLowerCase() === 'pasillos') ? undefined : getElementShadow(elemento).color,
+                shadowBlur: ((elemento.tipo || '').toLowerCase() === 'pasillos') ? 0 : (getElementShadow(elemento).blur / canvasStore.zoom),
+                shadowOpacity: ((elemento.tipo || '').toLowerCase() === 'pasillos') ? 0 : getElementShadow(elemento).opacity,
               }"
             />
             <!-- Barra de orientación (no para formas circulares) -->
@@ -529,10 +533,13 @@
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       :is-element-restricted="isRestricted"
+        :has-aisles="hasPasillos"
+        :is-aisle-dash-on="showPasillosDash"
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
       @fill-container="() => simularLlenadoElemento(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
+        @toggle-aisle-dash="() => (showPasillosDash = !showPasillosDash)"
       @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
     />
 
@@ -813,6 +820,10 @@ const elementosVisiblesEnCanvas = computed(() => {
   return visibles
 })
 
+// Detectar si existen pasillos visibles y toggle para su borde punteado
+const hasPasillos = computed(() => elementosVisiblesEnCanvas.value.some(e => (e.tipo || '').toLowerCase() === 'pasillos'))
+const showPasillosDash = ref(true)
+
 // Grid de referencia - BASADO EN LAS DIMENSIONES DEL LAYER
 const gridLines = computed(() => {
   const gridSizePx = Number(canvasStore.gridSize || 0)
@@ -901,7 +912,6 @@ const handleWheel = (e) => {
 const MIN_ZOOM = 0.1
 const MAX_ZOOM = 5
 const ZOOM_STEP = 1.1
-
 const canZoomIn = computed(() => (canvasStore.zoom || 1) < MAX_ZOOM)
 const canZoomOut = computed(() => (canvasStore.zoom || 1) > getDynamicMinZoom())
 
