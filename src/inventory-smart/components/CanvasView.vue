@@ -409,8 +409,8 @@
             y: -(39 / canvasStore.zoom),
             text:
               !canvasStore.estaEnPlanta
-                ? `${canvasStore.estructuraContenedorActual?.nombre} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`
-                : `${canvasStore.plantaActivaData?.nombre} - ${fmtCm(pxToCm(layerConfig.width, viewport.cmPerPx))} x ${fmtCm(pxToCm(layerConfig.height, viewport.cmPerPx))}`,
+                ? `${canvasStore.estructuraContenedorActual?.nombre} - ${formatLengthsCm([layerConfig.width * viewport.cmPerPx, layerConfig.height * viewport.cmPerPx])}`
+                : `${canvasStore.plantaActivaData?.nombre} - ${formatLengthsCm([layerConfig.width * viewport.cmPerPx, layerConfig.height * viewport.cmPerPx])}`,
             fontSize: 12 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#3b82f6',
@@ -593,7 +593,7 @@ import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
 import { GRID_SIZE, CM_TO_PX, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
-import { cmToPx, pxToCm, fmtCm } from '@/inventory-smart/utils/units'
+import { cmToPx, pxToCm, fmtCm, formatLengthsCm } from '@/inventory-smart/utils/units'
 import { useViewportStore } from '@/inventory-smart/stores/viewport'
 import { getActiveBounds } from '@/inventory-smart/utils/activeBounds'
 import SpeedDialContext from '@/inventory-smart/components/SpeedDialContext.vue'

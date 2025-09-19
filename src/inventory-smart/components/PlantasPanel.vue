@@ -49,9 +49,7 @@
                   {{ contarElementosEnPlanta(planta.id) }} elementos
                 </p>
                 <p class="text-xs text-gray-400 m-0 font-medium">
-                  {{ planta.dimensiones?.ancho || 800 }}×{{ planta.dimensiones?.largo || 1000 }}×{{
-                    planta.dimensiones?.alto || 280
-                  }}cm
+                  {{ formatLengthsCm([planta.dimensiones?.ancho || 0, planta.dimensiones?.largo || 0, planta.dimensiones?.alto || 0]) }}
                 </p>
               </div>
             </div>
@@ -494,6 +492,7 @@ import BackupModal from './BackupModal.vue'
 import { usePlantResizeGuard, pack as packShelf } from '@/inventory-smart/composables/usePlantResizeGuard'
 import { CM_TO_PX, MARGIN_CM, FACTOR_UTILIZACION } from '@/inventory-smart/utils/constants'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue';
+import { formatLengthCm, formatLengthsCm } from '../utils/units'
 
 // Store
 const canvasStore = useCanvasStore()

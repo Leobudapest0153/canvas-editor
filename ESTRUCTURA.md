@@ -72,7 +72,7 @@ Conjunto de utilidades para geometría, colisiones y precisión numérica:
 - Colisiones/colocación: `collision.js`, `circleCollisions.js`, `isPlacementValid.js`, `placementValidity.js`, `obstacleClamp.js`, `edgeConstraint.js`, `innerAABB.js`
 - Geometría y bounds: `geometry.js`, `geom.js`, `polygonBounds.js`, `polygonInset.js`, `bounds.js`, `finalIntervals.js`, `innerLocalCoords.js`, `innerViewDims.js`
 - Drag/RAF/math: `dragMath.js`, `finalizeDrag.js`, `activeBounds.js`, `precision.js`
-- Constantes y helpers: `constants.js`, `units.js`, `object.js`, `idGenerator.js`, `i18n.js`
+- Constantes y helpers: `constants.js`, `units.js`, `object.js`, `idGenerator.js`, `translator.js`
 
 ## Validación (`src/inventory-smart/validation/`)
 
