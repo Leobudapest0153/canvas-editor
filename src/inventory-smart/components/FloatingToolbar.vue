@@ -93,6 +93,25 @@
       </div>
     </UiTooltip>
 
+    <!-- Toggle borde punteado para Pasillos (solo visible si existen pasillos) -->
+    <UiTooltip v-if="hasAisles" :label="isAisleDashOn ? 'Quitar borde punteado de pasillos' : 'Mostrar borde punteado de pasillos'" :delay="200">
+      <div class="relative group">
+        <UiIconButton
+          class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-white/[.06] text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
+          @click.stop="$emit('toggle-aisle-dash')"
+          :state="isAisleDashOn ? 'on' : 'off'"
+          aria-label="Alternar borde punteado de pasillos"
+          :aria-pressed="isAisleDashOn ? 'true' : 'false'"
+        >
+          <!-- Icono: rectángulo con trazo punteado -->
+          <svg viewBox="0 0 24 24" class="pointer-events-none h-[22px] w-[22px] fill-none stroke-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
+            <rect x="4" y="6" width="16" height="12" rx="2" ry="2" :stroke-dasharray="isAisleDashOn ? '4 3' : '0'" stroke-width="2" />
+          </svg>
+        </UiIconButton>
+        <span v-if="isAisleDashOn" class="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--primary,theme(colors.blue.600))] ring-2 ring-slate-900/60"></span>
+      </div>
+    </UiTooltip>
+
     <!-- Lock / Unlock -->
     <UiTooltip
       v-if="isElementSelected && !isElementRestricted"
@@ -174,9 +193,12 @@ defineProps({
   isSnapping: { type: Boolean, default: false },
   avoidOverlap: { type: Boolean, default: false },
   isElementRestricted: { type: Boolean, default: false },
+  // Nuevo: control de pasillos
+  hasAisles: { type: Boolean, default: false },
+  isAisleDashOn: { type: Boolean, default: true },
 })
 
-defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'fill-container', 'delete'])
+defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'toggle-aisle-dash', 'fill-container', 'delete'])
 </script>
 
 <style>
