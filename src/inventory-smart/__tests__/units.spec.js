@@ -1,0 +1,47 @@
+import { describe, it, expect } from 'vitest'
+import { formatLengthCm, formatLengthsCm } from '@/inventory-smart/utils/units'
+
+describe('units formatting', () => {
+  it('formatLengthCm: <100cm stays in cm (integer)', () => {
+    expect(formatLengthCm(12)).toBe('12cm')
+    expect(formatLengthCm(12.4)).toBe('12cm')
+    expect(formatLengthCm(12.5)).toBe('13cm')
+    expect(formatLengthCm(-5.2)).toBe('-5cm')
+  })
+
+  it('formatLengthCm: >=100cm switches to meters with 2 decimals by default', () => {
+    expect(formatLengthCm(100)).toBe('1.00m')
+    expect(formatLengthCm(129)).toBe('1.29m')
+    expect(formatLengthCm(250)).toBe('2.50m')
+    expect(formatLengthCm(-345)).toBe('-3.45m')
+  })
+
+  it('formatLengthsCm: all <100cm keeps cm with integer rounding', () => {
+    expect(formatLengthsCm([12, 9, 45])).toBe('12×9×45cm')
+    expect(formatLengthsCm([12.5, 9.4])).toBe('13×9cm')
+    expect(formatLengthsCm([-5.4, 0, 10.6])).toBe('-5×0×11cm')
+  })
+
+  it('formatLengthsCm: all >=100cm prints in meters with 2 decimals', () => {
+    expect(formatLengthsCm([200, 100])).toBe('2.00×1.00m')
+    expect(formatLengthsCm([129, 100, 345])).toBe('1.29×1.00×3.45m')
+  })
+
+  it('formatLengthsCm: mixed values uses meters for all', () => {
+    expect(formatLengthsCm([250, 80])).toBe('2.50×0.80m')
+    expect(formatLengthsCm([90, 101, 45])).toBe('0.90×1.01×0.45m')
+  })
+
+  it('formatLengthsCm: respects meterDecimals option', () => {
+    expect(formatLengthsCm([250, 80], { meterDecimals: 1 })).toBe('2.5×0.8m')
+    expect(formatLengthsCm([101], { meterDecimals: 3 })).toBe('1.010m')
+  })
+
+  it('formatLengthsCm: empty or invalid arrays', () => {
+    expect(formatLengthsCm([])).toBe('')
+    // Non-finite values are rendered as empty slots
+    expect(formatLengthsCm([NaN, 100])).toBe('×1.00m')
+    expect(formatLengthsCm([Infinity, 90])).toBe('×0.90m')
+    expect(formatLengthsCm([undefined, 10])).toBe('×10cm')
+  })
+})
