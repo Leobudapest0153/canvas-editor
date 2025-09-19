@@ -321,13 +321,15 @@ export const nudgePlace = (
   maxAttempts = 16,
   detectConflictsFn = null, // Función para detectar conflictos pasada como parámetro
 ) => {
-  // Función auxiliar para verificar si una posición es válida
+  const boundaryType = boundary?.type
+  const boundaryMode = boundary?.mode ?? 'fixed'
+  const clampToBoundary = boundaryMode !== 'elastic'
   const isValidPosition = (testX, testY) => {
-    if (boundary.type === 'rect') {
+    if (clampToBoundary && boundaryType === 'rect') {
       if (testX < 0 || testY < 0 || testX + width > boundary.W || testY + height > boundary.H) {
         return { valid: false, x: testX, y: testY }
       }
-    } else if (boundary.type === 'polygon') {
+    } else if (clampToBoundary && boundaryType === 'polygon') {
       // Para elementos circulares, usar lógica circular
       if (elementToPlace?.forma === 'circular') {
         const radius = Math.min(width, height) / 2
