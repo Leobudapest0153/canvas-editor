@@ -13,6 +13,18 @@
           </summary>
           <div class="mt-3 space-y-3">
             <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Código</label>
+              <input
+                v-model="edited.codigo"
+                type="text"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2
+                focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
+                disabled:cursor-not-allowed disabled:text-gray-500"
+                placeholder="Código del elemento"
+                :disabled="true"
+              />
+            </div>
+            <div>
               <label class="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
               <input
                 v-model="edited.nombre"
@@ -24,8 +36,8 @@
                 :disabled="isSaving || isElementRestricted"
               />
             </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
+            <div class="grid grid-cols-1 gap-3">
+              <!-- <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
                 <input
                   :value="getTipoNombre(elementoSeleccionado.tipo)"
@@ -33,9 +45,9 @@
                   disabled
                   class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed"
                 />
-              </div>
+              </div> -->
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Categoría</label>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
                 <input
                   :value="getCategoriaDisplay(elementoSeleccionado.categoria)"
                   type="text"
@@ -509,6 +521,7 @@ onMounted(() => {
 
 const cargarDesdeStore = (el) =>
   deepClone({
+    codigo: el.codigo || '',
     nombre: el.nombre || '',
     color: el.color || '#3B82F6',
     orientacion: Number(el.orientacion) || 0,
