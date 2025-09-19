@@ -166,19 +166,21 @@
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Dimensiones:</span>
                 <span class="spec-value text-gray-700">
-                  {{ getCardDims(elemento).ancho }}x{{ getCardDims(elemento).largo }}x{{
+                  {{ formatLengthsCm([
+                    getCardDims(elemento).ancho,
+                    getCardDims(elemento).largo,
                     getCardDims(elemento).alto
-                  }}
+                  ]) }}
                 </span>
               </div>
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
                 <span class="spec-value text-gray-700">{{ elemento.pesoMaximo }}kg</span>
               </div>
-              <div class="spec-item flex justify-between text-xs">
+              <!-- <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
                 <span class="spec-value text-gray-700 capitalize">{{ elemento.ubicacion }}</span>
-              </div>
+              </div> -->
             </div>
 
             <!-- Badge de tipo y categoría -->
@@ -261,6 +263,7 @@ import {
   buildStructureFromForm,
   toCatalogItemFromStructure,
 } from '@/inventory-smart/composables/useStructureManager'
+import { formatLengthsCm } from '../utils/units'
 
 // Props
 const props = defineProps({

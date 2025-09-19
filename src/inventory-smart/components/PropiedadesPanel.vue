@@ -472,9 +472,7 @@ import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation.js'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation.js'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
-import { t } from '@/inventory-smart/utils/i18n.js'
-import TagFilter from '@/inventory-smart/components/TagFilter.vue'
-import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
+import { t } from '@/inventory-smart/utils/translator'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { toPrecisionCm } from '../utils/fixedDimensions'
 

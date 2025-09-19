@@ -315,7 +315,7 @@ watch(
         const restored = canvasStore.deserialize(latestBackup.data)
         if (restored) {
           showToast(
-            `Restaurando tus últimos cambios guardados (${fmtDate(latestBackup.timestamp)}).`,
+            `Restaurando últimos cambios sin guardar (${fmtDate(latestBackup.timestamp)}).`,
             'info',
           )
           return

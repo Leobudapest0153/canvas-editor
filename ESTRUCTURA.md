@@ -1,149 +1,133 @@
-# DV Canvas Editor - Estructura del Proyecto
+# Inventory Smart - Estructura del Proyecto
 
-Editor visual jerárquico para distribuir elementos (anaqueles, estantes, etc.) en plantas de un edificio, con soporte de jerarquía padre-hijo, propiedades dinámicas y vistas XY / ZX / ZY.
+Editor visual jerárquico para distribuir elementos (anaqueles, estantes, etc.) en plantas de un edificio, con soporte de jerarquía padre-hijo, propiedades dinámicas y vistas XY / XZ. El paquete funcional se encuentra bajo `src/inventory-smart` que encapsula la mayor parte de la lógica y UI del editor.
 
 ## Tecnologías
 
-- **Vue 3** con Composition API
-- **Konva.js** y vue-konva para canvas 2D
-- **Pinia** para gestión de estado
-- **Tailwind CSS** para estilos
-- **Vite** como bundler
+- Vue 3 (Composition API)
+- Vite 7
+- Pinia
+- Konva.js + vue-konva para canvas 2D
+- Tailwind CSS v4
+- Vitest
+- ESLint
 
-## Estructura de Componentes
+## Arquitectura de carpetas
 
-### `/src/components/`
+Estructura relevante:
 
-- **`CanvasView.vue`** - Lienzo principal con Konva
-  - Renderizado del canvas usando vue-konva
-  - Manejo de eventos de interacción (drag, drop, select)
-  - Gestión de transformaciones y zoom
-  - Coordinación de vistas XY/ZX/ZY
+- `src/`
+  - `App.vue`, `main.js`, `router/`, `pages/`, `styles/`
+  - `inventory-smart/`
+    - `InventorySmart.vue` (componente raíz del editor)
+    - `components/` (componentes UI del editor)
+    - `composables/` (hooks y lógica reutilizable)
+    - `stores/` (estado con Pinia)
+    - `utils/` (utilidades para validaciones, motor geométrico y más)
+    - `plugins/` (plugins)
+    - `validation/` (orquestación y validadores)
+    - `__tests__/` (pruebas)
 
-- **`PlantasPanel.vue`** - Panel superior para gestión de plantas
-  - Lista y selección de plantas del edificio
-  - CRUD de plantas (crear, editar, eliminar)
-  - Navegación entre plantas
-  - Información básica de cada planta
+## Componentes clave (`src/inventory-smart/components/`)
 
-- **`ElementosCatalogo.vue`** - Lista lateral con elementos predefinidos
-  - Catálogo organizado de elementos (anaqueles, estantes, etc.)
-  - Sistema de búsqueda y filtrado
-  - Drag and drop hacia el canvas
-  - Preview/thumbnail de elementos
+- `CanvasView.vue` — Lienzo con vue-konva
+  - Eventos de interacción (drag, drop, select)
+  - Transformaciones, zoom, reglas (`RulersOverlay.vue`) y guías (`SnapGuides.vue`)
+  - Capa de grid (`GridLayer.vue`)
+- `FloatingToolbar.vue`, `FloatingControls.vue`, `SpeedDialContext.vue` — Controles flotantes/contextuales
+- `PlantasPanel.vue`, `SidebarPanel.vue`, `NavegacionJerarquica.vue` — Navegación y paneles
+- `ElementosCatalogo.vue` — Catálogo y drag & drop al canvas
+- `PropiedadesPanel.vue` — Edición de propiedades del elemento seleccionado
+- `HistorialPanel.vue` — UI de undo/redo
+- `BackupModal.vue` — Persistencia
+- `ToastContainer.vue` — Render de toasts del plugin
+- `WorkspaceEditor.vue` — Editor de plantas
 
-- **`PropiedadesPanel.vue`** - Propiedades de elemento seleccionado
-  - Edición de propiedades en tiempo real
-  - Manejo de jerarquías padre-hijo
-  - Validación de cambios
-  - Propiedades dinámicas por tipo de elemento
+## Composables (`src/inventory-smart/composables/`)
 
-- **`HistorialCambios.vue`** - Control de undo/redo
-  - Botones y atajos para undo/redo
-  - Visualización del historial de cambios
-  - Navegación por el historial
-  - Descripción de operaciones
+Algunos hooks destacados:
 
-- **`VistaSelector.vue`** - Selector de vistas (XY/ZX/ZY)
-  - Botones/tabs para selección de vista
-  - Coordinación con canvas para cambios de perspectiva
-  - Controles específicos por vista
-  - Estado independiente por vista
+- `useCanvasStore.js` — Store/estado principal, con helpers del canvas
+- `useCanvasHistory.js`, `useCanvasWithHistory.js` — Historial y Undo/Redo
+- `useElementDrag.js`, `useRafDrag.js`, `useObjectSnapping.js` — Drag y snapping
+- `usePlacementGuards.js`, `usePlantResizeGuard.js` — Reglas de placement y resize
+- `useContextMenu.js`, `useConfirmDialog.js`, `useToast.js` — UX y diálogo
+- `useAutoSave.js`, `useStatePersistence.js`, `useCanvasImportExport.js` — Persistencia
+- `usePerfMode.js`, `useCacheOnDrag.js` — Rendimiento
+- `useWeightValidation.js`, `useDimensionValidation.js` — Validaciones de negocio
 
-- **`BufferPanel.vue`** - "Caja intermedia" para mover elementos
-  - Área temporal para depositar elementos
-  - Drag and drop bidireccional con canvas
-  - Validación antes de placement definitivo
-  - Gestión de elementos "flotantes"
+## Stores (`src/inventory-smart/stores/`)
 
-## Estructura de Composables
+- `catalog.js` — Catálogo de elementos y metadatos
+- `viewport.js` — Estado de viewport/zoom/scroll
 
-### `/src/composables/`
+## Plugins (`src/inventory-smart/plugins/`)
 
-- **`useCanvasStore.js`** - Estado y lógica de canvas (Pinia Store)
-  - Estado global del canvas (elementos, plantas, vista activa)
-  - Gestión de elementos jerárquicos
-  - CRUD de elementos en el canvas
-  - Configuración de canvas (zoom, pan, grid)
-  - Integración con otros stores
+- `toast.js` — Plugin de toasts reactivo con API global (provide/inject y `app.config.globalProperties.$toast`). Consumido por `ToastContainer.vue` y utilizable desde composables.
 
-- **`useHistorial.js`** - Control de undo/redo
-  - Mantener historial de operaciones
-  - Lógica de undo/redo
-  - Shortcuts de teclado (Ctrl+Z, Ctrl+Y)
-  - Optimización de memoria del historial
-  - Agrupación de operaciones relacionadas
+## Utilidades (`src/inventory-smart/utils/`)
 
-- **`useCollision.js`** - Detección de colisiones
-  - Detectar colisiones entre elementos
-  - Validar posicionamiento antes de colocar
-  - Feedback visual de colisiones
-  - Optimización con estructuras espaciales
-  - Manejo de colisiones en jerarquías
+Conjunto de utilidades para geometría, colisiones y precisión numérica:
 
-## Estructura de Utilidades
+- Colisiones/colocación: `collision.js`, `circleCollisions.js`, `isPlacementValid.js`, `placementValidity.js`, `obstacleClamp.js`, `edgeConstraint.js`, `innerAABB.js`
+- Geometría y bounds: `geometry.js`, `geom.js`, `polygonBounds.js`, `polygonInset.js`, `bounds.js`, `finalIntervals.js`, `innerLocalCoords.js`, `innerViewDims.js`
+- Drag/RAF/math: `dragMath.js`, `finalizeDrag.js`, `activeBounds.js`, `precision.js`
+- Constantes y helpers: `constants.js`, `units.js`, `object.js`, `idGenerator.js`, `translator.js`
 
-### `/src/utils/`
+## Validación (`src/inventory-smart/validation/`)
 
-- **`serialization.js`** - Guardar/cargar estado
-  - Serialización/deserialización a JSON
-  - Versionado de formatos de guardado
-  - Validación de integridad
-  - Exportación en múltiples formatos
-  - Migración entre versiones
+- `placementOrchestrator.js` — Orquestador de validaciones de placement
+- `fieldResolvers.js` — Resolución de campos y reglas
 
-- **`idGenerator.js`** - Generar IDs únicos
-  - Generación de IDs únicos (UUID, incremental)
-  - Validación de unicidad
-  - Prefijos por tipo de elemento
-  - IDs legibles para debugging
-  - Generación en lote
+## Rutas y página host (para probar el paquete localmente)
 
-## Estado Actual
+- `src/router/index.js` define la ruta raíz `/` que carga `src/pages/HomePage.vue`.
+- `HomePage.vue` instancia `<InventorySmart />` y orquesta la persistencia de `configCanvas` vía `localStorage` usando `SERIALIZE_CONFIG`.
 
-✅ **Completado:**
+## Pruebas (`src/inventory-smart/__tests__/`)
 
-- Estructura de archivos creada
-- Comentarios de propósito en cada archivo
-- Configuración base de componentes con Composition API
-- Estructura de stores con Pinia
-- Utilidades base para serialización e IDs
+Cobertura de dominio y UI: hotkeys, colisiones, snapping, orden de capas, resize guards, z-stacking, serialización de plantillas y más. Ejecutadas con Vitest + jsdom.
 
-🔧 **Pendiente de implementar:**
+## Estado actual
 
-- Lógica específica de cada componente
-- Integración entre componentes
-- Manejo de eventos y estado
-- Algoritmos de colisión
-- Serialización completa
-- UI/UX de los paneles
+✅ Implementado
 
-## Próximos Pasos
+- Estructura modular bajo `src/inventory-smart`
+- Integración de Pinia, Router, vue-konva y plugin de toasts
+- Motor geométrico y validaciones base
+- Suite de pruebas unitarias amplia (Vitest)
+- Configuración de Vite con alias `@` y Tailwind v4 plugin
 
-1. **Implementar CanvasView.vue** - Canvas principal con Konva
-2. **Configurar useCanvasStore.js** - Estado global del editor
-3. **Desarrollar ElementosCatalogo.vue** - Catálogo de elementos
-4. **Implementar sistema de drag & drop**
-5. **Configurar detección de colisiones**
-6. **Desarrollar sistema de historial**
-7. **Implementar vistas XY/ZX/ZY**
-8. **Configurar serialización completa**
+🔧 Pendiente
 
-## Comandos de Desarrollo
+- Completar integración UI de algunos modales/paneles
+- Afinar validaciones de negocio y performance en drag/snapping
+- Serialización/persistencia estable para producción (actualmente demo con `localStorage`)
+
+## Próximos pasos
+
+1. Optimizar hot paths de drag/snapping (memorización, estructuras espaciales si es necesario).
+2. Añadir pruebas de regresión para casos límite de colisión y clamps.
+3. Completar funcionalidad de panel de propiedades y validaciones asociadas.
+4. Agregar lógica para obtener datos de uso reales (peso, dimensiones, listado de productos, etc.) desde un API o fuente externa.
+
+## Comandos de desarrollo
 
 ```bash
 # Instalar dependencias
 npm install
 
-# Ejecutar en modo desarrollo
+# Desarrollo
 npm run dev
 
-# Construir para producción
+# Previsualización build
 npm run build
+npm run preview
 
-# Ejecutar tests
+# Tests unitarios
 npm run test:unit
 
-# Linting
+# Lint y formato
 npm run lint
+npm run format
 ```
