@@ -78,9 +78,9 @@
             width: canvasStore.elementoAura.width,
             height: canvasStore.elementoAura.height,
             fill: canvasStore.elementoAura.color,
-            opacity: 0.5, // Una opacidad base para el aura
-            cornerRadius: 10, // Bordes redondeados para un look más suave
-            listening: false, // El aura no debe ser clickeable
+            opacity: 0.5,
+            cornerRadius: 10,
+            listening: false,
           }"
         />
          <v-circle
@@ -158,7 +158,7 @@
                 shadowOpacity: elemento.tipo === 'pasillos' ? 0 : getElementShadow(elemento).opacity,
               }"
             />
-            <!-- Barra de orientación (no para formas circulares) -->
+            <!-- Barra de orientación -->
             <v-rect v-if="getOrientationBarRect(elemento)" :config="getOrientationBarRect(elemento)" />
             <!-- Etiqueta centrada del elemento (rectangular) -->
             <v-text :config="computeLabelProps(elemento)" />
@@ -176,7 +176,7 @@
               opacity: 0.35,
             }"
           >
-            <v-rect
+            <v-rect<
               :config="{
                 x: 0,
                 y: 0,
@@ -553,7 +553,6 @@
       :open="templateModalOpen"
       :element-id="canvasStore.elementoSeleccionado"
       @close="closeTemplateModal"
-      @saved="onTemplateSaved"
     />
 
   <CanvasInfo />
@@ -585,16 +584,14 @@ import {
   throttle
 } from '@/inventory-smart/utils/collision'
 import {
-  clampRectToRect,
   snapToGrid,
   nudgePlace,
 } from '@/inventory-smart/utils/geometry'
-import { clampRectToPolygon, clampCircleToPolygon, circleInPolygon, pointInPolygon, clampPointToPolygon, isRectCompletelyInPolygon } from '@/inventory-smart/utils/polygonBounds'
 import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
-import { GRID_SIZE, CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
+import { GRID_SIZE, CM_TO_PX, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { cmToPx, pxToCm, fmtCm } from '@/inventory-smart/utils/units'
 import { useViewportStore } from '@/inventory-smart/stores/viewport'
@@ -602,7 +599,6 @@ import { getActiveBounds } from '@/inventory-smart/utils/activeBounds'
 import SpeedDialContext from '@/inventory-smart/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/inventory-smart/composables/useContextMenu'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement'
-import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
@@ -621,7 +617,7 @@ import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
 import { toPrecisionCm } from '../utils/fixedDimensions'
 import { instantiateStructureOnCanvas } from '@/inventory-smart/composables/useStructureManager'
 
-// Nuevo: espacio seguro a la derecha para no quedar debajo del panel
+// Espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
   safeRight: { type: Number, default: 20 },
 })
@@ -648,13 +644,11 @@ const buffer = useCanvasBuffer()
 const ctx = useContextMenu()
 const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId: ctxElementId } = ctx
 const { deleteSelected } = useDeleteElement()
-const confirmDialog = useConfirmDialog()
 const weightValidation = useWeightValidation()
 
 const templateModalOpen = ref(false)
 const openTemplateModal = (elementId) => { templateModalOpen.value = true; ctx.close() }
 const closeTemplateModal = () => { templateModalOpen.value = false }
-function onTemplateSaved() { /* hook post-guardar si se requiere */ }
 const dimensionValidation = useDimensionValidation()
 
 // Object snapping
@@ -665,7 +659,7 @@ const {
   clearGuides
 } = useObjectSnapping()
 
-// Estado para controlar si el snapping está habilitado (por defecto desactivado — evita alineado automático)
+// Estado para controlar si el snapping está habilitado
 const isSnappingEnabled = ref(true)
 
 // === HELPERS DE CONVERSIÓN ===
@@ -735,7 +729,6 @@ const getDrawHeight = (elemento) => getElementPixelDimensions(elemento).height
 
 const conflictsApi = useConflicts()
 
-// === BLOQUEO DE ELEMENTOS ===
 const isElementLocked = (elementId) => {
   const el = canvasStore.elementosVisibles.find((e) => e.id === elementId)
   return el?.bloqueado === true
@@ -798,13 +791,11 @@ const layerConfig = computed(() => {
   return config
 })
 
-// Composable para zoom (después de declarar stageSize y layerConfig)
+// Composable para zoom
 const {
   getDynamicMinZoom: getMinZoom,
   fitToMinZoom,
   fitToContent,
-  calculateBoundingBox,
-  chooseBestBoundingBox
 } = useZoom(stageSize, layerConfig)
 
 // Elementos visibles en el canvas (excluye elementos ocultos)
@@ -862,7 +853,6 @@ const computeBoundary = () => {
 
 const getDynamicMinZoom = getMinZoom
 
-// === FUNCIONES DE ZOOM ===
 const handleWheel = (e) => {
   e.evt.preventDefault()
 
@@ -876,7 +866,6 @@ const handleWheel = (e) => {
   const dynamicMinZoom = getDynamicMinZoom()
   const clampedScale = Math.max(dynamicMinZoom, Math.min(5, newScale))
 
-  // Mantener la posición relativa al cursor
   const mousePointTo = {
     x: (pointer.x - stage.x()) / oldScale,
     y: (pointer.y - stage.y()) / oldScale,
@@ -889,16 +878,9 @@ const handleWheel = (e) => {
 
   canvasStore.configurarZoom(clampedScale, dynamicMinZoom)
   canvasStore.configurarPan(newPos.x, newPos.y)
-
-  try {
-    canvasStore.view.hasUserZoomPan = true
-  } catch {
-    /* ignore */
-  }
+  canvasStore.view.hasUserZoomPan = true
 }
 
-// Zoom programático (para botones)
-const MIN_ZOOM = 0.1
 const MAX_ZOOM = 5
 const ZOOM_STEP = 1.1
 
@@ -923,16 +905,15 @@ const zoomBy = (factor) => {
     }
     canvasStore.configurarZoom(newScale, dynamicMinZoom)
     canvasStore.configurarPan(newPos.x, newPos.y)
-    try { canvasStore.view.hasUserZoomPan = true } catch { /* ignore */ }
+    canvasStore.view.hasUserZoomPan = true
   } catch (err) {
-    console.warn('zoomBy error', err)
+    console.warn('Error during zoomBy:', err)
   }
 }
 
 const zoomIn = () => zoomBy(ZOOM_STEP)
 const zoomOut = () => zoomBy(1 / ZOOM_STEP)
 
-// Keybindings: Ctrl + '+' / Ctrl + '-' => zoom, handled globally
 const onKeyDown = (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
     if (e.key === '+') { e.preventDefault(); zoomIn() }
@@ -940,6 +921,7 @@ const onKeyDown = (e) => {
     if (e.key === '-') { e.preventDefault(); zoomOut() }
   }
 }
+
 onMounted(() => window.addEventListener('keydown', onKeyDown))
 onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 
@@ -960,11 +942,11 @@ const handleStageMouseDown = (e) => {
 const handleStageClick = (e) => {
   // Deseleccionar elemento si click en área vacía
   if (e.target === e.target.getStage() && !canvasStore.cambiosNoAplicados) {
-  canvasStore.seleccionarElemento(null)
-  // Cerrar controles y edición cuando se hace click en el stage vacío
-  editingElementId.value = null
-  // Limpiar guías de snapping
-  clearGuides()
+    canvasStore.seleccionarElemento(null)
+    // Cerrar controles y edición cuando se hace click en el stage vacío
+    editingElementId.value = null
+    // Limpiar guías de snapping
+    clearGuides()
     return;
   }
 
@@ -977,7 +959,6 @@ const handleStageClick = (e) => {
 
 // === FUNCIONES DE ELEMENTOS ===
 const selectElement = (element) => {
-  // Check restrictions
   if (element?.restrictions && element?.restrictions.includes('open-properties')) return;
   console.log('Seleccionando elemento:', element.id)
   const isNotCurrentElement = canvasStore.elementoSeleccionado !== element.id;
@@ -1013,13 +994,6 @@ const handleElementDoubleClick = (elemento) => {
   }
 }
 
-// Tracking de posiciones iniciales para revertir si corresponde
-// (Ahora se obtienen del composable useElementDrag)
-// Marca de borde para feedback visual
-const atEdgeMap = ref(new Map())
-
-// Convierte posición stage->layer considerando zoom/pan
-
 const toLayerCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
@@ -1027,8 +1001,6 @@ const toLayerCoords = (pos) => {
   const y = (pos.y - stage.y()) / scale
   return { x, y }
 }
-
-// Convierte posición layer->stage considerando zoom/pan
 
 const toStageCoords = (pos) => {
   const stage = stageRef.value.getNode()
@@ -1140,7 +1112,6 @@ const {
   handleTransformStart,
   handleTransformMove,
   handleTransformEnd,
-  toggleEditingMode
 } = useTransformer({
   canvasStore,
   stageRef,
@@ -1312,7 +1283,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
       candY = worldPos.y
   }
 
-  // 4. Crear elemento temporal para validaciones
+  // Crear elemento temporal para validaciones
   const tempEl = {
     id: '__temp_drop__',
     x: candX,
@@ -1555,7 +1526,7 @@ watch(
         const nodeAura = stage?.findOne(`#aura_${newId}`)
 
         if (elemento && stage && nodeAura) {
-          // 1. VOLVEMOS AL ZOOM INVASIVO ORIGINAL
+          // VOLVEMOS AL ZOOM INVASIVO ORIGINAL
           const margin = 150 // Margen alrededor del elemento
           const scale = Math.min(
             (stage.width() - margin) / elemento.width,
@@ -1571,7 +1542,7 @@ watch(
           canvasStore.configurarZoom(scale)
           canvasStore.configurarPan(newPos.x, newPos.y)
 
-          // 2. ANIMAMOS EL AURA (su opacidad y escala)
+          // ANIMAMOS EL AURA (su opacidad y escala)
           highlightAnimation.value = new Konva.Animation((frame) => {
             const period = 1000
             const oscillation = (Math.sin((frame.time * 2 * Math.PI) / period) + 1) / 2 // Va de 0 a 1
@@ -1688,7 +1659,6 @@ const canDragElement = (elemento) => {
   return dragModeGlobal.value
 }
 
-// === UTILIDADES DE TAMAÑO Y CENTRADO (restauradas) ===
 const updateStageSize = () => {
   if (!containerRef.value) return
   const container = containerRef.value
@@ -1729,9 +1699,7 @@ const handleKeyDown = (e) => {
       return;
     }
     canvasStore.seleccionarElemento(null)
-    // Asegurar que el transformer/edición se cierre
     editingElementId.value = null
-    // Limpiar guías de snapping
     clearGuides()
   } else {
     handleCanvasHotkeys(e, {
@@ -1770,28 +1738,31 @@ function recomputeBoundsAndIndex() {
   try {
     conflictsApi.clear()
     dragLastValidPositions.value.clear()
-    atEdgeMap.value.clear()
     isElementDragging.value = false
     stageDragEnabled.value = true
     nextTick(() => centrarPlantaEnCanvas())
-  } catch { /* ignore */ }
+  } catch {
+    console.error('Error recomputando bounds e índice de elementos')
+  }
 }
+
 function forceRedraw() {
   try {
     const layer = layerRef.value?.getNode?.()
     const stage = stageRef.value?.getNode?.()
     if (!layer || !stage) return
-    try { layer.clearCache?.() } catch { /* ignore */ }
-    try { stage.clearCache?.() } catch { /* ignore */ }
+    layer.clearCache?.()
+    stage.clearCache?.()
     layer.batchDraw?.()
     stage.batchDraw?.()
-  } catch { /* ignore */ }
+  } catch {
+    console.error('Error forzando redraw')
+  }
 }
 
 function resetVolatileState() {
   try {
     dragLastValidPositions.value.clear()
-    atEdgeMap.value.clear()
     conflictsApi.clear()
     isElementDragging.value = false
     stageDragEnabled.value = true
@@ -1822,23 +1793,18 @@ watch(() => canvasStore.elementoSeleccionadoCompleto, (elementoActual) => {
 }, { deep: true });
 
 // Ajustar la vista para encuadrar la planta activa
-// ✅ Simplificado para usar el composable useZoom unificado
 const fitToPlanta = () => {
   try {
     const stage = stageRef.value?.getNode?.()
     if (!stage) return
 
-    // Usar la función unificada del composable
     fitToContent(stage)
   } catch (e) {
     console.error('fitToPlanta error', e)
-    // Fallback seguro
     try {
       const stage = stageRef.value?.getNode?.()
       if (stage) fitToMinZoom(stage)
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
   }
 }
 
