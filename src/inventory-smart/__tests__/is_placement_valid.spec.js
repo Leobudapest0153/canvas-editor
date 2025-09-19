@@ -34,5 +34,33 @@ describe('isPlacementValid (modelo puro, unificado)', () => {
     const ok = isPlacementValid({ pos: { x: 170, y: 70 }, movingEl: C, neighbors, areaBounds: area, CM_TO_PX: 1 })
     expect(ok).toBe(true) // 170+30<=200 y 70+30<=100
   })
+  it('insideAreaModel ignora límites cuando mode es elastic', () => {
+    const elasticArea = {
+      ...area,
+      polygon: [
+        { x: 0, y: 0 },
+        { x: 200, y: 0 },
+        { x: 200, y: 100 },
+        { x: 0, y: 100 },
+      ],
+      mode: 'elastic',
+    }
+    const el = makeEl('B', 0, 0, 40, 20)
+    expect(insideAreaModel({ x: -50, y: -25 }, el, elasticArea, 0.5)).toBe(true)
+  })
+
+  it('isPlacementValid mantiene colisiones en modo elastic', () => {
+    const B = makeEl('B', 0, 0, 40, 20)
+    const neighbors = [makeEl('A', -15, 0, 40, 20)]
+    const elasticArea = { ...area, mode: 'elastic' }
+    const ok = isPlacementValid({
+      pos: { x: -10, y: 0 },
+      movingEl: B,
+      neighbors,
+      areaBounds: elasticArea,
+      CM_TO_PX: 1,
+    })
+    expect(ok).toBe(false)
+  })
 })
 

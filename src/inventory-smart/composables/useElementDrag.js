@@ -88,16 +88,19 @@ export function useElementDrag({
 
     // Iterar para resolver múltiples colisiones respetando contorno
     const MAX_ITERS = 3
-    const boundary = computeBoundary()
-    const W = boundary.type === 'rect' ? boundary.W : Infinity
-    const H = boundary.type === 'rect' ? boundary.H : Infinity
+    const boundary = computeBoundary() || {}
+    const boundaryMode = boundary?.mode ?? 'fixed'
+    const clampToBoundary = boundaryMode !== 'elastic'
+    const boundaryType = boundary.type
+    const W = boundaryType === 'rect' ? boundary.W : Infinity
+    const H = boundaryType === 'rect' ? boundary.H : Infinity
 
     // Paso (1): clamp al área primero
-    if (boundary.type === 'rect') {
+    if (clampToBoundary && boundaryType === 'rect') {
       const c = clampRectToRect(x, y, w, h, W, H)
       x = c.x
       y = c.y
-    } else if (boundary.type === 'polygon') {
+    } else if (clampToBoundary && boundaryType === 'polygon') {
       // Para elementos circulares, usar clamp circular con posición previa para movimiento suave
       if (elemento.forma === 'circular') {
         const radius = Math.min(w, h) / 2
@@ -149,7 +152,7 @@ export function useElementDrag({
       }
 
       // Proyección del MTD contra el contorno rectangular
-      if (boundary.type === 'rect') {
+      if (clampToBoundary && boundaryType === 'rect') {
         const proj = projectMTDAgainstBoundary(x, y, accDx, accDy, w, h, W, H)
         accDx = proj.dx
         accDy = proj.dy
@@ -159,11 +162,11 @@ export function useElementDrag({
       x += accDx
       y += accDy
 
-      if (boundary.type === 'rect') {
+      if (clampToBoundary && boundaryType === 'rect') {
         const c2 = clampRectToRect(x, y, w, h, W, H)
         x = c2.x
         y = c2.y
-      } else if (boundary.type === 'polygon') {
+      } else if (clampToBoundary && boundaryType === 'polygon') {
         if (elemento.forma === 'circular') {
           const radius = Math.min(w, h) / 2
           const centerX = x + radius
@@ -195,9 +198,10 @@ export function useElementDrag({
     const movingEnd = { ...elemento, x, y }
     const endConf = detectConflictsFor(movingEnd, all).filter((c) => c.bloqueante)
     const outsideArea =
-      boundary.type === 'rect'
+      clampToBoundary &&
+      (boundaryType === 'rect'
         ? x < -1e-6 || y < -1e-6 || x + w > W + 1e-6 || y + h > H + 1e-6
-        : !pointInPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.points)
+        : !pointInPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.points))
     if (outsideArea) {
       const cp = clampPointToPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.inset)
       x = cp.x - w / 2

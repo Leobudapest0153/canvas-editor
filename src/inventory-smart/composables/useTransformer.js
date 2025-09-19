@@ -585,7 +585,7 @@ export function useTransformer({
       try {
         if (typeof computeBoundary === 'function') {
           const boundary = computeBoundary()
-          if (boundary && boundary.type === 'polygon') {
+          if (boundary && boundary.type === 'polygon' && boundary.mode !== 'elastic') {
             let isInsidePolygon = false
             const polygon = boundary.inset || boundary.points
 

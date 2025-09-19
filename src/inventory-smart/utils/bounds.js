@@ -31,13 +31,19 @@ export function dimsCmFor(el = {}, vista = 'XY') {
 // Para elementos circulares, el parámetro element debe incluir la información de forma.
 // useSmooth: true para usar clamp suave durante el drag (evita saltos)
 export function clampInsideArea(x, y, w, h, boundary, element = null, useSmooth = false, previousPos = null) {
+  const mode = boundary?.mode ?? 'fixed'
+  const shouldClamp = mode !== 'elastic'
+
   if (boundary?.type === 'polygon') {
+    if (!shouldClamp) {
+      return { x, y }
+    }
     // Para elementos circulares, usar clamp circular
     if (element?.forma === 'circular') {
       const radius = Math.min(w, h) / 2
       const centerX = x + radius
       const centerY = y + radius
-      
+
       let clampedCenter
       if (useSmooth && previousPos) {
         const previousCenter = { x: previousPos.x + radius, y: previousPos.y + radius }
@@ -45,7 +51,7 @@ export function clampInsideArea(x, y, w, h, boundary, element = null, useSmooth 
       } else {
         clampedCenter = clampCircleToPolygon({ x: centerX, y: centerY, radius }, boundary.inset)
       }
-      
+
       return { x: clampedCenter.x - radius, y: clampedCenter.y - radius }
     } else {
       // Para elementos rectangulares, usar clamp rectangular
@@ -53,6 +59,11 @@ export function clampInsideArea(x, y, w, h, boundary, element = null, useSmooth 
       return { x: c.x, y: c.y }
     }
   }
+
+  if (!shouldClamp) {
+    return { x, y }
+  }
+
   const W = boundary?.width ?? boundary?.W ?? boundary?.maxX ?? 0
   const H = boundary?.height ?? boundary?.H ?? boundary?.maxY ?? 0
   const c = clampRectToRect(x, y, w, h, W, H)

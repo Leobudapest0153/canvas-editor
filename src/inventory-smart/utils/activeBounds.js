@@ -72,7 +72,7 @@ export function getActiveBounds(canvasStore) {
     return { mode: 'fixed', boundsPx: { width: widthPx, height: heightPx }, polygonPx }
   }
 
-  const planta = canvasStore.plantaActual
+  const planta = canvasStore.plantaActual || canvasStore.plantaActivaData || {}
 
   // Normalizar modo del piso a una sola propiedad para reducir complejidad
   if (

@@ -848,7 +848,12 @@ watch(
 
 // Contorno activo siempre expresado como polígono
 const computeBoundary = () => {
-  return { type: 'polygon', points: plantPolygon.value, inset: insetPoly.value }
+  return {
+    type: 'polygon',
+    mode: activeBounds.value.mode || 'fixed',
+    points: plantPolygon.value,
+    inset: insetPoly.value,
+  }
 }
 
 const getDynamicMinZoom = getMinZoom
@@ -1295,13 +1300,22 @@ const runPreDropValidations = (elemento, dropEvent) => {
 
   const boundary = computeBoundary()
 
+  if (boundary) {
+    const clamped = clampInsideArea(candX, candY, finalWidth, finalHeight, boundary, tempEl)
+    candX = clamped.x
+    candY = clamped.y
+    tempEl.x = candX
+    tempEl.y = candY
+  }
+
   // Usar la misma validación estricta que isPlacementValid
   const areaBounds = {
     minX: 0,
     minY: 0,
-    maxX: boundary.W || layerConfig.value.width,
-    maxY: boundary.H || layerConfig.value.height,
-    polygon: boundary.points
+    maxX: boundary?.W ?? layerConfig.value.width,
+    maxY: boundary?.H ?? layerConfig.value.height,
+    polygon: boundary?.points,
+    mode: boundary?.mode || 'fixed',
   }
 
   // Validación inicial estricta usando insideAreaModel
@@ -1312,10 +1326,11 @@ const runPreDropValidations = (elemento, dropEvent) => {
   const blocking = conflicts.filter((c) => c.bloqueante)
 
   let finalPos = { x: candX, y: candY }
+  const shouldTryNudge = blocking.length > 0 || (!isInside && boundary?.mode !== 'elastic')
   let ok = blocking.length === 0 && isInside
 
-  // Solo usar nudgePlace si no hay conflictos de colisión, pero mantener validación estricta de área
-  if (blocking.length > 0) {
+  // Solo usar nudgePlace si hay conflictos de colisión o si quedó fuera del área en modo fijo
+  if (shouldTryNudge) {
     const nudge = nudgePlace(
       candX,
       candY,
