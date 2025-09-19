@@ -528,6 +528,7 @@
       :is-snapping="isSnapping"
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
+      :is-element-restricted="isRestricted"
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
       @fill-container="() => simularLlenadoElemento(canvasStore.elementoSeleccionado)"

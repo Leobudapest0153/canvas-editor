@@ -9,7 +9,7 @@
 /**
   * Las restricciones pueden tomar los siguientes valores
   * enter: Limita que se pueda acceder usando doble clic
-  * drag: Limita arrastrar el elemento y que este pueda ser redimensionado
+  * drag: Limita arrastrar el elemento y que este pueda ser redimensionado. Restringe las acciones en la barra flotante
   * open-properties: No permite que se pueda seleccionar un elemento, lo que conlleva a que no se
   * puedan abrir las propiedades ni tampoco ser redimensionado o activar las acciones de la barra
   * flotante

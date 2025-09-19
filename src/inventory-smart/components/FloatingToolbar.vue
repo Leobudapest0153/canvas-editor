@@ -1,4 +1,4 @@
-﻿<!-- components/FloatingToolbar.vue -->
+<!-- components/FloatingToolbar.vue -->
 <template>
   <div
     class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[49] inline-flex items-center gap-3 whitespace-nowrap max-w-max rounded-[20px] border border-white/6 bg-slate-900/45 backdrop-blur-xl backdrop-saturate-150 px-3.5 py-2 shadow-[0_6px_18px_rgba(0,0,0,.08),inset_0_0_0_1px_rgba(255,255,255,.06)]"
@@ -95,7 +95,7 @@
 
     <!-- Lock / Unlock -->
     <UiTooltip
-      v-if="isElementSelected"
+      v-if="isElementSelected && !isElementRestricted"
       :label="isElementLocked ? 'Desbloquear elemento (L)' : 'Bloquear elemento (L)'"
       :delay="200"
     >
@@ -118,7 +118,7 @@
     </UiTooltip>
 
     <!-- Delete button -->
-    <UiTooltip v-if="isElementSelected" label="Borrar elemento (Supr)" :delay="200">
+    <UiTooltip v-if="isElementSelected && !isElementRestricted" label="Borrar elemento (Supr)" :delay="200">
       <UiIconButton
         class="hover:bg-white/[0.06]"
         aria-label="Borrar elemento (Supr)"
@@ -139,7 +139,7 @@
 
     <!-- Fill container -->
     <UiTooltip
-      v-if="isElementSelected && !isContainer"
+      v-if="isElementSelected && !isContainer && !isElementRestricted"
       label="(DEV) Asignar datos de uso"
       :delay="200"
     >
@@ -173,6 +173,7 @@ defineProps({
   isSnappingEnabled: { type: Boolean, default: true },
   isSnapping: { type: Boolean, default: false },
   avoidOverlap: { type: Boolean, default: false },
+  isElementRestricted: { type: Boolean, default: false },
 })
 
 defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'fill-container', 'delete'])
