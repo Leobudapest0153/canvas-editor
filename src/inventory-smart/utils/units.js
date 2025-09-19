@@ -29,16 +29,24 @@ export const formatLengthCm = (valueCm, { meterDecimals = 2 } = {}) => {
 }
 
 // Formatear varios valores a texto compacto, separados por '×' y con unidad al final.
-// Ejemplos: (120, 80, 45) -> '120×80×45cm', (250, 100) -> '2.50×1.00m'
+// Ejemplos: (120, 80, 45) -> '120×80×45cm', (250, 100) -> '250×100cm', (200, 100) -> '2×1m'
 export const formatLengthsCm = (valuesCm, options = {}) => {
   if (!Array.isArray(valuesCm) || valuesCm.length === 0) return ''
 
   const { meterDecimals = 2 } = options
 
-  // Si alguno es >= 100cm, mostramos todo en metros
-  const useMeters = valuesCm.some((v) => Math.abs(v) >= 100)
+  // Usar metros solo si TODOS los valores son finitos y >= 100cm
+  const useMeters = valuesCm.every((v) => Number.isFinite(v) && Math.abs(v) >= 100)
 
   if (useMeters) {
+    // Si todos los valores en metros son enteros exactos, mostrar sin decimales
+    const allIntegerMeters = valuesCm.every((v) => Number.isFinite(v) && Number.isInteger(v / 100))
+
+    if (allIntegerMeters) {
+      const formattedIntM = valuesCm.map((v) => (Number.isFinite(v) ? (v / 100).toString() : ''))
+      return `${formattedIntM.join('×')}m`
+    }
+
     const factor = Math.pow(10, meterDecimals)
     const formattedM = valuesCm.map((v) => {
       if (!Number.isFinite(v)) return ''

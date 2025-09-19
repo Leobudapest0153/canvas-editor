@@ -422,8 +422,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Limpiar timer pendiente y deseleccionar elemento
     clearZoomPanDebounce()
     elementoSeleccionado.value = null
-
-    // ✅ No resetear zoom/pan aquí - lo maneja el watch en CanvasView
   }
 
   /**
@@ -457,8 +455,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Limpiar timer pendiente y deseleccionar elemento
     clearZoomPanDebounce()
     elementoSeleccionado.value = null
-
-    // ✅ No resetear zoom/pan aquí - lo maneja el watch en CanvasView
   }
 
   const navegarAPlanta = (plantaId) => {
@@ -497,8 +493,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Limpiar timer pendiente y deseleccionar elemento
     clearZoomPanDebounce()
     elementoSeleccionado.value = null
-
-    // ✅ No resetear zoom/pan aquí - lo maneja el watch en CanvasView
   }
 
   const calcularCanvasAdaptativo = (elemento) => {
@@ -515,9 +509,9 @@ export const useCanvasStore = defineStore('canvas', () => {
         const orientacion = Number(elemento.orientacion || 0)
         const orientacionNormalizada = ((orientacion % 360) + 360) % 360
         const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
-        
+
         // En vista XZ: orientación determina qué usar como ancho
-        elementWidthPx = useAncho 
+        elementWidthPx = useAncho
           ? elemento.dimensiones.ancho * CM_TO_PX
           : elemento.dimensiones.largo * CM_TO_PX
         elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
@@ -533,7 +527,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         const orientacion = Number(elemento.orientacion || 0)
         const orientacionNormalizada = ((orientacion % 360) + 360) % 360
         const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
-        
+
         elementWidthPx = useAncho ? elemento.width : elemento.height
         elementHeightPx = elemento.height // Altura siempre es height en legacy
       } else {
