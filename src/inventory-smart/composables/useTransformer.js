@@ -66,6 +66,7 @@ export function useTransformer({
 
   const isRestricted = computed(() => {
     const elementSelected = canvasStore.elementoSeleccionadoCompleto;
+    if (!elementSelected) return false;
     const entityType = TIPOS_ENTIDAD.find((te) => te.id == elementSelected.tipo);
     return entityType && entityType.restrictions.includes('drag');
   });
