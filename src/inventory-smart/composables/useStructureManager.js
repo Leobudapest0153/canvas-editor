@@ -8,6 +8,8 @@
  */
 
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { generateCodigo, generateNombre } from '@/inventory-smart/utils/codeNameGenerator.js'
+import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
 
 const uid = (prefix) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
 
@@ -191,6 +193,8 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
         root = { ...root, dimensiones: dims }
         newMap.set(newRootId, root)
       }
+      // Dejar que el store genere nombre alfabético
+      delete root.nombre
     }
   } catch (e) {
     console.warn('Error ajustando dimensiones de pasillo:', e)
@@ -278,8 +282,8 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     // Limpiar propiedades que setea el store
     if (!parentId) { delete base.plantaId; base.padre = null }
 
-    let newId
-    if (!parentId) newId = canvasStore.agregarElemento(base)
+  let newId
+  if (!parentId) newId = canvasStore.agregarElemento(base, { preserveExistingCode: false, resetName: true, regenerateCode: true })
     else newId = addChildDirect(canvasStore, base, parentId)
     if (!newId) return null
 
@@ -355,6 +359,9 @@ function addChildDirect(canvasStore, elemento, parentId) {
       else if (tipo === 'cuartos' || tipo === 'pasillos') elemento.height = (dims.largo || 10) * 10
       else elemento.height = (dims.alto || 10) * 10
     }
+
+  // Generar codigo/nombre de forma unificada como si fuera nuevo (no preservar, resetear nombre)
+  assignCodigoNombre(elemento, canvasStore.elementos, { preserveExistingCode: false, resetName: true, regenerateCode: true })
 
     // Agregar a la lista de elementos
     canvasStore.elementos.push(elemento)
