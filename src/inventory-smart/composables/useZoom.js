@@ -130,12 +130,6 @@ export function useZoom(stageSize, layerConfig) {
 
     // Forzar redibujado
     stage.batchDraw()
-
-    try {
-      canvasStore.view.hasUserZoomPan = true
-    } catch {
-      /* ignore */
-    }
   }
 
   /**
@@ -180,12 +174,6 @@ export function useZoom(stageSize, layerConfig) {
 
       // Forzar redibujado
       stage.batchDraw()
-
-      try {
-        canvasStore.view.hasUserZoomPan = true
-      } catch {
-        /* ignore */
-      }
     } catch (e) {
       console.error('fitToContent error', e)
       // Fallback seguro

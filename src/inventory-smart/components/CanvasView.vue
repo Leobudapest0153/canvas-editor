@@ -176,7 +176,7 @@
               opacity: 0.35,
             }"
           >
-            <v-rect<
+            <v-rect
               :config="{
                 x: 0,
                 y: 0,
@@ -878,7 +878,6 @@ const handleWheel = (e) => {
 
   canvasStore.configurarZoom(clampedScale, dynamicMinZoom)
   canvasStore.configurarPan(newPos.x, newPos.y)
-  canvasStore.view.hasUserZoomPan = true
 }
 
 const MAX_ZOOM = 5
@@ -905,7 +904,6 @@ const zoomBy = (factor) => {
     }
     canvasStore.configurarZoom(newScale, dynamicMinZoom)
     canvasStore.configurarPan(newPos.x, newPos.y)
-    canvasStore.view.hasUserZoomPan = true
   } catch (err) {
     console.warn('Error during zoomBy:', err)
   }
