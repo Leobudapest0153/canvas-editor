@@ -106,7 +106,6 @@
             <select
               class="w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
               v-model="local.shape"
-              @change="onShapeChange"
             >
               <option value="none" disabled>Sin definir</option>
               <option value="rectangle">Rectángulo</option>
@@ -150,6 +149,7 @@
                 <input
                   type="number"
                   class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+                  :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.maxWeight }"
                   v-model.number="local.maxWeight"
                   placeholder="Ej. 1000"
                 />
@@ -184,7 +184,13 @@
           Cerrar
         </button>
         <button
-          class="px-4 py-2 cursor-pointer rounded-lg bg-primary text-white font-medium shadow-sm hover:bg-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-900"
+          class="px-4 py-2 rounded-lg font-medium shadow-sm focus:outline-none focus:ring-2"
+          :class="[
+            canSave
+              ? 'cursor-pointer bg-primary text-white hover:bg-primary-800 focus:ring-primary-900'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          ]"
+          :disabled="!canSave"
           @click="onSave"
         >
           Guardar Cambios
@@ -195,7 +201,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch, nextTick } from 'vue'
+import { computed, reactive, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useToast } from '@/inventory-smart/composables/useToast'
@@ -240,7 +246,7 @@ const local = reactive({
 })
 
 const notice = ref('')
-const errors = reactive({ name: false, dimensions: false })
+const errors = reactive({ name: false, dimensions: false, maxWeight: false })
 const isManuallyEdited = ref(false)
 const isLoadingData = ref(false)
 let dimensionChangeDebounce = null
@@ -347,16 +353,22 @@ const onPolygonUpdate = (newPolygon) => {
   isManuallyEdited.value = true
 }
 
-const heightMeters = computed({
-  get: () => local.height / 100,
-  set: (val) => {
-    // Asegurarse de que el valor sea un número antes de asignarlo
-    const numericVal = parseFloat(val)
-    if (!isNaN(numericVal)) {
-      local.height = Math.max(0, numericVal) * 100
-    }
+// Validación reactiva de campos básicos
+watch(
+  () => local.name,
+  (val) => {
+    errors.name = !String(val || '').trim()
   },
-})
+  { immediate: true },
+)
+watch(
+  () => local.maxWeight,
+  (val) => {
+    const n = Number(val)
+    errors.maxWeight = !Number.isFinite(n) || n < 0
+  },
+  { immediate: true },
+)
 
 function applyRect(w_cm, l_cm) {
   const wPx = w_cm * PIXELS_PER_CM
@@ -382,6 +394,138 @@ function applyCircle(w_cm, l_cm) {
   }))
 }
 
+// Watch de cambio de plantilla/shape con validación y posible revert
+watch(
+  () => local.shape,
+  (newShape, oldShape) => {
+    if (isLoadingData.value) return
+    if (newShape === oldShape) return
+    let newPolygon
+    if (newShape === 'rectangle') newPolygon = applyRect(rectW.value, rectL.value)
+    else if (newShape === 'circle') newPolygon = applyCircle(rectW.value, rectL.value)
+    else {
+      isManuallyEdited.value = true
+      return
+    }
+
+    const res = validatePolygonAndContainment(
+      newPolygon,
+      rectW.value * PIXELS_PER_CM,
+      rectL.value * PIXELS_PER_CM,
+    )
+    if (!res.ok) {
+      notice.value = res.message
+      // Revertir el cambio de shape
+      nextTick(() => {
+        local.shape = oldShape
+      })
+      return
+    }
+
+    notice.value = ''
+    local.polygon = newPolygon
+    isManuallyEdited.value = false
+    resetMode()
+    nextTick(() => {
+      canvasEditorRef.value?.fitStageToPolygon()
+    })
+  },
+)
+
+// Helpers de validación reutilizables
+function validatePolygonAndContainment(newPolygon, newWorldWidth, newWorldLength) {
+  const validation = canvasEditorRef.value?.isPolygonValid(newPolygon, local.elements)
+  if (validation && !validation.valid) {
+    return { ok: false, message: validation.message }
+  }
+
+  const areaBounds = {
+    minX: 0,
+    minY: 0,
+    maxX: newWorldWidth,
+    maxY: newWorldLength,
+    polygon: newPolygon,
+  }
+
+  const fuera = (local.elements || []).filter((el) => {
+    const pos = { x: Number(el?.x) || 0, y: Number(el?.y) || 0 }
+    return !insideAreaModel(pos, el, areaBounds, 0.5)
+  })
+  if (fuera.length > 0) {
+    const nombres = fuera.map((e) => e?.nombre || `ID ${e?.id}`).join(', ')
+    return {
+      ok: false,
+      message: `Con estas dimensiones, ${fuera.length === 1 ? 'el elemento' : 'los elementos'} ${nombres} quedarían fuera del área.`,
+    }
+  }
+
+  return { ok: true }
+}
+
+function validateElementsHeight(newY_cm) {
+  let alturaMinimaRequerida_cm = 0
+  const elementosQueNoCaben = []
+  for (const el of local.elements) {
+    const tipo = String(el?.tipo || '').toLowerCase()
+    if (tipo.includes('pasillo')) continue
+    const alturaEl = Number(el?.dimensiones?.alto) || 0
+    const zBase = Number(el?.alturaRespectoAlSuelo) || 0
+    const alturaTotalElemento_cm = alturaEl + zBase
+    alturaMinimaRequerida_cm = Math.max(alturaMinimaRequerida_cm, alturaTotalElemento_cm)
+    if (alturaTotalElemento_cm > newY_cm) {
+      elementosQueNoCaben.push(el.nombre || `ID ${el.id}`)
+    }
+  }
+  if (elementosQueNoCaben.length > 0) {
+    const alturaMinimaEnMetros = (alturaMinimaRequerida_cm / 100).toFixed(2)
+    const nombresElementos = elementosQueNoCaben.join(', ')
+    return {
+      ok: false,
+      message: `Altura insuficiente. Se requiere ${alturaMinimaEnMetros} m. Elementos afectados: ${nombresElementos}.`,
+    }
+  }
+  return { ok: true }
+}
+
+function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, fit: true }) {
+  const oldW_cm = rectW.value
+  const oldL_cm = rectL.value
+  if (!oldW_cm || !oldL_cm) return { ok: false, message: '' }
+
+  const oldWorldWidth = oldW_cm * PIXELS_PER_CM
+  const oldWorldLength = oldL_cm * PIXELS_PER_CM
+  const newWorldWidth = newW_cm * PIXELS_PER_CM
+  const newWorldLength = newL_cm * PIXELS_PER_CM
+
+  const scaleX = newWorldWidth / oldWorldWidth
+  const scaleY = newWorldLength / oldWorldLength
+  const scaledPolygon = local.polygon.map((p) => ({
+    x: Math.round(p.x * scaleX),
+    y: Math.round(p.y * scaleY),
+  }))
+
+  const polyCheck = validatePolygonAndContainment(scaledPolygon, newWorldWidth, newWorldLength)
+  if (!polyCheck.ok) return polyCheck
+
+  const heightCheck = validateElementsHeight(newY_cm)
+  if (!heightCheck.ok) return heightCheck
+
+  if (opts.apply) {
+    rectW.value = newW_cm
+    rectL.value = newL_cm
+    rectY.value = newY_cm
+    local.polygon = scaledPolygon
+    notice.value = ''
+
+    if (opts.fit) {
+      nextTick(() => {
+        canvasEditorRef.value?.fitStageToPolygon()
+      })
+    }
+  }
+  return { ok: true }
+}
+
 // --- WATCH CORREGIDO ---
 watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY]) => {
   if (isLoadingData.value) return
@@ -390,137 +534,51 @@ watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY
 
   // Si el valor del input es vacío, v-model.number lo convierte en '' (string) o null.
   // Esta guarda previene la ejecución si los valores no son números válidos y positivos.
-  if (typeof newW !== 'number' || typeof newL !== 'number' || newW <= 0 || newL <= 0) {
+  if (typeof newW !== 'number' || typeof newL !== 'number' || typeof newY !== 'number' || newW <= 0 || newL <= 0 || newY <= 0) {
+    errors.dimensions = true
+    // No ponemos notice para no ser agresivos mientras el usuario escribe
     return
   }
 
   dimensionChangeDebounce = setTimeout(() => {
-    const oldW_cm = rectW.value
-    const oldL_cm = rectL.value
-    const oldY_cm = rectY.value
-
-    // Usamos los valores de las refs, que son la fuente de verdad
-    const newW_cm = localRectWMeters.value * 100
-    const newL_cm = localRectLMeters.value * 100
-    const newY_cm = localRectYMeters.value * 100
-
-    const oldWorldWidth = oldW_cm * PIXELS_PER_CM
-    const oldWorldLength = oldL_cm * PIXELS_PER_CM
-    const oldWorldHeight = oldY_cm * PIXELS_PER_CM
-
-    if (oldWorldWidth === 0 || oldWorldHeight === 0 || oldWorldLength === 0) return
-
-    const newWorldWidth = newW_cm * PIXELS_PER_CM
-    const newWorldLength = newL_cm * PIXELS_PER_CM
-
-    const scaleX = newWorldWidth / oldWorldWidth
-    const scaleY = newWorldLength / oldWorldLength
-
-    const scaledPolygon = local.polygon.map((p) => ({
-      x: Math.round(p.x * scaleX),
-      y: Math.round(p.y * scaleY),
-    }))
-
-    const validation = canvasEditorRef.value?.isPolygonValid(scaledPolygon, local.elements)
-    if (validation && !validation.valid) {
-      notice.value = validation.message
-      return
+    const newW_cm = (Number(localRectWMeters.value) || 0) * 100
+    const newL_cm = (Number(localRectLMeters.value) || 0) * 100
+    const newY_cm = (Number(localRectYMeters.value) || 0) * 100
+    const res = tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, { apply: true, fit: true })
+    if (!res.ok) {
+      errors.dimensions = true
+      notice.value = res.message || ''
+    } else {
+      errors.dimensions = false
     }
-
-    // Validación adicional unificada: todos los elementos deben quedar contenidos en el área nueva (polígono)
-    const areaBoundsScaled = {
-      minX: 0,
-      minY: 0,
-      maxX: newWorldWidth,
-      maxY: newWorldLength,
-      polygon: scaledPolygon,
-    }
-    const fuera = (local.elements || []).filter((el) => {
-      const pos = { x: Number(el?.x) || 0, y: Number(el?.y) || 0 }
-      return !insideAreaModel(pos, el, areaBoundsScaled, 0.5)
-    })
-    if (fuera.length > 0) {
-      const nombres = fuera.map((e) => e?.nombre || `ID ${e?.id}`).join(', ')
-      notice.value = `Con estas dimensiones, ${fuera.length === 1 ? 'el elemento' : 'los elementos'} ${nombres} quedarían fuera del área.`
-      return
-    }
-
-    // Verifica si los elementos caben por la altura (omitir pasillos)
-
-    let alturaMinimaRequerida_cm = 0
-    const elementosQueNoCaben = []
-
-    for (const el of local.elements) {
-      if ((el?.tipo || '').toLowerCase() === 'pasillos') continue
-      const alturaEl = Number(el?.dimensiones?.alto) || 0
-      const zBase = Number(el?.alturaRespectoAlSuelo) || 0
-      const alturaTotalElemento_cm = alturaEl + zBase
-
-      alturaMinimaRequerida_cm = Math.max(alturaMinimaRequerida_cm, alturaTotalElemento_cm)
-
-      if (alturaTotalElemento_cm > newY_cm) {
-        elementosQueNoCaben.push(el.nombre || `ID ${el.id}`)
-      }
-    }
-
-    if (elementosQueNoCaben.length > 0) {
-      const alturaMinimaEnMetros = (alturaMinimaRequerida_cm / 100).toFixed(2)
-      const nombresElementos = elementosQueNoCaben.join(', ')
-
-      notice.value = `Altura insuficiente. Se requiere ${alturaMinimaEnMetros} m. Elementos afectados: ${nombresElementos}.`
-      return
-    }
-
-    rectW.value = newW_cm
-    rectL.value = newL_cm
-    rectY.value = newY_cm
-    local.polygon = scaledPolygon
-    notice.value = ''
-
-    nextTick(() => {
-      canvasEditorRef.value?.fitStageToPolygon()
-    })
   }, 400)
 })
 
-function onShapeChange(event) {
-  const oldShape = local.shape
-  const newShape = event.target.value
-  let newPolygon
-
-  if (newShape === 'rectangle') newPolygon = applyRect(rectW.value, rectL.value)
-  else if (newShape === 'circle') newPolygon = applyCircle(rectW.value, rectL.value)
-  else {
-    isManuallyEdited.value = true
-    return
-  }
-
-  const validation = canvasEditorRef.value?.isPolygonValid(newPolygon, local.elements)
-  if (validation && !validation.valid) {
-    notice.value = validation.message
-    local.shape = oldShape
-    event.target.value = oldShape
-    return
-  }
-
-  notice.value = ''
-  local.shape = newShape
-  local.polygon = newPolygon
-  isManuallyEdited.value = false
-  adding.value = false
-  deleting.value = false
-  nextTick(() => {
-    canvasEditorRef.value?.fitStageToPolygon()
-  })
-}
+// onShapeChange eliminado en favor del watch sobre local.shape
 
 function onSave() {
+  // Si hay un debounce pendiente, aplicamos dimensiones inmediatamente antes de guardar
+  if (dimensionChangeDebounce) {
+    clearTimeout(dimensionChangeDebounce)
+    const newW_cm = (Number(localRectWMeters.value) || 0) * 100
+    const newL_cm = (Number(localRectLMeters.value) || 0) * 100
+    const newY_cm = (Number(localRectYMeters.value) || 0) * 100
+    const res = tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, { apply: true, fit: false })
+    if (!res.ok) {
+      notice.value = res.message
+      showToast('Por favor corrige los errores antes de guardar.', 'error')
+      return
+    }
+  }
+
+  errors.name = false
+  errors.dimensions = false
+  errors.maxWeight = false
+
   if (notice.value) {
     showToast('Por favor corrige los errores antes de guardar.', 'error')
     return
-  } // Evitar guardar si hay un aviso activo
-  errors.name = false
-  errors.dimensions = false
+  }
 
   const finalValidation = canvasEditorRef.value?.isPolygonValid(local.polygon, local.elements)
   if (finalValidation && !finalValidation.valid) {
@@ -536,11 +594,18 @@ function onSave() {
 
   if (local.shape === 'rectangle' || local.shape === 'circle') {
     // Validar contra las refs directamente
-    if (localRectWMeters.value <= 0 || localRectLMeters.value <= 0 || heightMeters.value <= 0) {
+    if ((Number(localRectWMeters.value) || 0) <= 0 || (Number(localRectLMeters.value) || 0) <= 0 || (Number(localRectYMeters.value) || 0) <= 0) {
       errors.dimensions = true
       notice.value = 'Las dimensiones deben ser mayores a cero.'
       return
     }
+  }
+
+  // Validación extra: peso máximo no negativo
+  if (!Number.isFinite(Number(local.maxWeight)) || Number(local.maxWeight) < 0) {
+    errors.maxWeight = true
+    notice.value = 'La capacidad máxima (kg) no puede ser negativa.'
+    return
   }
 
   // Validación extra: altura suficiente para elementos no pasillos
@@ -548,7 +613,8 @@ function onSave() {
   let alturaMinimaRequerida_cm = 0
   const elementosQueNoCaben = []
   for (const el of local.elements) {
-    if ((el?.tipo || '').toLowerCase() === 'pasillos') continue
+    const tipo = String(el?.tipo || '').toLowerCase()
+    if (tipo.includes('pasillo')) continue
     const alturaEl = Number(el?.dimensiones?.alto) || 0
     const zBase = Number(el?.alturaRespectoAlSuelo) || 0
     const alturaTotalElemento_cm = alturaEl + zBase
@@ -616,7 +682,6 @@ function onSave() {
   }
 
   if (plantaData.id) {
-    console.log('Editando planta')
     canvasStore.editarPlanta(plantaData.id, plantaData)
     canvasStore.calcularCanvasAdaptativoPlanta(plantaData)
     showToast('Planta actualizada correctamente.', 'success')
@@ -629,4 +694,25 @@ function onSave() {
   resetMode()
   canvasStore.cerrarEditor()
 }
+
+// Estado derivado para habilitar el guardado
+const canSave = computed(() => {
+  const hasNotice = Boolean(notice.value)
+  const hasErrors = errors.name || errors.dimensions || errors.maxWeight
+  const hasValidName = Boolean(String(local.name || '').trim())
+  const dimsOk =
+    (Number(localRectWMeters.value) || 0) > 0 &&
+    (Number(localRectLMeters.value) || 0) > 0 &&
+    (Number(localRectYMeters.value) || 0) > 0
+  const weightOk = Number.isFinite(Number(local.maxWeight)) && Number(local.maxWeight) >= 0
+  return !hasNotice && !hasErrors && hasValidName && dimsOk && weightOk
+})
+
+onBeforeUnmount(() => {
+  if (dimensionChangeDebounce) {
+    clearTimeout(dimensionChangeDebounce)
+    dimensionChangeDebounce = null
+  }
+  document.body.style.cursor = 'default'
+})
 </script>
