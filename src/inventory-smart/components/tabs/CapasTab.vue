@@ -314,7 +314,7 @@ const getTipoNombre = (tipo) => {
 
 const getIconComponent = (elemento) => {
   // Determinar el componente de icono basado en tipo y ubicación
-  if (elemento.tipo === 'cuarto') {
+  if (elemento.tipo === 'cuartos') {
     return RoomIcon
   } else if (elemento.ubicacion === 'pared') {
     return SpaceOnWallIcon

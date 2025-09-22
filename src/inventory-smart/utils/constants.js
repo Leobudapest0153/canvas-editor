@@ -464,3 +464,28 @@ export const WEIGHT = {
 // === VERSIONADO DE EXPORT / SCHEMAS ===
 export const EXPORT_FORMAT_VERSION = '1.1.0'
 export const SCHEMA_VERSION_PLANTILLAS = 1
+
+// === FUNCIONES DE COLOR ===
+
+/**
+ * Determina si usar texto blanco o negro basado en la luminosidad del color de fondo
+ * @param {string} hexColor - Color en formato hexadecimal (ej: '#1C1E4D')
+ * @returns {string} - '#ffffff' para texto blanco o '#000000' para texto negro
+ */
+export const getContrastTextColor = (hexColor) => {
+  if (!hexColor || typeof hexColor !== 'string') return '#ffffff'
+
+  // Remover el # si está presente
+  const hex = hexColor.replace('#', '')
+
+  // Convertir a RGB
+  const r = parseInt(hex.substr(0, 2), 16)
+  const g = parseInt(hex.substr(2, 2), 16)
+  const b = parseInt(hex.substr(4, 2), 16)
+
+  // Calcular luminosidad usando la fórmula estándar
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+
+  // Si la luminosidad es menor a 0.5, usar texto blanco, sino negro
+  return luminance < 0.5 ? '#ffffff' : '#000000'
+}

@@ -224,26 +224,29 @@
                     <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
                     <span class="spec-value text-gray-700">{{ formatTemplateWeight(tpl) }}</span>
                   </div>
-                  <div class="spec-item flex justify-between text-xs">
+                  <!-- <div class="spec-item flex justify-between text-xs">
                     <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
                     <span class="spec-value text-gray-700 capitalize">{{ formatTemplateLocation(tpl) }}</span>
-                  </div>
+                  </div> -->
                 </div>
 
                 <div class="mt-2 flex gap-1">
                   <span
-                    class="inline-block px-2 py-1 text-xs rounded-full text-white"
-                    :style="{ backgroundColor: getTemplateColor(tpl) }"
+                    class="inline-block px-2 py-1 text-xs rounded-full"
+                    :style="{
+                      backgroundColor: getTemplateColor(tpl),
+                      color: getContrastTextColor(getTemplateColor(tpl))
+                    }"
                   >
                     Plantillas
                   </span>
-                  <span
+                  <!-- <span
                     v-for="tag in tpl.tags"
                     :key="tag"
                     class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700"
                   >
                     {{ tag }}
-                  </span>
+                  </span> -->
                 </div>
               </div>
             </div>
@@ -298,7 +301,7 @@ import { ref, onMounted, watch, computed, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
-import { getColorCategoria, TODAS_LAS_CATEGORIAS, UBICACIONES_DISPONIBLES } from '@/inventory-smart/utils/constants'
+import { getColorCategoria, TODAS_LAS_CATEGORIAS, UBICACIONES_DISPONIBLES, getContrastTextColor } from '@/inventory-smart/utils/constants'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
@@ -495,12 +498,10 @@ const getTemplateDims = (tpl) => ({
   alto: tpl.meta?.height || 0,
 })
 
-const getIconComponent = () => 'svg'
-
 const getIconComponentForTemplate = (tpl) => {
   // Determinar el componente de icono basado en el elemento raíz de la plantilla
   const root = getTemplateRoot(tpl)
-  if (root.tipo === 'cuarto') {
+  if (root.tipo === 'cuartos') {
     return RoomIcon
   } else if (root.ubicacion === 'pared') {
     return SpaceOnWallIcon

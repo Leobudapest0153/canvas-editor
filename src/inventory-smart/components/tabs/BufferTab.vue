@@ -164,7 +164,7 @@ const getPlantaName = (plantaId) => {
 
 const getIconComponent = (elemento) => {
   // Determinar el componente de icono basado en tipo y ubicación
-  if (elemento.tipo === 'cuarto') {
+  if (elemento.tipo === 'cuartos') {
     return RoomIcon
   } else if (elemento.ubicacion === 'pared') {
     return SpaceOnWallIcon
@@ -386,10 +386,10 @@ const handleDragEnd = () => {
 }
 
 .item-preview {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.25rem;
-  border: 1px solid #d1d5db;
+  width: 2.5rem;
+  height: 2.5rem;
+  /* border-radius: 0.25rem;
+  border: 1px solid #d1d5db; */
   display: flex;
   align-items: center;
   justify-content: center;

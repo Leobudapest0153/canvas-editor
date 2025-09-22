@@ -179,8 +179,11 @@
             <!-- Badge de tipo y categoría -->
             <div class="mt-2 flex gap-1">
               <span
-                class="inline-block px-2 py-1 text-xs rounded-full text-white"
-                :style="{ backgroundColor: getColorPorTipo(elemento.tipo) }"
+                class="inline-block px-2 py-1 text-xs rounded-full"
+                :style="{
+                  backgroundColor: getColorPorTipo(elemento.tipo),
+                  color: getContrastTextColor(getColorPorTipo(elemento.tipo))
+                }"
               >
                 {{ getTipoNombre(elemento.tipo) }}
               </span>
@@ -244,6 +247,7 @@ import {
   TIPOS_ENTIDAD,
   getColorPorTipo,
   getColorCategoria,
+  getContrastTextColor,
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
   TIPOS_ESPACIO,
@@ -428,7 +432,7 @@ const onGuardarElemento = (elemento) => {
 const onGuardarEspacio = (datosEspacio) => {
   try {
     const structure = buildStructureFromForm(datosEspacio)
-    const kind = datosEspacio.tipo === 'cuarto' ? 'room' : 'space'
+    const kind = datosEspacio.tipo === 'cuartos' ? 'room' : 'space'
     const item = toCatalogItemFromStructure({
       name: datosEspacio.datosGenerales?.nombre,
       description: datosEspacio.datosGenerales?.descripcion,
