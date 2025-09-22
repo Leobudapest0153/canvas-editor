@@ -945,6 +945,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       nuevoElemento.plantaId = contextoNavegacion.value.id
       nuevoElemento.padre = null
       nuevoElemento.etiquetas = [] // Sin etiquetas inicialmente
+      nuevoElemento.codigoEsl = '' // Sin código ESL inicialmente
 
       // Actualizar el array de elementos en la planta
       const planta = plantas.value.find((p) => p.id === contextoNavegacion.value.id)

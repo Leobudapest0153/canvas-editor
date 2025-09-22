@@ -413,7 +413,7 @@
               v-else
               class="text-sm text-gray-500"
             >
-            Sin pisos registrados
+              Sin pisos registrados
             </div>
           </div>
         </details>
@@ -426,6 +426,7 @@
               <label class="text-sm text-[#111928] font-medium">Código</label>
               <div class="flex items-center">
                 <input
+                  v-model="edited.codigoEsl"
                   type="text"
                   min="0"
                   :disabled="isSaving || isElementRestricted"
@@ -435,8 +436,9 @@
                   disabled:cursor-not-allowed disabled:text-gray-500"
                 />
                 <button
+                  @click="abrirModalIdentificarEsl"
                   :disabled="isSaving || isElementRestricted"
-                  class="text-[#364153] text-sm bg-gray-200 px-3 py-2 rounded-[6px] ml-1
+                  class="text-[#364153] text-sm bg-gray-200 px-3 py-2 cursor-pointer rounded-[6px] ml-1
                   disabled:opacity-50 hover:bg-gray-300 disabled:cursor-not-allowed">
                   Configurar
                 </button>
@@ -472,6 +474,12 @@
       </button>
     </div>
   </div>
+
+  <!-- Modal Identificar ESL -->
+  <IdentifyEslModal v-if="identifyEslModalOpen"
+    @close="cerrarModalIdentificarEsl"
+    @save="guardarCodigoEsl"
+  />
 </template>
 
 <script setup>
@@ -488,6 +496,7 @@ import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { t } from '@/inventory-smart/utils/translator'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { toPrecisionCm } from '../utils/fixedDimensions'
+import IdentifyEslModal from './modals/IdentifyEslModal.vue'
 
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
@@ -536,15 +545,15 @@ const cargarDesdeStore = (el) =>
       el.alturaSobreSueloCm != null
         ? Number(el.alturaSobreSueloCm)
         : el.alturaRespectoAlSuelo != null
-          ? Number(el.alturaRespectoAlSuelo)
-          : 0,
+        ? Number(el.alturaRespectoAlSuelo)
+        : 0,
     diametroCm:
       el.forma === 'circular' ? Number(el.dimensiones?.ancho ?? el.dimensiones?.largo ?? 0) : 0,
     // Buffer local de etiquetas (IDs)
     tags: Array.isArray(el.etiquetas) ? [...el.etiquetas] : [],
-  })
-
-// Estado para trackear valores previos y evitar validaciones innecesarias
+    // Propiedad ESL
+    codigoEsl: el.codigoEsl || '',
+  })// Estado para trackear valores previos y evitar validaciones innecesarias
 const valorDimensionAnterior = ref({})
 const valorPesoAnterior = ref(0)
 const valorDiametroAnterior = ref(0)
@@ -869,6 +878,11 @@ const guardar = async () => {
     patch.etiquetas = [...newTags]
   }
   delete patch.tags
+
+  // Mapear propiedad ESL
+  if (edited.value?.codigoEsl !== snapshotOriginal.value?.codigoEsl) {
+    patch.codigoEsl = edited.value?.codigoEsl || ''
+  }
 
   // Si es un elemento de pared, reflejar valores verticales y posicionar Y en px
   if (estaUbicadoEnPared.value) {
@@ -1457,6 +1471,9 @@ const deseleccionarElemento = () => {
 const createTagModalOpen = ref(false)
 const newTagText = ref('')
 
+// ====== Gestión del modal Identificar ESL ======
+const identifyEslModalOpen = ref(false)
+
 const onTagAdd = (tagId) => {
   if (!edited.value) return
   if (!Array.isArray(edited.value.tags)) edited.value.tags = []
@@ -1489,6 +1506,22 @@ const onTagCreateSave = async (payload) => {
   onTagAdd(tagId)
   createTagModalOpen.value = false
   newTagText.value = ''
+}
+
+// ====== Gestión del modal Identificar ESL ======
+const abrirModalIdentificarEsl = () => {
+  identifyEslModalOpen.value = true
+}
+
+const cerrarModalIdentificarEsl = () => {
+  identifyEslModalOpen.value = false
+}
+
+const guardarCodigoEsl = (payload) => {
+  if (edited.value && payload?.codigoEsl) {
+    edited.value.codigoEsl = payload.codigoEsl
+  }
+  cerrarModalIdentificarEsl()
 }
 
 const onKeydown = (e) => {
