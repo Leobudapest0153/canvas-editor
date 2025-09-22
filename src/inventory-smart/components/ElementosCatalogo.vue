@@ -262,6 +262,7 @@ import { formatLengthsCm } from '../utils/units'
 import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
 import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
 import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
+import { useToast } from '@/inventory-smart/composables/useToast'
 
 // Props
 const props = defineProps({
@@ -275,6 +276,7 @@ const modo = computed(() => props.modo)
 
 // Stores
 const canvasStore = useCanvasStore()
+const { showToast } = useToast();
 const catalogStore = useCatalogStore()
 const { filteredCatalogItems, catalogContext, searchText, selectedCategory, items } =
   storeToRefs(catalogStore)
@@ -502,6 +504,11 @@ const getCardDims = (item) => {
 
 // Drag and Drop
 const iniciarArrastre = (elemento, event) => {
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn');
+    event.preventDefault()
+    return
+  }
   console.log('Iniciando arrastre del elemento:', elemento)
   // Si el item trae payload de estructura (plantilla/room/space), arrastrar como 'plantilla-catalogo'
   const isStructured = !!elemento?.payload?.rootId && Array.isArray(elemento?.payload?.elements)

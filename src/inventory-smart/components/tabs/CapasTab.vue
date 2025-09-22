@@ -183,7 +183,7 @@
               :delay="200"
             >
             <button
-              @click.stop="() => {canvasStore.seleccionarElemento(elemento.id);  canvasStore.destacarElemento(elemento.id);}"
+              @click.stop="showAuraElement(elemento.id)"
               class="p-0 text-gray-400 hover:text-blue-600 cursor-pointer"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -307,6 +307,15 @@ const filtrosPanelRef = ref(null)
 // Computed properties
 const categorias = computed(() => CATEGORIAS)
 
+const showAuraElement = (elementoId) => {
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes buscar un elemento si tienes cambios pendientes', 'warn');
+    return;
+  }
+  canvasStore.destacarElemento(elementoId);
+  canvasStore.seleccionarElemento(elementoId);
+}
+
 const getTipoNombre = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.nombre || 'Desconocido'
@@ -382,6 +391,10 @@ const limpiarFiltros = () => {
 
 const onDelete = async (id) => {
   if (!id) return
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No se pueden eliminar elementos con cambios pendientes de guardar', 'warn')
+    return
+  }
   const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
   if (el && (el.bloqueado === true || el.locked === true)) {
     showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })

@@ -101,7 +101,6 @@ const canvasStore = useCanvasStore();
 const notChanges = computed(() => {
   const current = canvasStore.nivelAEditar.dimensiones.alto;
   const modify = props.draft?.clamp?.alturas?.[canvasStore.nivelAEditar.id];
-  console.log({ current, modify });
   return current === modify;
 });
 </script>
