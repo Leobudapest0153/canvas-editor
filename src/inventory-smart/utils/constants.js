@@ -54,7 +54,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'pasillo_base',
     nombre: 'Pasillo',
     tipo: 'pasillos',
-    categoria: 'pasillos',
+    categoria: 'otro',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#ffffff',
@@ -75,7 +75,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'cuarto_frio',
     nombre: 'Cuarto frío',
     tipo: 'cuartos',
-    categoria: 'cuartos',
+    categoria: 'almacenamiento',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#e0f2fe',
@@ -119,7 +119,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'anaquel_metalico_grande',
     nombre: 'Anaquel 2 x 2',
     tipo: 'elementos', // NUEVO CAMPO
-    categoria: 'anaqueles',
+    categoria: 'anaquel_metal',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#3b82f6',
@@ -140,7 +140,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'estante_pared_pequeno',
     nombre: 'Estante de Pared',
     tipo: 'elementos', // NUEVO CAMPO
-    categoria: 'estantes',
+    categoria: 'estante_madera',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#10b981',
@@ -162,7 +162,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'armario_pared_alto',
     nombre: 'Armario de Pared Alto',
     tipo: 'elementos', // NUEVO CAMPO
-    categoria: 'armarios',
+    categoria: 'otro',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#7c3aed',
@@ -184,7 +184,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'barril_basico',
     nombre: 'Barril',
     tipo: 'elementos',
-    categoria: 'contenedores',
+    categoria: 'otro',
     forma: 'circular',
     orientacion: 0,
     colorBase: '#f97316',
@@ -273,24 +273,6 @@ export const UBICACIONES_DISPONIBLES = [
 
 // === CATÁLOGOS PARA CUARTOS Y ESPACIOS ===
 
-export const TIPOS_CUARTO = [
-  { id: 'almacen', nombre: 'Almacén General' },
-  { id: 'cuarto_frio', nombre: 'Cuarto Frío' },
-  { id: 'oficina', nombre: 'Oficina' },
-  { id: 'recepcion', nombre: 'Recepción' },
-  { id: 'despacho', nombre: 'Despacho' },
-  { id: 'mantenimiento', nombre: 'Mantenimiento' },
-]
-
-export const TIPOS_ESPACIO = [
-  { id: 'zona_picking', nombre: 'Zona de Picking' },
-  { id: 'zona_packing', nombre: 'Zona de Packing' },
-  { id: 'zona_carga', nombre: 'Zona de Carga/Descarga' },
-  { id: 'zona_clasificacion', nombre: 'Zona de Clasificación' },
-  { id: 'zona_temporal', nombre: 'Almacenamiento Temporal' },
-  { id: 'pasillo_principal', nombre: 'Pasillo Principal' },
-]
-
 export const TIPOS_ZONA_CUARTO = [
   { id: 'almacenaje', nombre: 'Zona de almacenaje' },
   { id: 'cross_docking', nombre: 'Zona de Cross-docking' },
@@ -300,13 +282,21 @@ export const TIPOS_ZONA_ESPACIO = [
   { id: 'picking', nombre: 'Zona de picking' },
 ]
 
+export const TIPOS_ESPACIO = [
+  { id: 'anaquel_metal', nombre: 'Anaquel metal' },
+  { id: 'estante_madera', nombre: 'Estante madera' },
+  { id: 'repisa_aluminio', nombre: 'Repisa aluminio' },
+  { id: 'otro', nombre: 'Otro' }
+]
+
+export const TIPOS_CUARTO = [
+  { id: 'almacenamiento', nombre: 'Almacenamiento' },
+  { id: 'zona_de_descarga', nombre: 'Zona de Descarga' },
+  { id: 'almacenaje', nombre: 'Almacenaje' }
+]
+
 // === TODAS LAS CATEGORÍAS UNIFICADAS ===
 export const TODAS_LAS_CATEGORIAS = [
-  ...CATEGORIAS_ELEMENTOS,
-  ...CATEGORIAS_CONTENEDORES,
-  ...CATEGORIAS_CUARTOS,
-  ...CATEGORIAS_PISOS,
-  ...CATEGORIAS_PASILLOS,
   ...TIPOS_CUARTO,
   ...TIPOS_ESPACIO
 ]

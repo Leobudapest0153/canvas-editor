@@ -274,7 +274,7 @@ export function useDeleteElement() {
         }
 
         const isContainer = hijo.categoria === 'contenedores';
-        const hasUsage = hijo.uso && (hijo.uso.volumen > 0) || hijo.uso.peso > 0;
+        const hasUsage = hijo.uso && (hijo?.uso?.volumen > 0) || (hijo?.uso?.peso > 0);
 
         return isContainer && hasUsage;
       });
@@ -354,7 +354,7 @@ export function useDeleteElement() {
           }
 
           tiempo--
-          
+
           if (tiempo <= 0) {
             clearInterval(interval)
             interval = null
@@ -370,11 +370,11 @@ export function useDeleteElement() {
               '.toast',
               '[role="alert"]'
             ]
-            
+
             let toastElement = null
             for (const selector of selectors) {
               const elements = document.querySelectorAll(selector)
-              const found = Array.from(elements).find(el => 
+              const found = Array.from(elements).find(el =>
                 el.textContent && el.textContent.includes('Elemento(s) eliminados')
               )
               if (found) {
@@ -382,7 +382,7 @@ export function useDeleteElement() {
                 break
               }
             }
-            
+
             if (toastElement) {
               // Intentar actualizar diferentes tipos de elementos de texto
               const textSelectors = [
@@ -394,7 +394,7 @@ export function useDeleteElement() {
                 'span',
                 'p'
               ]
-              
+
               let updated = false
               for (const textSelector of textSelectors) {
                 const textEl = toastElement.querySelector(textSelector)
@@ -404,7 +404,7 @@ export function useDeleteElement() {
                   break
                 }
               }
-              
+
               // Si no encontramos un elemento hijo, actualizar directamente
               if (!updated && toastElement.textContent && toastElement.textContent.includes('Elemento(s) eliminados')) {
                 // Preservar el botón de deshacer si existe

@@ -1,6 +1,49 @@
 // Epsilon para tratar puntos en borde como "dentro"
 const PIP_EPS = 1e-9
 
+// Flag global (módulo) para bypass de límites de planta
+let __PLANT_IS_INFINITE__ = false
+export function setPlantInfiniteFlag(v) {
+  __PLANT_IS_INFINITE__ = !!v
+}
+
+// Helper: detectar polígono con bypass de límites (planta infinita)
+function _isInfinitePoly(polyOrPlant) {
+  if (__PLANT_IS_INFINITE__) return true
+  // Si es objeto planta
+  if (polyOrPlant && typeof polyOrPlant === 'object' && !Array.isArray(polyOrPlant)) {
+    return !!polyOrPlant.isInfinite
+  }
+  // Si es polígono (array) con metadata
+  return !!(polyOrPlant && polyOrPlant._isInfinite === true)
+}
+
+// API orientativa solicitada: encapsula verificación de límites
+// node puede ser: {x,y} punto, {x,y,width,height} rectángulo o {x,y,radius} círculo
+// plantOrPoly: planta con isInfinite o polígono activo (posible flag _isInfinite)
+export function isWithinPlantLimits(node, plantOrPoly, polygonIfAny) {
+  // Bypass global
+  if (_isInfinitePoly(plantOrPoly) || _isInfinitePoly(polygonIfAny)) return true
+
+  // Compatibilidad flexible: aceptar directamente polígono como segundo arg
+  const poly = Array.isArray(plantOrPoly) ? plantOrPoly : (Array.isArray(polygonIfAny) ? polygonIfAny : null)
+  if (!poly) return true // si no hay polígono definido, considerar dentro (no forzar fallo)
+
+  // Punto
+  if (node && typeof node.x === 'number' && typeof node.y === 'number' && node.width == null && node.height == null && node.radius == null) {
+    return pointInPolygon(node, poly)
+  }
+  // Círculo
+  if (node && typeof node.x === 'number' && typeof node.y === 'number' && typeof node.radius === 'number') {
+    return circleInPolygon({ x: node.x, y: node.y, radius: node.radius }, poly)
+  }
+  // Rectángulo
+  if (node && typeof node.x === 'number' && typeof node.y === 'number' && typeof node.width === 'number' && typeof node.height === 'number') {
+    return isRectCompletelyInPolygon(node.x, node.y, node.width, node.height, poly)
+  }
+  return true
+}
+
 function _toXY(p) {
   return { x: p.x ?? p[0], y: p.y ?? p[1] }
 }
@@ -25,6 +68,8 @@ function isPointOnSegment(p, a, b, eps = PIP_EPS) {
 }
 
 export function pointInPolygon(pt, poly) {
+  // Bypass de límites si la planta es infinita
+  if (_isInfinitePoly(poly)) return true
   const x = pt.x ?? pt[0]
   const y = pt.y ?? pt[1]
   // 1) Borde cuenta como dentro
@@ -62,6 +107,7 @@ export function nearestPointOnSegment(p, a, b) {
 }
 
 export function clampPointToPolygon(p, poly) {
+  if (_isInfinitePoly(poly)) return { x: p.x ?? p[0], y: p.y ?? p[1] }
   if (pointInPolygon(p, poly)) return { x: p.x ?? p[0], y: p.y ?? p[1] }
   let best = { x: 0, y: 0, d: Infinity }
   for (let i = 0; i < poly.length; i++) {
@@ -79,6 +125,7 @@ export function clampPointToPolygon(p, poly) {
 }
 
 export function clampRectToPolygon(rect, poly) {
+  if (_isInfinitePoly(poly)) return { x: rect.x, y: rect.y }
   const corners = [
     { x: rect.x, y: rect.y },
     { x: rect.x + rect.width, y: rect.y },
@@ -108,6 +155,7 @@ export function clampRectToPolygon(rect, poly) {
 
 // Nueva función para validar si un círculo está dentro de un polígono
 export function circleInPolygon(circle, poly) {
+  if (_isInfinitePoly(poly)) return true
   const { x, y, radius } = circle
 
   // Verificar que el centro del círculo esté dentro del polígono
@@ -138,6 +186,7 @@ export function circleInPolygon(circle, poly) {
 // Helper para verificar si un rectángulo está completamente dentro del polígono
 // Usa intersección de segmentos para detectar si algún borde del rectángulo cruza el polígono
 export const isRectCompletelyInPolygon = (x, y, width, height, polygon) => {
+  if (_isInfinitePoly(polygon)) return true
   // 1. Verificar que todas las esquinas estén dentro
   const corners = [
     { x, y, label: 'top-left' },
@@ -283,6 +332,7 @@ function distancePointToSegment(point, segmentStart, segmentEnd) {
 
 // Versión suave de clamp que evita saltos bruscos durante el drag
 export function clampCircleToPolygonSmooth(circle, poly, previousPos = null) {
+  if (_isInfinitePoly(poly)) return { x: circle.x, y: circle.y }
   const { x, y, radius } = circle
 
   // Si el círculo ya está completamente dentro, no hacer nada
@@ -397,6 +447,7 @@ export function clampCircleToPolygonSmooth(circle, poly, previousPos = null) {
 
 // Nueva función para ajustar (clamp) un círculo dentro de un polígono de forma fluida
 export function clampCircleToPolygon(circle, poly) {
+  if (_isInfinitePoly(poly)) return { x: circle.x, y: circle.y }
   const { x, y, radius } = circle
 
   // Si el círculo ya está completamente dentro, no hacer nada
@@ -570,6 +621,7 @@ function segmentsIntersect(p1, p2, q1, q2) {
  * Para elementos circulares, usa geometría circular en lugar de AABB.
  */
 export function rectFullyInsidePolygon(rect, poly, isCircular = false) {
+  if (_isInfinitePoly(poly)) return true
   if (!Array.isArray(poly) || poly.length < 3) return false
 
   // Si es circular, usar validación circular

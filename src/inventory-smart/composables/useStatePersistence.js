@@ -66,6 +66,8 @@ export const useStatePersistence = () => {
           pesoMaximoSoportado: Math.max(0, planta.pesoMaximoSoportado || 5000),
           elementos: Array.isArray(planta.elementos) ? planta.elementos : [],
           activa: Boolean(planta.activa),
+          // Nuevo: flag de planta elástica (persistir si true; fallback false)
+          isInfinite: planta.isInfinite === true,
           propiedadesPersonalizadas: planta.propiedadesPersonalizadas || {},
         }
       }),
@@ -86,6 +88,7 @@ export const useStatePersistence = () => {
           categoria: elemento.categoria || 'general',
           plantaId: elemento.plantaId,
           etiquetas: Array.isArray(elemento.etiquetas) ? elemento.etiquetas : [],
+          codigoEsl: elemento.codigoEsl || '',
 
           // Orientación discreta (0,90,180,270)
           orientacion: (() => {
@@ -362,6 +365,8 @@ export const useStatePersistence = () => {
             pesoMaximoSoportado: Math.max(0, plantaData.pesoMaximoSoportado || 5000),
             elementos: Array.isArray(plantaData.elementos) ? plantaData.elementos : [],
             activa: plantaData.activa === true,
+            // Nuevo: flag de planta elástica (fallback false si no viene)
+            isInfinite: plantaData.isInfinite === true,
             propiedadesPersonalizadas: plantaData.propiedadesPersonalizadas || {},
           }
 
@@ -418,6 +423,7 @@ export const useStatePersistence = () => {
             categoria: elementoData.categoria || 'general',
             plantaId: elementoData.plantaId,
             etiquetas: Array.isArray(elementoData.etiquetas) ? elementoData.etiquetas : [],
+            codigoEsl: elementoData.codigoEsl || '',
 
             // Orientación discreta con fallback
             orientacion: (() => {
@@ -674,6 +680,10 @@ export const useStatePersistence = () => {
           }
           if (planta.elementos && !Array.isArray(planta.elementos)) {
             validationResult.warnings.push(`${context}: elementos debe ser un array`)
+          }
+          // Nuevo: validar tipo del flag elástico si viene
+          if (Object.prototype.hasOwnProperty.call(planta, 'isInfinite') && typeof planta.isInfinite !== 'boolean') {
+            validationResult.warnings.push(`${context}: isInfinite debe ser boolean`)
           }
         })
       }

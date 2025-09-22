@@ -1,3 +1,5 @@
+import { generateCodigo, generateNombre } from '@/inventory-smart/utils/codeNameGenerator.js'
+import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
 /**
  * useCanvasStore.js
  *
@@ -56,6 +58,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         largo: 1500, // cm
       },
       pesoMaximoSoportado: 5000, // kg
+      // Nuevo flag para plantas elásticas (por defecto false)
+      isInfinite: false,
       poligono: [
         {
           x: 0,
@@ -750,8 +754,14 @@ export const useCanvasStore = defineStore('canvas', () => {
   const agregarPlanta = (nuevaPlanta) => {
     const id = `planta_${Date.now()}`
 
+    // Asignar código a la planta (secuencial PLA-###)
+    let codigo = undefined
+    const existentes = Array.isArray(plantas.value) ? plantas.value : []
+    codigo = generateCodigo('plantas', { existing: existentes })
+
     plantas.value.push({
       id,
+      codigo,
       nombre: nuevaPlanta.nombre || 'Nueva Planta',
       descripcion: nuevaPlanta.descripcion || '',
       elementos: [],
@@ -762,6 +772,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         largo: nuevaPlanta.dimensiones?.largo || 0,
       },
       pesoMaximoSoportado: nuevaPlanta.pesoMaximoSoportado || 3000,
+      // Flag de planta elástica: por defecto false
+      isInfinite: false,
       ...nuevaPlanta,
     })
     return id
@@ -861,7 +873,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   // Actions para elementos
-  const agregarElemento = (nuevoElemento) => {
+  const agregarElemento = (nuevoElemento, opts = {}) => {
     console.log('Agregando elemento al store:', nuevoElemento)
 
     const ubic = (
@@ -937,6 +949,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       nuevoElemento.plantaId = contextoNavegacion.value.id
       nuevoElemento.padre = null
       nuevoElemento.etiquetas = [] // Sin etiquetas inicialmente
+      nuevoElemento.codigoEsl = '' // Sin código ESL inicialmente
 
       // Actualizar el array de elementos en la planta
       const planta = plantas.value.find((p) => p.id === contextoNavegacion.value.id)
@@ -962,9 +975,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const shouldAuto = true
       if (shouldAuto && ['cuartos','pisos','elementos','pasillos'].includes(nuevoElemento.tipo)) {
         const typeKey = nuevoElemento.systemTypeKey || nuevoElemento.id
-        const isSystemDefault = !!(
-          typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey)
-        )
+        const isSystemDefault = !!(typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey))
         const isLocked = nuevoElemento.dimensionLock === true
         if (isSystemDefault && !isLocked) {
           const planta = plantas.value.find((p) => p.id === nuevoElemento.plantaId)
@@ -994,6 +1005,20 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     } catch (e) {
       console.warn('Auto-scale on create failed:', e)
+    }
+
+    // Asignación unificada de 'codigo' y nombre (pasillos)
+    try {
+      assignCodigoNombre(nuevoElemento, elementos.value, opts)
+    } catch (e) {
+      console.warn('No se pudo generar codigo/nombre:', e)
+      if (!nuevoElemento.codigo) {
+        try {
+          const pref = (nuevoElemento?.tipo || 'ELM').toString().slice(0, 3).toUpperCase()
+          const count = elementos.value.filter((el) => (el?.tipo || '').toLowerCase() === (nuevoElemento?.tipo || '').toLowerCase()).length + 1
+          nuevoElemento.codigo = `${pref}-${String(count).padStart(3, '0')}`
+        } catch { nuevoElemento.codigo = 'ELM-001' }
+      }
     }
 
     elementos.value.push(nuevoElemento)
@@ -1165,6 +1190,29 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     const ok = _deserialize(jsonString, storeActions)
+
+    // Post-procesar: garantizar que todas las plantas y elementos tengan 'codigo'
+    try {
+      // Plantas: asignar códigos únicos incrementando la lista existente a medida que asignamos
+      if (Array.isArray(plantas.value)) {
+        const existentes = plantas.value.filter(p => !!p)
+        const existentesConCodigo = existentes.filter(p => !!p.codigo)
+        for (const p of existentes) {
+          if (!p.codigo) {
+            p.codigo = generateCodigo('plantas', { existing: existentesConCodigo })
+            existentesConCodigo.push(p)
+          }
+        }
+      }
+      // Elementos
+      if (Array.isArray(elementos.value)) {
+        for (const el of elementos.value) {
+          try { assignCodigoNombre(el, elementos.value) } catch { /* ignore */ }
+        }
+      }
+    } catch (e) {
+      console.warn('Post-procesamiento de codigo/nombre tras deserializar falló:', e)
+    }
 
     // Importar plantillas si existen (retrocompatible)
     try {

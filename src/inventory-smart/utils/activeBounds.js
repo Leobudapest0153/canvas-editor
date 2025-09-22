@@ -1,4 +1,5 @@
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { setPlantInfiniteFlag } from '@/inventory-smart/utils/polygonBounds'
 
 // Map physical dimensions (cm) to width/height depending on active view and orientation
 // dims: {ancho, largo, alto}, element: elemento con orientación
@@ -50,6 +51,9 @@ export function bboxFromPolygon(poly) {
 export function getActiveBounds(canvasStore) {
   // Dentro de elemento/contenedor: usar sus dimensiones (siempre fijo)
   if (!canvasStore.estaEnPlanta) {
+    // En contextos internos, NO bypass de límites
+    setPlantInfiniteFlag(false)
+
     const elem = canvasStore.estructuraContenedorActual || {}
     const dims = elem.dimensiones || {}
     let { widthCm, heightCm } = mapDimsByView(dims, canvasStore.vistaActiva, elem)
@@ -83,23 +87,16 @@ export function getActiveBounds(canvasStore) {
     planta.modo = 'elastic'
   }
 
-  // Detectar modo elástico
-  const isElasticMode =
-    planta?.modo === 'elastic' ||
-    planta?.modoPiso === 'elastic' ||
-    planta?.floorMode === 'elastic' ||
-    planta?.elastic === true
+  // Actualizar flag global para validaciones de límites
+  setPlantInfiniteFlag(!!planta.isInfinite)
 
-  // Si es elástico y hay límites dinámicos, usar esos puntos
-  if (isElasticMode && Array.isArray(planta.elasticBoundaryPx) && planta.elasticBoundaryPx.length >= 3) {
-    const polygonPx = planta.elasticBoundaryPx
-    const boundsPx = bboxFromPolygon(polygonPx)
-    return { mode: 'elastic', boundsPx, polygonPx }
-  }
-
-  // Si hay polígono fijo, usarlo
   if (planta.poligono && Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
-    const polygonPx = planta.poligono
+    // Clonar superficial para evitar mutar store
+    const polygonPx = planta.poligono.map(p => ({ x: p.x, y: p.y }))
+    // Marcar metadata opcional
+    if (planta.isInfinite) {
+      Object.defineProperty(polygonPx, '_isInfinite', { value: true, enumerable: false, configurable: true })
+    }
     const boundsPx = bboxFromPolygon(polygonPx)
     return { mode: 'fixed', boundsPx, polygonPx }
   }
@@ -115,5 +112,8 @@ export function getActiveBounds(canvasStore) {
     { x: width, y: height },
     { x: 0, y: height },
   ]
+  if (planta.isInfinite) {
+    Object.defineProperty(polygonPx, '_isInfinite', { value: true, enumerable: false, configurable: true })
+  }
   return { mode: 'fixed', boundsPx: { width, height }, polygonPx }
 }

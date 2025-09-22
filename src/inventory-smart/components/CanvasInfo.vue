@@ -2,6 +2,15 @@
   <div ref="infoRef" class="canvas-info" :style="styleObject">
     <span>Zoom: {{ (store.zoom * 100).toFixed(2) }}%</span>
     <span>{{ t('views.label') }}: {{ t(`views.${store.vistaActiva}`) }}</span>
+    <template v-if="store.estaEnPlanta && store.plantaActivaData?.isInfinite === true">
+      <UiTooltip
+        label="Modo elástico: no hay límites de planta. Usa la grilla y el minimapa para orientarte."
+        position="bottom"
+        :delay="300"
+      >
+        <span class="elastic-badge">Elástico</span>
+      </UiTooltip>
+    </template>
     <!-- <span v-if="store.estaEnPlanta && store.plantaActivaData">
       Planta: {{ fmtCm(store.plantaActivaData.dimensiones.ancho) }} x {{ fmtCm(store.plantaActivaData.dimensiones.largo) }}
     </span> -->
@@ -20,6 +29,7 @@
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
 import { t } from '@/inventory-smart/utils/translator'
+import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 
 const { store } = useCanvasWithHistory()
 const infoRef = ref(null)

@@ -595,6 +595,20 @@ watch(
 .template-drag--invalid {
   outline: 2px dashed red;
 }
+
+/* Cambios recientes */
+.elastic-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  font-weight: 700;
+  font-size: 12px;
+  border-radius: 9999px;
+  color: #0f172a;
+  background: #a7f3d0; /* emerald-200 */
+  border: 1px solid #34d399; /* emerald-400 */
+}
 </style>
 
 <style scoped>
