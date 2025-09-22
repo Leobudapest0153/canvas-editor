@@ -5,7 +5,6 @@
   >
     <div class="absolute inset-0 bg-black/50 backdrop-blur-[1px]"/>
 
-    <!-- Modal -->
     <div
       class="relative z-10 bg-white shadow-2xl flex flex-col max-h-max py-3 px-5 w-[569px]">
       <div class="mb-4 flex items-center">
@@ -87,10 +86,10 @@
         <div class="relative max-w-max mr-2 flex items-center">
           <input
             type="radio"
-            name="caracteristicas-piso"
-            id="Zona de Cross-docking"
-            :checked="formValue.caracteristicas.includes('Zona de Cross-docking')"
-            value="Zona de Cross-docking"
+            name="tipoZona-piso"
+            id="zona-almacenaje"
+            v-model="formValue.tipoZona"
+            value="almacenaje"
             class="peer absolute z-30 top-0 bottom-0 left-0 right-0 opacity-0"
           />
           <div
@@ -100,7 +99,7 @@
           <div class="w-5 h-5 rounded-full bg-primary-700"></div>
         </div>
         <label
-          for="Zona de Cross-docking"
+          for="zona-almacenaje"
           class="font-light text-medium text-[#111928]"
         >
           Zona de almacenaje
@@ -110,10 +109,10 @@
         <div class="relative max-w-max mr-2 flex items-center">
             <input
               type="radio"
-              name="caracteristicas-piso"
-              id="Zona de almacenaje"
-              value="Zona de almacenaje"
-              :checked="formValue.caracteristicas.includes('Zona de almacenaje')"
+              name="tipoZona-piso"
+              id="zona-cross-docking"
+              v-model="formValue.tipoZona"
+              value="cross_docking"
               class="peer absolute z-30 top-0 bottom-0 left-0 right-0 opacity-0"
             />
             <div
@@ -124,7 +123,7 @@
 
           </div>
           <label
-            for="Zona de almacenaje"
+            for="zona-cross-docking"
             class="font-light text-medium text-[#111928]"
           >
             Zona de Cross-docking
@@ -136,14 +135,14 @@
               type="checkbox"
               id="materiales-fragiles"
               name="materiales-fragiles"
-              :checked="formValue.permiteMaterialesFragiles"
+              v-model="formValue.permiteFragiles"
               class="z-10 absolute opacity-0 top-0 left-0 right-0 bottom-0 peer"
             >
-              <label for="materiales-fragiles" class="w-4 h-4 border-2 border-gray-300 cursor-pointer flex opacity-0 peer-checked:opacity-100 justify-center items-center bg-primary-700 border-primary-700">
+            <label for="materiales-fragiles" class="w-4 h-4 border-2 border-gray-300 cursor-pointer flex opacity-0 peer-checked:opacity-100 justify-center items-center bg-primary-700 border-primary-700">
                 <svg class="w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path fill="currentColor" d="m9.55 18l-5.7-5.7l1.425-1.425L9.55 15.15l9.175-9.175L20.15 7.4z"/>
                 </svg>
-              </label>
+            </label>
             </div>
           <label for="materiales-fragiles">Permite materiales frágiles</label>
         </div>
@@ -152,18 +151,17 @@
             Tipo de productos admitidos *
           </label>
           <div class="relative" ref="dropdownRef">
-            <!-- Caja de selección -->
             <button
               @click.stop="dropdownOpen = !dropdownOpen"
               type="button"
               class="w-full border border-gray-300 rounded-[6px] py-2 px-4 flex justify-between items-center text-left text-[#6B7280]"
             >
               <span>
-                <template v-if="selectedOptions.length === 0">
+                <template v-if="formValue.tiposProductos.length === 0">
                   Placeholder
                 </template>
                 <template v-else>
-                  {{ selectedOptions.join(', ') }}
+                  {{ formValue.tiposProductos.join(', ') }}
                 </template>
               </span>
               <svg
@@ -177,12 +175,10 @@
               </svg>
             </button>
 
-            <!-- Lista desplegable -->
             <div
               v-if="dropdownOpen"
               class="absolute mt-1 w-full border border-gray-300 bg-white rounded-md shadow-lg z-20"
             >
-              <!-- Buscador -->
               <div class="p-2">
                 <input
                     type="text"
@@ -191,7 +187,6 @@
                   class="w-full border border-gray-300 rounded-md py-1.5 px-2 text-sm"
                 />
               </div>
-              <!-- Opciones -->
               <ul class="max-h-40 overflow-y-auto">
                 <li
                   v-for="option in filteredOptions"
@@ -200,16 +195,17 @@
                 >
                   <input
                     type="checkbox"
-                  :id="option"
-                  v-model="selectedOptions"
-                  class="text-primary-700"
-                />
-                <label :for="option" class="text-sm text-[#111928]">{{ option }}</label>
-              </li>
-            </ul>
+                    :id="option"
+                    v-model="formValue.tiposProductos"
+                    :value="option"
+                    class="text-primary-700"
+                  />
+                  <label :for="option" class="text-sm text-[#111928]">{{ option }}</label>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
-      </div>
       <button
         class="bg-[#E5E7EB] px-4 py-3 place-self-end rounded-[6px] text-[#6B7280] w-[122px] h-[50px]
         cursor-pointer"
@@ -247,7 +243,6 @@ const dropdownOpen = ref(false);
 const dropdownRef = ref();
 
 const search = ref('');
-const selectedOptions = ref([]);
 
 const options = [
   'Todos',
@@ -276,9 +271,9 @@ const formValue = ref({
       : ''
   },
   capacidadCarga: canvasStore.nivelAEditar?.capacidadCarga ?? '',
-  caracteristicas: canvasStore.nivelAEditar?.caracteristicas ?? '',
-  tipoProductos: canvasStore.nivelAEditar?.tipoProductos ?? [],
-  permiteMaterialesFragiles: canvasStore.nivelAEditar?.permiteMaterialesFragiles ?? false
+  tipoZona: canvasStore.nivelAEditar?.tipoZona ?? '',
+  tiposProductos: canvasStore.nivelAEditar?.tiposProductos ?? [],
+  permiteFragiles: canvasStore.nivelAEditar?.permiteFragiles ?? false
 });
 
 
@@ -325,9 +320,9 @@ watch(() => canvasStore.nivelAEditar, (newVal) => {
         : ''
     },
     capacidadCarga: newVal?.capacidadCarga ?? '',
-    caracteristicas: newVal?.caracteristicas ?? '',
-    tipoProductos: newVal?.tipoProductos ?? [],
-    permiteMaterialesFragiles: newVal?.permiteMaterialesFragiles ?? false
+    tipoZona: newVal?.tipoZona ?? '',
+    tiposProductos: newVal?.tiposProductos ?? [],
+    permiteFragiles: newVal?.permiteFragiles ?? false
   };
 }, { immediate: true, deep: true });
 onMounted(() => {
