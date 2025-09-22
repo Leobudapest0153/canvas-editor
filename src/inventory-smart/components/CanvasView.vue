@@ -16,6 +16,7 @@
     ref="containerRef"
     class="canvas-container"
     :class="{ 'drag-over': isDragOverCanvas, 'cursor-grab': !dragModeGlobal }"
+    :style="containerStyle"
     @drop="handleDrop"
     @dragover="handleDragOver"
     @dragenter="handleDragEnter"
@@ -676,8 +677,16 @@ const layerRef = ref(null)
 const backgroundLayerRef = ref(null)
 const overlaysLayerRef = ref(null)
 
+const shouldClipPlant = (plant) => !plant?.isInfinite
+
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
+
+const shouldClipActivePlant = computed(() => shouldClipPlant(canvasStore.plantaActivaData))
+
+const containerStyle = computed(() => ({
+  overflow: shouldClipActivePlant.value ? 'hidden' : 'visible',
+}))
 const { onDragStartGuard, onDragMoveGuard, onDragEndGuard, onTransformEndGuard } =
   usePlacementGuards()
 const buffer = useCanvasBuffer()
@@ -901,17 +910,28 @@ const gridLines = computed(() => {
 })
 
 watch(
-  plantPolygon,
-  (poly) => {
+  [plantPolygon, shouldClipActivePlant],
+  ([poly, clip]) => {
     const layer = layerRef.value?.getNode?.()
-    if (layer && poly?.length) {
-      layer.clipFunc((ctx) => {
-        ctx.beginPath()
-        poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-        ctx.closePath()
-      })
+    if (!layer) return
+
+    if (!clip || !poly?.length) {
+      try {
+        layer.clipFunc?.(null)
+        layer.clip && layer.clip({})
+      } catch {
+        /* ignore */
+      }
       layer.batchDraw?.()
+      return
     }
+
+    layer.clipFunc?.((ctx) => {
+      ctx.beginPath()
+      poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+      ctx.closePath()
+    })
+    layer.batchDraw?.()
   },
   { immediate: true },
 )
@@ -920,7 +940,7 @@ watch(
 const computeBoundary = () => {
   return {
     type: 'polygon',
-    mode: activeBounds.value.mode || 'fixed',
+    mode: shouldClipActivePlant.value ? activeBounds.value.mode || 'fixed' : 'elastic',
     points: plantPolygon.value,
     inset: insetPoly.value,
   }
@@ -1095,20 +1115,51 @@ const toStageCoords = (pos) => {
 
 // Drag bound para cada elemento y forma (clamp mínimo al contorno)
 const dragBoundForElement = (pos, elemento) => {
+  const stageNode = stageRef.value?.getNode?.()
+  const konvaNode = stageNode?.findOne?.(`#${elemento.id}`)
+
+  const fallbackLayer = {
+    x: Number.isFinite(konvaNode?.x?.()) ? konvaNode.x() : Number(elemento?.x) || 0,
+    y: Number.isFinite(konvaNode?.y?.()) ? konvaNode.y() : Number(elemento?.y) || 0,
+  }
+
+  let fallbackStage = { ...fallbackLayer }
+  try {
+    fallbackStage = toStageCoords(fallbackLayer)
+  } catch {
+    /* ignore */
+  }
+
+  const safeFallback = {
+    x: Number.isFinite(pos?.x) ? pos.x : fallbackStage.x,
+    y: Number.isFinite(pos?.y) ? pos.y : fallbackStage.y,
+  }
+
   try {
     const lp = toLayerCoords(pos)
-    const boundary = computeBoundary()
-    const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
-    const w = w_cm * CM_TO_PX
-    const h = h_cm * CM_TO_PX
+    let candidateLayer
 
-    // Obtener posición previa para movimiento suave
-    const lastPos = dragLastValidPositions.value.get(elemento.id)
+    if (shouldClipActivePlant.value) {
+      const boundary = computeBoundary()
+      const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
+      const w = w_cm * CM_TO_PX
+      const h = h_cm * CM_TO_PX
 
-    const c = clampInsideArea(lp.x, lp.y, w, h, boundary, elemento, true, lastPos)
-    return toStageCoords(c)
+      const lastPos = dragLastValidPositions.value.get(elemento.id)
+      candidateLayer = clampInsideArea(lp.x, lp.y, w, h, boundary, elemento, true, lastPos)
+    } else {
+      candidateLayer = {
+        x: Number.isFinite(lp.x) ? lp.x : fallbackLayer.x,
+        y: Number.isFinite(lp.y) ? lp.y : fallbackLayer.y,
+      }
+    }
+
+    const stageCoords = toStageCoords(candidateLayer)
+    const nx = Number.isFinite(stageCoords.x) ? stageCoords.x : safeFallback.x
+    const ny = Number.isFinite(stageCoords.y) ? stageCoords.y : safeFallback.y
+    return { x: nx, y: ny }
   } catch {
-    return pos
+    return safeFallback
   }
 }
 
