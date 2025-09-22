@@ -58,6 +58,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         largo: 1500, // cm
       },
       pesoMaximoSoportado: 5000, // kg
+      // Nuevo flag para plantas elásticas (por defecto false)
+      isInfinite: false,
       poligono: [
         {
           x: 0,
@@ -770,6 +772,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         largo: nuevaPlanta.dimensiones?.largo || 0,
       },
       pesoMaximoSoportado: nuevaPlanta.pesoMaximoSoportado || 3000,
+      // Flag de planta elástica: por defecto false
+      isInfinite: false,
       ...nuevaPlanta,
     })
     return id
@@ -971,9 +975,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const shouldAuto = true
       if (shouldAuto && ['cuartos','pisos','elementos','pasillos'].includes(nuevoElemento.tipo)) {
         const typeKey = nuevoElemento.systemTypeKey || nuevoElemento.id
-        const isSystemDefault = !!(
-          typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey)
-        )
+        const isSystemDefault = !!(typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey))
         const isLocked = nuevoElemento.dimensionLock === true
         if (isSystemDefault && !isLocked) {
           const planta = plantas.value.find((p) => p.id === nuevoElemento.plantaId)
