@@ -21,7 +21,7 @@ import { ref, computed, watch } from 'vue'
 import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
+import { useStatePersistence, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS } from '@/inventory-smart/composables/useStatePersistence'
 import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
@@ -115,6 +115,32 @@ export const useCanvasStore = defineStore('canvas', () => {
   const nivelAEditar = ref(null);
 
   const isDraggable = ref(true)
+
+  // === CATÁLOGOS DINÁMICOS (persistidos via useStatePersistence) ===
+  const catalogos = ref({
+    tiposEspacio: DEFAULT_TIPOS_ESPACIO,
+    tiposCuarto: DEFAULT_TIPOS_CUARTO,
+    tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+  })
+
+  const setCatalogos = (cats) => {
+    try {
+      const safe = {
+        tiposEspacio: Array.isArray(cats?.tiposEspacio) ? cats.tiposEspacio : DEFAULT_TIPOS_ESPACIO,
+        tiposCuarto: Array.isArray(cats?.tiposCuarto) ? cats.tiposCuarto : DEFAULT_TIPOS_CUARTO,
+        tiposProductoAdmitidos: Array.isArray(cats?.tiposProductoAdmitidos)
+          ? cats.tiposProductoAdmitidos
+          : DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+      }
+      catalogos.value = safe
+    } catch {
+      catalogos.value = {
+        tiposEspacio: DEFAULT_TIPOS_ESPACIO,
+        tiposCuarto: DEFAULT_TIPOS_CUARTO,
+        tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+      }
+    }
+  }
   // Configuración de grilla y snap
   // Por defecto desactivamos la cuadrícula (0 = sin cuadricula visual ni snap a grilla)
   const gridSize = ref(0) // px entre líneas de grilla (0 desactiva)
@@ -653,7 +679,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     try {
       const state = {
         plantas: plantas.value,
-        elementos: elementos.value
+        elementos: elementos.value,
+        catalogos: catalogos.value,
       }
       const data = _serialize(state)
       return _persist(data)
@@ -1116,6 +1143,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       elementos: elementos.value.map(e => e?._custom?.value || e),
       templates: catalogStore.templates?.map?.(t => t?._custom?.value || t) || [],
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
+      catalogos: catalogos.value,
     }
     const jsonStr = _serialize(state)
     try {
@@ -1159,6 +1187,9 @@ export const useCanvasStore = defineStore('canvas', () => {
       },
       addElemento: (elementoData) => {
         elementos.value.push(elementoData)
+      },
+      setCatalogos: (cats) => {
+        setCatalogos(cats)
       },
       setInitialNavigation: (plantaId, plantaNombre) => {
         // Establecer la primera planta como activa siempre
@@ -1464,6 +1495,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     elementoAura,
     isDraggable,
     cambiosNoAplicados,
+  // Catálogos dinámicos
+  catalogos,
+  setCatalogos,
     gestionPisosPropiedadesModal,
     nivelAEditar,
 

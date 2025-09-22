@@ -302,7 +302,8 @@ import { ref, onMounted, watch, computed, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
-import { getColorCategoria, TODAS_LAS_CATEGORIAS, UBICACIONES_DISPONIBLES } from '@/inventory-smart/utils/constants'
+import { getColorCategoria, UBICACIONES_DISPONIBLES } from '@/inventory-smart/utils/constants'
+import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
@@ -408,7 +409,12 @@ const selectCuartos = () => {
 }
 
 // Opciones de filtros en Plantillas
-const categoriasPlantillas = computed(() => TODAS_LAS_CATEGORIAS)
+const canvasStore = useCanvasStore()
+const categoriasPlantillas = computed(() => {
+  const a = canvasStore.catalogos?.tiposCuarto || []
+  const b = canvasStore.catalogos?.tiposEspacio || []
+  return [...a, ...b]
+})
 const ubicacionesPlantillas = computed(() => UBICACIONES_DISPONIBLES)
 
 onMounted(() => {

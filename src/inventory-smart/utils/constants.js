@@ -282,14 +282,16 @@ export const TIPOS_ZONA_ESPACIO = [
   { id: 'picking', nombre: 'Zona de picking' },
 ]
 
-export const TIPOS_ESPACIO = [
+// Catálogo dinámico: movido a useStatePersistence/useCanvasStore
+// Mantener defaults aquí solo como respaldo/compatibilidad
+export const DEFAULT_TIPOS_ESPACIO = [
   { id: 'anaquel_metal', nombre: 'Anaquel metal' },
   { id: 'estante_madera', nombre: 'Estante madera' },
   { id: 'repisa_aluminio', nombre: 'Repisa aluminio' },
   { id: 'otro', nombre: 'Otro' }
 ]
 
-export const TIPOS_CUARTO = [
+export const DEFAULT_TIPOS_CUARTO = [
   { id: 'almacenamiento', nombre: 'Almacenamiento' },
   { id: 'zona_de_descarga', nombre: 'Zona de Descarga' },
   { id: 'almacenaje', nombre: 'Almacenaje' }
@@ -297,8 +299,8 @@ export const TIPOS_CUARTO = [
 
 // === TODAS LAS CATEGORÍAS UNIFICADAS ===
 export const TODAS_LAS_CATEGORIAS = [
-  ...TIPOS_CUARTO,
-  ...TIPOS_ESPACIO
+  ...DEFAULT_TIPOS_CUARTO,
+  ...DEFAULT_TIPOS_ESPACIO
 ]
 
 // Orientaciones para cuartos (grados)
@@ -310,7 +312,7 @@ export const ORIENTACIONES = [
 ]
 
 // Tipos de productos que se pueden admitir en un piso/nivel
-export const TIPOS_PRODUCTO_ADMITIDOS = [
+export const DEFAULT_TIPOS_PRODUCTO_ADMITIDOS = [
   { id: 'secos', nombre: 'Productos secos' },
   { id: 'refrigerados', nombre: 'Refrigerados' },
   { id: 'congelados', nombre: 'Congelados' },
@@ -318,6 +320,20 @@ export const TIPOS_PRODUCTO_ADMITIDOS = [
   { id: 'peligrosos', nombre: 'Peligrosos' },
   { id: 'voluminosos', nombre: 'Voluminosos' },
 ]
+
+// DEPRECATION: exports legacy names for backward-compatibility
+/**
+ * @deprecated Usar catálogos dinámicos desde useCanvasStore.catalogos
+ */
+export const TIPOS_ESPACIO = DEFAULT_TIPOS_ESPACIO
+/**
+ * @deprecated Usar catálogos dinámicos desde useCanvasStore.catalogos
+ */
+export const TIPOS_CUARTO = DEFAULT_TIPOS_CUARTO
+/**
+ * @deprecated Usar catálogos dinámicos desde useCanvasStore.catalogos
+ */
+export const TIPOS_PRODUCTO_ADMITIDOS = DEFAULT_TIPOS_PRODUCTO_ADMITIDOS
 
 // === FUNCIONES DE UTILIDAD ===
 
