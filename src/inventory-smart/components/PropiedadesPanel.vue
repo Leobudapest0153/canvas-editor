@@ -258,6 +258,7 @@
                   min="0"
                   v-model.number="edited.capacidadCarga"
                   @change="validarPeso"
+                  @input="onPesoInput"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
                   focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
                   disabled:cursor-not-allowed disabled:text-gray-500"
@@ -268,75 +269,71 @@
               <p v-if="advertenciaPeso" class="text-xs text-amber-600">{{ advertenciaPeso }}</p>
             </div>
 
-            <!-- Capacidad de volumen teórico -->
-            <!-- <div>
-              <label class="text-sm text-gray-500">Volumen teórico</label>
-              <div class="flex items-center">
-                <input :value="volumenTeorico" disabled
-                  class="w-full px-2 py-1 bg-gray-50 border border-gray-300 rounded-md text-sm text-gray-500" />
-                <span class="ml-1 text-sm text-gray-500">m³</span>
+            <!-- Uso real del padre -->
+            <div v-if="mostrarUsoRealPadre" class="border-t pt-3">
+              <label class="text-sm font-medium text-gray-700 mb-2 block">Uso {{ getTipoNombrePadre() }}</label>
+              <!-- Peso real usado del padre -->
+              <div class="mb-2">
+                <!-- <label class="text-xs text-gray-500">Capacidad de peso usada</label> -->
+                <!-- <div class="flex items-center">
+                  <input
+                    :value="usoRealPesoPadre"
+                    disabled
+                    class="w-full px-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600"
+                  />
+                  <span class="ml-1 text-sm text-gray-500">kg</span>
+                </div> -->
+                <div v-if="infoPesoPadre.usado > 0" class="mt-1">
+                  <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>{{ porcentajePesoUsadoPadre }}% usado</span>
+                    <span>{{ infoPesoPadre.usado.toFixed(2) }} / {{ infoPesoPadre.maximo }} kg</span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-3">
+                    <div
+                      class="h-3 rounded-full transition-all duration-300"
+                      :style="{ width: porcentajePesoUsadoPadre + '%', backgroundColor: colorPesoUsadoPadre }"
+                    ></div>
+                  </div>
+                </div>
+                <!-- <div v-if="nombrePadre" class="mt-1">
+                  <p class="text-xs text-gray-500">
+                    Contenedor: <span class="font-medium">{{ nombrePadre }}</span>
+                  </p>
+                </div> -->
               </div>
-              <p v-if="volumenTeorico" class="text-xs text-gray-500 mt-1">
-                {{ descripcionVolumenTeorico }}
-              </p>
-            </div> -->
+            </div>
 
-            <!-- Uso real (solo lectura) -->
+            <!-- Uso real del elemento -->
             <div v-if="mostrarUsoReal" class="border-t pt-3">
-              <label class="text-sm font-medium text-gray-700 mb-2 block">Uso Real</label>
-
+              <label class="text-sm font-medium text-gray-700 mb-2 block">Uso {{ getTipoNombreActual() }}</label>
               <!-- Peso real usado -->
               <div class="mb-2">
-                <label class="text-xs text-gray-500">Capacidad de peso usada</label>
-                <div class="flex items-center">
+                <!-- <label class="text-xs text-gray-500">Capacidad de peso usada</label> -->
+                <!-- <div class="flex items-center">
                   <input
                     :value="usoRealPeso"
                     disabled
                     class="w-full px-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600"
                   />
                   <span class="ml-1 text-sm text-gray-500">kg</span>
-                </div>
+                </div> -->
                 <div v-if="usoRealPeso > 0" class="mt-1">
                   <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
                     <span>{{ porcentajePesoUsado }}% usado</span>
                     <span>{{ usoRealPeso }} / {{ edited.capacidadCarga || 0 }} kg</span>
                   </div>
-                  <div class="w-full bg-gray-200 rounded-full h-2">
+                  <div class="w-full bg-gray-200 rounded-full h-3">
                     <div
-                      class="h-2 rounded-full transition-all duration-300"
+                      class="h-3 rounded-full transition-all duration-300"
                       :style="{ width: porcentajePesoUsado + '%', backgroundColor: colorPesoUsado }"
                     ></div>
                   </div>
                 </div>
               </div>
-
-              <!-- Volumen real usado -->
-              <!-- <div>
-                <label class="text-xs text-gray-500">Volumen usado</label>
-                <div class="flex items-center">
-                  <input :value="usoRealVolumen" disabled
-                    class="w-full px-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600" />
-                  <span class="ml-1 text-sm text-gray-500">m³</span>
-                </div>
-                <div v-if="usoRealVolumen > 0" class="mt-1">
-                  <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
-                    <span>{{ porcentajeVolumenUsado }}% usado</span>
-                    <span>{{ usoRealVolumen }} / {{ volumenTeorico }} m³</span>
-                  </div>
-                  <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div class="h-2 rounded-full transition-all duration-300"
-                         :style="{ width: porcentajeVolumenUsado + '%', backgroundColor: colorVolumenUsado }"></div>
-                  </div>
-                </div>
-              </div> -->
-            </div>
-
-            <!-- Información del contexto padre -->
-            <div v-if="infoPesoPadre.limiteDePeso" class="text-xs text-gray-600">
-              {{ capacidadContextoTexto }}
             </div>
           </div>
         </details>
+
         <!-- Edición de niveles (Solo para cuartos)-->
         <details
           v-if="elementoSeleccionado.tipo === 'cuartos'"
@@ -1088,13 +1085,7 @@ const infoPesoPadre = computed(() => {
   const { padreId, padreType } = padreContext.value
   if (!padreId || !padreType)
     return { limiteDePeso: false, usado: 0, maximo: 0, disponible: Infinity, porcentajeUsado: 0 }
-  return calcularPesoDisponible(padreId, padreType)
-})
-
-const capacidadContextoTexto = computed(() => {
-  const info = infoPesoPadre.value
-  return `Actualmente la bodega tiene ${info.usado} kg ocupados (${toPrecisionCm(info.porcentajeUsado)}% de su capacidad).
-  Todavía puedes ocupar ${info.disponible} kg sin problemas.`
+  return calcularPesoDisponible(padreId, padreType, { validacionTeorica: false })
 })
 
 const validarPeso = () => {
@@ -1119,8 +1110,126 @@ const validarPeso = () => {
   // que bloquea el botón Guardar y muestra el mensaje apropiado
 }
 
+// Validación inmediata también para pasos con flechas del input number
+const onPesoInput = (e) => {
+  // Asegurar número y clamp >= 0
+  let val = Number(edited.value?.capacidadCarga)
+  if (!Number.isFinite(val)) val = 0
+  if (val < 0) val = 0
+  // Normalizar a 2 decimales para evitar ruido por floats de step="any"
+  val = Number(val.toFixed(2))
+  if (edited.value.capacidadCarga !== val) {
+    edited.value.capacidadCarga = val
+  }
+
+  // Ejecutar las mismas validaciones que en @change para impedir estados inválidos
+  const prev = valorPesoAnterior.value
+  if (prev === undefined || Math.abs(prev - val) >= 0.01) {
+    // Comprobar validaciones duras: uso real, hijos y padre; si fallan, revertir suavemente
+    const elemento = elementoSeleccionado.value
+    if (!elemento) return
+
+    // 1. uso real
+    const real = validarPesoMaximoVsUsoReal(elemento, val)
+    if (!real.valido) {
+      // ajustar mínimo a uso actual
+      const minPorUso = Number((elemento?.uso?.peso || 0).toFixed(2))
+      edited.value.capacidadCarga = minPorUso
+      valorPesoAnterior.value = minPorUso
+      showWarning(real.mensaje)
+      return
+    }
+
+    // 2. hijos
+    const hijos = validarCapacidadVsHijos(elemento, val)
+    if (!hijos.valido) {
+      // ajustar mínimo a suma de capacidades de hijos si está disponible en mensaje/contexto
+      // Como fallback, simplemente revertimos al snapshot si no tenemos el dato
+      const sumaHijos = hijos?.requerido || null
+      if (Number.isFinite(sumaHijos)) {
+        edited.value.capacidadCarga = Number(Number(sumaHijos).toFixed(2))
+        valorPesoAnterior.value = edited.value.capacidadCarga
+      } else {
+        edited.value.capacidadCarga = snapshotOriginal.value.capacidadCarga
+        valorPesoAnterior.value = edited.value.capacidadCarga
+      }
+      showWarning(hijos.mensaje)
+      return
+    }
+
+    // 3. padre teórico si aplica
+    const { padreId, padreType } = padreContext.value
+    if (padreId && padreType) {
+      const sim = { ...elemento, capacidadCarga: val }
+      const teor = validarPesoElemento(sim, padreId, padreType, {
+        validacionTeorica: true,
+        esEdicion: true,
+      })
+      if (!teor.valido && teor.limiteDePeso) {
+        // ajustar máximo al permitido por el padre (capacidadCarga - (pesoTotal - nuevaCapacidad))
+        // Si tenemos datos, fijamos al máximo permitido; si no, revertimos
+        const maxPadre = Number(teor?.capacidadCarga ?? 0)
+        const pesoTotal = Number(teor?.pesoTotal ?? 0)
+        // Si pesoTotal > capacidad, bajar val lo suficiente; como aproximación, setear a (capacidadCarga - exceso)
+        if (Number.isFinite(maxPadre) && Number.isFinite(teor?.exceso)) {
+          const nuevoVal = Math.max(0, Number((maxPadre - teor.exceso).toFixed(2)))
+          edited.value.capacidadCarga = nuevoVal
+          valorPesoAnterior.value = nuevoVal
+        } else {
+          edited.value.capacidadCarga = snapshotOriginal.value.capacidadCarga
+          valorPesoAnterior.value = edited.value.capacidadCarga
+        }
+        showWarning(
+          `Se excede el límite de peso del contenedor padre. Exceso: ${teor.exceso.toFixed(2)} kg (Total: ${teor.pesoTotal.toFixed(2)}/${teor.capacidadCarga} kg).`
+        )
+        return
+      }
+    }
+
+    // Si pasaron las validaciones, actualizamos el valorAnterior para no revalidar innecesariamente
+    valorPesoAnterior.value = val
+  }
+}
+
 const getTipoNombre = (tipo) => {
   return TIPOS_ENTIDAD.find((t) => t.id === tipo)?.nombre || tipo
+}
+
+const getTipoNombrePadre = () => {
+  const { padreId, padreType } = padreContext.value
+  if (!padreId || !padreType) return 'elemento'
+
+  if (padreType === 'plantas') {
+    return 'de la planta'
+  }
+
+  const elemento = canvasStore.elementoPorId(padreId)
+  if (!elemento) return 'elemento'
+
+  // Mapear tipos específicos
+  const tipo = elemento.tipo
+  if (tipo === 'cuartos') return 'del cuarto'
+  if (tipo === 'pisos') return 'del piso'
+  if (tipo === 'elementos') return 'del elemento'
+  if (tipo === 'contenedores') return 'del contenedor'
+  if (tipo === 'pasillos') return 'del pasillo'
+
+  return `del ${getTipoNombre(tipo)}`
+}
+
+const getTipoNombreActual = () => {
+  const elemento = elementoSeleccionado.value
+  if (!elemento) return 'elemento'
+
+  const tipo = elemento.tipo
+  if (tipo === 'cuartos') return 'del cuarto'
+  if (tipo === 'pisos') return 'del piso'
+  if (tipo === 'elementos') return 'del elemento'
+  if (tipo === 'contenedores') return 'del contenedor'
+  if (tipo === 'pasillos') return 'del pasillo'
+  if (tipo === 'plantas') return 'de la planta'
+
+  return `del ${getTipoNombre(tipo)}`
 }
 
 const getCategoriaDisplay = (categoria) => {
@@ -1284,7 +1393,7 @@ const porcentajePesoUsado = computed(() => {
   const peso = parseFloat(usoRealPeso.value)
   const maximo = edited.value?.capacidadCarga || 0
   if (maximo === 0) return 0
-  return Math.min(100, toPrecisionCm((peso / maximo) * 100))
+  return Math.min(100, toPrecisionCm((peso / maximo) * 100)).toFixed(2)
 })
 
 // const porcentajeVolumenUsado = computed(() => {
@@ -1307,6 +1416,32 @@ const colorPesoUsado = computed(() => {
 //   if (porcentaje < 85) return '#f59e0b' // Amarillo
 //   return '#ef4444' // Rojo
 // })
+
+/**
+ * Datos del uso real del padre
+ */
+const mostrarUsoRealPadre = computed(() => {
+  const { padreId, padreType } = padreContext.value
+  return padreId && padreType && infoPesoPadre.value.limiteDePeso && infoPesoPadre.value.usado > 0
+})
+
+const usoRealPesoPadre = computed(() => {
+  return infoPesoPadre.value.usado ? infoPesoPadre.value.usado.toFixed(2) : '0.00'
+})
+
+const porcentajePesoUsadoPadre = computed(() => {
+  const usado = infoPesoPadre.value.usado || 0
+  const maximo = infoPesoPadre.value.maximo || 0
+  if (maximo === 0) return 0
+  return Math.min(100, toPrecisionCm((usado / maximo) * 100)).toFixed(2)
+})
+
+const colorPesoUsadoPadre = computed(() => {
+  const porcentaje = porcentajePesoUsadoPadre.value
+  if (porcentaje < 50) return '#10b981' // Verde
+  if (porcentaje < 85) return '#f59e0b' // Amarillo
+  return '#ef4444' // Rojo
+})
 
 const alturaPlanta = computed(
   () => canvasStore.plantaPorId(canvasStore.plantaActiva)?.dimensiones?.alto || 0,

@@ -313,6 +313,12 @@ export function useProductSimulation({ canvasStore, showToast, forceRedraw }) {
   const simularLlenadoElemento = (elementoId) => {
     if (!elementoId) return;
 
+    // Permitir solo al estar en contexto planta
+    if (canvasStore.contextoActual.tipo !== 'plantas') {
+      showToast('La simulación solo está disponible desde las plantas.', 'warning');
+      return;
+    }
+
     const elemento = canvasStore.elementoPorId(elementoId);
     if (!elemento) return;
 
