@@ -163,11 +163,12 @@
           @click="seleccionarElemento(elemento.id)"
         >
           <!-- Visual -->
-          <div
-            class="w-10 h-10 rounded-md flex-shrink-0 flex items-center justify-center"
-            :style="{ backgroundColor: elemento.colorBase || '#E0E0E0' }"
-          >
-            <span class="text-xl">{{ elemento.icono || '📦' }}</span>
+          <div class="flex-shrink-0">
+            <component
+              :is="getIconComponent(elemento)"
+              :backgroundColor="elemento.colorBase || elemento.color || '#E0E0E0'"
+              class="w-10 h-10"
+            />
           </div>
           <!-- Info -->
           <div class="flex-1 overflow-hidden">
@@ -182,7 +183,7 @@
               :delay="200"
             >
             <button
-              @click.stop="() => {canvasStore.seleccionarElemento(elemento.id);  canvasStore.destacarElemento(elemento.id);}"
+              @click.stop="showAuraElement(elemento.id)"
               class="p-0 text-gray-400 hover:text-blue-600 cursor-pointer"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -281,6 +282,9 @@ import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import {useDeleteElement} from '@/inventory-smart/composables/useDeleteElement'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
+import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
+import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
 const { showToast } = useToast()
 // Composables
 const canvasStore = useCanvasStore()
@@ -303,9 +307,29 @@ const filtrosPanelRef = ref(null)
 // Computed properties
 const categorias = computed(() => CATEGORIAS)
 
+const showAuraElement = (elementoId) => {
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes buscar un elemento si tienes cambios pendientes', 'warn');
+    return;
+  }
+  canvasStore.destacarElemento(elementoId);
+  canvasStore.seleccionarElemento(elementoId);
+}
+
 const getTipoNombre = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.nombre || 'Desconocido'
+}
+
+const getIconComponent = (elemento) => {
+  // Determinar el componente de icono basado en tipo y ubicación
+  if (elemento.tipo === 'cuarto') {
+    return RoomIcon
+  } else if (elemento.ubicacion === 'pared') {
+    return SpaceOnWallIcon
+  } else {
+    return SpaceIcon
+  }
 }
 
 const elementosFiltrados = computed(() => {
@@ -367,6 +391,14 @@ const limpiarFiltros = () => {
 
 const onDelete = async (id) => {
   if (!id) return
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No se pueden eliminar elementos con cambios pendientes de guardar', 'warn')
+    return
+  }
+  if (['elementos', 'cuartos'].includes(canvasStore.contextoNavegacion.tipo)) {
+    showToast('No se pueden eliminar elementos en la vista actual', 'warn');
+    return
+  }
   const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
   if (el && (el.bloqueado === true || el.locked === true)) {
     showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })

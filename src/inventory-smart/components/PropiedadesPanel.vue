@@ -534,7 +534,7 @@ const cargarDesdeStore = (el) =>
   deepClone({
     codigo: el.codigo || '',
     nombre: el.nombre || '',
-    color: el.color || '#3B82F6',
+    color: el.color || '#1C1E4D',
     orientacion: Number(el.orientacion) || 0,
     dimensiones: {
       ancho: el.dimensiones?.ancho || 0,
@@ -728,7 +728,7 @@ const guardarDeshabilitado = computed(
 const pisos = computed(() => {
   const hijos = elementoSeleccionado.value.hijos ?? [];
 
-  return canvasStore.elementos.filter((e) => hijos.includes(e.id));
+  return canvasStore.elementos.filter((e) => hijos.includes(e.id)).reverse();
 })
 
 const revertir = () => {

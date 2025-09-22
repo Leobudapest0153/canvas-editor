@@ -38,7 +38,7 @@
           <input
             type="text"
             placeholder="01"
-            :value="canvasStore.nivelAEditar?.codigo ?? ''"
+            v-model="formValue.codigo"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
         <div class="col-span-2 flex flex-col gap-y-2">
@@ -46,14 +46,14 @@
           <input
             type="text"
             placeholder="piso bajo"
-            :value="canvasStore.nivelAEditar?.nombre ?? ''"
+            v-model="formValue.nombre"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
         <div class="flex flex-col gap-y-2">
           <label class="font-normal text-medium text-[#111928]" for="largo">Largo (m)</label>
           <input
             type="text"
-            :value="canvasStore.nivelAEditar?.dimensiones?.largo ?? ''"
+            v-model="formValue.dimensiones.largo"
             placeholder="30"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
@@ -63,7 +63,7 @@
           <input
             type="text"
             placeholder="30"
-            :value="canvasStore.nivelAEditar?.dimensiones?.alto ?? ''"
+            v-model="formValue.dimensiones.alto"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
         <div class="flex flex-col gap-y-2">
@@ -71,7 +71,7 @@
           <input
             type="text"
             placeholder="30"
-            :value="canvasStore.nivelAEditar?.dimensiones?.ancho ?? ''"
+            v-model="formValue.dimensiones.ancho"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
         <div class="flex flex-col gap-y-2">
@@ -79,7 +79,7 @@
           <input
             type="text"
             placeholder="30"
-            :value="canvasStore.nivelAEditar?.pesoMaximo"
+            v-model="formValue.capacidadCarga"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
       <h3 class="font-semibold text-medium text-primary-800 col-span-2">Características del piso</h3>
@@ -89,6 +89,7 @@
             type="radio"
             name="caracteristicas-piso"
             id="Zona de Cross-docking"
+            :checked="formValue.caracteristicas.includes('Zona de Cross-docking')"
             value="Zona de Cross-docking"
             class="peer absolute z-30 top-0 bottom-0 left-0 right-0 opacity-0"
           />
@@ -112,6 +113,7 @@
               name="caracteristicas-piso"
               id="Zona de almacenaje"
               value="Zona de almacenaje"
+              :checked="formValue.caracteristicas.includes('Zona de almacenaje')"
               class="peer absolute z-30 top-0 bottom-0 left-0 right-0 opacity-0"
             />
             <div
@@ -134,6 +136,7 @@
               type="checkbox"
               id="materiales-fragiles"
               name="materiales-fragiles"
+              :checked="formValue.permiteMaterialesFragiles"
               class="z-10 absolute opacity-0 top-0 left-0 right-0 bottom-0 peer"
             >
               <label for="materiales-fragiles" class="w-4 h-4 border-2 border-gray-300 cursor-pointer flex opacity-0 peer-checked:opacity-100 justify-center items-center bg-primary-700 border-primary-700">
@@ -198,7 +201,6 @@
                   <input
                     type="checkbox"
                   :id="option"
-                  :value="option"
                   v-model="selectedOptions"
                   class="text-primary-700"
                 />
@@ -215,20 +217,29 @@
       >
         Cancelar
       </button>
-      <button class="bg-primary-700 w-[117px] h-[50px] font-normal text-white rounded-[6px]
+      <button
+        @click="onSave"
+        class="bg-primary-700 w-[117px] h-[50px] font-normal text-white rounded-[6px]
         cursor-pointer">
         Guardar
       </button>
 
       </div>
     </div>
+    <FloorLevelsHeightConfirmModal
+      :open="canvasStore.confirmacionAlturasNivelesModal"
+      :draft="canvasStore.propuestaAlturasNiveles"
+      @confirm="(estrategia) => canvasStore.confirmarPropuestaAlturasNiveles(estrategia)"
+      @cancel="() => canvasStore.cancelarPropuestaAlturasNiveles()"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore';
+import FloorLevelsHeightConfirmModal from '@/inventory-smart/components/modals/FloorLevelsHeightConfirmModal.vue'
 
 const canvasStore = useCanvasStore();
 
@@ -250,6 +261,27 @@ const filteredOptions = computed(() =>
   )
 );
 
+const formValue = ref({
+  codigo: canvasStore.nivelAEditar?.codigo ?? '',
+  nombre: canvasStore.nivelAEditar?.nombre ?? '',
+  dimensiones: {
+    ancho: canvasStore.nivelAEditar?.dimensiones?.ancho
+      ? (canvasStore.nivelAEditar.dimensiones.ancho / 100).toFixed(2)
+      : '',
+    largo: canvasStore.nivelAEditar?.dimensiones?.largo
+      ? (canvasStore.nivelAEditar.dimensiones.largo / 100).toFixed(2)
+      : '',
+    alto: canvasStore.nivelAEditar?.dimensiones?.alto
+      ? (canvasStore.nivelAEditar.dimensiones.alto / 100).toFixed(2)
+      : ''
+  },
+  capacidadCarga: canvasStore.nivelAEditar?.capacidadCarga ?? '',
+  caracteristicas: canvasStore.nivelAEditar?.caracteristicas ?? '',
+  tipoProductos: canvasStore.nivelAEditar?.tipoProductos ?? [],
+  permiteMaterialesFragiles: canvasStore.nivelAEditar?.permiteMaterialesFragiles ?? false
+});
+
+
 // Cierra dropdown al hacer clic fuera
 const handleClickOutside = (event) => {
   // 1. Si el dropdown está cerrado, no hagas nada.
@@ -261,6 +293,43 @@ const handleClickOutside = (event) => {
   }
 };
 
+const onSave = () => {
+  const data = Object.assign({}, formValue.value);
+  data.dimensiones = {
+    ancho: formValue.value.dimensiones.ancho
+      ? Math.round(parseFloat(formValue.value.dimensiones.ancho) * 100)
+      : null,
+    largo: formValue.value.dimensiones.largo
+      ? Math.round(parseFloat(formValue.value.dimensiones.largo) * 100)
+      : null,
+    alto: formValue.value.dimensiones.alto
+      ? Math.round(parseFloat(formValue.value.dimensiones.alto) * 100)
+      : null
+  };
+  canvasStore.guardarCuartoNivelesPropiedades(data, canvasStore.nivelAEditar?.id);
+}
+
+watch(() => canvasStore.nivelAEditar, (newVal) => {
+  formValue.value = {
+    codigo: newVal?.codigo ?? '',
+    nombre: newVal?.nombre ?? '',
+    dimensiones: {
+      ancho: newVal?.dimensiones?.ancho
+        ? (newVal.dimensiones.ancho / 100).toFixed(2)
+        : '',
+      largo: newVal?.dimensiones?.largo
+        ? (newVal.dimensiones.largo / 100).toFixed(2)
+        : '',
+      alto: newVal?.dimensiones?.alto
+        ? (newVal.dimensiones.alto / 100).toFixed(2)
+        : ''
+    },
+    capacidadCarga: newVal?.capacidadCarga ?? '',
+    caracteristicas: newVal?.caracteristicas ?? '',
+    tipoProductos: newVal?.tipoProductos ?? [],
+    permiteMaterialesFragiles: newVal?.permiteMaterialesFragiles ?? false
+  };
+}, { immediate: true, deep: true });
 onMounted(() => {
   document.addEventListener('click', handleClickOutside);
 });

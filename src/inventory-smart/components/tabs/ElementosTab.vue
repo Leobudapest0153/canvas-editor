@@ -147,7 +147,7 @@
           </transition>
         </div>
       </div>
-      
+
       <!-- Contenido principal - SIEMPRE se muestra -->
       <div class="elementos-lista flex-1 overflow-y-auto p-4">
         <!-- Mensaje vacío cuando no hay plantillas - CENTRADO Y MÁS ARRIBA -->
@@ -202,15 +202,11 @@
               </button>
 
               <div class="elemento-preview flex items-center justify-center mb-3">
-                <div
-                  :class="[
-                    'preview-shape rounded-sm flex items-center justify-center relative shadow-sm border border-white/20',
-                    'w-12 h-8',
-                  ]"
-                  :style="{ backgroundColor: getTemplateColor(tpl) }"
-                >
-                  <component :is="getIconComponent('box')" class="w-4 h-4 text-white" />
-                </div>
+                <component
+                  :is="getIconComponentForTemplate(tpl)"
+                  :backgroundColor="getTemplateColor(tpl)"
+                  class="w-12 h-8"
+                />
               </div>
 
               <div class="elemento-info space-y-1">
@@ -307,6 +303,9 @@ import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
+import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
+import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
+import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
 
 const catalogStore = useCatalogStore()
 const { selectedCatalog, searchText, templates } = storeToRefs(catalogStore)
@@ -503,6 +502,18 @@ const getTemplateDims = (tpl) => ({
 })
 
 const getIconComponent = () => 'svg'
+
+const getIconComponentForTemplate = (tpl) => {
+  // Determinar el componente de icono basado en el elemento raíz de la plantilla
+  const root = getTemplateRoot(tpl)
+  if (root.tipo === 'cuarto') {
+    return RoomIcon
+  } else if (root.ubicacion === 'pared') {
+    return SpaceOnWallIcon
+  } else {
+    return SpaceIcon
+  }
+}
 
 const getTemplateRoot = (tpl) => {
   const elems = tpl.payload?.elements || []
