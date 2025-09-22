@@ -100,21 +100,32 @@
             />
           </div>
 
-          <!-- Plantilla -->
+          <!-- Modo: Planta elástica -->
           <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
-            <h4 class="text-sm font-semibold text-gray-800 mb-3">Plantilla</h4>
-            <select
-              class="w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
-              v-model="local.shape"
-            >
-              <option value="none" disabled>Sin definir</option>
-              <option value="rectangle">Rectángulo</option>
-              <option value="circle">Círculo</option>
-            </select>
+            <h4 class="text-sm font-semibold text-gray-800 mb-3">Modo</h4>
+            <label class="flex items-center gap-3 select-none">
+              <input type="checkbox" v-model="local.isInfinite" />
+              <span class="font-semibold">Planta elástica</span>
+              <UiTooltip
+                label="En modo elástico no hay límites de planta. Usa la grilla y el minimapa para orientarte."
+                position="right"
+                :delay="300"
+              >
+                <svg class="w-4 h-4 text-slate-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M18 10A8 8 0 11.001 9.999 8 8 0 0118 10zM9 9V5h2v6H9zm0 4h2v2H9z" />
+                </svg>
+              </UiTooltip>
+            </label>
+            <p v-if="local.isInfinite" class="mt-2 text-xs text-slate-600">
+              En este modo se ignoran los límites de planta. Las dimensiones y la capacidad quedan deshabilitadas.
+            </p>
+            <p v-else-if="showLimitedHint" class="mt-2 text-xs text-amber-700">
+              Define dimensiones válidas antes de guardar para salir del modo elástico.
+            </p>
           </div>
 
           <!-- Dimensiones -->
-          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
+          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm" v-show="!local.isInfinite">
             <h4 class="text-sm font-semibold text-gray-800 mb-3">Dimensiones</h4>
             <div class="grid grid-cols-2 gap-x-3 gap-y-3">
               <div>
@@ -144,17 +155,19 @@
                   v-model.number="localRectYMeters"
                 />
               </div>
-              <div class="col-span-2">
-                <label class="mb-1 block text-xs text-slate-600">Capacidad máxima (kg)</label>
-                <input
-                  type="number"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
-                  :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.maxWeight }"
-                  v-model.number="local.maxWeight"
-                  placeholder="Ej. 1000"
-                />
-              </div>
             </div>
+          </div>
+
+          <!-- Capacidad máxima -->
+          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm" v-show="!local.isInfinite">
+            <h4 class="text-sm font-semibold text-gray-800 mb-2">Capacidad máxima (kg)</h4>
+            <input
+              type="number"
+              class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+              :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.maxWeight }"
+              v-model.number="local.maxWeight"
+              placeholder="Ej. 1000"
+            />
           </div>
 
           <!-- Extras -->
@@ -208,6 +221,7 @@ import { useToast } from '@/inventory-smart/composables/useToast'
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
 import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import DrawEditor from './DrawEditor.vue'
+import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 
 const canvasStore = useCanvasStore()
 const { showToast } = useToast()
@@ -243,6 +257,8 @@ const local = reactive({
   pixelsPerUnit: PIXELS_PER_CM,
   height: 500,
   maxWeight: 1000,
+  // NUEVO: modo elástico
+  isInfinite: false,
 })
 
 const notice = ref('')
@@ -250,6 +266,9 @@ const errors = reactive({ name: false, dimensions: false, maxWeight: false })
 const isManuallyEdited = ref(false)
 const isLoadingData = ref(false)
 let dimensionChangeDebounce = null
+
+// Hint cuando se cambia de elástico -> limitado
+const showLimitedHint = ref(false)
 
 function defaultRect(w_cm, l_cm) {
   const w = w_cm * PIXELS_PER_CM
@@ -278,7 +297,9 @@ function resetLocalState() {
   local.elements = []
   local.height = 500
   local.maxWeight = 1000
+  local.isInfinite = false
   isManuallyEdited.value = false
+  showLimitedHint.value = false
 
   localRectWMeters.value = rectW.value / 100
   localRectLMeters.value = rectL.value / 100
@@ -299,6 +320,7 @@ watch(
       local.name = planta.nombre
       local.polygon = planta.poligono
       local.shape = planta.forma ?? 'none'
+      local.isInfinite = !!planta.isInfinite
 
       const todosLosElementos = canvasStore.elementos || []
       local.elements = todosLosElementos.filter((el) => el.plantaId === planta.id && !el.padre)
@@ -432,6 +454,24 @@ watch(
   },
 )
 
+// NUEVO: Watch del modo elástico
+watch(
+  () => local.isInfinite,
+  async (isOn, wasOn) => {
+    if (isLoadingData.value) return
+    // Si pasa a elástico, aplicar inmediatamente en la planta activa (si existe)
+    if (isOn && local.id) {
+      try { canvasStore.editarPlanta(local.id, { isInfinite: true }) } catch (e) { /* ignore */ }
+      showLimitedHint.value = false
+      notice.value = ''
+    }
+    // Si pasa a limitado desde elástico, mostrar hint hasta que se guarde con dimensiones válidas
+    if (!isOn && wasOn) {
+      showLimitedHint.value = true
+    }
+  },
+)
+
 // Helpers de validación reutilizables
 function validatePolygonAndContainment(newPolygon, newWorldWidth, newWorldLength) {
   const validation = canvasEditorRef.value?.isPolygonValid(newPolygon, local.elements)
@@ -532,6 +572,9 @@ watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY
 
   clearTimeout(dimensionChangeDebounce)
 
+  // Si el modo es elástico, ignorar cambios de dimensiones
+  if (local.isInfinite) return
+
   // Si el valor del input es vacío, v-model.number lo convierte en '' (string) o null.
   // Esta guarda previene la ejecución si los valores no son números válidos y positivos.
   if (typeof newW !== 'number' || typeof newL !== 'number' || typeof newY !== 'number' || newW <= 0 || newL <= 0 || newY <= 0) {
@@ -557,8 +600,8 @@ watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY
 // onShapeChange eliminado en favor del watch sobre local.shape
 
 function onSave() {
-  // Si hay un debounce pendiente, aplicamos dimensiones inmediatamente antes de guardar
-  if (dimensionChangeDebounce) {
+  // Si hay un debounce pendiente, aplicamos dimensiones inmediatamente antes de guardar (solo en modo limitado)
+  if (!local.isInfinite && dimensionChangeDebounce) {
     clearTimeout(dimensionChangeDebounce)
     const newW_cm = (Number(localRectWMeters.value) || 0) * 100
     const newL_cm = (Number(localRectLMeters.value) || 0) * 100
@@ -575,20 +618,47 @@ function onSave() {
   errors.dimensions = false
   errors.maxWeight = false
 
-  if (notice.value) {
-    showToast('Por favor corrige los errores antes de guardar.', 'error')
-    return
-  }
-
-  const finalValidation = canvasEditorRef.value?.isPolygonValid(local.polygon, local.elements)
-  if (finalValidation && !finalValidation.valid) {
-    notice.value = finalValidation.message
-    return
-  }
-
-  if (!local.name.trim()) {
+  if (!String(local.name || '').trim()) {
     errors.name = true
     notice.value = 'El campo "Nombre" es obligatorio.'
+    return
+  }
+
+  // Rama Modo Elástico: omitir validaciones de contención y dimensiones
+  if (local.isInfinite) {
+    const plantaData = {
+      id: local.id,
+      nombre: local.name.trim(),
+      isInfinite: true,
+      // Preservamos referencias existentes (polígono/dimensiones) para compat
+      dimensiones: {
+        alto: (Number(localRectYMeters.value) || 0) * 100 || (canvasStore.plantaEnEdicion?.dimensiones?.alto || 0),
+        ancho: rectW.value,
+        largo: rectL.value,
+      },
+      forma: local.shape,
+      poligono: local.polygon,
+      pesoMaximoSoportado: Number(local.maxWeight) || 0,
+    }
+
+    if (plantaData.id) {
+      canvasStore.editarPlanta(plantaData.id, plantaData)
+      canvasStore.calcularCanvasAdaptativoPlanta(plantaData)
+      showToast('Modo elástico aplicado a la planta.', 'success')
+    } else {
+      delete plantaData.id
+      canvasStore.agregarPlanta(plantaData)
+    }
+
+    resetLocalState()
+    resetMode()
+    canvasStore.cerrarEditor()
+    return
+  }
+
+  // Rama Modo Limitado (validaciones completas)
+  if (notice.value) {
+    showToast('Por favor corrige los errores antes de guardar.', 'error')
     return
   }
 
@@ -601,7 +671,7 @@ function onSave() {
     }
   }
 
-  // Validación extra: peso máximo no negativo
+  // Validación extra: capacidad no negativa (solo si visible)
   if (!Number.isFinite(Number(local.maxWeight)) || Number(local.maxWeight) < 0) {
     errors.maxWeight = true
     notice.value = 'La capacidad máxima (kg) no puede ser negativa.'
@@ -671,6 +741,7 @@ function onSave() {
     id: local.id,
     nombre: local.name.trim(),
     pesoMaximoSoportado: local.maxWeight,
+    isInfinite: false,
     dimensiones: {
       // Alto desde input en metros -> cm
       alto: (Number(localRectYMeters.value) || 0) * 100,
@@ -700,11 +771,15 @@ const canSave = computed(() => {
   const hasNotice = Boolean(notice.value)
   const hasErrors = errors.name || errors.dimensions || errors.maxWeight
   const hasValidName = Boolean(String(local.name || '').trim())
-  const dimsOk =
-    (Number(localRectWMeters.value) || 0) > 0 &&
-    (Number(localRectLMeters.value) || 0) > 0 &&
-    (Number(localRectYMeters.value) || 0) > 0
-  const weightOk = Number.isFinite(Number(local.maxWeight)) && Number(local.maxWeight) >= 0
+  // En modo elástico, no exigimos dimensiones/capacidad
+  const dimsOk = local.isInfinite
+    ? true
+    : (Number(localRectWMeters.value) || 0) > 0 &&
+      (Number(localRectLMeters.value) || 0) > 0 &&
+      (Number(localRectYMeters.value) || 0) > 0
+  const weightOk = local.isInfinite
+    ? true
+    : (Number.isFinite(Number(local.maxWeight)) && Number(local.maxWeight) >= 0)
   return !hasNotice && !hasErrors && hasValidName && dimsOk && weightOk
 })
 
