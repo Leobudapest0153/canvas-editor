@@ -556,7 +556,7 @@
                           </div>
                           <ul class="p-2 space-y-1">
                             <li
-                              v-for="opt in TIPOS_PRODUCTO_ADMITIDOS"
+                              v-for="opt in catalogos.tiposProductoAdmitidos"
                               :key="opt.id"
                               class="px-2 py-1 rounded hover:bg-gray-50"
                             >
@@ -677,14 +677,13 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import {
   FORMAS_DISPONIBLES,
-  TIPOS_CUARTO,
-  TIPOS_ESPACIO,
   TIPOS_ZONA_CUARTO,
   TIPOS_ZONA_ESPACIO,
-  TIPOS_PRODUCTO_ADMITIDOS,
   ORIENTACIONES,
   UBICACIONES_DISPONIBLES,
 } from '@/inventory-smart/utils/constants'
@@ -696,9 +695,13 @@ const setDropdownRef = (id, el) => {
   if (el) dropdownRefs.set(id, el)
 }
 
-const mapaTiposProducto = Object.fromEntries(
-  (TIPOS_PRODUCTO_ADMITIDOS || []).map((t) => [t.id, t.nombre]),
-)
+// Catálogos dinámicos desde el store
+const canvasStore = useCanvasStore()
+const { catalogos } = storeToRefs(canvasStore)
+
+const mapaTiposProducto = computed(() => Object.fromEntries(
+  (catalogos.value.tiposProductoAdmitidos || []).map((t) => [t.id, t.nombre])
+))
 
 const handleClickOutside = (e) => {
   if (!openDropdownId.value) return
@@ -734,6 +737,11 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
 })
 
+// Helpers locales desde catálogos dinámicos
+const TIPOS_PRODUCTO_ADMITIDOS_LOCAL = computed(() => catalogos.value.tiposProductoAdmitidos || [])
+const TIPOS_CUARTO_LOCAL = computed(() => catalogos.value.tiposCuarto || [])
+const TIPOS_ESPACIO_LOCAL = computed(() => catalogos.value.tiposEspacio || [])
+
 const toggleTipoProducto = (pisoNivel, id) => {
   if (!Array.isArray(pisoNivel.tiposProductos)) pisoNivel.tiposProductos = []
   const idx = pisoNivel.tiposProductos.indexOf(id)
@@ -742,7 +750,7 @@ const toggleTipoProducto = (pisoNivel, id) => {
 }
 
 const seleccionarTodosTipos = (pisoNivel) => {
-  pisoNivel.tiposProductos = TIPOS_PRODUCTO_ADMITIDOS.map((t) => t.id)
+  pisoNivel.tiposProductos = (catalogos.value.tiposProductoAdmitidos || []).map((t) => t.id)
 }
 
 const limpiarTipos = (pisoNivel) => {
@@ -813,7 +821,7 @@ const ensureTouchedForLevel = (nivel) => {
 
 // Computed
 const tiposDisponibles = computed(() => {
-  return props.modo === 'cuarto' ? TIPOS_CUARTO : TIPOS_ESPACIO
+  return props.modo === 'cuarto' ? catalogos.value.tiposCuarto : catalogos.value.tiposEspacio
 })
 
 const formasDisponibles = computed(() => {

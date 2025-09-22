@@ -246,8 +246,6 @@ import {
   getColorCategoria,
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
-  TIPOS_ESPACIO,
-  TIPOS_CUARTO,
 } from '@/inventory-smart/utils/constants'
 import { CATALOGO } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
@@ -348,8 +346,8 @@ const nuevoElemento = ref({
 
 // const puedeCrearElementosPersonalizados = computed(() => catalogContext.value.mode !== 'root')
 
-// Computed: categorías disponibles según el tab (requerimiento: Espacios -> TIPOS_ESPACIO, Cuartos -> TIPOS_CUARTO)
-const categoriasDisponibles = computed(() => (modo.value === 'cuarto' ? TIPOS_CUARTO : TIPOS_ESPACIO))
+// Computed: categorías disponibles según el tab (dinámicos desde store)
+const categoriasDisponibles = computed(() => (modo.value === 'cuarto' ? canvasStore.catalogos.tiposCuarto : canvasStore.catalogos.tiposEspacio))
 
 // Ubicaciones disponibles según el modo actual
 const ubicacionesDisponibles = computed(() => {
