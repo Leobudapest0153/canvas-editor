@@ -415,6 +415,7 @@
             >
               Sin pisos registrados
             </div>
+          </div>
         </details>
         <details open class="bg-gray-50 rounded-lg p-4">
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">
