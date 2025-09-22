@@ -250,8 +250,6 @@ import {
   getContrastTextColor,
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
-  TIPOS_ESPACIO,
-  TIPOS_CUARTO,
 } from '@/inventory-smart/utils/constants'
 import { CATALOGO } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
@@ -266,6 +264,7 @@ import { formatLengthsCm } from '../utils/units'
 import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
 import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
 import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
+import { useToast } from '@/inventory-smart/composables/useToast'
 
 // Props
 const props = defineProps({
@@ -279,6 +278,7 @@ const modo = computed(() => props.modo)
 
 // Stores
 const canvasStore = useCanvasStore()
+const { showToast } = useToast();
 const catalogStore = useCatalogStore()
 const { filteredCatalogItems, catalogContext, searchText, selectedCategory, items } =
   storeToRefs(catalogStore)
@@ -350,8 +350,8 @@ const nuevoElemento = ref({
 
 // const puedeCrearElementosPersonalizados = computed(() => catalogContext.value.mode !== 'root')
 
-// Computed: categorías disponibles según el tab (requerimiento: Espacios -> TIPOS_ESPACIO, Cuartos -> TIPOS_CUARTO)
-const categoriasDisponibles = computed(() => (modo.value === 'cuarto' ? TIPOS_CUARTO : TIPOS_ESPACIO))
+// Computed: categorías disponibles según el tab (dinámicos desde store)
+const categoriasDisponibles = computed(() => (modo.value === 'cuarto' ? canvasStore.catalogos.tiposCuarto : canvasStore.catalogos.tiposEspacio))
 
 // Ubicaciones disponibles según el modo actual
 const ubicacionesDisponibles = computed(() => {
@@ -506,6 +506,17 @@ const getCardDims = (item) => {
 
 // Drag and Drop
 const iniciarArrastre = (elemento, event) => {
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn');
+    event.preventDefault()
+    return
+  }
+
+  if (['cuartos', 'elementos'].includes(canvasStore.contextoNavegacion.tipo)) {
+    showToast('No puedes arrastrar elementos mientras estás editando un cuarto o elemento.', 'warn');
+    event.preventDefault()
+    return
+  }
   console.log('Iniciando arrastre del elemento:', elemento)
   // Si el item trae payload de estructura (plantilla/room/space), arrastrar como 'plantilla-catalogo'
   const isStructured = !!elemento?.payload?.rootId && Array.isArray(elemento?.payload?.elements)

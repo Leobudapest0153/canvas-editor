@@ -483,7 +483,8 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
-import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { TIPOS_ENTIDAD, CM_TO_PX } from '@/inventory-smart/utils/constants'
+// useCanvasStore ya importado arriba
 import { deepClone, deepEqual, makePatch } from '@/inventory-smart/utils/object'
 import { useToast } from '@/inventory-smart/composables/useToast.js'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
@@ -1233,7 +1234,8 @@ const getTipoNombreActual = () => {
 }
 
 const getCategoriaDisplay = (categoria) => {
-  return TODAS_LAS_CATEGORIAS.find((c) => c.id === categoria)?.nombre || categoria
+  const allCats = [...(canvasStore.catalogos?.tiposCuarto || []), ...(canvasStore.catalogos?.tiposEspacio || [])]
+  return allCats.find((c) => c.id === categoria)?.nombre || categoria
 }
 
 const esEstructura = computed(() => {

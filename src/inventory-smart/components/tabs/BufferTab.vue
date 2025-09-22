@@ -143,10 +143,12 @@ import { toPrecisionCm } from '@/inventory-smart/utils/fixedDimensions'
 import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
 import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
 import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
+import { useToast } from '@/inventory-smart/composables/useToast'
 
 // Composables
 const buffer = useCanvasBuffer()
 const canvasStore = useCanvasStore()
+const { showToast } = useToast()
 
 // Estado local
 const isDragging = ref(false)
@@ -201,6 +203,11 @@ const handleRemove = (bufferItemId) => {
 
 // Drag & Drop
 const handleDragStart = (event, item) => {
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes agregar nuevos elementos si hay cambios pendientes de guardar', 'warn');
+    event.preventDefault()
+    return
+  }
   isDragging.value = true
   // Configurar datos de drag
   const dragData = {

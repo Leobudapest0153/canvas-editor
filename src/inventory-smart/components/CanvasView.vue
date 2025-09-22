@@ -1038,7 +1038,7 @@ const handleStageMouseDown = (e) => {
 
 const handleStageClick = (e) => {
   // Deseleccionar elemento si click en área vacía
-  if (e.target === e.target.getStage() && !canvasStore.cambiosNoAplicados) {
+  if (e.target === e.target.getStage() && !canvasStore.cambiosNoAplicados && !canvasStore.nivelAEditar) {
     canvasStore.seleccionarElemento(null)
     // Cerrar controles y edición cuando se hace click en el stage vacío
     editingElementId.value = null
@@ -1895,7 +1895,7 @@ function centrarPlantaEnCanvas() {
 const handleGlobalClick = (e) => {
   const isFormElement = e.target.matches('input, button, select, textarea, [contenteditable]')
   const isInPropertiesPanel = e.target.closest('[data-properties-panel]')
-  if (!containerRef.value?.contains(e.target) && !isFormElement && !isInPropertiesPanel) {
+  if (!containerRef.value?.contains(e.target) && !isFormElement && !isInPropertiesPanel && !canvasStore.cambiosNoAplicados && !canvasStore.nivelAEditar) {
     canvasStore.seleccionarElemento(null)
     editingElementId.value = null
   }
@@ -1908,6 +1908,10 @@ const handleKeyDown = (e) => {
   if (key === 'escape' || key === 'esc') {
     if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
       showToast('Tienes cambios pendientes de guardar', 'warn')
+      return
+    }
+    if (canvasStore.nivelAEditar) {
+      showToast('Edición de nivel en proceso', 'warn')
       return
     }
     canvasStore.seleccionarElemento(null)

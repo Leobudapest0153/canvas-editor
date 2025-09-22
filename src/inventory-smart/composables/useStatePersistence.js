@@ -4,14 +4,40 @@
  * Composable para gestionar la serialización y persistencia del estado del canvas.
  *
  * Responsabilidades:
- * - Serialización completa del estado (plantas, elementos, configuración)
+ * - Serialización completa del estado (plantas, elementos, configuración, catálogos)
  * - Deserialización y restauración del estado
  * - Persistencia en localStorage
  * - Validación de estructura de datos
  * - Manejo de errores en operaciones de persistencia
+ * - Gestión de catálogos dinámicos
  */
 
 import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG } from "../utils/constants"
+
+// === CATÁLOGOS POR DEFECTO ===
+// Estos catálogos se pueden sobrescribir dinámicamente en el estado persistente
+
+export const DEFAULT_TIPOS_ESPACIO = [
+  { id: 'anaquel_metal', nombre: 'Anaquel metal' },
+  { id: 'estante_madera', nombre: 'Estante madera' },
+  { id: 'repisa_aluminio', nombre: 'Repisa aluminio' },
+  { id: 'otro', nombre: 'Otro' }
+]
+
+export const DEFAULT_TIPOS_CUARTO = [
+  { id: 'almacenamiento', nombre: 'Almacenamiento' },
+  { id: 'zona_de_descarga', nombre: 'Zona de Descarga' },
+  { id: 'almacenaje', nombre: 'Almacenaje' }
+]
+
+export const DEFAULT_TIPOS_PRODUCTO_ADMITIDOS = [
+  { id: 'secos', nombre: 'Productos secos' },
+  { id: 'refrigerados', nombre: 'Refrigerados' },
+  { id: 'congelados', nombre: 'Congelados' },
+  { id: 'fragiles', nombre: 'Frágiles' },
+  { id: 'peligrosos', nombre: 'Peligrosos' },
+  { id: 'voluminosos', nombre: 'Voluminosos' },
+]
 
 export const useStatePersistence = () => {
   /**
@@ -44,6 +70,13 @@ export const useStatePersistence = () => {
         ...(includeMetrics && {
           metrics: calculateStateMetrics(state)
         })
+      },
+
+      // Catálogos dinámicos (pueden sobrescribir los defaults)
+      catalogos: {
+        tiposEspacio: state.catalogos?.tiposEspacio || DEFAULT_TIPOS_ESPACIO,
+        tiposCuarto: state.catalogos?.tiposCuarto || DEFAULT_TIPOS_CUARTO,
+        tiposProductoAdmitidos: state.catalogos?.tiposProductoAdmitidos || DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
       },
 
       // Estado de plantas con todas sus propiedades
@@ -339,6 +372,29 @@ export const useStatePersistence = () => {
       // === LIMPIEZA Y PREPARACIÓN ===
       storeActions.clearState()
 
+      // === RESTAURAR CATÁLOGOS ===
+      if (state.catalogos) {
+        const catalogosRestaurados = {
+          tiposEspacio: Array.isArray(state.catalogos.tiposEspacio) 
+            ? state.catalogos.tiposEspacio 
+            : DEFAULT_TIPOS_ESPACIO,
+          tiposCuarto: Array.isArray(state.catalogos.tiposCuarto) 
+            ? state.catalogos.tiposCuarto 
+            : DEFAULT_TIPOS_CUARTO,
+          tiposProductoAdmitidos: Array.isArray(state.catalogos.tiposProductoAdmitidos) 
+            ? state.catalogos.tiposProductoAdmitidos 
+            : DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+        }
+        storeActions.setCatalogos(catalogosRestaurados)
+      } else {
+        // Usar catálogos por defecto si no existen en el archivo
+        storeActions.setCatalogos({
+          tiposEspacio: DEFAULT_TIPOS_ESPACIO,
+          tiposCuarto: DEFAULT_TIPOS_CUARTO,
+          tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+        })
+      }
+
       // === RESTAURAR PLANTAS CON VALIDACIÓN INDIVIDUAL ===
       let plantasRestauradas = 0
       state.plantas.forEach((plantaData, index) => {
@@ -507,7 +563,12 @@ export const useStatePersistence = () => {
         elementos: elementosRestaurados,
         elementosOmitidos,
         plantaActiva: primeraPlanta.id,
-        warnings: validation.warnings?.length || 0
+        warnings: validation.warnings?.length || 0,
+        catalogos: {
+          tiposEspacio: state.catalogos?.tiposEspacio?.length || DEFAULT_TIPOS_ESPACIO.length,
+          tiposCuarto: state.catalogos?.tiposCuarto?.length || DEFAULT_TIPOS_CUARTO.length,
+          tiposProductoAdmitidos: state.catalogos?.tiposProductoAdmitidos?.length || DEFAULT_TIPOS_PRODUCTO_ADMITIDOS.length,
+        }
       }
 
       console.log('✅ Estado deserializado exitosamente:', summary)
@@ -985,6 +1046,46 @@ export const useStatePersistence = () => {
     return report
   }
 
+  /**
+   * Obtiene los catálogos actuales o los defaults
+   * @param {Object} state - Estado actual del store
+   * @returns {Object} Catálogos disponibles
+   */
+  const getCatalogos = (state) => {
+    return {
+      tiposEspacio: state.catalogos?.tiposEspacio || DEFAULT_TIPOS_ESPACIO,
+      tiposCuarto: state.catalogos?.tiposCuarto || DEFAULT_TIPOS_CUARTO,
+      tiposProductoAdmitidos: state.catalogos?.tiposProductoAdmitidos || DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+    }
+  }
+
+  /**
+   * Valida un catálogo individual
+   * @param {Array} catalogo - Array de elementos del catálogo
+   * @param {string} nombre - Nombre del catálogo para logging
+   * @returns {boolean} true si el catálogo es válido
+   */
+  const validateCatalogo = (catalogo, nombre) => {
+    if (!Array.isArray(catalogo)) {
+      console.warn(`⚠️ Catálogo ${nombre}: debe ser un array`)
+      return false
+    }
+
+    const hasValidItems = catalogo.every(item => 
+      item && 
+      typeof item === 'object' && 
+      typeof item.id === 'string' && 
+      typeof item.nombre === 'string'
+    )
+
+    if (!hasValidItems) {
+      console.warn(`⚠️ Catálogo ${nombre}: algunos elementos no tienen la estructura correcta (id, nombre)`)
+      return false
+    }
+
+    return true
+  }
+
   return {
     // Funciones principales
     serialize,
@@ -997,6 +1098,15 @@ export const useStatePersistence = () => {
     validateStructure,
     hasStateChanged,
     generateValidationReport,
+
+    // Gestión de catálogos
+    getCatalogos,
+    validateCatalogo,
+
+    // Catálogos por defecto (para referencia)
+    DEFAULT_TIPOS_ESPACIO,
+    DEFAULT_TIPOS_CUARTO,
+    DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
 
     // Utilidades internas (para testing o debugging)
     validateStateBeforeSerialization,
