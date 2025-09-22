@@ -727,7 +727,7 @@ const guardarDeshabilitado = computed(
 const pisos = computed(() => {
   const hijos = elementoSeleccionado.value.hijos ?? [];
 
-  return canvasStore.elementos.filter((e) => hijos.includes(e.id));
+  return canvasStore.elementos.filter((e) => hijos.includes(e.id)).reverse();
 })
 
 const revertir = () => {
