@@ -28,7 +28,6 @@
       @mousedown="handleStageMouseDown"
       @click="handleStageClick"
     >
-
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
         <v-line
           v-if="plantPolygon.length"
@@ -69,22 +68,26 @@
       </v-layer>
       <v-layer ref="layerRef">
         <template v-if="canvasStore.elementoAura">
-        <v-rect
-          v-if="canvasStore.elementoAura.forma === 'rectangular' || !canvasStore.elementoAura.forma"
-          :config="{
-            id: canvasStore.elementoAura.id,
-            x: canvasStore.elementoAura.x,
-            y: canvasStore.elementoAura.y,
-            width: canvasStore.elementoAura.width,
-            height: canvasStore.elementoAura.height,
-            fill: canvasStore.elementoAura.color,
-            opacity: 0.5,
-            cornerRadius: 10,
-            listening: false,
-          }"
-        />
-         <v-circle
-            v-else-if="canvasStore.elementoAura.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
+          <v-rect
+            v-if="
+              canvasStore.elementoAura.forma === 'rectangular' || !canvasStore.elementoAura.forma
+            "
+            :config="{
+              id: canvasStore.elementoAura.id,
+              x: canvasStore.elementoAura.x,
+              y: canvasStore.elementoAura.y,
+              width: canvasStore.elementoAura.width,
+              height: canvasStore.elementoAura.height,
+              fill: canvasStore.elementoAura.color,
+              opacity: 0.5,
+              cornerRadius: 10,
+              listening: false,
+            }"
+          />
+          <v-circle
+            v-else-if="
+              canvasStore.elementoAura.forma === 'circular' && canvasStore.vistaActiva === 'XY'
+            "
             :config="{
               id: canvasStore.elementoAura.id,
               x: canvasStore.elementoAura.x + canvasStore.elementoAura.width / 2,
@@ -96,8 +99,7 @@
               listening: false,
             }"
           />
-
-      </template>
+        </template>
 
         <!-- Renderizado de elementos del store -->
         <template v-for="elemento in elementosVisiblesEnCanvas" :key="elemento.id">
@@ -146,24 +148,52 @@
                 y: 0,
                 width: getDrawWidth(elemento),
                 height: getDrawHeight(elemento),
-                fill: ((elemento.tipo || '').toLowerCase() === 'pasillos') ? '#ffffff' : elemento.color,
-                stroke: ((elemento.tipo || '').toLowerCase() === 'pasillos')
-                  ? (showPasillosDash ? '#959799' : undefined)
-                  : (((elemento.tipo || '').toLowerCase() === 'pisos') ? 'rgba(0,0,0,0.3)' : undefined),
-                strokeWidth: ((elemento.tipo || '').toLowerCase() === 'pasillos')
-                  ? (showPasillosDash ? (1 / canvasStore.zoom) : 0)
-                  : (((elemento.tipo || '').toLowerCase() === 'pisos') ? (1 / canvasStore.zoom) : 0),
-                dash: ((elemento.tipo || '').toLowerCase() === 'pasillos')
-                  ? (showPasillosDash ? [6 / canvasStore.zoom, 4 / canvasStore.zoom] : undefined)
-                  : (((elemento.tipo || '').toLowerCase() === 'pisos') ? [6 / canvasStore.zoom, 4 / canvasStore.zoom] : undefined),
+                fill:
+                  (elemento.tipo || '').toLowerCase() === 'pasillos' ? '#ffffff' : elemento.color,
+                stroke:
+                  (elemento.tipo || '').toLowerCase() === 'pasillos'
+                    ? showPasillosDash
+                      ? '#959799'
+                      : undefined
+                    : (elemento.tipo || '').toLowerCase() === 'pisos'
+                      ? 'rgba(0,0,0,0.3)'
+                      : undefined,
+                strokeWidth:
+                  (elemento.tipo || '').toLowerCase() === 'pasillos'
+                    ? showPasillosDash
+                      ? 1 / canvasStore.zoom
+                      : 0
+                    : (elemento.tipo || '').toLowerCase() === 'pisos'
+                      ? 1 / canvasStore.zoom
+                      : 0,
+                dash:
+                  (elemento.tipo || '').toLowerCase() === 'pasillos'
+                    ? showPasillosDash
+                      ? [6 / canvasStore.zoom, 4 / canvasStore.zoom]
+                      : undefined
+                    : (elemento.tipo || '').toLowerCase() === 'pisos'
+                      ? [6 / canvasStore.zoom, 4 / canvasStore.zoom]
+                      : undefined,
                 opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
-                shadowColor: ((elemento.tipo || '').toLowerCase() === 'pasillos') ? undefined : getElementShadow(elemento).color,
-                shadowBlur: ((elemento.tipo || '').toLowerCase() === 'pasillos') ? 0 : (getElementShadow(elemento).blur / canvasStore.zoom),
-                shadowOpacity: ((elemento.tipo || '').toLowerCase() === 'pasillos') ? 0 : getElementShadow(elemento).opacity,
+                shadowColor:
+                  (elemento.tipo || '').toLowerCase() === 'pasillos'
+                    ? undefined
+                    : getElementShadow(elemento).color,
+                shadowBlur:
+                  (elemento.tipo || '').toLowerCase() === 'pasillos'
+                    ? 0
+                    : getElementShadow(elemento).blur / canvasStore.zoom,
+                shadowOpacity:
+                  (elemento.tipo || '').toLowerCase() === 'pasillos'
+                    ? 0
+                    : getElementShadow(elemento).opacity,
               }"
             />
             <!-- Barra de orientación -->
-            <v-rect v-if="getOrientationBarRect(elemento)" :config="getOrientationBarRect(elemento)" />
+            <v-rect
+              v-if="getOrientationBarRect(elemento)"
+              :config="getOrientationBarRect(elemento)"
+            />
             <!-- Etiqueta centrada del elemento (rectangular) -->
             <v-text :config="computeLabelProps(elemento)" />
           </v-group>
@@ -193,20 +223,20 @@
               }"
             />
             <!-- Icono de candado para elemento bloqueado -->
-              <v-text
-                v-if="canvasStore.zoom > 0.8"
-                :config="{
-                  width: getDrawWidth(elemento),
-                  height: getDrawHeight(elemento),
-                  verticalAlign: 'middle',
-                  align: 'center',
-                  text: '🔒',
-                  fontSize: 32 / canvasStore.zoom,
-                  fontFamily: 'Arial',
-                  fill: '#f59e0b',
-                  listening: false,
-                }"
-              />
+            <v-text
+              v-if="canvasStore.zoom > 0.8"
+              :config="{
+                width: getDrawWidth(elemento),
+                height: getDrawHeight(elemento),
+                verticalAlign: 'middle',
+                align: 'center',
+                text: '🔒',
+                fontSize: 32 / canvasStore.zoom,
+                fontFamily: 'Arial',
+                fill: '#f59e0b',
+                listening: false,
+              }"
+            />
           </v-group>
 
           <!-- Elementos circulares: en vista aérea (XY) son círculos, en vista de frente (XZ) son rectángulos -->
@@ -322,7 +352,11 @@
           </v-group>
           <!-- Icono de candado para elemento circular bloqueado en vista aérea (XY) -->
           <v-group
-            v-if="isElementLocked(elemento.id) && elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
+            v-if="
+              isElementLocked(elemento.id) &&
+              elemento.forma === 'circular' &&
+              canvasStore.vistaActiva === 'XY'
+            "
             :config="{
               x: elemento.x,
               y: elemento.y,
@@ -362,7 +396,11 @@
 
           <!-- Icono de candado para elemento circular bloqueado en vista de frente (XZ) (rectangular) -->
           <v-group
-            v-if="isElementLocked(elemento.id) && elemento.forma === 'circular' && canvasStore.vistaActiva === 'XZ'"
+            v-if="
+              isElementLocked(elemento.id) &&
+              elemento.forma === 'circular' &&
+              canvasStore.vistaActiva === 'XZ'
+            "
             :config="{
               x: elemento.x,
               y: elemento.y,
@@ -405,16 +443,14 @@
         </template>
       </v-layer>
       <v-layer ref="uiLayerRef" :config="{ listening: false }">
-
         <!-- Debug: mostrar información según el contexto -->
         <v-text
           :config="{
             x: 10,
             y: -(39 / canvasStore.zoom),
-            text:
-              !canvasStore.estaEnPlanta
-                ? `${canvasStore.estructuraContenedorActual?.nombre} - ${formatLengthsCm([layerConfig.width * viewport.cmPerPx, layerConfig.height * viewport.cmPerPx])}`
-                : `${canvasStore.plantaActivaData?.nombre} - ${formatLengthsCm([layerConfig.width * viewport.cmPerPx, layerConfig.height * viewport.cmPerPx])}`,
+            text: !canvasStore.estaEnPlanta
+              ? `${canvasStore.estructuraContenedorActual?.nombre} - ${formatLengthsCm([layerConfig.width * viewport.cmPerPx, layerConfig.height * viewport.cmPerPx])}`
+              : `${canvasStore.plantaActivaData?.nombre} - ${formatLengthsCm([layerConfig.width * viewport.cmPerPx, layerConfig.height * viewport.cmPerPx])}`,
             fontSize: 12 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#3b82f6',
@@ -425,7 +461,7 @@
           v-if="canvasStore.estaEnPlanta"
           :config="{
             x: 10,
-            y: -(11 / canvasStore.zoom) - (8 / canvasStore.zoom),
+            y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
             text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
             fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
@@ -434,37 +470,37 @@
           }"
         />
 
-          <v-text
-            v-else-if="canvasStore.estaEnCuarto"
-            :config="{
-              x: 10,
-              y: -(11 / canvasStore.zoom) - (8 / canvasStore.zoom),
-              text: `Pisos: ${elementosVisiblesEnCanvas.length}`,
-              fontSize: 11 / canvasStore.zoom,
-              fontFamily: 'Arial',
-              fill: '#6b7280',
-              listening: false,
-            }"
-          />
+        <v-text
+          v-else-if="canvasStore.estaEnCuarto"
+          :config="{
+            x: 10,
+            y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
+            text: `Pisos: ${elementosVisiblesEnCanvas.length}`,
+            fontSize: 11 / canvasStore.zoom,
+            fontFamily: 'Arial',
+            fill: '#6b7280',
+            listening: false,
+          }"
+        />
 
-          <v-text
-            v-else-if="canvasStore.estaEnPiso"
-            :config="{
-              x: 10,
-              y: -(11 / canvasStore.zoom) - (8 / canvasStore.zoom),
-              text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
-              fontSize: 11 / canvasStore.zoom,
-              fontFamily: 'Arial',
-              fill: '#6b7280',
-              listening: false,
-            }"
-          />
+        <v-text
+          v-else-if="canvasStore.estaEnPiso"
+          :config="{
+            x: 10,
+            y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
+            text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
+            fontSize: 11 / canvasStore.zoom,
+            fontFamily: 'Arial',
+            fill: '#6b7280',
+            listening: false,
+          }"
+        />
 
         <v-text
           v-if="canvasStore.estaEnElemento"
           :config="{
             x: 10,
-            y: -(11 / canvasStore.zoom) - (8 / canvasStore.zoom),
+            y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
             text: `Contenedores: ${elementosVisiblesEnCanvas.length}`,
             fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
@@ -476,7 +512,7 @@
           v-if="canvasStore.estaEnContenedor"
           :config="{
             x: 10,
-            y: -(11 / canvasStore.zoom) - (8 / canvasStore.zoom),
+            y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
             text: `Items: ${elementosVisiblesEnCanvas.length} (elementos + contenedores)`,
             fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
@@ -499,8 +535,12 @@
         />
 
         <v-transformer
-          v-if="isEditingSelected && canvasStore.elementoSeleccionado && !selectedElementLocked &&
-          !isRestricted"
+          v-if="
+            isEditingSelected &&
+            canvasStore.elementoSeleccionado &&
+            !selectedElementLocked &&
+            !isRestricted
+          "
           ref="transformerRef"
           :config="{
             rotateEnabled: false,
@@ -509,7 +549,7 @@
             anchorFill: '#ffffff',
             anchorCornerRadius: 2,
             anchorSize: 8,
-            borderStroke: '#6366f1'
+            borderStroke: '#6366f1',
           }"
         />
       </v-layer>
@@ -533,13 +573,13 @@
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       :is-element-restricted="isRestricted"
-        :has-aisles="hasPasillos"
-        :is-aisle-dash-on="showPasillosDash"
+      :has-aisles="hasPasillos"
+      :is-aisle-dash-on="showPasillosDash"
       @set-mode="toggleDragMode()"
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
       @fill-container="() => simularLlenadoElemento(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
-        @toggle-aisle-dash="() => (showPasillosDash = !showPasillosDash)"
+      @toggle-aisle-dash="() => (showPasillosDash = !showPasillosDash)"
       @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
     />
 
@@ -562,21 +602,21 @@
       @close="closeTemplateModal"
     />
 
-  <CanvasInfo />
+    <CanvasInfo />
 
-  <FloatingControls
-    :safe-right="safeRight"
-    :can-undo="canUndo"
-    :can-redo="canRedo"
-    :can-zoom-in="canZoomIn"
-    :can-zoom-out="canZoomOut"
-    :can-fit="!!canvasStore.plantaActivaData"
-    @undo="undo()"
-    @redo="redo()"
-    @zoom-in="zoomIn()"
-    @zoom-out="zoomOut()"
-    @fit="fitToPlanta"
-  />
+    <FloatingControls
+      :safe-right="safeRight"
+      :can-undo="canUndo"
+      :can-redo="canRedo"
+      :can-zoom-in="canZoomIn"
+      :can-zoom-out="canZoomOut"
+      :can-fit="!!canvasStore.plantaActivaData"
+      @undo="undo()"
+      @redo="redo()"
+      @zoom-in="zoomIn()"
+      @zoom-out="zoomOut()"
+      @fit="fitToPlanta"
+    />
   </div>
 </template>
 
@@ -586,14 +626,8 @@ import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWit
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
 import RulersOverlay from '@/inventory-smart/components/RulersOverlay.vue'
-import {
-  detectConflictsFor,
-  throttle
-} from '@/inventory-smart/utils/collision'
-import {
-  snapToGrid,
-  nudgePlace,
-} from '@/inventory-smart/utils/geometry'
+import { detectConflictsFor, throttle } from '@/inventory-smart/utils/collision'
+import { snapToGrid, nudgePlace } from '@/inventory-smart/utils/geometry'
 import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
@@ -630,7 +664,10 @@ const props = defineProps({
 })
 
 // Referencia segura a Konva (cuando está disponible globalmente via vue-konva)
-const Konva = typeof globalThis !== 'undefined' ? globalThis.Konva || (typeof window !== 'undefined' ? window.Konva : null) : null
+const Konva =
+  typeof globalThis !== 'undefined'
+    ? globalThis.Konva || (typeof window !== 'undefined' ? window.Konva : null)
+    : null
 
 // Referencias
 const containerRef = ref(null)
@@ -641,30 +678,32 @@ const overlaysLayerRef = ref(null)
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
-const {
-  onDragStartGuard,
-  onDragMoveGuard,
-  onDragEndGuard,
-  onTransformEndGuard,
-} = usePlacementGuards()
+const { onDragStartGuard, onDragMoveGuard, onDragEndGuard, onTransformEndGuard } =
+  usePlacementGuards()
 const buffer = useCanvasBuffer()
 const ctx = useContextMenu()
-const { visible: ctxVisible, x: ctxX, y: ctxY, isLocked: ctxIsLocked, elementId: ctxElementId } = ctx
+const {
+  visible: ctxVisible,
+  x: ctxX,
+  y: ctxY,
+  isLocked: ctxIsLocked,
+  elementId: ctxElementId,
+} = ctx
 const { deleteSelected } = useDeleteElement()
 const weightValidation = useWeightValidation()
 
 const templateModalOpen = ref(false)
-const openTemplateModal = (elementId) => { templateModalOpen.value = true; ctx.close() }
-const closeTemplateModal = () => { templateModalOpen.value = false }
+const openTemplateModal = (elementId) => {
+  templateModalOpen.value = true
+  ctx.close()
+}
+const closeTemplateModal = () => {
+  templateModalOpen.value = false
+}
 const dimensionValidation = useDimensionValidation()
 
 // Object snapping
-const {
-  activeGuides: snapGuides,
-  isSnapping,
-  performSnap,
-  clearGuides
-} = useObjectSnapping()
+const { activeGuides: snapGuides, isSnapping, performSnap, clearGuides } = useObjectSnapping()
 
 // Estado para controlar si el snapping está habilitado
 const isSnappingEnabled = ref(true)
@@ -684,11 +723,11 @@ const getElementPixelDimensions = (elemento) => {
     if (canvasStore.vistaActiva === 'XZ') {
       const orientacion = Number(elemento.orientacion || 0)
       const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-      const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
+      const useAncho = orientacionNormalizada === 0 || orientacionNormalizada === 180
 
       return {
         width: useAncho ? elemento.width : elemento.height,
-        height: elemento.height
+        height: elemento.height,
       }
     }
     return { width: elemento.width, height: elemento.height }
@@ -700,24 +739,36 @@ const getElementPixelDimensions = (elemento) => {
 
     if (canvasStore.vistaActiva === 'XY') {
       // Vista aérea (XY): width = ancho, height = largo
-      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
-      heightCm = elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      widthCm =
+        elemento.dimensiones.ancho ||
+        (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm =
+        elemento.dimensiones.largo ||
+        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else if (canvasStore.vistaActiva === 'XZ') {
       // Vista de frente (XZ): considerar orientación para el width
       const orientacion = Number(elemento.orientacion || 0)
       const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-      const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
+      const useAncho = orientacionNormalizada === 0 || orientacionNormalizada === 180
 
       // En XZ: orientación determina si width usa ancho o largo
       widthCm = useAncho
-        ? (elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10))
-        : (elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6))
+        ? elemento.dimensiones.ancho ||
+          (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+        : elemento.dimensiones.largo ||
+          (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
       // Height siempre es alto en XZ
-      heightCm = elemento.dimensiones.alto || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      heightCm =
+        elemento.dimensiones.alto ||
+        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else {
       // Fallback a vista aérea (XY)
-      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
-      heightCm = elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      widthCm =
+        elemento.dimensiones.ancho ||
+        (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm =
+        elemento.dimensiones.largo ||
+        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     }
 
     return {
@@ -744,7 +795,12 @@ const isElementLocked = (elementId) => {
 const toggleLockElement = (elementId) => {
   const el = canvasStore.elementosVisibles.find((e) => e.id === elementId)
   if (!el) return
-  canvasStore.actualizarElemento(elementId, { bloqueado: !el.bloqueado }, true, `Elemento ${!el.bloqueado ? 'bloqueado' : 'desbloqueado'}: ${el.nombre || el.tipo || elementId}`)
+  canvasStore.actualizarElemento(
+    elementId,
+    { bloqueado: !el.bloqueado },
+    true,
+    `Elemento ${!el.bloqueado ? 'bloqueado' : 'desbloqueado'}: ${el.nombre || el.tipo || elementId}`,
+  )
 }
 
 // Conflictos en vivo durante el arrastre
@@ -753,14 +809,15 @@ const setLiveConflictsThrottled = throttle((movingEl) => {
   try {
     const list = detectConflictsFor(movingEl, canvasStore.elementosVisibles)
     conflictsApi.setConflicts(list, movingEl.id)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }, 32)
-
 
 // Estado local del canvas (otros estados vienen del composable useElementDrag)
 const stageSize = ref({ width: 800, height: 600 })
 const isDragOverCanvas = ref(false)
-const highlightAnimation = ref(null);
+const highlightAnimation = ref(null)
 
 // Configuración del stage - OCUPA TODO EL CONTENEDOR
 const stageConfig = computed(() => {
@@ -812,7 +869,9 @@ const elementosVisiblesEnCanvas = computed(() => {
 })
 
 // Detectar si existen pasillos visibles y toggle para su borde punteado
-const hasPasillos = computed(() => elementosVisiblesEnCanvas.value.some(e => (e.tipo || '').toLowerCase() === 'pasillos'))
+const hasPasillos = computed(() =>
+  elementosVisiblesEnCanvas.value.some((e) => (e.tipo || '').toLowerCase() === 'pasillos'),
+)
 const showPasillosDash = ref(true)
 
 // Grid de referencia - BASADO EN LAS DIMENSIONES DEL LAYER
@@ -924,9 +983,18 @@ const zoomOut = () => zoomBy(1 / ZOOM_STEP)
 
 const onKeyDown = (e) => {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
-    if (e.key === '+') { e.preventDefault(); zoomIn() }
-    if (e.key === '=') { e.preventDefault(); zoomIn() }
-    if (e.key === '-') { e.preventDefault(); zoomOut() }
+    if (e.key === '+') {
+      e.preventDefault()
+      zoomIn()
+    }
+    if (e.key === '=') {
+      e.preventDefault()
+      zoomIn()
+    }
+    if (e.key === '-') {
+      e.preventDefault()
+      zoomOut()
+    }
   }
 }
 
@@ -955,30 +1023,34 @@ const handleStageClick = (e) => {
     editingElementId.value = null
     // Limpiar guías de snapping
     clearGuides()
-    return;
+    return
   }
 
   // Resaltar sección de guardados
-  if (canvasStore.cambiosNoAplicados && e.target === e.target.getStage() && canvasStore.elementoSeleccionado) {
-    const msg = "Tienes cambios pendientes de guardar";
-    showToast(msg, 'warn');
+  if (
+    canvasStore.cambiosNoAplicados &&
+    e.target === e.target.getStage() &&
+    canvasStore.elementoSeleccionado
+  ) {
+    const msg = 'Tienes cambios pendientes de guardar'
+    showToast(msg, 'warn')
   }
 }
 
 // === FUNCIONES DE ELEMENTOS ===
 const selectElement = (element) => {
-  if (element?.restrictions && element?.restrictions.includes('open-properties')) return;
+  if (element?.restrictions && element?.restrictions.includes('open-properties')) return
   console.log('Seleccionando elemento:', element.id)
-  const isNotCurrentElement = canvasStore.elementoSeleccionado !== element.id;
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== element.id
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado && isNotCurrentElement) {
-    const msg = "No puedes seleccionar un nuevo elemento con cambios pendientes de guardar";
-    showToast(msg, 'warn');
-    return;
+    const msg = 'No puedes seleccionar un nuevo elemento con cambios pendientes de guardar'
+    showToast(msg, 'warn')
+    return
   }
   canvasStore.seleccionarElemento(element.id)
   // Si el modo arrastre global está activado y el elemento NO está bloqueado, activar edición (transformer)
   if (dragModeGlobal.value && element.id && !isElementLocked(element.id)) {
-    editingElementId.value = element.id;
+    editingElementId.value = element.id
     nextTick(setupTransformer)
   } else {
     editingElementId.value = null
@@ -986,13 +1058,13 @@ const selectElement = (element) => {
 }
 
 const handleElementDoubleClick = (elemento) => {
-  if (elemento?.restrictions && elemento.restrictions.includes('enter')) return;
+  if (elemento?.restrictions && elemento.restrictions.includes('enter')) return
   console.log('Double-click en elemento:', elemento.nombre)
 
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
-    const msg = "No puedes entrar a un elemento si tienes cambios pendientes de guardar";
-    showToast(msg, 'warn');
-    return;
+    const msg = 'No puedes entrar a un elemento si tienes cambios pendientes de guardar'
+    showToast(msg, 'warn')
+    return
   }
   // Navegables según la nueva jerarquía: cuartos, pisos, elementos
   const navegables = ['cuartos', 'pisos', 'elementos']
@@ -1078,8 +1150,8 @@ const { showToast } = useToast()
 const { simularLlenadoElemento } = useProductSimulation({
   canvasStore,
   showToast,
-  forceRedraw
-});
+  forceRedraw,
+})
 
 // Composable de drag de elementos
 const {
@@ -1135,7 +1207,7 @@ const {
   clearGuides,
   isSnappingEnabled,
   // Boundary provider para clamping
-  computeBoundary
+  computeBoundary,
 })
 
 // Función auxiliar para convertir coordenadas del puntero a coordenadas de mundo
@@ -1198,26 +1270,26 @@ const runPreDropValidations = (elemento, dropEvent) => {
   const resultadoValidacionPeso = weightValidation.validarPesoElemento(
     elementoParaPeso,
     canvasStore.contextoActual.id,
-    canvasStore.contextoActual.tipo
+    canvasStore.contextoActual.tipo,
   )
 
   if (!resultadoValidacionPeso.valido) {
-    let tipoPadre = ""
+    let tipoPadre = ''
     if (canvasStore.estaEnPlanta) {
-      tipoPadre = "la planta"
+      tipoPadre = 'la planta'
     } else if (canvasStore.estaEnCuarto) {
-      tipoPadre = "el cuarto"
+      tipoPadre = 'el cuarto'
     } else if (canvasStore.estaEnPiso) {
-      tipoPadre = "el piso"
+      tipoPadre = 'el piso'
     } else if (canvasStore.estaEnContenedor) {
-      tipoPadre = "el contenedor"
+      tipoPadre = 'el contenedor'
     } else if (canvasStore.estaEnElemento) {
-      tipoPadre = "el elemento"
+      tipoPadre = 'el elemento'
     }
     // El elemento excedería el peso máximo permitido
     showToast(
       `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`,
-      'error'
+      'error',
     )
     return { ok: false, reason: 'weight' }
   }
@@ -1231,7 +1303,9 @@ const runPreDropValidations = (elemento, dropEvent) => {
     altoCm = plantaAlto
   }
 
-  const isSystemDefault = !!(elemento?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(elemento.id))
+  const isSystemDefault = !!(
+    elemento?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(elemento.id)
+  )
   if (isSystemDefault && elemento?.dimensionLock !== true) {
     const planta = canvasStore.plantaActivaData
     if (planta && planta.dimensiones) {
@@ -1240,7 +1314,10 @@ const runPreDropValidations = (elemento, dropEvent) => {
         h: planta.dimensiones.largo,
         d: planta.dimensiones.alto,
       }
-      const dims = computeDimsByAxisScale(elemento.id, parentDims, { snap: true, gridPx: GRID_SIZE })
+      const dims = computeDimsByAxisScale(elemento.id, parentDims, {
+        snap: true,
+        gridPx: GRID_SIZE,
+      })
       if (dims) {
         anchoCm = dims.ancho
         largoCm = dims.largo
@@ -1272,23 +1349,28 @@ const runPreDropValidations = (elemento, dropEvent) => {
   candY = snapped.y
 
   if (!canvasStore.estaEnPlanta) {
-      const parent = canvasStore.estructuraContenedorActual
-      const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
-      const temp = {
-        id: '__temp',
-        dimensiones: { ancho: anchoCm, largo: largoCm, alto: altoCm },
-        posicion: { x: candX, y: candY },
-      }
-      const sess = makeInnerSession({ parentEl: parent, movingEl: temp, siblings, vista: canvasStore.vistaActiva })
-      let local = sess.toLocal({ x: candX, y: candY }, parent)
-      local = sess.finalizeLocal(local)
-      if (!sess.isValidLocal(local)) {
-        showToast('No hay espacio suficiente aquí para colocar el elemento.', 'error')
-        return { ok: false, reason: 'bounds' }
-      }
-      const worldPos = sess.toWorld(local, parent)
-      candX = worldPos.x
-      candY = worldPos.y
+    const parent = canvasStore.estructuraContenedorActual
+    const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
+    const temp = {
+      id: '__temp',
+      dimensiones: { ancho: anchoCm, largo: largoCm, alto: altoCm },
+      posicion: { x: candX, y: candY },
+    }
+    const sess = makeInnerSession({
+      parentEl: parent,
+      movingEl: temp,
+      siblings,
+      vista: canvasStore.vistaActiva,
+    })
+    let local = sess.toLocal({ x: candX, y: candY }, parent)
+    local = sess.finalizeLocal(local)
+    if (!sess.isValidLocal(local)) {
+      showToast('No hay espacio suficiente aquí para colocar el elemento.', 'error')
+      return { ok: false, reason: 'bounds' }
+    }
+    const worldPos = sess.toWorld(local, parent)
+    candX = worldPos.x
+    candY = worldPos.y
   }
 
   // Crear elemento temporal para validaciones
@@ -1311,7 +1393,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
     minY: 0,
     maxX: boundary.W || layerConfig.value.width,
     maxY: boundary.H || layerConfig.value.height,
-    polygon: boundary.points
+    polygon: boundary.points,
   }
 
   // Validación inicial estricta usando insideAreaModel
@@ -1383,11 +1465,13 @@ const createElementFromDrop = (data, dropEvent) => {
   let largoCmFinal = largoCm
   let finalHeightFinal = finalHeight
 
+  const isAisle = (elemento?.tipo || '').toLowerCase() === 'pasillos'
   const nuevoElemento = {
     id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
     tipo: elemento.tipo,
     categoria: elemento.categoria,
-    nombre: elemento.nombre || 'Nuevo elemento',
+    // Para pasillos NO establecer nombre por defecto; dejar que el store lo genere
+    ...(isAisle ? {} : { nombre: elemento.nombre || 'Nuevo elemento' }),
     dimensiones: { ancho: anchoCm, largo: largoCmFinal, alto: altoCm },
     x: finalPosition.x,
     y: finalPosition.y,
@@ -1406,7 +1490,7 @@ const createElementFromDrop = (data, dropEvent) => {
     uso: { volumen: 0, peso: 0 },
     descripcion: elemento.descripcion || '',
     contenedores: elemento.contenedores ? [...elemento.contenedores] : [],
-    hijos: []
+    hijos: [],
   }
   console.log('✅ Creando elemento desde drop en posición válida:', nuevoElemento)
   canvasStore.agregarElemento(nuevoElemento)
@@ -1455,18 +1539,34 @@ const getOrientationBarRect = (elemento) => {
     // Barra pegada al borde (sin margen), grosor escalado por zoom
     const margin = 0
     const thick = Math.max(2, 4 / (canvasStore.zoom || 1))
-    const color = '#facc15'
+    const color = '#fdfd43'
     if (o === 180) {
       const width = Math.max(1, w - 2 * margin)
       return { x: margin, y: 0, width, height: thick, fill: color, listening: false, opacity: 0.95 }
     }
     if (o === 0) {
       const width = Math.max(1, w - 2 * margin)
-      return { x: margin, y: Math.max(0, h - thick), width, height: thick, fill: color, listening: false, opacity: 0.95 }
+      return {
+        x: margin,
+        y: Math.max(0, h - thick),
+        width,
+        height: thick,
+        fill: color,
+        listening: false,
+        opacity: 0.95,
+      }
     }
     if (o === 90) {
       const height = Math.max(1, h - 2 * margin)
-      return { x: Math.max(0, w - thick), y: margin, width: thick, height, fill: color, listening: false, opacity: 0.95 }
+      return {
+        x: Math.max(0, w - thick),
+        y: margin,
+        width: thick,
+        height,
+        fill: color,
+        listening: false,
+        opacity: 0.95,
+      }
     }
     // 270
     const height = Math.max(1, h - 2 * margin)
@@ -1476,20 +1576,31 @@ const getOrientationBarRect = (elemento) => {
   }
 }
 
+const getElementLabelText = (elemento) => {
+  if (!elemento) return 'Elemento'
+  const tipoKey = (elemento?.tipo || '').toLowerCase()
+  const code = elemento?.codigo || ''
+  if (tipoKey === 'cuartos') {
+    const name = elemento?.nombre || 'Cuarto'
+    return code ? `${name}\n${code}` : name
+  }
+  return code || elemento?.nombre || elemento?.tipo || 'Elemento'
+}
+
 // Si el elemento es más alto que ancho (h > w), se muestra el texto en vertical (rotado -90°);
 const computeLabelProps = (elemento) => {
   const w = getDrawWidth(elemento)
   const h = getDrawHeight(elemento)
   const minSide = Math.max(0, Math.min(w, h))
   const base = Math.min(280, Math.max(100, minSide * 0.22))
-
+  const displayText = getElementLabelText(elemento)
   let cfg = {
     x: 0,
     y: 0,
     width: w,
     height: h,
     rotation: 0,
-    text: elemento.nombre || elemento.tipo || 'Elemento',
+    text: displayText,
     align: 'center',
     verticalAlign: 'middle',
     fontStyle: 'bold',
@@ -1500,6 +1611,7 @@ const computeLabelProps = (elemento) => {
     shadowColor: 'black',
     shadowBlur: 2,
     shadowOpacity: 0.6,
+    lineHeight: 1.15,
   }
 
   if (h > w && w > 0 && h > 0) {
@@ -1557,7 +1669,6 @@ watch(
 
             // La opacidad del aura "respira" entre 0.3 y 0.7
             nodeAura.opacity(0.3 + oscillation * 0.4)
-
           }, nodeAura.getLayer())
 
           highlightAnimation.value.start()
@@ -1661,9 +1772,13 @@ const toggleSnapping = () => {
 const canDragElement = (elemento) => {
   // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
   // Y si no hay cambios sin aplicar de otro elemento
-  const isNotCurrentElement = canvasStore.elementoSeleccionado != elemento.id;
-  if (isElementLocked(elemento.id) || (canvasStore.cambiosNoAplicados && isNotCurrentElement) ||
-  (elemento?.restrictions && elemento.restrictions.includes('drag'))) return false
+  const isNotCurrentElement = canvasStore.elementoSeleccionado != elemento.id
+  if (
+    isElementLocked(elemento.id) ||
+    (canvasStore.cambiosNoAplicados && isNotCurrentElement) ||
+    (elemento?.restrictions && elemento.restrictions.includes('drag'))
+  )
+    return false
   return dragModeGlobal.value
 }
 
@@ -1685,15 +1800,17 @@ function centrarPlantaEnCanvas() {
     const centerX = (stageWidth - layerWidth * canvasStore.zoom) / 2
     const centerY = (stageHeight - layerHeight * canvasStore.zoom) / 2
     canvasStore.configurarPan(centerX, centerY)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 const handleGlobalClick = (e) => {
   const isFormElement = e.target.matches('input, button, select, textarea, [contenteditable]')
   const isInPropertiesPanel = e.target.closest('[data-properties-panel]')
   if (!containerRef.value?.contains(e.target) && !isFormElement && !isInPropertiesPanel) {
-  canvasStore.seleccionarElemento(null)
-  editingElementId.value = null
+    canvasStore.seleccionarElemento(null)
+    editingElementId.value = null
   }
 }
 
@@ -1704,7 +1821,7 @@ const handleKeyDown = (e) => {
   if (key === 'escape' || key === 'esc') {
     if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
       showToast('Tienes cambios pendientes de guardar', 'warn')
-      return;
+      return
     }
     canvasStore.seleccionarElemento(null)
     editingElementId.value = null
@@ -1725,8 +1842,8 @@ onMounted(async () => {
   await nextTick()
   updateStageSize()
   if (containerRef.value) {
-  sizeResizeObserver = new ResizeObserver(updateStageSize)
-  sizeResizeObserver.observe(containerRef.value)
+    sizeResizeObserver = new ResizeObserver(updateStageSize)
+    sizeResizeObserver.observe(containerRef.value)
   }
   await nextTick()
   centrarPlantaEnCanvas()
@@ -1774,7 +1891,9 @@ function resetVolatileState() {
     conflictsApi.clear()
     isElementDragging.value = false
     stageDragEnabled.value = true
-  } catch (e) { console.error('Error reseteando estado volátil:', e) }
+  } catch (e) {
+    console.error('Error reseteando estado volátil:', e)
+  }
 }
 
 if (typeof window !== 'undefined') {
@@ -1791,14 +1910,18 @@ watch(
   },
 )
 
-watch(() => canvasStore.elementoSeleccionadoCompleto, (elementoActual) => {
-  // Comprobamos si hay un cambio Y SI NO estamos interactuando con el transformer.
-  if (elementoActual && isEditingSelected.value && !isInteractingWithTransformer.value) {
-    nextTick(() => {
-      setupTransformer();
-    });
-  }
-}, { deep: true });
+watch(
+  () => canvasStore.elementoSeleccionadoCompleto,
+  (elementoActual) => {
+    // Comprobamos si hay un cambio Y SI NO estamos interactuando con el transformer.
+    if (elementoActual && isEditingSelected.value && !isInteractingWithTransformer.value) {
+      nextTick(() => {
+        setupTransformer()
+      })
+    }
+  },
+  { deep: true },
+)
 
 // Ajustar la vista para encuadrar la planta activa
 const fitToPlanta = () => {
@@ -1812,7 +1935,9 @@ const fitToPlanta = () => {
     try {
       const stage = stageRef.value?.getNode?.()
       if (stage) fitToMinZoom(stage)
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -1849,15 +1974,19 @@ const getClientXY = (e) => {
 }
 
 const onShapeContextMenu = (evt, elemento) => {
-  if (elemento?.restrictions && elemento.restrictions.includes('right-click')) return;
-  try { (evt?.evt || evt)?.preventDefault?.() } catch { /* ignore */ }
+  if (elemento?.restrictions && elemento.restrictions.includes('right-click')) return
+  try {
+    ;(evt?.evt || evt)?.preventDefault?.()
+  } catch {
+    /* ignore */
+  }
   // No abrir si hay drag activo
   if (isElementDragging.value || (typeof window !== 'undefined' && window.__dvCanvasDragActive)) {
     return
   }
   // No abrir si hay cambios pendientes
-  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elemento.id;
-  if (canvasStore.cambiosNoAplicados && isNotCurrentElement) return;
+  const isNotCurrentElement = canvasStore.elementoSeleccionado !== elemento.id
+  if (canvasStore.cambiosNoAplicados && isNotCurrentElement) return
   // Asegurar selección del shape antes de abrir
   if (canvasStore.elementoSeleccionado !== elemento.id) {
     canvasStore.seleccionarElemento(elemento.id)
@@ -1902,7 +2031,8 @@ const toggleLock = async (id) => {
 // Acción eliminar desde el menú contextual
 const onDelete = async (id) => {
   if (!id) return
-  const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
+  const el =
+    canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
   if (el && (el.bloqueado === true || el.locked === true)) {
     showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
     ctx.close()
@@ -1954,8 +2084,17 @@ const onDelete = async (id) => {
   font-weight: 500;
 }
 
-.canvas-info.should-wrap { flex-wrap: wrap; gap: 10px }
-.fade-scale-enter-active, .fade-scale-leave-active { transition: all 0.15s ease; }
-.fade-scale-enter-from, .fade-scale-leave-to { opacity: 0; transform: translateY(8px) scale(0.9); }
-
+.canvas-info.should-wrap {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.fade-scale-enter-active,
+.fade-scale-leave-active {
+  transition: all 0.15s ease;
+}
+.fade-scale-enter-from,
+.fade-scale-leave-to {
+  opacity: 0;
+  transform: translateY(8px) scale(0.9);
+}
 </style>

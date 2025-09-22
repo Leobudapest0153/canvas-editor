@@ -240,7 +240,7 @@ export const useCanvasBuffer = () => {
       }
       return false
     } else {
-      // Pegar elemento simple (sin hijos) - generar nuevo ID único
+  // Pegar elemento simple (sin hijos) - generar nuevo ID único
       const uniqueTimestamp = Date.now()
       const randomSuffix = Math.random().toString(36).substr(2, 9)
       const newId = `${elemento.tipo || elemento.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
@@ -263,11 +263,15 @@ export const useCanvasBuffer = () => {
         x: position.x,
         y: position.y,
       }
+      // Si es pasillo, permitir que el store genere el nombre alfabético
+      if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
+        delete newElement.nombre
+      }
       // Limpiar propiedades que el store manejará
       delete newElement.plantaId
       delete newElement.padre
 
-      const finalElementId = canvasStore.agregarElemento(newElement)
+      const finalElementId = canvasStore.agregarElemento(newElement, { preserveExistingCode: false, resetName: true, regenerateCode: true })
 
       if (finalElementId) {
         console.log('📋 Elemento simple pegado desde buffer con nuevo ID único:', {
