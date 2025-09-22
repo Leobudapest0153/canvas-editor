@@ -79,7 +79,7 @@
           <input
             type="text"
             placeholder="30"
-            v-model="formValue.pesoMaximo"
+            v-model="formValue.capacidadCarga"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
       <h3 class="font-semibold text-medium text-primary-800 col-span-2">Características del piso</h3>
@@ -275,7 +275,7 @@ const formValue = ref({
       ? (canvasStore.nivelAEditar.dimensiones.alto / 100).toFixed(2)
       : ''
   },
-  pesoMaximo: canvasStore.nivelAEditar?.pesoMaximo ?? '',
+  capacidadCarga: canvasStore.nivelAEditar?.capacidadCarga ?? '',
   caracteristicas: canvasStore.nivelAEditar?.caracteristicas ?? '',
   tipoProductos: canvasStore.nivelAEditar?.tipoProductos ?? [],
   permiteMaterialesFragiles: canvasStore.nivelAEditar?.permiteMaterialesFragiles ?? false
@@ -324,7 +324,7 @@ watch(() => canvasStore.nivelAEditar, (newVal) => {
         ? (newVal.dimensiones.alto / 100).toFixed(2)
         : ''
     },
-    pesoMaximo: newVal?.pesoMaximo ?? '',
+    capacidadCarga: newVal?.capacidadCarga ?? '',
     caracteristicas: newVal?.caracteristicas ?? '',
     tipoProductos: newVal?.tipoProductos ?? [],
     permiteMaterialesFragiles: newVal?.permiteMaterialesFragiles ?? false

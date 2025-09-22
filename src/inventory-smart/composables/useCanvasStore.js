@@ -1299,6 +1299,11 @@ export const useCanvasStore = defineStore('canvas', () => {
       return;
     }
 
+    if (nivelActualizado?.dimensiones?.alto >= elementos.value.find(e => e.id === level.padre)?.dimensiones?.alto) {
+      showToast('La altura del nivel no puede exceder la altura del cuarto', 'error');
+      return;
+    }
+
     // 1) Proponer cambio (solo nos importa dimensiones aquí; alto es clave)
     const res = proposeLevelChange(elementos.value, id, nivelActualizado || {});
     if (res.status === 'error') {
