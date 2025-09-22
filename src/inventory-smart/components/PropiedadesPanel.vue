@@ -357,12 +357,12 @@
               </button>
             </div>
           </summary>
-          <div class="mt-3 space-y-3" v-if="pisos.length > 0">
-            <div
-
-              v-for="(piso, index) in pisos"
-              :key="index"
-              class="bg-white p-3 flex items-center justify-between rounded-md shadow-sm relative"
+          <div class="mt-3 space-y-3">
+            <template v-if="pisos.length > 0">
+              <div
+                v-for="(piso, index) in pisos"
+                :key="index"
+                class="bg-white p-3 flex items-center justify-between rounded-md shadow-sm relative"
               >
               <div class="flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" class="text-[#1C1E4D] mr-2">
@@ -408,10 +408,13 @@
                 </div>
               </div>
             </div>
-          </div>
-          <div v-else class="text-sm text-gray-500">
-            Sin pisos registrados
-          </div>
+            </template>
+            <div
+              v-else
+              class="text-sm text-gray-500"
+            >
+              Sin pisos registrados
+            </div>
         </details>
         <details open class="bg-gray-50 rounded-lg p-4">
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">
