@@ -339,22 +339,6 @@ const previousCrumb = computed(() => {
   color: #9ca3af;
 }
 
-.plant-selector {
-  padding: 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  background: white;
-  font-size: 0.875rem;
-  color: #374151;
-  min-width: 120px;
-}
-
-.plant-selector:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
 /* Responsive */
 @media (max-width: 768px) {
   .navegacion-jerarquica {

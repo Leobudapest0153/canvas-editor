@@ -19,7 +19,7 @@
     <div class="catalogo-header p-1 border-gray-200">
   <div class="relative px-4 mb-1" v-if="hayElementosEnTab">
         <div class="flex items-center justify-between" ref="filtrosBotonRef">
-          <UiTooltip position="bottom" :delay="200" class="w-full">
+          <UiTooltip position="top" label="Desplegar filtros" :delay="200" class="w-full">
             <button
               @click="toggleFiltros"
               class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -141,24 +141,12 @@
           }"
         >
           <!-- Preview del elemento -->
-          <div class="elemento-preview flex items-center justify-center mb-3">
-            <div
-              :class="[
-                'preview-shape rounded flex items-center justify-center relative shadow-sm border border-white/20',
-                getShapeClass(elemento.forma),
-                elemento.forma === 'circular' ? 'w-10 h-10' : 'w-12 h-8',
-              ]"
-              :style="{
-                backgroundColor:
-                  elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria),
-              }"
-            >
-              <component :is="getIconComponent(elemento.icono)" class="w-4 h-4 text-white" />
-              <span
-                v-if="elemento.ubicacion === 'pared'"
-                class="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full"
-              ></span>
-            </div>
+          <div class="flex items-center justify-center mb-3">
+            <component
+              :is="getIconComponentForElement(elemento)"
+              :backgroundColor="elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria)"
+              class="w-12 h-8"
+            />
           </div>
 
           <!-- Información del elemento -->
@@ -271,6 +259,9 @@ import {
   toCatalogItemFromStructure,
 } from '@/inventory-smart/composables/useStructureManager'
 import { formatLengthsCm } from '../utils/units'
+import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
+import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
+import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
 
 // Props
 const props = defineProps({
@@ -479,25 +470,14 @@ const getCategoriaName = (categoriaId) => {
   return categoria ? categoria.nombre : 'Sin categoría'
 }
 
-const getIconComponent = (iconType) => {
-  const icons = {
-    rack: 'svg',
-    shelf: 'svg',
-    table: 'svg',
-    cabinet: 'svg',
-    box: 'svg',
-  }
-  return icons[iconType] || 'svg'
-}
-
-const getShapeClass = (forma) => {
-  switch (forma) {
-    case 'rectangular':
-      return 'rounded-sm'
-    case 'circular':
-      return 'rounded-full aspect-square' // Añadimos aspect-square para mantener la relación de aspecto 1:1
-    default:
-      return 'rounded-sm'
+const getIconComponentForElement = (elemento) => {
+  // Determinar el componente de icono basado en tipo y ubicación
+  if (elemento.tipo === 'cuartos') {
+    return RoomIcon
+  } else if (elemento.ubicacion === 'pared') {
+    return SpaceOnWallIcon
+  } else {
+    return SpaceIcon
   }
 }
 
