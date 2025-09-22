@@ -16,6 +16,7 @@
     ref="containerRef"
     class="canvas-container"
     :class="{ 'drag-over': isDragOverCanvas, 'cursor-grab': !dragModeGlobal }"
+    :style="containerStyle"
     @drop="handleDrop"
     @dragover="handleDragOver"
     @dragenter="handleDragEnter"
@@ -113,7 +114,9 @@
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
               draggable: canDragElement(elemento),
-              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
+              dragBoundFunc(pos) {
+                return dragBoundForElement(pos, elemento, this)
+              },
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
@@ -249,7 +252,9 @@
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
               draggable: canDragElement(elemento),
-              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
+              dragBoundFunc(pos) {
+                return dragBoundForElement(pos, elemento, this)
+              },
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
@@ -305,7 +310,9 @@
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
               draggable: canDragElement(elemento),
-              dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
+              dragBoundFunc(pos) {
+                return dragBoundForElement(pos, elemento, this)
+              },
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
@@ -678,6 +685,18 @@ const overlaysLayerRef = ref(null)
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
+
+const shouldClipPlant = (plant) => !plant?.isInfinite
+
+const isPlantInfinite = computed(
+  () => canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true,
+)
+
+const activePlantForClip = computed(() => (canvasStore.estaEnPlanta ? canvasStore.plantaActivaData : null))
+
+const clipActiveLayer = computed(() => shouldClipPlant(activePlantForClip.value))
+
+const containerStyle = computed(() => ({ overflow: isPlantInfinite.value ? 'visible' : 'hidden' }))
 const { onDragStartGuard, onDragMoveGuard, onDragEndGuard, onTransformEndGuard } =
   usePlacementGuards()
 const buffer = useCanvasBuffer()
@@ -901,26 +920,32 @@ const gridLines = computed(() => {
 })
 
 watch(
-  plantPolygon,
-  (poly) => {
+  () => [plantPolygon.value, clipActiveLayer.value],
+  ([poly, shouldClip]) => {
     const layer = layerRef.value?.getNode?.()
-    if (layer && poly?.length) {
+    if (!layer) return
+
+    if (!shouldClip || !Array.isArray(poly) || poly.length === 0) {
+      layer.clipFunc(null)
+    } else {
       layer.clipFunc((ctx) => {
         ctx.beginPath()
         poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
         ctx.closePath()
       })
-      layer.batchDraw?.()
     }
+    layer.batchDraw?.()
   },
   { immediate: true },
 )
 
 // Contorno activo siempre expresado como polígono
 const computeBoundary = () => {
+  const baseMode = activeBounds.value.mode || 'fixed'
+  const mode = clipActiveLayer.value ? baseMode : 'elastic'
   return {
     type: 'polygon',
-    mode: activeBounds.value.mode || 'fixed',
+    mode,
     points: plantPolygon.value,
     inset: insetPoly.value,
   }
@@ -1094,21 +1119,62 @@ const toStageCoords = (pos) => {
 }
 
 // Drag bound para cada elemento y forma (clamp mínimo al contorno)
-const dragBoundForElement = (pos, elemento) => {
+const dragBoundForElement = (pos, elemento, nodeCtx) => {
+  const node =
+    nodeCtx && typeof nodeCtx.x === 'function'
+      ? nodeCtx
+      : typeof nodeCtx?.getNode === 'function'
+        ? nodeCtx.getNode()
+        : null
+
+  const fallbackX = Number.isFinite(node?.x?.())
+    ? node.x()
+    : Number.isFinite(elemento?.x)
+      ? elemento.x
+      : 0
+  const fallbackY = Number.isFinite(node?.y?.())
+    ? node.y()
+    : Number.isFinite(elemento?.y)
+      ? elemento.y
+      : 0
+
+  const sanitize = (value, fallback) => (Number.isFinite(value) ? value : fallback)
+
   try {
+    if (isPlantInfinite.value) {
+      return {
+        x: sanitize(pos?.x, fallbackX),
+        y: sanitize(pos?.y, fallbackY),
+      }
+    }
+
+    const stage = stageRef.value?.getNode?.()
+    if (!stage) {
+      return {
+        x: sanitize(pos?.x, fallbackX),
+        y: sanitize(pos?.y, fallbackY),
+      }
+    }
+
     const lp = toLayerCoords(pos)
     const boundary = computeBoundary()
     const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
     const w = w_cm * CM_TO_PX
     const h = h_cm * CM_TO_PX
 
-    // Obtener posición previa para movimiento suave
     const lastPos = dragLastValidPositions.value.get(elemento.id)
+    const clamped = clampInsideArea(lp.x, lp.y, w, h, boundary, elemento, true, lastPos)
+    const stageCoords = toStageCoords(clamped)
 
-    const c = clampInsideArea(lp.x, lp.y, w, h, boundary, elemento, true, lastPos)
-    return toStageCoords(c)
+    return {
+      x: sanitize(stageCoords.x, fallbackX),
+      y: sanitize(stageCoords.y, fallbackY),
+    }
   } catch {
-    return pos
+    return {
+      x: sanitize(pos?.x, fallbackX),
+      y: sanitize(pos?.y, fallbackY),
+    }
   }
 }
 
