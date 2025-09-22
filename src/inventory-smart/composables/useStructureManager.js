@@ -43,7 +43,7 @@ export function buildStructureFromForm(form) {
     colorBase: datosGenerales.color || '#3B82F6',
     dimensiones: dimsCm,
     pesoMaximo: Number(dimensiones.capacidadCarga) || 0,
-    ubicacion: 'suelo',
+    ubicacion: modo === 'cuarto' ? 'suelo' : datosGenerales.ubicacion,
     descripcion: datosGenerales.descripcion || '',
     icono: modo === 'cuarto' ? 'home' : 'box',
     hijos: [],

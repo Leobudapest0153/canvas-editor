@@ -103,8 +103,65 @@
                   </p>
                 </div>
 
-                <!-- Orientación (siempre visible) -->
-                <div>
+                <!-- Orientación y Ubicación en la misma fila -->
+                <div v-if="modo === 'espacio'" class="grid grid-cols-2 gap-4">
+                  <!-- Orientación -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Orientación*</label>
+                    <select
+                      v-model="datosGenerales.orientacion"
+                      class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      :class="
+                        touchedGeneral.orientacion && !validOrientacion
+                          ? 'border-red-400'
+                          : 'border-gray-300'
+                      "
+                      @change="touchedGeneral.orientacion = true"
+                      @blur="touchedGeneral.orientacion = true"
+                    >
+                      <option value="">Seleccionar orientación</option>
+                      <option v-for="opt in ORIENTACIONES" :key="opt.id" :value="opt.id">
+                        {{ opt.nombre }}
+                      </option>
+                    </select>
+                    <p
+                      v-if="touchedGeneral.orientacion && !validOrientacion"
+                      class="mt-1 text-xs text-red-600"
+                    >
+                      Selecciona una orientación.
+                    </p>
+                  </div>
+
+                  <!-- Ubicación -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Ubicación*</label>
+                    <select
+                      v-model="datosGenerales.ubicacion"
+                      class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      :class="
+                        touchedGeneral.ubicacion && !validUbicacion
+                          ? 'border-red-400'
+                          : 'border-gray-300'
+                      "
+                      @change="touchedGeneral.ubicacion = true"
+                      @blur="touchedGeneral.ubicacion = true"
+                    >
+                      <option value="">Seleccionar ubicación</option>
+                      <option v-for="ubicacion in UBICACIONES_DISPONIBLES" :key="ubicacion.id" :value="ubicacion.id">
+                        {{ ubicacion.nombre }}
+                      </option>
+                    </select>
+                    <p
+                      v-if="touchedGeneral.ubicacion && !validUbicacion"
+                      class="mt-1 text-xs text-red-600"
+                    >
+                      Selecciona una ubicación.
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Orientación solo (para cuartos) -->
+                <div v-else>
                   <label class="block text-sm font-medium text-gray-700 mb-2">Orientación*</label>
                   <select
                     v-model="datosGenerales.orientacion"
@@ -629,6 +686,7 @@ import {
   TIPOS_ZONA_ESPACIO,
   TIPOS_PRODUCTO_ADMITIDOS,
   ORIENTACIONES,
+  UBICACIONES_DISPONIBLES,
 } from '@/inventory-smart/utils/constants'
 import UiTooltip from './ui/UiTooltip.vue'
 
@@ -714,6 +772,7 @@ const datosGenerales = ref({
   tipoSeleccionado: '',
   descripcion: '',
   orientacion: '',
+  ubicacion: '',
 })
 
 const dimensiones = ref({
@@ -730,6 +789,7 @@ const touchedGeneral = ref({
   nombre: false,
   tipoSeleccionado: false,
   orientacion: false,
+  ubicacion: false,
   forma: false,
   largo: false,
   alto: false,
@@ -739,6 +799,7 @@ const touchedGeneral = ref({
 const validNombre = computed(() => datosGenerales.value.nombre.trim() !== '')
 const validTipo = computed(() => datosGenerales.value.tipoSeleccionado !== '')
 const validOrientacion = computed(() => datosGenerales.value.orientacion !== '')
+const validUbicacion = computed(() => datosGenerales.value.ubicacion !== '')
 const validForma = computed(() => dimensiones.value.forma !== '')
 const validLargo = computed(() => Number(dimensiones.value.largo) > 0)
 const validAlto = computed(() => Number(dimensiones.value.alto) > 0)
@@ -784,8 +845,14 @@ const tiposZonaUI = computed(() => {
 const esFormularioValido = computed(() => {
   const dg = datosGenerales.value
   const dim = dimensiones.value
-  const hasGeneral =
-    dg.nombre.trim() !== '' && dg.tipoSeleccionado !== '' && dg.color && dg.orientacion !== ''
+  
+  let hasGeneral = dg.nombre.trim() !== '' && dg.tipoSeleccionado !== '' && dg.color && dg.orientacion !== ''
+  
+  // Para espacios, también validar ubicación
+  if (props.modo === 'espacio') {
+    hasGeneral = hasGeneral && dg.ubicacion !== ''
+  }
+  
   const hasDims =
     dim.forma !== '' && dim.largo > 0 && dim.alto > 0 && dim.ancho > 0 && dim.capacidadCarga > 0
   // En niveles/pisos, solo los campos de "Características" son obligatorios (tipoZona). Los demás se auto-calculan.
@@ -884,6 +951,7 @@ const inicializarFormulario = () => {
     tipoSeleccionado: '',
     descripcion: '',
     orientacion: '',
+    ubicacion: '',
   }
 
   dimensiones.value = {
@@ -944,6 +1012,7 @@ const resetTouched = () => {
     nombre: false,
     tipoSeleccionado: false,
     orientacion: false,
+    ubicacion: false,
     forma: false,
     largo: false,
     alto: false,
