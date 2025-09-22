@@ -58,7 +58,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         ancho: 1500, // cm
         largo: 1500, // cm
       },
-      pesoMaximoSoportado: 5000, // kg
+      capacidadCargaSoportado: 5000, // kg
       poligono: [
         {
           x: 0,
@@ -602,7 +602,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Actualización directa SIN validaciones de colocación/vecinos.
   // patch típico: { dimensiones: { alto: number, ancho?: number, largo?: number }, alturaRespectoAlSuelo?: number }
-  const actualizarElementoSinValidacion = (id, patch = {}, saveHistory = true, description = 'Actualización sin validación') => {
+  const actualizarElementoSinValidacion = (id, patch = {}, description = 'Actualización sin validación') => {
     try {
       const idx = elementos.value.findIndex(e => e && e.id === id);
       if (idx === -1) {
@@ -645,13 +645,13 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       elementos.value.splice(idx, 1, next);
 
-      if (saveHistory) {
-        if (typeof registrarEnHistorial === 'function') {
-          registrarEnHistorial({ tipo: 'update', id, antes: prev, despues: next, descripcion: description });
-        } else if (typeof addToHistory === 'function') {
-          addToHistory({ type: 'update', id, before: prev, after: next, description });
-        }
-      }
+      // if (saveHistory) {
+      //   if (typeof registrarEnHistorial === 'function') {
+      //     registrarEnHistorial({ tipo: 'update', id, antes: prev, despues: next, descripcion: description });
+      //   } else if (typeof addToHistory === 'function') {
+      //     addToHistory({ type: 'update', id, before: prev, after: next, description });
+      //   }
+      // }
 
       return true;
     } catch (err) {
@@ -833,7 +833,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         ancho: nuevaPlanta.dimensiones?.ancho || 0,
         largo: nuevaPlanta.dimensiones?.largo || 0,
       },
-      pesoMaximoSoportado: nuevaPlanta.pesoMaximoSoportado || 3000,
+      capacidadCargaSoportado: nuevaPlanta.capacidadCargaSoportado || 3000,
       ...nuevaPlanta,
     })
     return id

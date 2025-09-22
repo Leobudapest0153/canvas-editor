@@ -256,7 +256,7 @@
                 <input
                   type="number"
                   min="0"
-                  v-model.number="edited.pesoMaximo"
+                  v-model.number="edited.capacidadCarga"
                   @change="validarPeso"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
                   focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
@@ -287,7 +287,7 @@
 
               <!-- Peso real usado -->
               <div class="mb-2">
-                <label class="text-xs text-gray-500">Peso usado</label>
+                <label class="text-xs text-gray-500">Capacidad de peso usada</label>
                 <div class="flex items-center">
                   <input
                     :value="usoRealPeso"
@@ -299,7 +299,7 @@
                 <div v-if="usoRealPeso > 0" class="mt-1">
                   <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
                     <span>{{ porcentajePesoUsado }}% usado</span>
-                    <span>{{ usoRealPeso }} / {{ edited.pesoMaximo || 0 }} kg</span>
+                    <span>{{ usoRealPeso }} / {{ edited.capacidadCarga || 0 }} kg</span>
                   </div>
                   <div class="w-full bg-gray-200 rounded-full h-2">
                     <div
@@ -540,7 +540,7 @@ const cargarDesdeStore = (el) =>
       largo: el.dimensiones?.largo || 0,
       alto: el.dimensiones?.alto || 0,
     },
-    pesoMaximo: el.pesoMaximo || 0,
+    capacidadCarga: el.capacidadCarga || 0,
     alturaSobreSueloCm:
       el.alturaSobreSueloCm != null
         ? Number(el.alturaSobreSueloCm)
@@ -571,7 +571,7 @@ watch(
         largo: edited.value?.dimensiones?.largo || 0,
         alto: edited.value?.dimensiones?.alto || 0,
       }
-      valorPesoAnterior.value = edited.value?.pesoMaximo || 0
+      valorPesoAnterior.value = edited.value?.capacidadCarga || 0
       valorDiametroAnterior.value = edited.value?.diametroCm || 0
 
       // Limpiar errores al cargar nuevo elemento
@@ -920,7 +920,7 @@ const guardar = async () => {
 
   // 3) Validación de peso solo si cambió
   const pesoCambio =
-    Math.abs((valorPesoAnterior.value || 0) - (Number(edited.value?.pesoMaximo) || 0)) > 0.01
+    Math.abs((valorPesoAnterior.value || 0) - (Number(edited.value?.capacidadCarga) || 0)) > 0.01
   if (pesoCambio && advertenciaPeso.value) {
     showWarning(advertenciaPeso.value)
     isSaving.value = false
@@ -937,7 +937,7 @@ const guardar = async () => {
       largo: largoCm,
       alto: altoCm,
     }
-    valorPesoAnterior.value = Number(edited.value?.pesoMaximo) || 0
+    valorPesoAnterior.value = Number(edited.value?.capacidadCarga) || 0
     valorDiametroAnterior.value = esCircular.value ? anchoCm : 0
 
     showSuccess(diamChanged ? 'Diámetro actualizado' : 'Cambios guardados')
@@ -1098,12 +1098,12 @@ const capacidadContextoTexto = computed(() => {
 })
 
 const validarPeso = () => {
-  const val = Number(edited.value.pesoMaximo)
+  const val = Number(edited.value.capacidadCarga)
   const valorAnterior = valorPesoAnterior.value
 
   if (isNaN(val) || val < 0) {
     showWarning('El valor debe ser mayor o igual a 0')
-    edited.value.pesoMaximo = snapshotOriginal.value.pesoMaximo
+    edited.value.capacidadCarga = snapshotOriginal.value.capacidadCarga
     return
   }
 
@@ -1282,7 +1282,7 @@ const usoRealPeso = computed(() => {
 
 const porcentajePesoUsado = computed(() => {
   const peso = parseFloat(usoRealPeso.value)
-  const maximo = edited.value?.pesoMaximo || 0
+  const maximo = edited.value?.capacidadCarga || 0
   if (maximo === 0) return 0
   return Math.min(100, toPrecisionCm((peso / maximo) * 100))
 })
@@ -1324,7 +1324,7 @@ const advertenciaAltura = computed(() => {
 const advertenciaPeso = computed(() => {
   if (!elementoSeleccionado.value || !edited.value) return null
 
-  const newVal = Number(edited.value?.pesoMaximo || 0)
+  const newVal = Number(edited.value?.capacidadCarga || 0)
   if (!Number.isFinite(newVal) || newVal < 0) return 'La capacidad debe ser un número válido.'
 
   // Solo ejecutar validaciones costosas si el valor del peso realmente cambió
@@ -1351,7 +1351,7 @@ const advertenciaPeso = computed(() => {
   if (padreId && padreType) {
     const elementoSimulado = {
       ...elementoSeleccionado.value,
-      pesoMaximo: newVal,
+      capacidadCarga: newVal,
     }
 
     const validacionTeorica = validarPesoElemento(elementoSimulado, padreId, padreType, {
@@ -1360,7 +1360,7 @@ const advertenciaPeso = computed(() => {
     })
 
     if (!validacionTeorica.valido && validacionTeorica.limiteDePeso) {
-      return `Se excede el límite de peso del contenedor padre. Exceso: ${validacionTeorica.exceso.toFixed(2)} kg (Total: ${validacionTeorica.pesoTotal.toFixed(2)}/${validacionTeorica.pesoMaximo} kg).`
+      return `Se excede el límite de peso del contenedor padre. Exceso: ${validacionTeorica.exceso.toFixed(2)} kg (Total: ${validacionTeorica.pesoTotal.toFixed(2)}/${validacionTeorica.capacidadCarga} kg).`
     }
   }
 

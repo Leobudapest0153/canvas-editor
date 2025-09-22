@@ -523,7 +523,7 @@ const getTemplateColor = (tpl) => {
 const getTemplateWeightVal = (tpl) => {
   if (tpl.meta?.weight != null) return tpl.meta.weight
   const root = getTemplateRoot(tpl)
-  return root.pesoMaximo
+  return root.capacidadCarga
 }
 
 const getTemplateLocationVal = (tpl) => {

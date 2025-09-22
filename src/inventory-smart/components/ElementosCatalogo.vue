@@ -168,7 +168,7 @@
               </div>
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
-                <span class="spec-value text-gray-700">{{ elemento.pesoMaximo }}kg</span>
+                <span class="spec-value text-gray-700">{{ elemento.capacidadCarga }}kg</span>
               </div>
               <!-- <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
@@ -331,7 +331,7 @@ const nuevoElemento = ref({
     largo: 100,
     alto: 75,
   },
-  pesoMaximo: 50,
+  capacidadCarga: 50,
   ubicacion: 'suelo',
   descripcion: '',
   icono: 'box',

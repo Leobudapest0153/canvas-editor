@@ -2,6 +2,10 @@
 
 import { nextTick } from 'vue';
 
+// Debido a cambios en req, no es posible validar volumen real
+// mantener desactivado
+const ENABLE_VOLUME_SIMULATION = false;
+
 /**
  * Determina el color de estado basado en un porcentaje de uso.
  * @param {number} porcentaje - El porcentaje de 0 a 100.
@@ -30,33 +34,99 @@ const calcularPorcentajeUso = (valorActual, valorMaximo) => {
  * @returns {Array|null} - Un array con objetos para cada barra de progreso o null.
  */
 export const getUsoInfo = (elemento) => {
-  // Solo mostrar si el elemento tiene la propiedad 'uso' y al menos uno es mayor que cero
-  if (!elemento.uso || (elemento.uso.volumen === 0 && elemento.uso.peso === 0)) {
+  // Solo mostrar si el elemento tiene la propiedad 'uso' y al menos el peso es mayor que cero
+  if (!elemento.uso || elemento.uso.peso === 0) {
     return null;
   }
 
   // Calcular porcentajes basados en los valores máximos del elemento
-  const porcentajePeso = calcularPorcentajeUso(elemento.uso.peso, elemento.pesoMaximo || 0);
-  const porcentajeVolumen = calcularPorcentajeUso(elemento.uso.volumen, elemento.volumenMaximo || 0);
+  const porcentajePeso = calcularPorcentajeUso(elemento.uso.peso, elemento.capacidadCarga || 0);
 
-  return [
+  const result = [
     {
+      tipo: 'Peso',
+      porcentaje: porcentajePeso,
+      color: getUsoColor(porcentajePeso),
+      valorActual: elemento.uso.peso,
+      valorMaximo: elemento.capacidadCarga || 0,
+      unidad: 'kg'
+    },
+  ];
+
+  // Solo incluir volumen si está habilitado
+  if (ENABLE_VOLUME_SIMULATION && elemento.uso.volumen > 0) {
+    const porcentajeVolumen = calcularPorcentajeUso(elemento.uso.volumen, elemento.volumenMaximo || 0);
+    result.unshift({
       tipo: 'Volumen',
       porcentaje: porcentajeVolumen,
       color: getUsoColor(porcentajeVolumen),
       valorActual: elemento.uso.volumen,
       valorMaximo: elemento.volumenMaximo || 0,
       unidad: 'm³'
-    },
-    {
-      tipo: 'Peso',
-      porcentaje: porcentajePeso,
-      color: getUsoColor(porcentajePeso),
-      valorActual: elemento.uso.peso,
-      valorMaximo: elemento.pesoMaximo || 0,
-      unidad: 'kg'
-    },
-  ];
+    });
+  }
+
+  return result;
+};
+
+/**
+ * Obtiene el color del indicador de uso basado en el porcentaje de peso.
+ * @param {Object} elemento - El elemento a evaluar.
+ * @returns {string|null} - El color del indicador o null si no tiene datos de uso.
+ */
+export const getUsageIndicatorColor = (elemento) => {
+  // Verificar si el elemento tiene datos de uso
+  if (!elemento?.uso || elemento?.uso?.peso === 0) {
+    return null;
+  }
+
+  const porcentajePeso = calcularPorcentajeUso(elemento.uso.peso, elemento.capacidadCarga || 0);
+  return getUsoColor(porcentajePeso);
+};
+
+/**
+ * Limpia los datos de uso de un elemento y sus hijos recursivamente.
+ * @param {Object} elemento - El elemento a limpiar.
+ * @param {Function} elementoPorId - Función para obtener elemento por ID.
+ * @returns {Object} - El elemento limpio sin datos de uso.
+ */
+export const limpiarDatosUso = (elemento, elementoPorId = null) => {
+  if (!elemento) return elemento;
+
+  // Crear una copia del elemento sin datos de uso
+  const elementoLimpio = { ...elemento };
+  delete elementoLimpio.uso;
+
+  // Si tiene hijos, limpiarlos recursivamente
+  if (elementoLimpio.hijos && Array.isArray(elementoLimpio.hijos) && elementoPorId) {
+    elementoLimpio.hijos = elementoLimpio.hijos.map(hijoId => {
+      const hijo = elementoPorId(hijoId);
+      if (hijo) {
+        return limpiarDatosUso(hijo, elementoPorId);
+      }
+      return hijoId;
+    });
+  }
+
+  return elementoLimpio;
+};
+
+/**
+ * Limpia los datos de uso de una estructura de elementos.
+ * @param {Object} estructura - La estructura que contiene elementos.
+ * @returns {Object} - La estructura limpia sin datos de uso.
+ */
+export const limpiarDatosUsoEstructura = (estructura) => {
+  if (!estructura || !estructura.elements) return estructura;
+
+  const estructuraLimpia = { ...estructura };
+  estructuraLimpia.elements = estructura.elements.map(elemento => {
+    const elementoLimpio = { ...elemento };
+    delete elementoLimpio.uso;
+    return elementoLimpio;
+  });
+
+  return estructuraLimpia;
 };
 
 /**
@@ -130,6 +200,22 @@ export function useProductSimulation({ canvasStore, showToast, forceRedraw }) {
   };
 
   /**
+   * Verifica si un elemento puede tener datos de uso simulados.
+   * @param {string} elementoId - El ID del elemento a verificar.
+   * @returns {boolean} - True si puede tener datos de uso, false en caso contrario.
+   */
+  const puedeSimularUso = (elementoId) => {
+    const elemento = canvasStore.elementoPorId(elementoId);
+    if (!elemento) return false;
+
+    // Los pasillos no pueden tener datos de uso
+    if (elemento.tipo === 'pasillos') return false;
+
+    // Los demás tipos pueden tener datos de uso
+    return true;
+  };
+
+  /**
    * Verifica si un elemento tiene contenedores (directos o indirectos).
    * @param {string} elementoId - El ID del elemento a verificar.
    * @returns {boolean} - True si tiene contenedores, false en caso contrario.
@@ -154,16 +240,20 @@ export function useProductSimulation({ canvasStore, showToast, forceRedraw }) {
    * respetando las capacidades máximas individuales de cada elemento.
    * @param {number} valorTotal - El valor total a distribuir.
    * @param {Array} elementos - Los elementos entre los que distribuir.
-   * @param {string} propiedad - La propiedad máxima a considerar ('pesoMaximo' o 'volumenTeorico').
+   * @param {string} propiedad - La propiedad máxima a considerar ('capacidadCarga' o 'volumenTeorico').
    * @param {string} tipoValor - El tipo de valor ('peso' o 'volumen').
    * @returns {Array} - Array de valores asignados a cada elemento.
    */
   const distribuirValorProporcional = (valorTotal, elementos, propiedad, tipoValor = 'peso') => {
     if (elementos.length === 0) return [];
 
-    // Obtener las capacidades máximas de cada elemento
-    const capacidades = elementos.map(elemento => {
-      if (tipoValor === 'volumen' && propiedad === 'volumenTeorico') {
+    // Filtrar elementos que pueden tener datos de uso
+    const elementosValidos = elementos.filter(elemento => puedeSimularUso(elemento.id));
+    if (elementosValidos.length === 0) return elementos.map(() => 0);
+
+    // Obtener las capacidades máximas de cada elemento válido
+    const capacidades = elementosValidos.map(elemento => {
+      if (ENABLE_VOLUME_SIMULATION && tipoValor === 'volumen' && propiedad === 'volumenTeorico') {
         return calcularVolumenTeorico(elemento);
       }
       return elemento[propiedad] || 0;
@@ -179,10 +269,23 @@ export function useProductSimulation({ canvasStore, showToast, forceRedraw }) {
     const factorAjuste = Math.min(1, capacidadTotalDisponible / valorTotal);
     const valorTotalAjustado = valorTotal * factorAjuste;
 
+    // Crear array de resultados con índices originales
+    const resultados = elementos.map(() => 0);
+    let indiceValido = 0;
+
     // Distribuir proporcionalmente respetando las capacidades individuales
-    return elementos.map((elemento, index) => {
-      const capacidadIndividual = capacidades[index];
-      if (capacidadIndividual === 0) return 0;
+    elementos.forEach((elemento, index) => {
+      if (!puedeSimularUso(elemento.id)) {
+        resultados[index] = 0;
+        return;
+      }
+
+      const capacidadIndividual = capacidades[indiceValido];
+      if (capacidadIndividual === 0) {
+        resultados[index] = 0;
+        indiceValido++;
+        return;
+      }
 
       // Calcular valor proporcional
       const proporcion = capacidadIndividual / capacidadTotalDisponible;
@@ -195,13 +298,16 @@ export function useProductSimulation({ canvasStore, showToast, forceRedraw }) {
       const valorMaximoParaEsteElemento = capacidadIndividual * (factorMinimo + Math.random() * (factorMaximo - factorMinimo));
 
       // Usar el menor entre el valor proporcional y el valor máximo permitido para este elemento
-      return Math.min(valorProporcional, valorMaximoParaEsteElemento);
+      resultados[index] = Math.min(valorProporcional, valorMaximoParaEsteElemento);
+      indiceValido++;
     });
+
+    return resultados;
   };
 
   /**
-   * Simula el llenado de un elemento asignando valores reales en Kg y m³.
-   * Solo funciona si el elemento tiene contenedores.
+   * Simula el llenado de un elemento asignando valores reales en Kg.
+   * Funciona con todos los elementos excepto pasillos.
    * @param {string} elementoId - El ID del elemento a llenar.
    */
   const simularLlenadoElemento = (elementoId) => {
@@ -210,84 +316,114 @@ export function useProductSimulation({ canvasStore, showToast, forceRedraw }) {
     const elemento = canvasStore.elementoPorId(elementoId);
     if (!elemento) return;
 
-    // RESTRICCIÓN: Solo permitir simulación si el elemento tiene contenedores
-    if (!tieneContenedores(elementoId)) {
+    // RESTRICCIÓN: No permitir simulación en pasillos
+    if (!puedeSimularUso(elementoId)) {
       showToast(
-        `No se puede simular: ${elemento.nombre} no tiene contenedores.`,
+        `No se puede simular: ${elemento.nombre} es un pasillo.`,
         'warning'
       );
       return;
     }
 
-    // Calcular el volumen teórico del elemento como límite máximo
-    const volumenTeoricoMaximo = calcularVolumenTeorico(elemento);
-
     // Obtener todos los hijos de forma recursiva
     const hijos = obtenerHijosRecursivo(elementoId);
 
-    let pesoTotalUsado, volumenTotalUsado;
+    let pesoTotalUsado = 0;
+    let volumenTotalUsado = 0;
 
     // Si tiene hijos, calcular los valores basándose en la capacidad de los hijos
     if (hijos.length > 0) {
       // Generar valores aleatorios iniciales como referencia para la distribución
-      const pesoMaximo = elemento.pesoMaximo || 0;
+      const capacidadCarga = elemento.capacidadCarga || 0;
 
       const factorMinimo = 0.1;
       const factorMaximo = 0.9;
 
-      const pesoReferencia = pesoMaximo > 0
-        ? parseFloat((pesoMaximo * (factorMinimo + Math.random() * (factorMaximo - factorMinimo))).toFixed(2))
+      const pesoReferencia = capacidadCarga > 0
+        ? parseFloat((capacidadCarga * (factorMinimo + Math.random() * (factorMaximo - factorMinimo))).toFixed(2))
         : 0;
 
-      // Para volumen, usar el volumen teórico como límite máximo
-      const volumenReferencia = volumenTeoricoMaximo > 0
-        ? parseFloat((volumenTeoricoMaximo * (factorMinimo + Math.random() * (factorMaximo - factorMinimo))).toFixed(3))
-        : 0;
+      // Distribuir el peso entre los hijos respetando sus capacidades
+      const pesosDistribuidos = distribuirValorProporcional(pesoReferencia, hijos, 'capacidadCarga', 'peso');
 
-      // Distribuir los valores entre los hijos respetando sus capacidades
-      const pesosDistribuidos = distribuirValorProporcional(pesoReferencia, hijos, 'pesoMaximo', 'peso');
-      const volumenesDistribuidos = distribuirValorProporcional(volumenReferencia, hijos, 'volumenTeorico', 'volumen');
+      let volumenesDistribuidos = [];
+      if (ENABLE_VOLUME_SIMULATION) {
+        // Calcular el volumen teórico del elemento como límite máximo
+        const volumenTeoricoMaximo = calcularVolumenTeorico(elemento);
+
+        // Para volumen, usar el volumen teórico como límite máximo
+        const volumenReferencia = volumenTeoricoMaximo > 0
+          ? parseFloat((volumenTeoricoMaximo * (factorMinimo + Math.random() * (factorMaximo - factorMinimo))).toFixed(3))
+          : 0;
+
+        volumenesDistribuidos = distribuirValorProporcional(volumenReferencia, hijos, 'volumenTeorico', 'volumen');
+      } else {
+        volumenesDistribuidos = hijos.map(() => 0);
+      }
 
       // Actualizar cada hijo con sus valores asignados
       hijos.forEach((hijo, index) => {
+        if (!puedeSimularUso(hijo.id)) return; // Saltar pasillos
+
         const pesoAsignado = parseFloat(pesosDistribuidos[index].toFixed(2));
-        const volumenAsignado = parseFloat(volumenesDistribuidos[index].toFixed(3));
+        const volumenAsignado = ENABLE_VOLUME_SIMULATION
+          ? parseFloat(volumenesDistribuidos[index].toFixed(3))
+          : 0;
 
         const nuevoUsoHijo = {
           peso: pesoAsignado,
           volumen: volumenAsignado,
         };
 
-        canvasStore.actualizarElemento(
+        canvasStore.actualizarElementoSinValidacion(
           hijo.id,
           { uso: nuevoUsoHijo },
           `Simulación distribuida para hijo: ${hijo.nombre}`
         );
       });
 
-      // El valor real del padre es la suma de los valores asignados a los hijos
-      pesoTotalUsado = parseFloat(pesosDistribuidos.reduce((suma, peso) => suma + peso, 0).toFixed(2));
-      volumenTotalUsado = parseFloat(volumenesDistribuidos.reduce((suma, volumen) => suma + volumen, 0).toFixed(3));
+      // El valor real del padre es la suma de los valores asignados a los hijos válidos
+      pesoTotalUsado = parseFloat(
+        pesosDistribuidos
+          .filter((_, index) => puedeSimularUso(hijos[index].id))
+          .reduce((suma, peso) => suma + peso, 0)
+          .toFixed(2)
+      );
 
+      if (ENABLE_VOLUME_SIMULATION) {
+        volumenTotalUsado = parseFloat(
+          volumenesDistribuidos
+            .filter((_, index) => puedeSimularUso(hijos[index].id))
+            .reduce((suma, volumen) => suma + volumen, 0)
+            .toFixed(3)
+        );
+      }
+
+      const hijosValidosCount = hijos.filter(hijo => puedeSimularUso(hijo.id)).length;
       showToast(
-        `Simulación completada para ${elemento.nombre} y ${hijos.length} elementos hijos.`,
+        `Simulación completada para ${elemento.nombre} y ${hijosValidosCount} elementos hijos.`,
         'success'
       );
     } else {
-      // Si no tiene hijos pero es un contenedor, generar valores aleatorios
-      const pesoMaximo = elemento.pesoMaximo || 0;
+      // Si no tiene hijos, generar valores aleatorios para el elemento mismo
+      const capacidadCarga = elemento.capacidadCarga || 0;
 
       const factorMinimo = 0.1;
       const factorMaximo = 0.9;
 
-      pesoTotalUsado = pesoMaximo > 0
-        ? parseFloat((pesoMaximo * (factorMinimo + Math.random() * (factorMaximo - factorMinimo))).toFixed(2))
+      pesoTotalUsado = capacidadCarga > 0
+        ? parseFloat((capacidadCarga * (factorMinimo + Math.random() * (factorMaximo - factorMinimo))).toFixed(2))
         : 0;
 
-      // Para volumen, usar el volumen teórico como límite máximo
-      volumenTotalUsado = volumenTeoricoMaximo > 0
-        ? parseFloat((volumenTeoricoMaximo * (factorMinimo + Math.random() * (factorMaximo - factorMinimo))).toFixed(3))
-        : 0;
+      if (ENABLE_VOLUME_SIMULATION) {
+        // Calcular el volumen teórico del elemento como límite máximo
+        const volumenTeoricoMaximo = calcularVolumenTeorico(elemento);
+
+        // Para volumen, usar el volumen teórico como límite máximo
+        volumenTotalUsado = volumenTeoricoMaximo > 0
+          ? parseFloat((volumenTeoricoMaximo * (factorMinimo + Math.random() * (factorMaximo - factorMinimo))).toFixed(3))
+          : 0;
+      }
 
       showToast(`Simulación completada para ${elemento.nombre}.`, 'success');
     }

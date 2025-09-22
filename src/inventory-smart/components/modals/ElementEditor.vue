@@ -144,7 +144,7 @@
               <div class="mb-2">
                 <label class="block text-sm font-medium text-gray-700">Capacidad de Carga (kg)</label>
                 <input
-                  v-model.number="localElemento.pesoMaximo"
+                  v-model.number="localElemento.capacidadCarga"
                   type="number"
                   min="0"
                   class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
@@ -280,7 +280,7 @@ const elementoEditandoInfo = computed(() => {
   let claseColor = 'text-gray-600';
 
   // Si el peso máximo que está configurando es menor al actual, mostrar advertencia
-  if (localElemento.value.pesoMaximo < pesoActual) {
+  if (localElemento.value.capacidadCarga < pesoActual) {
   mensaje += ` (la capacidad debe ser al menos ${pesoActual} kg)`;
     claseColor = 'text-red-600';
   }
@@ -303,7 +303,7 @@ const localElemento = ref({
   forma: '',
   colorBase: '#1C1E4D',
   dimensiones: { ancho: 100, largo: 100, alto: 75 },
-  pesoMaximo: 50,
+  capacidadCarga: 50,
   ubicacion: 'suelo',
   alturaRespectoAlSuelo: 0,
   descripcion: '',
@@ -361,7 +361,7 @@ const restablecerFormulario = () => {
     forma: '',
     colorBase: '#1C1E4D',
     dimensiones: { ancho: 100, largo: 100, alto: 75 },
-    pesoMaximo: 50,
+    capacidadCarga: 50,
     ubicacion: 'suelo',
     alturaRespectoAlSuelo: 0,
     descripcion: '',
@@ -401,7 +401,7 @@ const validarFormulario = () => {
     showToast('Las dimensiones deben ser mayores a 0', 'error')
     return false
   }
-  if (elemento.pesoMaximo <= 0) {
+  if (elemento.capacidadCarga <= 0) {
     showToast('La capacidad de carga debe ser mayor a 0', 'error')
     return false
   }
@@ -424,7 +424,7 @@ const handleSubmit = () => {
   // Si estamos editando un elemento existente, validar el peso máximo
   if (props.value && props.value.id) {
     const elementoId = props.value.id;
-    const nuevoPesoMaximo = localElemento.value.pesoMaximo;
+    const nuevoPesoMaximo = localElemento.value.capacidadCarga;
 
     // Calculamos el peso total actual de los elementos hijos
     const tipoElemento = props.value.tipo || 'elementos';

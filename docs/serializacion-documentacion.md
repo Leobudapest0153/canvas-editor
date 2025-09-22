@@ -25,7 +25,7 @@ Convierte el estado completo del canvas a formato JSON, incluyendo todas las pla
         "ancho": 1000,
         "largo": 1200
       },
-      "pesoMaximoSoportado": 5000,
+      "capacidadCargaSoportado": 5000,
       "elementos": [],
       "activa": true,
       "propiedadesPersonalizadas": {}
@@ -55,7 +55,7 @@ Convierte el estado completo del canvas a formato JSON, incluyendo todas las pla
         "visible": true
       },
       "propiedades": {
-        "pesoMaximo": 300,
+        "capacidadCarga": 300,
         "ubicacion": "suelo",
         "descripcion": "Anaquel metálico de capacidad media"
       },

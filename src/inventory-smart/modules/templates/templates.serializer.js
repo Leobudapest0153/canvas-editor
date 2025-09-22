@@ -26,7 +26,7 @@ export const exportTemplatesToDTO = (rawTemplates = []) => {
       forma: el.forma,
       ubicacion: el.ubicacion,
       alturaRespectoAlSuelo: el.alturaRespectoAlSuelo,
-      pesoMaximo: el.pesoMaximo,
+      capacidadCarga: el.capacidadCarga,
       volumenMaximo: el.volumenMaximo,
       // Nuevo: persistimos metadatos por nodo relevantes para estructura
       meta: el.meta ? { ...el.meta } : undefined,
@@ -45,7 +45,7 @@ export const exportTemplatesToDTO = (rawTemplates = []) => {
         height: tpl.meta?.height || root?.dimensiones?.alto || 0,
         depth: tpl.meta?.depth || root?.dimensiones?.largo || 0,
         childrenCount: tpl.meta?.childrenCount ?? Math.max(0, nodos.length - 1),
-        weight: tpl.meta?.weight || root?.pesoMaximo,
+        weight: tpl.meta?.weight || root?.capacidadCarga,
         location: tpl.meta?.location || root?.ubicacion,
       },
       estructura: { rootId: payload.rootId || root?.id, nodos },
@@ -86,7 +86,7 @@ export const importTemplatesFromDTO = (dtos = []) => {
         forma: n.forma,
         ubicacion: n.ubicacion,
         alturaRespectoAlSuelo: n.alturaRespectoAlSuelo,
-        pesoMaximo: n.pesoMaximo,
+        capacidadCarga: n.capacidadCarga,
         volumenMaximo: n.volumenMaximo,
         // Reconstruir metadatos por nodo (tienePisosGenerados, esPisoInterno, indicePiso, etc.)
         meta: n.meta ? { ...n.meta } : undefined,

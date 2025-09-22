@@ -63,7 +63,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 600,
       alto: 10, // será igualado a planta.alto
     },
-    pesoMaximo: 0,
+    capacidadCarga: 0,
     ubicacion: 'suelo',
     descripcion: 'Pasillo de circulación',
     icono: 'road',
@@ -84,7 +84,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 400,
       alto: 250,
     },
-    pesoMaximo: 0,
+    capacidadCarga: 500,
     ubicacion: 'suelo',
     descripcion: 'Cuarto especial',
     icono: 'home',
@@ -105,7 +105,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 100,
       alto: 10,
     },
-    pesoMaximo: 0,
+    capacidadCarga: 500,
     ubicacion: 'suelo',
     descripcion: 'Piso interno de cuarto',
     icono: 'brick',
@@ -128,7 +128,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 200,
       alto: 180,
     },
-    pesoMaximo: 500, // kg
+    capacidadCarga: 500, // kg
     ubicacion: 'suelo',
     descripcion: 'Anaquel metálico de alta capacidad para almacenamiento pesado',
     icono: 'rack',
@@ -149,7 +149,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 25,
       alto: 20,
     },
-    pesoMaximo: 50, // kg
+    capacidadCarga: 50, // kg
     ubicacion: 'pared',
     alturaRespectoAlSuelo: 150, // cm - altura típica para estantes de pared
     descripcion: 'Estante montado en pared para almacenamiento ligero',
@@ -171,7 +171,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 30,
       alto: 80,
     },
-    pesoMaximo: 100, // kg
+    capacidadCarga: 100, // kg
     ubicacion: 'pared',
     alturaRespectoAlSuelo: 50, // cm - altura moderada para armarios
     descripcion: 'Armario montado en pared para almacenamiento vertical',
@@ -193,7 +193,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 60,
       alto: 90,
     },
-    pesoMaximo: 200, // kg
+    capacidadCarga: 200, // kg
     ubicacion: 'suelo',
     descripcion: 'Barril estándar de madera',
     icono: 'barrel',
@@ -216,7 +216,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 10,
       alto: 10,
     },
-    pesoMaximo: 1,
+    capacidadCarga: 1,
     ubicacion: 'interior',
     descripcion: 'Contenedor básico para almacenamiento organizado (nivel de elemento)',
     icono: 'box',

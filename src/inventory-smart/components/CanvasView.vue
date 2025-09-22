@@ -553,6 +553,25 @@
           }"
         />
       </v-layer>
+      <!-- Capa de indicadores de uso (por encima del transformer) -->
+      <v-layer ref="indicatorsLayerRef" :config="{ listening: false }">
+        <!-- Indicadores de uso para todos los elementos visibles -->
+        <template v-for="elemento in elementosVisiblesEnCanvas" :key="`indicator-${elemento.id}`">
+          <v-circle
+            v-if="getUsageIndicatorColor(elemento)"
+            :config="{
+              x: elemento.x + getDrawWidth(elemento) - 1 / canvasStore.zoom,
+              y: elemento.y - 1 / canvasStore.zoom,
+              radius: 8 / canvasStore.zoom,
+              fill: getUsageIndicatorColor(elemento),
+              stroke: '#ffffff',
+              strokeWidth: 2 / canvasStore.zoom,
+              listening: false,
+              opacity: 0.9,
+            }"
+          />
+        </template>
+      </v-layer>
     </v-stage>
 
     <rulers-overlay
@@ -643,6 +662,7 @@ import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
+import { getUsageIndicatorColor } from '@/inventory-smart/composables/useSimulateProducts'
 import { useObjectSnapping } from '@/inventory-smart/composables/useObjectSnapping'
 import { usePlacementGuards } from '@/inventory-smart/composables/usePlacementGuards'
 import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
@@ -675,6 +695,7 @@ const stageRef = ref(null)
 const layerRef = ref(null)
 const backgroundLayerRef = ref(null)
 const overlaysLayerRef = ref(null)
+const indicatorsLayerRef = ref(null)
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -1483,7 +1504,7 @@ const createElementFromDrop = (data, dropEvent) => {
     orientacion: Number(elemento.orientacion) || 0,
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
-    pesoMaximo: elemento.pesoMaximo || 0,
+    capacidadCarga: elemento.capacidadCarga || 0,
     volumenMaximo: (anchoCm * largoCmFinal * altoCm) / 100,
     dimensionLock: false,
     systemTypeKey: elemento.id,
