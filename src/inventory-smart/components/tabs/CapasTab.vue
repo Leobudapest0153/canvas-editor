@@ -395,6 +395,10 @@ const onDelete = async (id) => {
     showToast('No se pueden eliminar elementos con cambios pendientes de guardar', 'warn')
     return
   }
+  if (['elementos', 'cuartos'].includes(canvasStore.contextoNavegacion.tipo)) {
+    showToast('No se pueden eliminar elementos en la vista actual', 'warn');
+    return
+  }
   const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
   if (el && (el.bloqueado === true || el.locked === true)) {
     showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })

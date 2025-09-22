@@ -509,6 +509,12 @@ const iniciarArrastre = (elemento, event) => {
     event.preventDefault()
     return
   }
+
+  if (['cuartos', 'elementos'].includes(canvasStore.contextoNavegacion.tipo)) {
+    showToast('No puedes arrastrar elementos mientras estás editando un cuarto o elemento.', 'warn');
+    event.preventDefault()
+    return
+  }
   console.log('Iniciando arrastre del elemento:', elemento)
   // Si el item trae payload de estructura (plantilla/room/space), arrastrar como 'plantilla-catalogo'
   const isStructured = !!elemento?.payload?.rootId && Array.isArray(elemento?.payload?.elements)
