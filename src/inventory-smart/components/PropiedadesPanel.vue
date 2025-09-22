@@ -346,11 +346,11 @@
             </div>
           </summary>
           <div class="mt-3 space-y-3">
-            <div
-              v-if="pisos.length > 0"
-              v-for="(piso, index) in pisos"
-              :key="index"
-              class="bg-white p-3 flex items-center justify-between rounded-md shadow-sm relative"
+            <template v-if="pisos.length > 0">
+              <div
+                v-for="(piso, index) in pisos"
+                :key="index"
+                class="bg-white p-3 flex items-center justify-between rounded-md shadow-sm relative"
               >
               <div class="flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" class="text-[#1C1E4D] mr-2">
@@ -396,6 +396,7 @@
                 </div>
               </div>
             </div>
+            </template>
             <div
               v-else
               class="text-sm text-gray-500"
