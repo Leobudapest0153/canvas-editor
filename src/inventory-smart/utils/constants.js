@@ -21,7 +21,7 @@ export const TIPOS_ENTIDAD = [
   { id: 'cuartos', nombre: 'Cuartos', color: '#0ea5e9', icono: '🏠', restrictions: [] },
   { id: 'pisos', nombre: 'Pisos', color: '#22c55e', icono: '🧱', restrictions: ['read-only-properties', 'right-click', 'drag'] },
   { id: 'pasillos', nombre: 'Pasillos', color: '#111827', icono: '🛣️', restrictions: [] },
-  { id: 'elementos', nombre: 'Elementos', color: '#3b82f6', icono: '📦', restrictions: [] },
+  { id: 'elementos', nombre: 'Elementos', color: '#1C1E4D', icono: '📦', restrictions: [] },
   { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', icono: '🗃️', restrictions: ['read-only-properties', 'right-click', 'drag'] },
 ]
 
@@ -237,7 +237,7 @@ export const CATEGORIAS_CONTENEDORES = [
 ]
 
 export const CATEGORIAS_CUARTOS = [
-  { id: 'cuartos', nombre: 'Cuartos', color: '#0ea5e9', tipo: 'cuartos' },
+  { id: 'cuartos', nombre: 'Cuartos', color: '#1c1e4d', tipo: 'cuartos' },
 ]
 
 export const CATEGORIAS_PISOS = [

@@ -163,11 +163,12 @@
           @click="seleccionarElemento(elemento.id)"
         >
           <!-- Visual -->
-          <div
-            class="w-10 h-10 rounded-md flex-shrink-0 flex items-center justify-center"
-            :style="{ backgroundColor: elemento.colorBase || '#E0E0E0' }"
-          >
-            <span class="text-xl">{{ elemento.icono || '📦' }}</span>
+          <div class="flex-shrink-0">
+            <component
+              :is="getIconComponent(elemento)"
+              :backgroundColor="elemento.colorBase || elemento.color || '#E0E0E0'"
+              class="w-10 h-10"
+            />
           </div>
           <!-- Info -->
           <div class="flex-1 overflow-hidden">
@@ -281,6 +282,9 @@ import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import {useDeleteElement} from '@/inventory-smart/composables/useDeleteElement'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
+import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
+import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
 const { showToast } = useToast()
 // Composables
 const canvasStore = useCanvasStore()
@@ -306,6 +310,17 @@ const categorias = computed(() => CATEGORIAS)
 const getTipoNombre = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.nombre || 'Desconocido'
+}
+
+const getIconComponent = (elemento) => {
+  // Determinar el componente de icono basado en tipo y ubicación
+  if (elemento.tipo === 'cuarto') {
+    return RoomIcon
+  } else if (elemento.ubicacion === 'pared') {
+    return SpaceOnWallIcon
+  } else {
+    return SpaceIcon
+  }
 }
 
 const elementosFiltrados = computed(() => {
