@@ -3,7 +3,6 @@
  * Centraliza el cálculo del zoom mínimo dinámico y las operaciones de zoom
  */
 
-import { computed } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
 import { CM_TO_PX } from '../utils/constants'
 
@@ -21,11 +20,32 @@ export function useZoom(stageSize, layerConfig) {
       return { x: 0, y: 0, width: Math.max(1, localW), height: Math.max(1, localH) }
     }
 
-    // Contexto 2: planta activa
+    // Contexto 2: planta activa -> priorizar contenido si existe
     if (canvasStore.plantaActivaData) {
+      // 2.a) BBox del contenido visible (elementos de la planta activa)
+      const elems = (canvasStore.elementosVisibles || []).filter((e) => e?.visible !== false && e?.plantaId === canvasStore.plantaActiva)
+      if (elems.length > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        for (const el of elems) {
+          const x = Number(el.x) || 0
+          const y = Number(el.y) || 0
+          const w = Number(el.width) || 0
+          const h = Number(el.height) || 0
+          minX = Math.min(minX, x)
+          minY = Math.min(minY, y)
+          maxX = Math.max(maxX, x + w)
+          maxY = Math.max(maxY, y + h)
+        }
+        if (Number.isFinite(minX) && Number.isFinite(minY) && Number.isFinite(maxX) && Number.isFinite(maxY)) {
+          const width = Math.max(1, maxX - minX)
+          const height = Math.max(1, maxY - minY)
+          return { x: minX, y: minY, width, height }
+        }
+      }
+
       const planta = canvasStore.plantaActivaData
 
-      // Priorizar polígono si está disponible
+      // 2.b) Priorizar polígono si está disponible
       if (planta.poligono && Array.isArray(planta.poligono) && planta.poligono.length > 0) {
         const xs = planta.poligono.map((p) => p.x)
         const ys = planta.poligono.map((p) => p.y)
@@ -46,7 +66,7 @@ export function useZoom(stageSize, layerConfig) {
         return { _candidates: [bboxPx, bboxCmToPx] }
       }
 
-      // Usar dimensiones físicas de la planta
+      // 2.c) Usar dimensiones físicas de la planta
       if (planta.dimensiones && (planta.dimensiones.ancho || planta.dimensiones.largo)) {
         const w = (planta.dimensiones.ancho || 100) * CM_TO_PX
         const h = (planta.dimensiones.largo || 100) * CM_TO_PX
@@ -104,6 +124,17 @@ export function useZoom(stageSize, layerConfig) {
     return 0.001 // valor seguro si no hay nada
   }
 
+  const safeStageCall = (stage, method, ...args) => {
+    try {
+      if (stage && typeof stage[method] === 'function') {
+        return stage[method](...args)
+      }
+    } catch {
+      /* ignore */
+    }
+    return undefined
+  }
+
   /**
    * Establece el zoom al valor mínimo dinámico y centra la vista en 0,0
    */
@@ -112,24 +143,24 @@ export function useZoom(stageSize, layerConfig) {
 
     const dynamicMinZoom = getDynamicMinZoom()
 
-    // Resetear transformaciones del stage antes de aplicar nuevas
-    stage.scale({ x: 1, y: 1 })
-    stage.position({ x: 0, y: 0 })
+    // Resetear transformaciones del stage antes de aplicar nuevas (si existen)
+    safeStageCall(stage, 'scale', { x: 1, y: 1 })
+    safeStageCall(stage, 'position', { x: 0, y: 0 })
 
     // Centrar en 0,0 con el zoom mínimo
     const centerX = stageSize.value.width / 2
     const centerY = stageSize.value.height / 2
 
     // Aplicar transformaciones desde estado limpio
-    stage.scale({ x: dynamicMinZoom, y: dynamicMinZoom })
-    stage.position({ x: centerX, y: centerY })
+    safeStageCall(stage, 'scale', { x: dynamicMinZoom, y: dynamicMinZoom })
+    safeStageCall(stage, 'position', { x: centerX, y: centerY })
 
     // Sincronizar con el store
     canvasStore.configurarZoom(dynamicMinZoom, dynamicMinZoom)
     canvasStore.configurarPan(centerX, centerY)
 
     // Forzar redibujado
-    stage.batchDraw()
+    safeStageCall(stage, 'batchDraw')
   }
 
   /**
@@ -156,24 +187,23 @@ export function useZoom(stageSize, layerConfig) {
       const dynamicMinZoom = getDynamicMinZoom()
 
       // IMPORTANTE: Resetear transformaciones del stage antes de aplicar nuevas
-      // Esto asegura que partimos de un estado limpio independientemente de transformaciones previas
-      stage.scale({ x: 1, y: 1 })
-      stage.position({ x: 0, y: 0 })
+      safeStageCall(stage, 'scale', { x: 1, y: 1 })
+      safeStageCall(stage, 'position', { x: 0, y: 0 })
 
       // Calcular pan para centrar bbox en viewport (en coords de stage)
       const stageX = (stageSize.value.width - chosen.width * dynamicMinZoom) / 2 - chosen.x * dynamicMinZoom
       const stageY = (stageSize.value.height - chosen.height * dynamicMinZoom) / 2 - chosen.y * dynamicMinZoom
 
       // Aplicar transformaciones desde estado limpio
-      stage.scale({ x: dynamicMinZoom, y: dynamicMinZoom })
-      stage.position({ x: stageX, y: stageY })
+      safeStageCall(stage, 'scale', { x: dynamicMinZoom, y: dynamicMinZoom })
+      safeStageCall(stage, 'position', { x: stageX, y: stageY })
 
       // Sincronizar con el store DESPUÉS de aplicar al stage
       canvasStore.configurarZoom(dynamicMinZoom, dynamicMinZoom)
       canvasStore.configurarPan(stageX, stageY)
 
       // Forzar redibujado
-      stage.batchDraw()
+      safeStageCall(stage, 'batchDraw')
     } catch (e) {
       console.error('fitToContent error', e)
       // Fallback seguro
