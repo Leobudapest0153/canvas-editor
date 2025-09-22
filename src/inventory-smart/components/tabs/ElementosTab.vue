@@ -91,9 +91,10 @@
       v-else
       class="flex-1 overflow-hidden flex flex-col"
     >
-      <div class="catalogo-header border-b border-gray-200">
+      <!-- Header de filtros solo cuando hay plantillas -->
+      <div class="catalogo-header border-b border-gray-200" v-if="templates && templates.length > 0">
         <div class="relative">
-          <!-- <div class="px-4 mb-1 bg-white" ref="filtrosBotonRef">
+          <div class="px-4 mb-1 bg-white" ref="filtrosBotonRef">
             <UiTooltip label="Desplegar filtros" position="bottom" :delay="200" class="w-full">
               <button
                 @click="toggleFiltros"
@@ -106,125 +107,58 @@
                 <span v-if="hayFiltrosActivos" class="w-2 h-2 bg-blue-500 rounded-full"></span>
               </button>
             </UiTooltip>
-          </div> -->
-
-        <transition name="unroll">
-          <div v-if="filtrosVisibles" class="absolute top-full left-0 w-full bg-gray-50 shadow-lg z-10" ref="filtrosPanelRef">
-            <div class="p-3 grid grid-cols-1 gap-3">
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
-                <input
-                  v-model="filtroNombre"
-                  @keyup.enter="() => (filtrosVisibles = false)"
-                  placeholder="Nombre..."
-                  class="w-full px-3 py-2 border rounded-md text-sm"
-                />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Categoría</label>
-                <select v-model="filtroCategoria" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
-                  <option value="">Todas</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
-                <select v-model="filtroUbicacion" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
-                  <option value="">Todas</option>
-                </select>
-              </div>
-              <div class="pt-1">
-                <button v-if="hayFiltrosActivos" @click="limpiarFiltros" class="px-3 py-2 bg-gray-100 rounded-md text-xs">Limpiar filtros</button>
-              </div>
-            </div>
           </div>
-        </transition>
-      </div>
-      <div class="elementos-lista flex-1 overflow-y-auto p-4">
-        <div class="grid grid-cols-1 gap-3">
-          <div
-            v-for="tpl in plantillasFiltradas"
-            :key="tpl.id"
-            :draggable="true"
-            @dragstart="onTemplateDragStart(tpl, $event)"
-            @dragend="onTemplateDragEnd"
-            @contextmenu.prevent="openTemplateContextMenu($event, tpl)"
-            class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md border-l-4 hover:scale-[1.02] hover:bg-gray-50 transition duration-200"
-            :style="{ borderLeftColor: getTemplateColor(tpl) }"
-          >
-            <!-- Botón de acciones (tres puntos) -->
-            <button
-              type="button"
-              class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded cursor-pointer"
-              aria-haspopup="menu"
-              :aria-expanded="ctxMenu.visible && ctxMenu.template?.id === tpl.id ? 'true' : 'false'"
-              :aria-controls="`tpl-menu-${tpl.id}`"
-              title="Acciones"
-              @click.stop="toggleTemplateKebab($event, tpl)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-                <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 14a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
-              </svg>
-            </button>
 
-            <div class="elemento-preview flex items-center justify-center mb-3">
-              <div
-                :class="[
-                  'preview-shape rounded-sm flex items-center justify-center relative shadow-sm border border-white/20',
-                  'w-12 h-8',
-                ]"
-                :style="{ backgroundColor: getTemplateColor(tpl) }"
-              >
-                <component :is="getIconComponent('box')" class="w-4 h-4 text-white" />
+          <transition name="unroll">
+            <div v-if="filtrosVisibles" class="absolute top-full left-0 w-full bg-gray-50 shadow-lg z-10" ref="filtrosPanelRef">
+              <div class="p-3 grid grid-cols-1 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
+                  <input
+                    v-model="filtroNombre"
+                    @keyup.enter="() => (filtrosVisibles = false)"
+                    placeholder="Nombre..."
+                    class="w-full px-3 py-2 border rounded-md text-sm"
+                  />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Categoría</label>
+                  <select v-model="filtroCategoria" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
+                    <option value="">Todas</option>
+                    <option v-for="c in categoriasPlantillas" :key="c.id" :value="c.id">
+                      {{ c.nombre }}
+                    </option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
+                  <select v-model="filtroUbicacion" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
+                    <option value="">Todas</option>
+                    <option v-for="u in ubicacionesPlantillas" :key="u.id" :value="u.id">
+                      {{ u.nombre }}
+                    </option>
+                  </select>
+                </div>
+                <div class="pt-1">
+                  <button v-if="hayFiltrosActivos" @click="limpiarFiltros" class="px-3 py-2 bg-gray-100 rounded-md text-xs">Limpiar filtros</button>
+                </div>
               </div>
             </div>
-
-            <div class="elemento-info space-y-1">
-              <h3 class="font-semibold text-sm text-gray-800 mb-1">{{ tpl.name }}</h3>
-              <p class="text-xs text-gray-500 mb-2">{{ templateDescription(tpl) }}</p>
-
-              <div class="elemento-specs space-y-1">
-                <div class="spec-item flex justify-between text-xs">
-                  <span class="spec-label text-gray-500 font-medium">Dimensiones:</span>
-                  <span class="spec-value text-gray-700">
-                    {{ getTemplateDims(tpl).ancho }}x{{ getTemplateDims(tpl).largo }}x{{ getTemplateDims(tpl).alto }}
-                  </span>
-                </div>
-                <div class="spec-item flex justify-between text-xs">
-                  <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
-                  <span class="spec-value text-gray-700">{{ formatTemplateWeight(tpl) }}</span>
-                </div>
-                <div class="spec-item flex justify-between text-xs">
-                  <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
-                  <span class="spec-value text-gray-700 capitalize">{{ formatTemplateLocation(tpl) }}</span>
-                </div>
-              </div>
-
-              <div class="mt-2 flex gap-1">
-                <span
-                  class="inline-block px-2 py-1 text-xs rounded-full text-white"
-                  :style="{ backgroundColor: getTemplateColor(tpl) }"
-                >
-                  Plantillas
-                </span>
-                <span
-                  v-for="tag in tpl.tags"
-                  :key="tag"
-                  class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700"
-                >
-                  {{ tag }}
-                </span>
-              </div>
-            </div>
-          </div>
+          </transition>
         </div>
-
-  <div v-if="plantillasFiltradas.length === 0" class="text-center py-12">
-          <svg
-            class="w-12 h-12 text-gray-300 mx-auto mb-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+      </div>
+      
+      <!-- Contenido principal - SIEMPRE se muestra -->
+      <div class="elementos-lista flex-1 overflow-y-auto p-4">
+        <!-- Mensaje vacío cuando no hay plantillas - CENTRADO Y MÁS ARRIBA -->
+        <div v-if="!templates || !Array.isArray(templates) || templates.length === 0" class="flex items-center justify-center h-full">
+          <div class="text-center">
+            <svg
+              class="w-12 h-12 text-gray-300 mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -232,10 +166,113 @@
               d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m0 0v5m0-5v-5"
             />
           </svg>
-          <p class="text-gray-500 text-center">Aún no hay plantillas</p>
+          <p class="text-gray-500 text-center">No se encontraron elementos</p>
           <p class="text-gray-400 text-sm text-center mt-1">
-            Crea una desde un elemento
+            Prueba con otros filtros o crea uno nuevo
           </p>
+          </div>
+        </div>
+
+        <!-- Lista + vacío por filtros -->
+        <div v-else>
+          <div class="grid grid-cols-1 gap-3">
+            <div
+              v-for="tpl in plantillasFiltradas"
+              :key="tpl.id"
+              :draggable="true"
+              @dragstart="onTemplateDragStart(tpl, $event)"
+              @dragend="onTemplateDragEnd"
+              @contextmenu.prevent="openTemplateContextMenu($event, tpl)"
+              class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md border-l-4 hover:scale-[1.02] hover:bg-gray-50 transition duration-200"
+              :style="{ borderLeftColor: getTemplateColor(tpl) }"
+            >
+              <!-- Botón de acciones (tres puntos) -->
+              <button
+                type="button"
+                class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded cursor-pointer"
+                aria-haspopup="menu"
+                :aria-expanded="ctxMenu.visible && ctxMenu.template?.id === tpl.id ? 'true' : 'false'"
+                :aria-controls="`tpl-menu-${tpl.id}`"
+                title="Acciones"
+                @click.stop="toggleTemplateKebab($event, tpl)"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                  <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 14a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
+                </svg>
+              </button>
+
+              <div class="elemento-preview flex items-center justify-center mb-3">
+                <div
+                  :class="[
+                    'preview-shape rounded-sm flex items-center justify-center relative shadow-sm border border-white/20',
+                    'w-12 h-8',
+                  ]"
+                  :style="{ backgroundColor: getTemplateColor(tpl) }"
+                >
+                  <component :is="getIconComponent('box')" class="w-4 h-4 text-white" />
+                </div>
+              </div>
+
+              <div class="elemento-info space-y-1">
+                <h3 class="font-semibold text-sm text-gray-800 mb-1">{{ tpl.name }}</h3>
+                <p class="text-xs text-gray-500 mb-2">{{ templateDescription(tpl) }}</p>
+
+                <div class="elemento-specs space-y-1">
+                  <div class="spec-item flex justify-between text-xs">
+                    <span class="spec-label text-gray-500 font-medium">Dimensiones:</span>
+                    <span class="spec-value text-gray-700">
+                      {{ getTemplateDims(tpl).ancho }}x{{ getTemplateDims(tpl).largo }}x{{ getTemplateDims(tpl).alto }}
+                    </span>
+                  </div>
+                  <div class="spec-item flex justify-between text-xs">
+                    <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
+                    <span class="spec-value text-gray-700">{{ formatTemplateWeight(tpl) }}</span>
+                  </div>
+                  <div class="spec-item flex justify-between text-xs">
+                    <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
+                    <span class="spec-value text-gray-700 capitalize">{{ formatTemplateLocation(tpl) }}</span>
+                  </div>
+                </div>
+
+                <div class="mt-2 flex gap-1">
+                  <span
+                    class="inline-block px-2 py-1 text-xs rounded-full text-white"
+                    :style="{ backgroundColor: getTemplateColor(tpl) }"
+                  >
+                    Plantillas
+                  </span>
+                  <span
+                    v-for="tag in tpl.tags"
+                    :key="tag"
+                    class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700"
+                  >
+                    {{ tag }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mensaje de vacío por filtros -->
+          <div v-if="plantillasFiltradas.length === 0" class="text-center py-12">
+            <svg
+              class="w-12 h-12 text-gray-300 mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m0 0v5m0-5v-5"
+              />
+            </svg>
+            <p class="text-gray-500 text-center">No hay resultados con los filtros aplicados</p>
+            <p class="text-gray-400 text-sm text-center mt-1">
+              Ajusta o limpia los filtros para ver resultados
+            </p>
+          </div>
         </div>
       </div>
 
@@ -256,7 +293,6 @@
           Eliminar
         </button>
       </div>
-</div>
     </div>
   </div>
 </template>
@@ -266,13 +302,13 @@ import { ref, onMounted, watch, computed, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
-import { getColorCategoria } from '@/inventory-smart/utils/constants'
+import { getColorCategoria, TODAS_LAS_CATEGORIAS, UBICACIONES_DISPONIBLES } from '@/inventory-smart/utils/constants'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 
 const catalogStore = useCatalogStore()
-const { selectedCatalog, searchText } = storeToRefs(catalogStore)
+const { selectedCatalog, searchText, templates } = storeToRefs(catalogStore)
 
 const { showSuccess, showInfo, showError } = useToast()
 const confirmDialog = useConfirmDialog()
@@ -371,6 +407,10 @@ const selectCuartos = () => {
   if (selectedCatalog.value !== 'elementos') selectCatalog('elementos')
 }
 
+// Opciones de filtros en Plantillas
+const categoriasPlantillas = computed(() => TODAS_LAS_CATEGORIAS)
+const ubicacionesPlantillas = computed(() => UBICACIONES_DISPONIBLES)
+
 onMounted(() => {
   const saved = localStorage.getItem('inventory.selectedCatalog')
   if (saved === 'plantillas' || saved === 'elementos') {
@@ -391,12 +431,19 @@ watch(selectedCatalog, (val) => {
   localStorage.setItem('inventory.selectedCatalog', val)
 })
 
-const filteredTemplates = computed(() =>
-  catalogStore.searchTemplates(searchText.value)
-)
+// Resultado de búsqueda global (texto) sobre plantillas
+const filteredTemplates = computed(() => catalogStore.searchTemplates(searchText.value))
+
+// Base REAL para mostrar/ocultar filtros y vacío absoluto (todas las plantillas existentes)
+const plantillasBase = computed(() => {
+  const arr = templates.value
+  console.log('plantillasBase computed:', arr?.length || 0, arr)
+  return Array.isArray(arr) ? arr : []
+})
 
 // Computed local para filtrar plantillas por nombre/categoría/ubicación (patrón CapasTab)
 const plantillasFiltradas = computed(() => {
+  // Lista visible = búsqueda global (si hay) + filtros locales (nombre/categoría/ubicación)
   const base = Array.isArray(filteredTemplates.value) ? filteredTemplates.value.slice() : []
   let out = base
 
@@ -425,6 +472,11 @@ const plantillasFiltradas = computed(() => {
   }
 
   return out
+})
+
+// Cerrar filtros si ya no hay plantillas base
+watch(templates, (arr) => {
+  if (!arr || arr.length === 0) filtrosVisibles.value = false
 })
 
 const formatDate = (iso) => {
@@ -532,7 +584,7 @@ const handleDeleteTemplate = async (tpl) => {
   if (!tpl) return closeTemplateContextMenu()
 
   // Si la plantilla ya no existe
-  const exists = !!catalogStore.templates.find((t) => t.id === tpl.id)
+  const exists = !!templates.value.find((t) => t.id === tpl.id)
   if (!exists) {
     showInfo('La plantilla ya no existe — refrescando lista')
     catalogStore.loadTemplatesFromLocalStorage()
@@ -550,6 +602,7 @@ const handleDeleteTemplate = async (tpl) => {
 
   try {
     catalogStore.removeTemplate(tpl.id)
+    console.log('After removeTemplate, templates count:', templates.value?.length || 0)
     showSuccess('Plantilla eliminada')
   } catch (e) {
     showError('No se pudo eliminar la plantilla')
