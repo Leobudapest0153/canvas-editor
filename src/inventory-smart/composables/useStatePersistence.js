@@ -86,6 +86,7 @@ export const useStatePersistence = () => {
           categoria: elemento.categoria || 'general',
           plantaId: elemento.plantaId,
           etiquetas: Array.isArray(elemento.etiquetas) ? elemento.etiquetas : [],
+          codigoEsl: elemento.codigoEsl || '',
 
           // Orientación discreta (0,90,180,270)
           orientacion: (() => {
@@ -418,6 +419,7 @@ export const useStatePersistence = () => {
             categoria: elementoData.categoria || 'general',
             plantaId: elementoData.plantaId,
             etiquetas: Array.isArray(elementoData.etiquetas) ? elementoData.etiquetas : [],
+            codigoEsl: elementoData.codigoEsl || '',
 
             // Orientación discreta con fallback
             orientacion: (() => {

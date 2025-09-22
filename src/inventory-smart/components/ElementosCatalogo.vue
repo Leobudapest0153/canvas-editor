@@ -17,9 +17,9 @@
   <div class="elementos-catalogo h-full flex flex-col bg-white border-r border-gray-200">
     <!-- Header del catálogo -->
     <div class="catalogo-header p-1 border-gray-200">
-      <div class="relative px-4 mb-1">
+  <div class="relative px-4 mb-1" v-if="hayElementosEnTab">
         <div class="flex items-center justify-between" ref="filtrosBotonRef">
-          <UiTooltip label="Desplegar filtros" position="bottom" :delay="200" class="w-full">
+          <UiTooltip position="bottom" :delay="200" class="w-full">
             <button
               @click="toggleFiltros"
               class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -65,15 +65,20 @@
                   </option>
                 </select>
               </div>
-              <div>
+              <div v-if="modo !== 'cuarto'">
                 <label class="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
                 <select
                   v-model="ubicacionSeleccionada"
                   class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white"
                 >
                   <option value="">Todas</option>
-                  <option value="suelo">Suelo</option>
-                  <option value="pared">Pared</option>
+                  <option
+                    v-for="u in ubicacionesDisponibles"
+                    :key="u.id"
+                    :value="u.id"
+                  >
+                    {{ u.nombre }}
+                  </option>
                 </select>
               </div>
               <div class="pt-1">
@@ -113,7 +118,7 @@
               d="M12 4v16m8-8H4"
             />
           </svg>
-          <span class="ml-1 text-sm font-medium">
+          <span class="ml-1 text-sm">
             Agregar {{ modo === 'cuarto' ? 'cuarto' : 'espacio' }}
           </span>
         </button></UiTooltip
@@ -166,19 +171,21 @@
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Dimensiones:</span>
                 <span class="spec-value text-gray-700">
-                  {{ getCardDims(elemento).ancho }}x{{ getCardDims(elemento).largo }}x{{
+                  {{ formatLengthsCm([
+                    getCardDims(elemento).ancho,
+                    getCardDims(elemento).largo,
                     getCardDims(elemento).alto
-                  }}
+                  ]) }}
                 </span>
               </div>
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
                 <span class="spec-value text-gray-700">{{ elemento.pesoMaximo }}kg</span>
               </div>
-              <div class="spec-item flex justify-between text-xs">
+              <!-- <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
                 <span class="spec-value text-gray-700 capitalize">{{ elemento.ubicacion }}</span>
-              </div>
+              </div> -->
             </div>
 
             <!-- Badge de tipo y categoría -->
@@ -251,6 +258,8 @@ import {
   getColorCategoria,
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
+  TIPOS_ESPACIO,
+  TIPOS_CUARTO,
 } from '@/inventory-smart/utils/constants'
 import { CATALOGO } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
@@ -261,6 +270,7 @@ import {
   buildStructureFromForm,
   toCatalogItemFromStructure,
 } from '@/inventory-smart/composables/useStructureManager'
+import { formatLengthsCm } from '../utils/units'
 
 // Props
 const props = defineProps({
@@ -345,36 +355,42 @@ const nuevoElemento = ref({
 
 // const puedeCrearElementosPersonalizados = computed(() => catalogContext.value.mode !== 'root')
 
-// Computed: categorías disponibles según el contexto
-const categoriasDisponibles = computed(() => {
-  const tipos = catalogStore.allowedTypesForContext(catalogContext.value)
-  let cats = TODAS_LAS_CATEGORIAS.filter((cat) => tipos.includes(cat.tipo))
-  // Ajuste por modo: en 'cuarto' solo categorías de 'cuartos'; en 'espacio' excluye 'cuartos'
-  if (modo.value === 'cuarto') {
-    cats = cats.filter((c) => c.tipo === 'cuartos')
-  } else {
-    cats = cats.filter((c) => c.tipo !== 'cuartos')
-  }
-  return cats
+// Computed: categorías disponibles según el tab (requerimiento: Espacios -> TIPOS_ESPACIO, Cuartos -> TIPOS_CUARTO)
+const categoriasDisponibles = computed(() => (modo.value === 'cuarto' ? TIPOS_CUARTO : TIPOS_ESPACIO))
+
+// Ubicaciones disponibles según el modo actual
+const ubicacionesDisponibles = computed(() => {
+  // Mapear el modo a los tipos que aplican en constantes
+  const aplicaTipo = modo.value === 'cuarto' ? 'cuartos' : 'elementos'
+  return UBICACIONES_DISPONIBLES.filter((u) => (u.aplicaA || []).includes(aplicaTipo))
 })
 
-// Computed local para filtrar los elementos del catálogo (igual que en CapasTab.vue)
-const elementosFiltrados = computed(() => {
-  // Partimos de lo que la store ya nos devuelve (filtrado por contexto y búsqueda global)
+// Si la ubicación seleccionada ya no es válida para el modo, limpiar
+watch([ubicacionSeleccionada, ubicacionesDisponibles], () => {
+  const ids = new Set(ubicacionesDisponibles.value.map((u) => u.id))
+  if (ubicacionSeleccionada.value && !ids.has(ubicacionSeleccionada.value)) {
+    ubicacionSeleccionada.value = ''
+  }
+})
+
+// Base por modo (sin filtros de texto/categoría/ubicación) — sirve para decidir si mostrar Filtros
+const elementosBasePorModo = computed(() => {
   const base = Array.isArray(filteredCatalogItems.value)
     ? filteredCatalogItems.value.slice()
     : Array.isArray(items.value)
       ? items.value.slice()
       : []
+  return modo.value === 'cuarto'
+    ? base.filter((el) => el.tipo === 'cuartos')
+    : base.filter((el) => el.tipo !== 'cuartos')
+})
 
-  let out = base
+const hayElementosEnTab = computed(() => (elementosBasePorModo.value.length > 0))
 
-  // Filtro por modo: en 'cuarto' solo items tipo 'cuartos'; en 'espacio' todos menos 'cuartos'
-  if (modo.value === 'cuarto') {
-    out = out.filter((el) => el.tipo === 'cuartos')
-  } else {
-    out = out.filter((el) => el.tipo !== 'cuartos')
-  }
+// Computed local para filtrar los elementos del catálogo (igual que en CapasTab.vue)
+const elementosFiltrados = computed(() => {
+  // Partimos del base por modo y aplicamos filtros UI
+  let out = elementosBasePorModo.value.slice()
 
   // Filtro por texto (nombre o descripción)
   if (filtroTexto && filtroTexto.value) {
@@ -397,6 +413,11 @@ const elementosFiltrados = computed(() => {
   }
 
   return out
+})
+
+// Cerrar panel de filtros si el tab queda sin elementos base
+watch(hayElementosEnTab, (val) => {
+  if (!val) filtrosVisibles.value = false
 })
 
 const onGuardarElemento = (elemento) => {
@@ -438,6 +459,13 @@ watch([() => categoriaSeleccionada.value, () => categoriasDisponibles.value], ()
   const ids = new Set((categoriasDisponibles.value || []).map((c) => c.id))
   if (categoriaSeleccionada.value && !ids.has(categoriaSeleccionada.value)) {
     categoriaSeleccionada.value = null
+  }
+})
+
+// Si cambiamos a modo 'cuarto', limpiar la ubicación para que no quede filtro oculto aplicado
+watch(modo, (nuevo) => {
+  if (nuevo === 'cuarto') {
+    ubicacionSeleccionada.value = ''
   }
 })
 

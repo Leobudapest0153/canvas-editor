@@ -19,12 +19,9 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
-import { useViewportStore } from '@/inventory-smart/stores/viewport'
-import { pxToCm, fmtCm } from '@/inventory-smart/utils/units'
-import { t } from '@/inventory-smart/i18n'
+import { t } from '@/inventory-smart/utils/translator'
 
 const { store } = useCanvasWithHistory()
-const viewport = useViewportStore()
 const infoRef = ref(null)
 const styleObject = ref({})
 
@@ -59,7 +56,7 @@ onMounted(() => {
     resizeObs = new ResizeObserver(recompute)
     resizeObs.observe(infoRef.value?.parentElement)
   } catch (e) {
-    // noop
+    console.warn('ResizeObserver not supported?')
   }
 })
 onUnmounted(() => {
@@ -67,7 +64,7 @@ onUnmounted(() => {
   try {
     resizeObs && resizeObs.disconnect()
   } catch (e) {
-    // noop
+    console.warn('Error disconnecting ResizeObserver:', e)
   }
 })
 
