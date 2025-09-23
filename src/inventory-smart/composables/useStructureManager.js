@@ -180,7 +180,7 @@ export function toFormFromCatalogItem(item) {
       largo: fromCm(d.largo),
       alto: fromCm(d.alto),
       ancho: fromCm(d.ancho),
-      capacidadCarga: Number(root.pesoMaximo) || 0,
+      capacidadCarga: Number(root.capacidadCarga ?? root.pesoMaximo) || 0,
     }
 
     // Recuperar pisos/niveles internos, en orden por índice
@@ -230,7 +230,7 @@ export function toFormFromCatalogItem(item) {
       largo: fromCm(d.largo),
       alto: fromCm(d.alto),
       ancho: fromCm(d.ancho),
-      capacidadCarga: Number(item.pesoMaximo) || 0,
+      capacidadCarga: Number(item.capacidadCarga ?? item.pesoMaximo) || 0,
     }
     const pisosNiveles = [
       {
