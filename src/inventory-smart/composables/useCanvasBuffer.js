@@ -21,10 +21,6 @@ import { useToast } from './useToast'
 // Estado global del buffer (singleton)
 const bufferItems = ref([])
 
-watch(bufferItems, (newVal) => {
-  console.log('📋 Buffer actualizado - elementos en buffer:', newVal)
-}, { deep: true })
-
 export const useCanvasBuffer = () => {
   const canvasStore = useCanvasStore()
   const weightValidation = useWeightValidation()
