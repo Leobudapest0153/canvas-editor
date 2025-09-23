@@ -636,6 +636,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         return false;
       }
 
+      console.log('[actualizarElementoSinValidacion] Actualizando elemento:', id, 'con patch:', patch);
+
       const prev = elementos.value[idx];
 
       const next = {
@@ -658,7 +660,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (patch.alturaRespectoAlSuelo != null && Number.isFinite(Number(patch.alturaRespectoAlSuelo))) {
         next.alturaRespectoAlSuelo = Math.max(0, Math.round(Number(patch.alturaRespectoAlSuelo)));
       }
-
       // Normalizaciones en px
       for (const k of ['x', 'y', 'width', 'height']) {
         if (patch[k] != null && Number.isFinite(Number(patch[k]))) {
@@ -668,7 +669,6 @@ export const useCanvasStore = defineStore('canvas', () => {
           next[k] = v;
         }
       }
-
       elementos.value.splice(idx, 1, next);
 
       if (saveHistory) {
@@ -678,7 +678,6 @@ export const useCanvasStore = defineStore('canvas', () => {
           addToHistory({ type: 'update', id, before: prev, after: next, description });
         }
       }
-
       return true;
     } catch (err) {
       console.error('[actualizarElementoSinValidacion] Error:', err);
@@ -1361,14 +1360,13 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const guardarCuartoNivelesPropiedades = (nivelActualizado, id) => {
     if (!id) {
-      console.error('No hay ID de nivel a editar');
-      return;
     }
     const level = elementos.value.find(e => e.id === id);
     if (!level) {
       console.error('Nivel no encontrado');
       return;
     }
+
 
     if (nivelActualizado?.dimensiones?.alto > elementos.value.find(e => e.id === level.padre)?.dimensiones?.alto) {
       showToast('La altura del nivel no puede exceder la altura del cuarto', 'error');
@@ -1409,7 +1407,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
-  const confirmarPropuestaAlturasNiveles = (estrategia /* 'clamp' | 'redistribute' */) => {
+  const confirmarPropuestaAlturasNiveles = (estrategia) => {
     if (!propuestaAlturasNiveles.value) {
       showToast('No hay propuesta pendiente', 'error');
       return false;

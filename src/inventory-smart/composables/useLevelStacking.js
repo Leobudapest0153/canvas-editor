@@ -136,11 +136,11 @@ function getRoomAndLevels(elements, levelId) {
   if (!level) return { error: 'Nivel no encontrado' };
 
   const room = byId(level.padre);
-  if (!room || room.tipo !== 'cuartos') return { error: 'Cuarto padre no encontrado' };
+  if (!room || !['cuartos', 'elementos'].includes(room.tipo)) return { error: 'Cuarto padre no encontrado' };
 
   const orderIds = (room.hijos || [])
     .map(id => byId(id))
-    .filter(e => e && e.tipo === 'pisos')
+    .filter(e => e && ['contenedores', 'pisos'].includes(e.tipo))
     .map(e => e.id);
 
   return { room, level, orderIds, byId };
@@ -256,7 +256,6 @@ export function applyLevelChange(elements, draft, strategy, updater) {
 
   const targetId = draft.targetId;
   const targetPatch = draft.targetPatch || {};
-
   // 3) Aplicar a cada nivel: alto (cm), baseZ (cm), y (px desde arriba), height (px)
   for (const id of draft.nivelesOrden) {
     const hCm = Math.max(MIN_LEVEL_CM, Math.round(Number(alturas[id]) || 0));
@@ -301,6 +300,7 @@ export function applyLevelChange(elements, draft, strategy, updater) {
         ...(patch.width != null ? { width: patch.width } : {}),
       };
     }
+
 
     const ok = updater(id, patch, true, 'Ajuste de niveles en cuarto');
     if (!ok) return { ok: false, message: 'Falló la actualización de un nivel.' };

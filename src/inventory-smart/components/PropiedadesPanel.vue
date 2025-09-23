@@ -339,7 +339,7 @@
         </details>
         <!-- Edición de niveles (Solo para cuartos)-->
         <details
-          v-if="elementoSeleccionado.tipo === 'cuartos'"
+          v-if="['cuartos', 'elementos'].includes(elementoSeleccionado.tipo)"
           open
           class="bg-gray-50 rounded-lg p-4"
         >
