@@ -52,7 +52,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, provide } from 'vue'
 import SidebarPanel from './components/SidebarPanel.vue'
 import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
@@ -71,15 +71,38 @@ import ConfirmModal from './components/ConfirmModal.vue'
 import LoaderOverlay from './components/LoaderOverlay.vue'
 import { AUTOSAVE_CONFIG } from '@/inventory-smart/utils/constants'
 import ConfirmReplaceModal from '@/inventory-smart/components/modals/ConfirmReplaceModal.vue'
+import { useServicesStore, SERVICE_TYPES } from './stores/services.js'
 
 const props = defineProps({
   configCanvas: {
     type: [String, null],
     default: () => '',
   },
-})
-
-// Definir emits para comunicar cambios al componente padre
+  /**
+   * Array con función de servicio para obtener productos de contenedores.
+   * El servicio debe ser de tipo 'container_products' y recibir:
+   * - containerId: ID/código del contenedor
+   * - filter: filtro de texto opcional
+   * - pagination: datos de paginación opcionales
+   *
+   * La respuesta debe incluir: products[], totalCount, pagination
+   *
+   * @type {ExternalService[]}
+   */
+  externalServices: {
+    type: Array,
+    default: () => [],
+    validator: (services) => {
+      if (!Array.isArray(services)) return false
+      return services.every(service =>
+        service &&
+        typeof service.name === 'string' &&
+        service.type === 'container_products' &&
+        typeof service.handler === 'function'
+      )
+    }
+  }
+})// Definir emits para comunicar cambios al componente padre
 const emit = defineEmits(['configUpdated'])
 
 const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
@@ -88,6 +111,47 @@ const buffer = useCanvasBuffer()
 const { deleteSelected } = useDeleteElement()
 const { handlePaste } = useAutoPaste()
 const { showToast } = useToast()
+const servicesStore = useServicesStore()
+
+// ======= Gestión de Servicios Externos =======
+// Registrar servicios externos en la store cuando cambien las props
+watch(
+  () => props.externalServices,
+  (newServices) => {
+    try {
+      servicesStore.registerServices(newServices)
+      if (newServices.length > 0) {
+        console.log(`✅ Registrados ${newServices.length} servicios externos`)
+      }
+    } catch (error) {
+      console.error('Error al registrar servicios externos:', error)
+      showToast('Error al registrar servicios externos', 'error')
+    }
+  },
+  { immediate: true }
+)
+
+// Función auxiliar para llamar servicios externos
+const callExternalService = async (serviceName, params = null, options = {}) => {
+  try {
+    const response = await servicesStore.callService(serviceName, params, options)
+    return response
+  } catch (error) {
+    console.error(`Error al llamar servicio "${serviceName}":`, error)
+    showToast(`Error en servicio: ${serviceName}`, 'error')
+    throw error
+  }
+}
+
+// Exponer funciones para uso en componentes hijos si es necesario
+const externalServicesAPI = {
+  callService: callExternalService,
+  listServices: servicesStore.listServices,
+  hasServices: servicesStore.hasServices,
+  clearCache: servicesStore.clearCache,
+  isServiceLoading: servicesStore.isServiceLoading,
+  getServiceError: servicesStore.getServiceError
+}
 
 // Estado del modal de aviso de reemplazo por servidor
 const showReplaceNotice = ref(false)
@@ -272,6 +336,9 @@ const fmtDate = (iso) => {
 onMounted(() => {
   try {
     window.addEventListener('keydown', handleKeydown)
+
+    // Provide de la API de servicios externos para componentes hijos
+    provide('externalServicesAPI', externalServicesAPI)
   } catch (error) {
     window.removeEventListener('keydown', handleKeydown)
     showToast('Ha ocurrido un error al importar la configuración', 'error')

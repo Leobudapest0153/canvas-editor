@@ -4,7 +4,7 @@
       <h2 class="text-lg font-semibold text-gray-800">Propiedades</h2>
     </div>
 
-    <div v-if="elementoSeleccionado" class="flex-1 overflow-y-auto p-4">
+    <div v-if="elementoSeleccionado" class="flex-1 overflow-y-auto p-3">
       <div class="space-y-4">
         <!-- Información general -->
         <details open class="bg-gray-50 rounded-lg p-4">
@@ -442,6 +442,22 @@
             </div>
           </div>
         </details>
+
+        <!-- Productos del contenedor -->
+        <details v-if="esContenedor" open class="bg-gray-50 rounded-lg p-4">
+          <summary class="text-sm font-medium text-gray-700 cursor-pointer">
+            Productos/Insumos almacenados
+          </summary>
+          <div class="mt-3">
+            <ContainerProductsList
+              v-if="elementoSeleccionado?.codigo"
+              :containerId="elementoSeleccionado.codigo"
+            />
+            <div v-else class="text-sm text-gray-500 text-center py-4">
+              El contenedor necesita un código para mostrar los productos
+            </div>
+          </div>
+        </details>
       </div>
     </div>
 
@@ -485,6 +501,7 @@ import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
 import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX } from '@/inventory-smart/utils/constants'
 import { deepClone, deepEqual, makePatch } from '@/inventory-smart/utils/object'
 import { useToast } from '@/inventory-smart/composables/useToast.js'
+import ContainerProductsList from './ContainerProductsList.vue'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation.js'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation.js'
@@ -1104,9 +1121,6 @@ const validarPeso = () => {
 
   // Actualizar valor anterior
   valorPesoAnterior.value = val
-
-  // La validación completa (teórica + real) se maneja en advertenciaPeso
-  // que bloquea el botón Guardar y muestra el mensaje apropiado
 }
 
 const getTipoNombre = (tipo) => {
@@ -1180,115 +1194,6 @@ const esPasillo = computed(
   () => (elementoSeleccionado.value?.tipo || '').toLowerCase() === 'pasillos',
 )
 
-// const volumen = computed(() => {
-//   if (!esContenedor.value) return null
-//   const d = edited.value?.dimensiones || {}
-//   if (elementoSeleccionado.value?.forma === 'circular') {
-//     const diam = d.ancho || 0
-//     const alto = d.alto || 0
-//     return ((Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000).toFixed(2)
-//   }
-//   return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(2)
-// })
-
-/**
- * Calcula el volumen teórico basándose en los hijos del elemento
- */
-// const volumenTeorico = computed(() => {
-//   const elemento = elementoSeleccionado.value
-//   if (!elemento) return '0.00'
-
-//   // Para contenedores: siempre calcular basándose en sus propias dimensiones
-//   if (elemento.tipo === 'contenedores') {
-//     const d = elemento.dimensiones || {}
-//     if (elemento.forma === 'circular') {
-//       const diam = d.ancho || 0
-//       const alto = d.alto || 0
-//       return ((Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000).toFixed(3)
-//     }
-//     return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(3)
-//   }
-
-//   // Para elementos: calcular basándose en el volumen de los contenedores que tiene dentro
-//   if (elemento.tipo === 'elementos') {
-//     return calcularVolumenPorHijos(elemento.id, 'contenedores')
-//   }
-
-//   // Fallback: calcular volumen por dimensiones propias
-//   const d = elemento.dimensiones || {}
-//   if (elemento.forma === 'circular') {
-//     const diam = d.ancho || 0
-//     const alto = d.alto || 0
-//     return ((Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000).toFixed(3)
-//   }
-//   return (((d.ancho || 0) * (d.largo || 0) * (d.alto || 0)) / 1_000_000).toFixed(3)
-// })
-
-/**
- * Calcula el volumen total de los hijos de un elemento
- */
-// const calcularVolumenPorHijos = (elementoId, tipoHijos) => {
-//   const elemento = canvasStore.elementoPorId(elementoId)
-//   if (!elemento || !elemento.hijos || elemento.hijos.length === 0) {
-//     return '0.000'
-//   }
-
-//   let volumenTotal = 0
-
-//   for (const hijoId of elemento.hijos) {
-//     const hijo = canvasStore.elementoPorId(hijoId)
-//     if (!hijo) continue
-
-//     // Filtrar por tipo si es necesario
-//     if (tipoHijos === 'contenedores' && hijo.tipo !== 'contenedores') continue
-
-//     // Calcular volumen del hijo basándose en sus dimensiones
-//     const dims = hijo.dimensiones || {}
-//     let volumenHijo = 0
-
-//     if (hijo.forma === 'circular') {
-//       const diam = dims.ancho || 0
-//       const alto = dims.alto || 0
-//       volumenHijo = (Math.PI * Math.pow(diam / 2, 2) * alto) / 1_000_000 // cm³ a m³
-//     } else {
-//       volumenHijo = ((dims.ancho || 0) * (dims.largo || 0) * (dims.alto || 0)) / 1_000_000 // cm³ a m³
-//     }
-
-//     volumenTotal += volumenHijo
-
-//     // Si este hijo también tiene hijos, sumarlos recursivamente
-//     if (hijo.hijos && hijo.hijos.length > 0) {
-//       const volumenSubhijos = parseFloat(calcularVolumenPorHijos(hijoId, 'todos'))
-//       volumenTotal += volumenSubhijos
-//     }
-//   }
-
-//   return volumenTotal.toFixed(3)
-// }
-
-// const descripcionVolumenTeorico = computed(() => {
-//   const elemento = elementoSeleccionado.value
-//   if (!elemento) return ''
-
-//   const numHijos = elemento.hijos?.length || 0
-
-//   if (elemento.tipo === 'elementos') {
-//     const contenedores = elemento.hijos?.filter(hijoId => {
-//       const hijo = canvasStore.elementoPorId(hijoId)
-//       return hijo && hijo.tipo === 'contenedores'
-//     }).length || 0
-
-//     if (contenedores === 0) return 'Sin contenedores internos'
-//     return `Calculado desde ${contenedores} contenedor${contenedores > 1 ? 'es' : ''}`
-//   }
-
-//   if (elemento.tipo === 'contenedores') {
-//     return 'Calculado desde dimensiones propias'
-//   }
-
-//   return 'Calculado desde dimensiones'
-// })
-
 /**
  * Uso real del elemento
  */
@@ -1302,11 +1207,6 @@ const usoRealPeso = computed(() => {
   return uso?.peso ? uso.peso.toFixed(2) : '0.00'
 })
 
-// const usoRealVolumen = computed(() => {
-//   const uso = elementoSeleccionado.value?.uso
-//   return uso?.volumen ? uso.volumen.toFixed(3) : '0.000'
-// })
-
 const porcentajePesoUsado = computed(() => {
   const peso = parseFloat(usoRealPeso.value)
   const maximo = edited.value?.capacidadCarga || 0
@@ -1314,26 +1214,12 @@ const porcentajePesoUsado = computed(() => {
   return Math.min(100, toPrecisionCm((peso / maximo) * 100)).toFixed(2)
 })
 
-// const porcentajeVolumenUsado = computed(() => {
-//   const volumen = parseFloat(usoRealVolumen.value)
-//   const maximo = parseFloat(volumenTeorico.value)
-//   if (maximo === 0) return 0
-//   return Math.min(100, toPrecisionCm((volumen / maximo) * 100))
-// })
-
 const colorPesoUsado = computed(() => {
   const porcentaje = porcentajePesoUsado.value
   if (porcentaje < 50) return '#10b981' // Verde
   if (porcentaje < 85) return '#f59e0b' // Amarillo
   return '#ef4444' // Rojo
 })
-
-// const colorVolumenUsado = computed(() => {
-//   const porcentaje = porcentajeVolumenUsado.value
-//   if (porcentaje < 50) return '#10b981' // Verde
-//   if (porcentaje < 85) return '#f59e0b' // Amarillo
-//   return '#ef4444' // Rojo
-// })
 
 /**
  * Datos del uso real del padre
@@ -1513,46 +1399,8 @@ const deseleccionarElemento = () => {
   canvasStore.setCambiosNoAplicados(false)
 }
 
-// ====== Gestión de etiquetas (buffer local) ======
-const createTagModalOpen = ref(false)
-const newTagText = ref('')
-
 // ====== Gestión del modal Identificar ESL ======
 const identifyEslModalOpen = ref(false)
-
-const onTagAdd = (tagId) => {
-  if (!edited.value) return
-  if (!Array.isArray(edited.value.tags)) edited.value.tags = []
-  if (!edited.value.tags.includes(tagId)) edited.value.tags.push(tagId)
-}
-
-const onTagRemove = (tagId) => {
-  if (!edited.value || !Array.isArray(edited.value.tags)) return
-  edited.value.tags = edited.value.tags.filter((id) => id !== tagId)
-}
-
-const onTagCreateOpen = (text) => {
-  newTagText.value = text || ''
-  createTagModalOpen.value = true
-}
-
-const onTagCreateSave = async (payload) => {
-  // payload: { nombre?: string, texto?: string, color?: string, colorFondo?, colorTexto? }
-  const texto = (payload?.nombre || payload?.texto || newTagText.value || '').trim()
-  if (!texto) return
-  const nueva = {
-    texto,
-    colorFondo: payload?.colorFondo || payload?.color || '#DBEAFE',
-    colorTexto: payload?.colorTexto || '#1E40AF',
-  }
-  // Crear en catálogo global
-  canvasStore.agregarEtiqueta(nueva)
-  // Obtener el ID recién creado (max actual)
-  const tagId = Math.max(0, ...canvasStore.etiquetas.map((e) => e.id))
-  onTagAdd(tagId)
-  createTagModalOpen.value = false
-  newTagText.value = ''
-}
 
 // ====== Gestión del modal Identificar ESL ======
 const abrirModalIdentificarEsl = () => {
