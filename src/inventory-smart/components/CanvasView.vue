@@ -2189,6 +2189,34 @@ const onDelete = async (id) => {
   await deleteSelected({ withConfirm: true })
   ctx.close()
 }
+
+const getStageInstance = () => stageRef.value?.getNode?.() || null
+
+const getStageSizeSnapshot = () => ({
+  width: stageSize.value.width,
+  height: stageSize.value.height,
+})
+
+const getViewportWorldRect = () => {
+  const stage = getStageInstance()
+  if (!stage) return null
+  const scale = typeof stage.scaleX === 'function' ? stage.scaleX() || 1 : 1
+  if (!Number.isFinite(scale) || scale === 0) return null
+  const stageX = typeof stage.x === 'function' ? stage.x() || 0 : 0
+  const stageY = typeof stage.y === 'function' ? stage.y() || 0 : 0
+  return {
+    minX: (0 - stageX) / scale,
+    minY: (0 - stageY) / scale,
+    maxX: (stageSize.value.width - stageX) / scale,
+    maxY: (stageSize.value.height - stageY) / scale,
+  }
+}
+
+defineExpose({
+  getStage: getStageInstance,
+  getStageSize: getStageSizeSnapshot,
+  getViewportWorldRect,
+})
 </script>
 
 <style scoped>

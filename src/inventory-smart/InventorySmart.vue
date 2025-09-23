@@ -14,7 +14,10 @@
 
       <!-- Canvas principal -->
       <div class="app-canvas">
-        <CanvasView :safeRight="canvasStore.mostrarPropiedades ? 320 : 20" />
+        <CanvasView
+          ref="canvasViewRef"
+          :safeRight="canvasStore.mostrarPropiedades ? 320 : 20"
+        />
       </div>
 
       <!-- Panel de propiedades (superpuesto para no empujar el canvas) -->
@@ -86,8 +89,10 @@ const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
 const { deleteSelected } = useDeleteElement()
-const { handlePaste } = useAutoPaste()
+const { handlePaste: autoPaste } = useAutoPaste()
 const { showToast } = useToast()
+
+const canvasViewRef = ref(null)
 
 // Estado del modal de aviso de reemplazo por servidor
 const showReplaceNotice = ref(false)
@@ -190,7 +195,7 @@ const handleKeydown = (e) => {
       handleCopyToBuffer()
     } else if (e.key === 'v') {
       e.preventDefault()
-      handlePaste()
+      triggerPaste()
     }
   } else if (e.key === 'Delete' || e.key === 'Backspace') {
     // Supr o Retroceso -> eliminar seleccionado
@@ -209,6 +214,56 @@ const handleCopyToBuffer = () => {
   if (elementoSeleccionado) {
     buffer.copyToBuffer(elementoSeleccionado)
     console.log('📋 Estructura copiada al buffer')
+  }
+}
+
+const triggerPaste = () => {
+  try {
+    const stage = canvasViewRef.value?.getStage?.()
+    const viewportSize = canvasViewRef.value?.getStageSize?.() || null
+    const viewportWorld = canvasViewRef.value?.getViewportWorldRect?.() || null
+
+    let startPosition = null
+
+    if (stage && typeof stage.getPointerPosition === 'function') {
+      const pointer = stage.getPointerPosition()
+      const scale = typeof stage.scaleX === 'function' ? stage.scaleX() || 1 : 1
+      const stageX = typeof stage.x === 'function' ? stage.x() || 0 : 0
+      const stageY = typeof stage.y === 'function' ? stage.y() || 0 : 0
+
+      if (pointer) {
+        startPosition = {
+          x: (pointer.x - stageX) / (scale || 1),
+          y: (pointer.y - stageY) / (scale || 1),
+        }
+      }
+
+      if (!startPosition && viewportSize) {
+        startPosition = {
+          x: (viewportSize.width / 2 - stageX) / (scale || 1),
+          y: (viewportSize.height / 2 - stageY) / (scale || 1),
+        }
+      }
+    }
+
+    if (!startPosition && viewportSize) {
+      const scale = canvasStore.zoom || 1
+      const stageX = canvasStore.panX || 0
+      const stageY = canvasStore.panY || 0
+      startPosition = {
+        x: (viewportSize.width / 2 - stageX) / (scale || 1),
+        y: (viewportSize.height / 2 - stageY) / (scale || 1),
+      }
+    }
+
+    void autoPaste({
+      startPosition: startPosition || null,
+      viewportSize,
+      viewportWorld,
+    })
+  } catch (error) {
+    console.warn('No se pudo calcular el punto inicial para pegar:', error)
+    void autoPaste()
   }
 }
 
