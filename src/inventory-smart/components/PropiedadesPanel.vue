@@ -258,7 +258,6 @@
                   min="0"
                   v-model.number="edited.capacidadCarga"
                   @change="validarPeso"
-                  @input="onPesoInput"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
                   focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
                   disabled:cursor-not-allowed disabled:text-gray-500"
@@ -483,8 +482,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
-import { TIPOS_ENTIDAD, CM_TO_PX } from '@/inventory-smart/utils/constants'
-// useCanvasStore ya importado arriba
+import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX } from '@/inventory-smart/utils/constants'
 import { deepClone, deepEqual, makePatch } from '@/inventory-smart/utils/object'
 import { useToast } from '@/inventory-smart/composables/useToast.js'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
@@ -1111,87 +1109,6 @@ const validarPeso = () => {
   // que bloquea el botón Guardar y muestra el mensaje apropiado
 }
 
-// Validación inmediata también para pasos con flechas del input number
-const onPesoInput = (e) => {
-  // Asegurar número y clamp >= 0
-  let val = Number(edited.value?.capacidadCarga)
-  if (!Number.isFinite(val)) val = 0
-  if (val < 0) val = 0
-  // Normalizar a 2 decimales para evitar ruido por floats de step="any"
-  val = Number(val.toFixed(2))
-  if (edited.value.capacidadCarga !== val) {
-    edited.value.capacidadCarga = val
-  }
-
-  // Ejecutar las mismas validaciones que en @change para impedir estados inválidos
-  const prev = valorPesoAnterior.value
-  if (prev === undefined || Math.abs(prev - val) >= 0.01) {
-    // Comprobar validaciones duras: uso real, hijos y padre; si fallan, revertir suavemente
-    const elemento = elementoSeleccionado.value
-    if (!elemento) return
-
-    // 1. uso real
-    const real = validarPesoMaximoVsUsoReal(elemento, val)
-    if (!real.valido) {
-      // ajustar mínimo a uso actual
-      const minPorUso = Number((elemento?.uso?.peso || 0).toFixed(2))
-      edited.value.capacidadCarga = minPorUso
-      valorPesoAnterior.value = minPorUso
-      showWarning(real.mensaje)
-      return
-    }
-
-    // 2. hijos
-    const hijos = validarCapacidadVsHijos(elemento, val)
-    if (!hijos.valido) {
-      // ajustar mínimo a suma de capacidades de hijos si está disponible en mensaje/contexto
-      // Como fallback, simplemente revertimos al snapshot si no tenemos el dato
-      const sumaHijos = hijos?.requerido || null
-      if (Number.isFinite(sumaHijos)) {
-        edited.value.capacidadCarga = Number(Number(sumaHijos).toFixed(2))
-        valorPesoAnterior.value = edited.value.capacidadCarga
-      } else {
-        edited.value.capacidadCarga = snapshotOriginal.value.capacidadCarga
-        valorPesoAnterior.value = edited.value.capacidadCarga
-      }
-      showWarning(hijos.mensaje)
-      return
-    }
-
-    // 3. padre teórico si aplica
-    const { padreId, padreType } = padreContext.value
-    if (padreId && padreType) {
-      const sim = { ...elemento, capacidadCarga: val }
-      const teor = validarPesoElemento(sim, padreId, padreType, {
-        validacionTeorica: true,
-        esEdicion: true,
-      })
-      if (!teor.valido && teor.limiteDePeso) {
-        // ajustar máximo al permitido por el padre (capacidadCarga - (pesoTotal - nuevaCapacidad))
-        // Si tenemos datos, fijamos al máximo permitido; si no, revertimos
-        const maxPadre = Number(teor?.capacidadCarga ?? 0)
-        const pesoTotal = Number(teor?.pesoTotal ?? 0)
-        // Si pesoTotal > capacidad, bajar val lo suficiente; como aproximación, setear a (capacidadCarga - exceso)
-        if (Number.isFinite(maxPadre) && Number.isFinite(teor?.exceso)) {
-          const nuevoVal = Math.max(0, Number((maxPadre - teor.exceso).toFixed(2)))
-          edited.value.capacidadCarga = nuevoVal
-          valorPesoAnterior.value = nuevoVal
-        } else {
-          edited.value.capacidadCarga = snapshotOriginal.value.capacidadCarga
-          valorPesoAnterior.value = edited.value.capacidadCarga
-        }
-        showWarning(
-          `Se excede el límite de peso del contenedor padre. Exceso: ${teor.exceso.toFixed(2)} kg (Total: ${teor.pesoTotal.toFixed(2)}/${teor.capacidadCarga} kg).`
-        )
-        return
-      }
-    }
-
-    // Si pasaron las validaciones, actualizamos el valorAnterior para no revalidar innecesariamente
-    valorPesoAnterior.value = val
-  }
-}
-
 const getTipoNombre = (tipo) => {
   return TIPOS_ENTIDAD.find((t) => t.id === tipo)?.nombre || tipo
 }
@@ -1234,8 +1151,7 @@ const getTipoNombreActual = () => {
 }
 
 const getCategoriaDisplay = (categoria) => {
-  const allCats = [...(canvasStore.catalogos?.tiposCuarto || []), ...(canvasStore.catalogos?.tiposEspacio || [])]
-  return allCats.find((c) => c.id === categoria)?.nombre || categoria
+  return TODAS_LAS_CATEGORIAS.find((c) => c.id === categoria)?.nombre || categoria
 }
 
 const esEstructura = computed(() => {
@@ -1464,13 +1380,6 @@ const advertenciaPeso = computed(() => {
   const newVal = Number(edited.value?.capacidadCarga || 0)
   if (!Number.isFinite(newVal) || newVal < 0) return 'La capacidad debe ser un número válido.'
 
-  // Solo ejecutar validaciones costosas si el valor del peso realmente cambió
-  const valorAnterior = valorPesoAnterior.value
-  if (valorAnterior !== undefined && Math.abs(valorAnterior - newVal) < 0.01) {
-    // Si el valor no cambió, no hay advertencia (asumimos que ya se validó antes)
-    return null
-  }
-
   // 1. VALIDACIÓN DE USO REAL: capacidad ≥ uso actual del elemento
   const validacionReal = validarPesoMaximoVsUsoReal(elementoSeleccionado.value, newVal)
   if (!validacionReal.valido) {
@@ -1497,7 +1406,7 @@ const advertenciaPeso = computed(() => {
     })
 
     if (!validacionTeorica.valido && validacionTeorica.limiteDePeso) {
-      return `Se excede el límite de peso del contenedor padre. Exceso: ${validacionTeorica.exceso.toFixed(2)} kg (Total: ${validacionTeorica.pesoTotal.toFixed(2)}/${validacionTeorica.capacidadCarga} kg).`
+      return `Se excede la capacidad de peso teórica ${getTipoNombrePadre()}. Exceso: ${validacionTeorica.exceso.toFixed(2)} kg (Total: ${validacionTeorica.pesoTotal.toFixed(2)}/${validacionTeorica.capacidadCarga} kg).`
     }
   }
 
