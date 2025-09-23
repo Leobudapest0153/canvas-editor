@@ -243,6 +243,8 @@ const ovalSamplePoints = (cx, cy, rx, ry, n) =>
   })
 
 const PIXELS_PER_CM = CM_TO_PX
+const MIN_DIMENSION_CM = 100
+const DEFAULT_HEIGHT_CM = 300
 
 const rectW = ref(500)
 const rectL = ref(500)
@@ -279,6 +281,7 @@ let dimensionChangeDebounce = null
 const showLimitedHint = ref(false)
 
 const INFINITE_PREVIEW_PADDING = 14
+let suppressDimensionWatch = false
 
 const previewFrameBBox = computed(() => {
   // Plantas infinitas → preview se encuadra al BBox de elementos con padding.
@@ -324,6 +327,168 @@ function defaultRect(w_cm, l_cm) {
     { x: w, y: l },
     { x: 0, y: l },
   ]
+}
+
+function getElementSizePx(el) {
+  let width = Number(el?.width)
+  let height = Number(el?.height)
+
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+    const dims = el?.dimensiones || {}
+    const anchoCm = Number(dims?.ancho)
+    const largoCm = Number(dims?.largo)
+    if (Number.isFinite(anchoCm) && anchoCm > 0) {
+      width = anchoCm * PIXELS_PER_CM
+    }
+    if (Number.isFinite(largoCm) && largoCm > 0) {
+      height = largoCm * PIXELS_PER_CM
+    }
+  }
+
+  return { width, height }
+}
+
+function getElementPositionPx(el) {
+  let x = Number(el?.x)
+  let y = Number(el?.y)
+
+  if (!Number.isFinite(x) && el?.posicion) {
+    x = Number(el.posicion?.x)
+  }
+  if (!Number.isFinite(y) && el?.posicion) {
+    y = Number(el.posicion?.y)
+  }
+
+  return { x, y }
+}
+
+function rotatePoint(point, pivot, angleRad) {
+  const dx = point.x - pivot.x
+  const dy = point.y - pivot.y
+  const cos = Math.cos(angleRad)
+  const sin = Math.sin(angleRad)
+  return {
+    x: pivot.x + dx * cos - dy * sin,
+    y: pivot.y + dx * sin + dy * cos,
+  }
+}
+
+function computeElementsBoundingBox(elements, paddingPx = 0) {
+  if (!Array.isArray(elements) || elements.length === 0) return null
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let hasValid = false
+
+  for (const el of elements) {
+    if (!el || el.visible === false) continue
+    const { x, y } = getElementPositionPx(el)
+    const { width, height } = getElementSizePx(el)
+
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+      continue
+    }
+    if (width <= 0 || height <= 0) continue
+
+    hasValid = true
+
+    const rotationDeg = Number(el?.rotation ?? el?.posicion?.rotation ?? 0) || 0
+    const normalizedRotation = ((rotationDeg % 360) + 360) % 360
+    const baseCorners = [
+      { x, y },
+      { x: x + width, y },
+      { x: x + width, y: y + height },
+      { x, y: y + height },
+    ]
+
+    let allPoints = baseCorners
+    if (Math.abs(normalizedRotation) > 1e-3) {
+      const angleRad = (normalizedRotation * Math.PI) / 180
+      const pivotTopLeft = { x, y }
+      const pivotCenter = { x: x + width / 2, y: y + height / 2 }
+      const rotatedTopLeft = baseCorners.map((pt) => rotatePoint(pt, pivotTopLeft, angleRad))
+      const rotatedCenter = baseCorners.map((pt) => rotatePoint(pt, pivotCenter, angleRad))
+      allPoints = [...baseCorners, ...rotatedTopLeft, ...rotatedCenter]
+    }
+
+    for (const pt of allPoints) {
+      const px = Number(pt?.x)
+      const py = Number(pt?.y)
+      if (!Number.isFinite(px) || !Number.isFinite(py)) continue
+      if (px < minX) minX = px
+      if (py < minY) minY = py
+      if (px > maxX) maxX = px
+      if (py > maxY) maxY = py
+    }
+  }
+
+  if (!hasValid || !Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return null
+  }
+
+  const padding = Math.max(0, Number(paddingPx) || 0)
+  const paddedMinX = minX - padding
+  const paddedMinY = minY - padding
+  const paddedMaxX = maxX + padding
+  const paddedMaxY = maxY + padding
+
+  return {
+    minX: paddedMinX,
+    minY: paddedMinY,
+    maxX: paddedMaxX,
+    maxY: paddedMaxY,
+    widthPx: paddedMaxX - paddedMinX,
+    heightPx: paddedMaxY - paddedMinY,
+  }
+}
+
+function proposeFiniteDimensionsFromElements(elements) {
+  const bbox = computeElementsBoundingBox(elements, INFINITE_PREVIEW_PADDING)
+  if (!bbox) return null
+
+  const widthPx = Math.max(Math.ceil(bbox.widthPx), Math.ceil(bbox.maxX))
+  const lengthPx = Math.max(Math.ceil(bbox.heightPx), Math.ceil(bbox.maxY))
+
+  const widthCm = Math.max(1, Math.ceil(widthPx / PIXELS_PER_CM))
+  const lengthCm = Math.max(1, Math.ceil(lengthPx / PIXELS_PER_CM))
+
+  return { widthCm, lengthCm, bbox }
+}
+
+function computeSuggestedHeightCm(currentHeightCm, elements) {
+  const candidate = Number(currentHeightCm)
+  if (Number.isFinite(candidate) && candidate > 0) {
+    return Math.ceil(candidate)
+  }
+
+  let tallest = 0
+  for (const el of elements || []) {
+    if (!el || el.visible === false) continue
+    const elementHeight = Number(el?.dimensiones?.alto) || 0
+    const zBase = Number(el?.alturaRespectoAlSuelo) || 0
+    const total = elementHeight + zBase
+    if (total > tallest) {
+      tallest = total
+    }
+  }
+
+  if (tallest > 0) {
+    return Math.ceil(tallest)
+  }
+  return DEFAULT_HEIGHT_CM
+}
+
+function isAxisAlignedRectangle(polygon) {
+  if (!Array.isArray(polygon) || polygon.length !== 4) return false
+  const xs = polygon.map((p) => Number(p?.x))
+  const ys = polygon.map((p) => Number(p?.y))
+  if (!xs.every(Number.isFinite) || !ys.every(Number.isFinite)) return false
+  const uniqueX = Array.from(new Set(xs.map((n) => Math.round(n))))
+  const uniqueY = Array.from(new Set(ys.map((n) => Math.round(n))))
+  if (uniqueX.length !== 2 || uniqueY.length !== 2) return false
+  return true
 }
 
 const closeModal = () => {
@@ -516,7 +681,53 @@ watch(
     }
     // Si pasa a limitado desde elástico, mostrar hint hasta que se guarde con dimensiones válidas
     if (!isOn && wasOn) {
-      showLimitedHint.value = true
+      const proposed = proposeFiniteDimensionsFromElements(local.elements || [])
+      const fallbackWidthCm = Number(rectW.value) > 0 ? rectW.value : MIN_DIMENSION_CM
+      const fallbackLengthCm = Number(rectL.value) > 0 ? rectL.value : MIN_DIMENSION_CM
+      const suggestedWidthCm = proposed?.widthCm ?? fallbackWidthCm
+      const suggestedLengthCm = proposed?.lengthCm ?? fallbackLengthCm
+      const widthCm = Math.max(MIN_DIMENSION_CM, suggestedWidthCm)
+      const lengthCm = Math.max(MIN_DIMENSION_CM, suggestedLengthCm)
+      const heightCm = Math.max(1, computeSuggestedHeightCm(rectY.value, local.elements || []))
+
+      const prevWorldWidth = worldWidth.value
+      const prevWorldHeight = worldHeight.value
+
+      // Al pasar de infinita→finita: usamos el BBox del contenido para proponer dimensiones (W×L) con padding,
+      // rellenamos el formulario y reencuadramos el preview con el nuevo rectángulo.
+      suppressDimensionWatch = true
+      try {
+        rectW.value = widthCm
+        rectL.value = lengthCm
+        rectY.value = heightCm
+        localRectWMeters.value = widthCm / 100
+        localRectLMeters.value = lengthCm / 100
+        localRectYMeters.value = heightCm / 100
+
+        const newWorldWidth = widthCm * PIXELS_PER_CM
+        const newWorldHeight = lengthCm * PIXELS_PER_CM
+
+        if (!Array.isArray(local.polygon) || local.polygon.length < 3 || isAxisAlignedRectangle(local.polygon)) {
+          local.polygon = defaultRect(widthCm, lengthCm)
+        } else if (Number.isFinite(prevWorldWidth) && prevWorldWidth > 0 && Number.isFinite(prevWorldHeight) && prevWorldHeight > 0) {
+          const scaleX = newWorldWidth / prevWorldWidth
+          const scaleY = newWorldHeight / prevWorldHeight
+          local.polygon = local.polygon.map((point) => ({
+            x: Math.round((Number(point?.x) || 0) * scaleX),
+            y: Math.round((Number(point?.y) || 0) * scaleY),
+          }))
+        }
+
+        isManuallyEdited.value = true
+        errors.dimensions = false
+        notice.value = ''
+        showLimitedHint.value = false
+
+        await nextTick()
+        canvasEditorRef.value?.fitStageToPolygon()
+      } finally {
+        suppressDimensionWatch = false
+      }
     }
   },
 )
@@ -618,6 +829,7 @@ function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, f
 // --- WATCH CORREGIDO ---
 watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY]) => {
   if (isLoadingData.value) return
+  if (suppressDimensionWatch) return
 
   clearTimeout(dimensionChangeDebounce)
 
