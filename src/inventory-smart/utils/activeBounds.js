@@ -77,6 +77,7 @@ export function getActiveBounds(canvasStore) {
   }
 
   const planta = canvasStore.plantaActual || canvasStore.plantaActivaData || {}
+  const isInfinite = !!planta.isInfinite
 
   // Normalizar modo del piso a una sola propiedad para reducir complejidad
   if (
@@ -88,17 +89,17 @@ export function getActiveBounds(canvasStore) {
   }
 
   // Actualizar flag global para validaciones de límites
-  setPlantInfiniteFlag(!!planta.isInfinite)
+  setPlantInfiniteFlag(isInfinite)
 
   if (planta.poligono && Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
     // Clonar superficial para evitar mutar store
     const polygonPx = planta.poligono.map(p => ({ x: p.x, y: p.y }))
     // Marcar metadata opcional
-    if (planta.isInfinite) {
+    if (isInfinite) {
       Object.defineProperty(polygonPx, '_isInfinite', { value: true, enumerable: false, configurable: true })
     }
     const boundsPx = bboxFromPolygon(polygonPx)
-    return { mode: 'fixed', boundsPx, polygonPx }
+    return { mode: isInfinite ? 'elastic' : 'fixed', boundsPx, polygonPx }
   }
 
   // Fallback: dimensiones rectangulares
@@ -112,8 +113,8 @@ export function getActiveBounds(canvasStore) {
     { x: width, y: height },
     { x: 0, y: height },
   ]
-  if (planta.isInfinite) {
+  if (isInfinite) {
     Object.defineProperty(polygonPx, '_isInfinite', { value: true, enumerable: false, configurable: true })
   }
-  return { mode: 'fixed', boundsPx: { width, height }, polygonPx }
+  return { mode: isInfinite ? 'elastic' : 'fixed', boundsPx: { width, height }, polygonPx }
 }

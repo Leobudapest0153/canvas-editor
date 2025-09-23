@@ -264,6 +264,10 @@ export function useDimensionValidation() {
       return { valida: true, razon: 'No se encontró el contenedor padre o no tiene dimensiones' };
     }
 
+    if (canvasStore.plantaActivaData?.isInfinite === true) {
+      return { valida: true, razon: 'La planta activa es infinita; no aplica contención por canvas adaptativo' };
+    }
+
     const vista = canvasStore.vistaActiva || 'XY'
     const esVistaFrontal = vista === 'XZ'
 

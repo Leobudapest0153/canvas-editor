@@ -104,16 +104,33 @@ export function useTransformer({
           const MINW = 10
           const MINH = 10
           if (newBox.width <= 0 || newBox.height <= 0) return oldBox
-          if (newBox.width < MINW || newBox.height < MINH) return oldBox
+
+          const boundary = typeof computeBoundary === 'function' ? computeBoundary() : null
+          const boundaryMode = boundary?.mode
+          const isElasticBoundary = boundaryMode === 'elastic'
+          const floorIsInfinite = canvasStore.plantaActivaData?.isInfinite === true
+          const allowElasticResize = floorIsInfinite || isElasticBoundary
+
+          if (!allowElasticResize && (newBox.width < MINW || newBox.height < MINH)) {
+            return oldBox
+          }
+
+          let adjustedBox = allowElasticResize
+            ? {
+                ...newBox,
+                width: Math.max(MINW, newBox.width),
+                height: Math.max(MINH, newBox.height),
+              }
+            : newBox
 
           // Para elementos circulares, mantener aspecto cuadrado
           if (elemento?.forma === 'circular') {
-            const size = Math.max(newBox.width, newBox.height)
-            return { ...newBox, width: size, height: size }
+            const size = Math.max(adjustedBox.width, adjustedBox.height)
+            adjustedBox = { ...adjustedBox, width: size, height: size }
           }
 
           // NO aplicar clamping aquí - permitir transformación libre
-          return newBox
+          return adjustedBox
         },
       })
       trComp.getLayer()?.batchDraw?.()
@@ -364,8 +381,20 @@ export function useTransformer({
         return
       }
 
-  // Usar el snapshot congelado para todas las operaciones
-  const elementoSnapshot = elemento
+      // Usar el snapshot congelado para todas las operaciones
+      const elementoSnapshot = elemento
+
+      let boundary = null
+      if (typeof computeBoundary === 'function') {
+        try {
+          boundary = computeBoundary() || null
+        } catch (boundaryErr) {
+          console.warn('[transform-boundary-compute-error]', boundaryErr)
+        }
+      }
+
+      const floorIsInfinite = canvasStore.plantaActivaData?.isInfinite === true
+      const boundaryMode = boundary?.mode || (floorIsInfinite ? 'elastic' : 'fixed')
 
       // Extraer valores de Konva (mantener valores originales para Konva y store)
       const width = node.width() * node.scaleX()
@@ -583,28 +612,25 @@ export function useTransformer({
 
       // VALIDACIÓN 2: Verificar que esté dentro del polígono de la planta
       try {
-        if (typeof computeBoundary === 'function') {
-          const boundary = computeBoundary()
-          if (boundary && boundary.type === 'polygon' && boundary.mode !== 'elastic') {
-            let isInsidePolygon = false
-            const polygon = boundary.inset || boundary.points
+        if (boundary && boundary.type === 'polygon' && boundary.mode !== 'elastic') {
+          let isInsidePolygon = false
+          const polygon = boundary.inset || boundary.points
 
-            if (elemento?.forma === 'circular') {
-              // Para círculos, verificar que el círculo completo esté dentro
-              const radius = Math.min(width, height) / 2
-              const centerX = x + radius
-              const centerY = y + radius
-              isInsidePolygon = circleInPolygon({ x: centerX, y: centerY, radius }, polygon)
-            } else {
-              // Para rectángulos, usar verificación completa con muestreo denso
-              isInsidePolygon = isRectCompletelyInPolygon(x, y, width, height, polygon)
-            }
+          if (elemento?.forma === 'circular') {
+            // Para círculos, verificar que el círculo completo esté dentro
+            const radius = Math.min(width, height) / 2
+            const centerX = x + radius
+            const centerY = y + radius
+            isInsidePolygon = circleInPolygon({ x: centerX, y: centerY, radius }, polygon)
+          } else {
+            // Para rectángulos, usar verificación completa con muestreo denso
+            isInsidePolygon = isRectCompletelyInPolygon(x, y, width, height, polygon)
+          }
 
-            if (!isInsidePolygon) {
-              showToast('El elemento debe permanecer completamente dentro del área de la planta', 'warning')
-              revertTransform(elementId, 'elemento fuera del polígono')
-              return
-            }
+          if (!isInsidePolygon) {
+            showToast('El elemento debe permanecer completamente dentro del área de la planta', 'warning')
+            revertTransform(elementId, 'elemento fuera del polígono')
+            return
           }
         }
       } catch (err) {
@@ -614,11 +640,15 @@ export function useTransformer({
       // VALIDACIÓN 3: Placement validation (colisiones, área) - usar valores corregidos
       // Usar neighbors del snapshot para evitar cambios durante la validación
       const neighbors = Array.from(elementosSnapshot.values()).filter((e) => e.id !== elementId)
+      const layerBounds = layerConfig?.value || { width: 0, height: 0 }
       const areaBounds = {
         minX: 0,
         minY: 0,
-        maxX: layerConfig.value.width,
-        maxY: layerConfig.value.height,
+        mode: boundaryMode || 'fixed',
+      }
+      if ((boundaryMode || 'fixed') !== 'elastic') {
+        areaBounds.maxX = layerBounds.width
+        areaBounds.maxY = layerBounds.height
       }
       const elementoParaValidacion =
         elementoSnapshot?.forma === 'circular'
