@@ -260,6 +260,10 @@ export function useDimensionValidation() {
     const parentId = elemento.padre || elemento.parentId;
     const padre = canvasStore.elementoPorId(parentId);
 
+    if (canvasStore.plantaActivaData?.isInfinite === true && canvasStore.estaEnPlanta) {
+      return { valida: true, razon: 'La planta activa es infinita, no aplica restricción de canvas adaptativo' };
+    }
+
     if (!padre || !padre.dimensiones) {
       return { valida: true, razon: 'No se encontró el contenedor padre o no tiene dimensiones' };
     }

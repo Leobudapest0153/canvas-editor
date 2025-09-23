@@ -7,6 +7,10 @@ export function setPlantInfiniteFlag(v) {
   __PLANT_IS_INFINITE__ = !!v
 }
 
+export function isPlantInfinite() {
+  return __PLANT_IS_INFINITE__
+}
+
 // Helper: detectar polígono con bypass de límites (planta infinita)
 function _isInfinitePoly(polyOrPlant) {
   if (__PLANT_IS_INFINITE__) return true
