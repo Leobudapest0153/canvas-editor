@@ -606,7 +606,7 @@
       @close="closeTemplateModal"
     />
 
-    <CanvasInfo />
+    <CanvasInfo v-if="!isInfinitePlant" />
 
     <FloatingControls
       :safe-right="safeRight"
