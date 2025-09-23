@@ -449,6 +449,7 @@
       <v-layer ref="uiLayerRef" :config="{ listening: false }">
         <!-- Debug: mostrar información según el contexto -->
         <v-text
+          v-if="!canvasStore.estaEnPlanta || canvasStore.plantaActivaData?.isInfinite !== true"
           :config="{
             x: 10,
             y: -(39 / canvasStore.zoom),
@@ -459,10 +460,11 @@
             fontFamily: 'Arial',
             fill: '#3b82f6',
             listening: false,
+            name: 'floor-info-label',
           }"
         />
         <v-text
-          v-if="canvasStore.estaEnPlanta"
+          v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite !== true"
           :config="{
             x: 10,
             y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
@@ -471,6 +473,7 @@
             fontFamily: 'Arial',
             fill: '#6b7280',
             listening: false,
+            name: 'floor-info-label',
           }"
         />
 
