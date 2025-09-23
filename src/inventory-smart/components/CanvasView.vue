@@ -15,7 +15,11 @@
   <div
     ref="containerRef"
     class="canvas-container"
-    :class="{ 'drag-over': isDragOverCanvas, 'cursor-grab': !dragModeGlobal }"
+    :class="{
+      'drag-over': isDragOverCanvas,
+      'cursor-grab': !dragModeGlobal,
+      'infinite-floor': isInfinitePlant,
+    }"
     @drop="handleDrop"
     @dragover="handleDragOver"
     @dragenter="handleDragEnter"
@@ -836,6 +840,7 @@ const stageConfig = computed(() => {
 })
 
 const activeBounds = computed(() => getActiveBounds(canvasStore))
+const isInfinitePlant = computed(() => canvasStore.plantaActivaData?.isInfinite === true)
 
 const plantPolygon = computed(() => activeBounds.value.polygonPx)
 
@@ -843,16 +848,34 @@ const insetPoly = computed(() => polygonInset(plantPolygon.value, 1))
 
 const plantPolygonFlat = computed(() => plantPolygon.value.flatMap((p) => [p.x, p.y]))
 
-const floorBoundary = computed(() => activeBounds.value.boundsPx)
+const floorBoundary = computed(() => {
+  const bounds = activeBounds.value.boundsPx || { width: 0, height: 0 }
+  if (!isInfinitePlant.value) {
+    return bounds
+  }
+  const zoom = canvasStore.zoom || 1
+  const viewWidth = stageSize.value.width / (zoom || 1)
+  const viewHeight = stageSize.value.height / (zoom || 1)
+  return {
+    width: Math.max(bounds.width || 0, viewWidth || 0),
+    height: Math.max(bounds.height || 0, viewHeight || 0),
+  }
+})
 
 // Configuración del layer - SIEMPRE USA CANVAS ADAPTATIVO
 const layerConfig = computed(() => {
-  // Usar siempre canvasAdaptativo como fuente única de verdad
-  const config = {
-    width: canvasStore.canvasAdaptativo.width,
-    height: canvasStore.canvasAdaptativo.height,
+  const baseWidth = canvasStore.canvasAdaptativo?.width || 0
+  const baseHeight = canvasStore.canvasAdaptativo?.height || 0
+  if (!isInfinitePlant.value) {
+    return { width: baseWidth, height: baseHeight }
   }
-  return config
+  const zoom = canvasStore.zoom || 1
+  const viewWidth = stageSize.value.width / (zoom || 1)
+  const viewHeight = stageSize.value.height / (zoom || 1)
+  return {
+    width: Math.max(baseWidth, viewWidth || 0),
+    height: Math.max(baseHeight, viewHeight || 0),
+  }
 })
 
 // Composable para zoom
@@ -865,7 +888,51 @@ const {
 // Elementos visibles en el canvas (excluye elementos ocultos)
 const elementosVisiblesEnCanvas = computed(() => {
   const visibles = canvasStore.elementosVisibles.filter((elemento) => elemento.visible !== false)
-  return visibles
+  if (!isInfinitePlant.value) {
+    return visibles
+  }
+
+  const zoom = canvasStore.zoom || 1
+  const stageWidth = stageSize.value.width || 0
+  const stageHeight = stageSize.value.height || 0
+
+  if (!stageWidth || !stageHeight || !Number.isFinite(zoom) || zoom <= 0) {
+    return visibles
+  }
+
+  const viewX = -canvasStore.panX / zoom
+  const viewY = -canvasStore.panY / zoom
+  const viewW = stageWidth / zoom
+  const viewH = stageHeight / zoom
+  const padding = 200 / zoom
+
+  const minX = viewX - padding
+  const maxX = viewX + viewW + padding
+  const minY = viewY - padding
+  const maxY = viewY + viewH + padding
+
+  const stage = stageRef.value?.getNode?.()
+
+  return visibles.filter((elemento) => {
+    const width = getDrawWidth(elemento) || 0
+    const height = getDrawHeight(elemento) || 0
+    const x = elemento.x ?? 0
+    const y = elemento.y ?? 0
+
+    const intersects = x + width >= minX && x <= maxX && y + height >= minY && y <= maxY
+    if (intersects) {
+      return true
+    }
+
+    if (stage) {
+      const node = stage.findOne?.(`#${elemento.id}`)
+      if (node && typeof node.isDragging === 'function' && node.isDragging()) {
+        return true
+      }
+    }
+
+    return false
+  })
 })
 
 // Detectar si existen pasillos visibles y toggle para su borde punteado
@@ -901,19 +968,33 @@ const gridLines = computed(() => {
 })
 
 watch(
-  plantPolygon,
-  (poly) => {
+  [plantPolygon, isInfinitePlant],
+  ([poly, infinite]) => {
     const layer = layerRef.value?.getNode?.()
-    if (layer && poly?.length) {
-      layer.clipFunc((ctx) => {
-        ctx.beginPath()
-        poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-        ctx.closePath()
-      })
+    if (!layer) return
+
+    if (infinite || !poly?.length) {
+      try {
+        layer.clipFunc(null)
+        if (typeof layer.clipWidth === 'function') layer.clipWidth(null)
+        if (typeof layer.clipHeight === 'function') layer.clipHeight(null)
+        if (typeof layer.clipX === 'function') layer.clipX(0)
+        if (typeof layer.clipY === 'function') layer.clipY(0)
+      } catch {
+        /* ignore */
+      }
       layer.batchDraw?.()
+      return
     }
+
+    layer.clipFunc((ctx) => {
+      ctx.beginPath()
+      poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+      ctx.closePath()
+    })
+    layer.batchDraw?.()
   },
-  { immediate: true },
+  { immediate: true, deep: true },
 )
 
 // Contorno activo siempre expresado como polígono
@@ -1096,6 +1177,9 @@ const toStageCoords = (pos) => {
 // Drag bound para cada elemento y forma (clamp mínimo al contorno)
 const dragBoundForElement = (pos, elemento) => {
   try {
+    if (isInfinitePlant.value) {
+      return pos
+    }
     const lp = toLayerCoords(pos)
     const boundary = computeBoundary()
     const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
@@ -1237,7 +1321,7 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
 const runPreDropValidations = (elemento, dropEvent) => {
   if (!elemento) return { ok: false, reason: 'invalid' }
 
-  const contextoActual = canvasStore.contextoActual.tipo
+  const contextoActual = canvasStore.contextoActual?.tipo || 'plantas'
   const tipoElemento = elemento.tipo
 
   // Reglas de jerarquía actualizadas
@@ -1989,8 +2073,13 @@ const fitToPlanta = () => {
 
 // Auto-ajustar siempre que cambia el contexto (planta / elemento / contenedor)
 watch(
-  () => [canvasStore.contextoActual.tipo, canvasStore.contextoActual.id],
+  () => {
+    const ctx = canvasStore.contextoActual || {}
+    return [ctx?.tipo, ctx?.id]
+  },
   async () => {
+    const ctx = canvasStore.contextoActual
+    if (!ctx || !ctx.tipo) return
     // Esperar a que el store recalcule canvasAdaptativo y layerConfig
     await nextTick()
     await nextTick()
@@ -2102,6 +2191,10 @@ const onDelete = async (id) => {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   transition: all 0.2s ease;
+}
+
+.canvas-container.infinite-floor {
+  overflow: visible;
 }
 
 .canvas-container.drag-over {
