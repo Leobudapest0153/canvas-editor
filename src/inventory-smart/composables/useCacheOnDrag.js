@@ -4,7 +4,21 @@ import { watch, getCurrentInstance, onUnmounted } from 'vue'
 // - On `dragstart`: calls `node.cache()` and `node.draw()`
 // - On `dragend`: calls `node.clearCache()` and `node.draw()`
 // Listeners attach when the ref gains a node and detach when it changes or on component unmount.
-export function useCacheOnDrag(refNode) {
+export function useCacheOnDrag(refNode, options = {}) {
+  const isCachingEnabled = () => {
+    try {
+      if (typeof options.isEnabled === 'function') {
+        return options.isEnabled() !== false
+      }
+      if (Object.prototype.hasOwnProperty.call(options, 'isEnabled')) {
+        return !!options.isEnabled
+      }
+    } catch {
+      /* ignore */
+    }
+    return true
+  }
+
   /** @type {any|null} */
   let node = null
 
@@ -16,6 +30,7 @@ export function useCacheOnDrag(refNode) {
   }
 
   const onDragStart = () => {
+    if (!isCachingEnabled()) return
     try {
       node && node.cache && node.cache()
       node && node.draw && node.draw()
@@ -25,6 +40,7 @@ export function useCacheOnDrag(refNode) {
   }
 
   const onDragEnd = () => {
+    if (!isCachingEnabled()) return
     try {
       node && node.clearCache && node.clearCache()
       node && node.draw && node.draw()

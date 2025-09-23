@@ -12,16 +12,23 @@ export function dimsCmFor(el = {}, vista = 'XY') {
     return { w_cm: d, h_cm: d }
   }
 
-  const w = dims.ancho != null ? dims.ancho : (el.width || 0) / CM_TO_PX
+  const fallbackWidthCm = (el.width || 0) / CM_TO_PX
+  const fallbackHeightCm = (el.height || 0) / CM_TO_PX
+  const w = dims.ancho != null ? dims.ancho : fallbackWidthCm
 
   // Seleccionar la dimensión vertical adecuada según la vista:
   // - En vista XY (planta) la dimensión vertical corresponde a 'largo' (o 'prof')
   // - En vista XZ (frontal) la dimensión vertical corresponde a 'alto' (o 'prof')
   let h
   if (vista === 'XZ') {
-    h = dims.alto != null ? dims.alto : dims.prof != null ? dims.prof : dims.largo != null ? dims.largo : (el.height || 0) / CM_TO_PX
+    if (dims.alto != null) h = dims.alto
+    else if (dims.prof != null) h = dims.prof
+    else if (dims.largo != null) h = dims.largo
+    else h = fallbackHeightCm
   } else {
-    h = dims.prof != null ? dims.prof : dims.largo != null ? dims.largo : (el.height || 0) / CM_TO_PX
+    if (dims.prof != null) h = dims.prof
+    else if (dims.largo != null) h = dims.largo
+    else h = fallbackHeightCm
   }
 
   return { w_cm: w, h_cm: h }
@@ -31,6 +38,9 @@ export function dimsCmFor(el = {}, vista = 'XY') {
 // Para elementos circulares, el parámetro element debe incluir la información de forma.
 // useSmooth: true para usar clamp suave durante el drag (evita saltos)
 export function clampInsideArea(x, y, w, h, boundary, element = null, useSmooth = false, previousPos = null) {
+  if (boundary?.isInfinite === true || boundary?.points?._isInfinite === true) {
+    return { x, y }
+  }
   const mode = boundary?.mode ?? 'fixed'
   const shouldClamp = mode !== 'elastic'
 

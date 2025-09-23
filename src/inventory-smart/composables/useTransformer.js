@@ -34,6 +34,22 @@ export function useTransformer({
   const transformInitialState = new Map()
   const transformState = new Map()
 
+  const unwrapKonvaNode = (maybeNode) => {
+    if (!maybeNode) return null
+    if (typeof maybeNode.getNode === 'function') {
+      try {
+        return maybeNode.getNode()
+      } catch {
+        return null
+      }
+    }
+    return maybeNode || null
+  }
+
+  const getStageNode = () => unwrapKonvaNode(stageRef?.value)
+  const getLayerNode = () => unwrapKonvaNode(layerRef?.value)
+  const getTransformerNode = () => unwrapKonvaNode(transformerRef?.value)
+
   // Cleanup automático para prevenir memory leaks
   const cleanupStaleStates = () => {
     const activeIds = new Set(canvasStore.elementosVisibles.map((e) => e.id))
@@ -49,8 +65,8 @@ export function useTransformer({
 
   // Helper para obtener nodos del stage directamente
   const getNode = (elementId) => {
-    const stage = stageRef.value?.getNode?.()
-    if (!stage) return null
+    const stage = getStageNode()
+    if (!stage || typeof stage.findOne !== 'function') return null
     return stage.findOne(`#${elementId}`)
   }
 
@@ -81,12 +97,16 @@ export function useTransformer({
     // Verificar que no hay transformación activa antes de configurar
     if (isInteractingWithTransformer.value) return
 
-    const trComp = transformerRef.value?.getNode?.()
-    if (!trComp) return
+    const trComp = getTransformerNode()
+    if (!trComp || typeof trComp.nodes !== 'function') return
 
     const node = getNode(canvasStore.elementoSeleccionado)
     if (node) {
-      trComp.nodes([node])
+      try {
+        trComp.nodes([node])
+      } catch {
+        return
+      }
       const elemento = canvasStore.elementosVisibles.find(
         (e) => e.id === canvasStore.elementoSeleccionado,
       )
@@ -98,9 +118,10 @@ export function useTransformer({
         return
       }
 
-      trComp.setAttrs({
-        flipEnabled: false,
-        boundBoxFunc: (oldBox, newBox) => {
+      if (typeof trComp.setAttrs === 'function') {
+        trComp.setAttrs({
+          flipEnabled: false,
+          boundBoxFunc: (oldBox, newBox) => {
           const MINW = 10
           const MINH = 10
           if (newBox.width <= 0 || newBox.height <= 0) return oldBox
@@ -114,9 +135,10 @@ export function useTransformer({
 
           // NO aplicar clamping aquí - permitir transformación libre
           return newBox
-        },
-      })
-      trComp.getLayer()?.batchDraw?.()
+          },
+        })
+      }
+      trComp.getLayer?.()?.batchDraw?.()
     } else {
       console.warn(
         '[transform-warning] No se pudo encontrar el nodo para elemento:',
@@ -179,7 +201,7 @@ export function useTransformer({
         bbox?.strokeWidth(0)
       }
 
-      const layer = layerRef.value?.getNode?.()
+      const layer = getLayerNode()
       layer?.batchDraw?.()
     } catch (error) {
       console.error('[transform-clear-feedback-error] Error limpiando feedback visual:', error)
@@ -585,7 +607,12 @@ export function useTransformer({
       try {
         if (typeof computeBoundary === 'function') {
           const boundary = computeBoundary()
-          if (boundary && boundary.type === 'polygon' && boundary.mode !== 'elastic') {
+          if (
+            boundary &&
+            boundary.type === 'polygon' &&
+            boundary.mode !== 'elastic' &&
+            boundary.isInfinite !== true
+          ) {
             let isInsidePolygon = false
             const polygon = boundary.inset || boundary.points
 

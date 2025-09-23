@@ -15,7 +15,7 @@
   <div
     ref="containerRef"
     class="canvas-container"
-    :class="{ 'drag-over': isDragOverCanvas, 'cursor-grab': !dragModeGlobal }"
+    :class="{ 'drag-over': isDragOverCanvas, 'cursor-grab': !dragModeGlobal, 'infinite-canvas': isInfiniteCanvas }"
     @drop="handleDrop"
     @dragover="handleDragOver"
     @dragenter="handleDragEnter"
@@ -108,6 +108,7 @@
             v-if="elemento.forma === 'rectangular' || !elemento.forma"
             :config="{
               id: elemento.id,
+              name: 'element-node',
               x: elemento.x,
               y: elemento.y,
               width: getDrawWidth(elemento),
@@ -244,6 +245,7 @@
             v-else-if="elemento.forma === 'circular' && canvasStore.vistaActiva === 'XY'"
             :config="{
               id: elemento.id,
+              name: 'element-node',
               x: elemento.x,
               y: elemento.y,
               width: getDrawWidth(elemento),
@@ -300,6 +302,7 @@
             v-else-if="elemento.forma === 'circular' && canvasStore.vistaActiva === 'XZ'"
             :config="{
               id: elemento.id,
+              name: 'element-node',
               x: elemento.x,
               y: elemento.y,
               width: getDrawWidth(elemento),
@@ -669,6 +672,16 @@ const Konva =
     ? globalThis.Konva || (typeof window !== 'undefined' ? window.Konva : null)
     : null
 
+const requestAnimFrame =
+  typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
+    ? window.requestAnimationFrame.bind(window)
+    : (cb) => setTimeout(cb, 16)
+
+const cancelAnimFrame =
+  typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function'
+    ? window.cancelAnimationFrame.bind(window)
+    : (id) => clearTimeout(id)
+
 // Referencias
 const containerRef = ref(null)
 const stageRef = ref(null)
@@ -676,8 +689,59 @@ const layerRef = ref(null)
 const backgroundLayerRef = ref(null)
 const overlaysLayerRef = ref(null)
 
+const unwrapKonvaNode = (maybeNode) => {
+  if (!maybeNode) return null
+  if (typeof maybeNode.getNode === 'function') {
+    try {
+      return maybeNode.getNode()
+    } catch {
+      return null
+    }
+  }
+  return maybeNode || null
+}
+
+const getStageNode = () => unwrapKonvaNode(stageRef.value)
+const getLayerNode = () => unwrapKonvaNode(layerRef.value)
+
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
+
+const safeConfigurarZoom = (zoom, minZoom) => {
+  try {
+    if (typeof canvasStore?.configurarZoom === 'function') {
+      if (minZoom === undefined) {
+        canvasStore.configurarZoom(zoom)
+      } else {
+        canvasStore.configurarZoom(zoom, minZoom)
+      }
+      return
+    }
+  } catch {
+    /* ignore */
+  }
+  if (canvasStore && 'zoom' in canvasStore) {
+    canvasStore.zoom = zoom
+  }
+  if (minZoom !== undefined && canvasStore && 'minZoom' in canvasStore) {
+    canvasStore.minZoom = minZoom
+  }
+}
+
+const safeConfigurarPan = (x, y) => {
+  try {
+    if (typeof canvasStore?.configurarPan === 'function') {
+      canvasStore.configurarPan(x, y)
+      return
+    }
+  } catch {
+    /* ignore */
+  }
+  if (canvasStore) {
+    if ('panX' in canvasStore) canvasStore.panX = x
+    if ('panY' in canvasStore) canvasStore.panY = y
+  }
+}
 const { onDragStartGuard, onDragMoveGuard, onDragEndGuard, onTransformEndGuard } =
   usePlacementGuards()
 const buffer = useCanvasBuffer()
@@ -839,6 +903,12 @@ const activeBounds = computed(() => getActiveBounds(canvasStore))
 
 const plantPolygon = computed(() => activeBounds.value.polygonPx)
 
+const isInfiniteCanvas = computed(() => {
+  if (!canvasStore.estaEnPlanta) return false
+  if (plantPolygon.value && plantPolygon.value._isInfinite === true) return true
+  return canvasStore.plantaActivaData?.isInfinite === true
+})
+
 const insetPoly = computed(() => polygonInset(plantPolygon.value, 1))
 
 const plantPolygonFlat = computed(() => plantPolygon.value.flatMap((p) => [p.x, p.y]))
@@ -848,10 +918,10 @@ const floorBoundary = computed(() => activeBounds.value.boundsPx)
 // Configuración del layer - SIEMPRE USA CANVAS ADAPTATIVO
 const layerConfig = computed(() => {
   // Usar siempre canvasAdaptativo como fuente única de verdad
-  const config = {
-    width: canvasStore.canvasAdaptativo.width,
-    height: canvasStore.canvasAdaptativo.height,
-  }
+  const adaptativo = canvasStore.canvasAdaptativo || {}
+  const width = Number(adaptativo.width) || stageSize.value.width || 0
+  const height = Number(adaptativo.height) || stageSize.value.height || 0
+  const config = { width, height }
   return config
 })
 
@@ -901,28 +971,259 @@ const gridLines = computed(() => {
 })
 
 watch(
-  plantPolygon,
-  (poly) => {
-    const layer = layerRef.value?.getNode?.()
-    if (layer && poly?.length) {
-      layer.clipFunc((ctx) => {
-        ctx.beginPath()
-        poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-        ctx.closePath()
-      })
+  [plantPolygon, isInfiniteCanvas],
+  ([poly, infinite]) => {
+    const layer = getLayerNode()
+    if (!layer) return
+    const canClip = typeof layer.clipFunc === 'function'
+
+    if (infinite) {
+      if (canClip) {
+        try {
+          layer.clipFunc(null)
+        } catch {
+          /* ignore */
+        }
+      }
       layer.batchDraw?.()
+      return
+    }
+
+    if (poly?.length && canClip) {
+      try {
+        layer.clipFunc((ctx) => {
+          ctx.beginPath()
+          poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+          ctx.closePath()
+        })
+      } catch {
+        /* ignore */
+      }
+    } else if (canClip) {
+      try {
+        layer.clipFunc(null)
+      } catch {
+        /* ignore */
+      }
+    }
+    layer.batchDraw?.()
+  },
+  { immediate: true },
+)
+
+const showAllCullableNodes = () => {
+  const layer = getLayerNode()
+  if (!layer || typeof layer.find !== 'function') return
+  const nodes = layer.find('.element-node')
+  if (!nodes) return
+  let changed = false
+  nodes.each((node) => {
+    if (!node || typeof node.visible !== 'function') return
+    if (!node.visible()) {
+      node.visible(true)
+      changed = true
+    }
+  })
+  if (changed) {
+    layer.batchDraw && layer.batchDraw()
+  }
+}
+
+let viewportCullingRaf = null
+
+const scheduleViewportCulling = () => {
+  if (!isInfiniteCanvas.value) {
+    showAllCullableNodes()
+    if (viewportCullingRaf != null) {
+      cancelAnimFrame(viewportCullingRaf)
+      viewportCullingRaf = null
+    }
+    return
+  }
+
+  if (viewportCullingRaf != null) return
+  viewportCullingRaf = requestAnimFrame(() => {
+    viewportCullingRaf = null
+    applyViewportCulling()
+  })
+}
+
+const applyViewportCulling = () => {
+  if (!isInfiniteCanvas.value) {
+    showAllCullableNodes()
+    return
+  }
+
+  const layer = getLayerNode()
+  const stage = getStageNode()
+  if (!layer || !stage || typeof layer.find !== 'function') return
+
+  const rawScale =
+    typeof stage.scaleX === 'function'
+      ? stage.scaleX()
+      : typeof stage.scale === 'function'
+        ? stage.scale()?.x
+        : stage.scaleX
+  const scale = rawScale && Number.isFinite(rawScale) ? rawScale : 1
+
+  const rawWidth = typeof stage.width === 'function' ? stage.width() : stage.width
+  const rawHeight = typeof stage.height === 'function' ? stage.height() : stage.height
+  const stageWidth = Number.isFinite(rawWidth) && rawWidth > 0 ? rawWidth : stageSize.value.width || 0
+  const stageHeight = Number.isFinite(rawHeight) && rawHeight > 0 ? rawHeight : stageSize.value.height || 0
+  if (!stageWidth || !stageHeight) return
+
+  const rawX = typeof stage.x === 'function' ? stage.x() : stage.x
+  const rawY = typeof stage.y === 'function' ? stage.y() : stage.y
+  const stageX = Number.isFinite(rawX) ? rawX : 0
+  const stageY = Number.isFinite(rawY) ? rawY : 0
+
+  const viewX0 = -stageX / scale
+  const viewY0 = -stageY / scale
+  const viewX1 = viewX0 + stageWidth / scale
+  const viewY1 = viewY0 + stageHeight / scale
+  const padding = 200 / scale
+
+  const minX = viewX0 - padding
+  const minY = viewY0 - padding
+  const maxX = viewX1 + padding
+  const maxY = viewY1 + padding
+
+  const nodes = layer.find('.element-node')
+  if (!nodes) return
+
+  let changed = false
+  nodes.each((node) => {
+    if (!node || typeof node.visible !== 'function') return
+    if (typeof node.isDragging === 'function' && node.isDragging?.()) {
+      if (!node.visible()) {
+        node.visible(true)
+        changed = true
+      }
+      return
+    }
+
+    let rect
+    try {
+      rect = node.getClientRect?.({ skipStroke: true, relativeTo: layer })
+    } catch {
+      rect = null
+    }
+    const rectX = rect?.x ?? 0
+    const rectY = rect?.y ?? 0
+    const rectW = rect?.width ?? 0
+    const rectH = rect?.height ?? 0
+
+    const outside =
+      rectX + rectW < minX ||
+      rectY + rectH < minY ||
+      rectX > maxX ||
+      rectY > maxY
+
+    const shouldBeVisible = !outside
+    if (node.visible() !== shouldBeVisible) {
+      node.visible(shouldBeVisible)
+      changed = true
+    }
+  })
+
+  if (changed) {
+    layer.batchDraw && layer.batchDraw()
+  }
+}
+
+watch(
+  isInfiniteCanvas,
+  (infinite) => {
+    if (infinite) {
+      scheduleViewportCulling()
+    } else {
+      showAllCullableNodes()
     }
   },
   { immediate: true },
 )
 
+watch(
+  () => [canvasStore.panX, canvasStore.panY, canvasStore.zoom, stageSize.value.width, stageSize.value.height],
+  () => {
+    if (!isInfiniteCanvas.value) return
+    scheduleViewportCulling()
+  },
+)
+
+watch(
+  () => elementosVisiblesEnCanvas.value.map((el) => el.id),
+  () => {
+    if (!isInfiniteCanvas.value) return
+    nextTick(() => scheduleViewportCulling())
+  },
+)
+
+watch(
+  () => layerRef.value,
+  (layerComponent, prev) => {
+    const prevLayer = unwrapKonvaNode(prev)
+    if (prevLayer && typeof prevLayer.off === 'function') {
+      prevLayer.off('.viewport-cull')
+    }
+    const layer = unwrapKonvaNode(layerComponent)
+    if (!layer || typeof layer.on !== 'function') return
+    layer.on('dragmove.viewport-cull', scheduleViewportCulling)
+    layer.on('dragend.viewport-cull', scheduleViewportCulling)
+    layer.on('dragstart.viewport-cull', scheduleViewportCulling)
+    layer.on('transform.viewport-cull', scheduleViewportCulling)
+    layer.on('transformend.viewport-cull', scheduleViewportCulling)
+    if (isInfiniteCanvas.value) scheduleViewportCulling()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => stageRef.value,
+  (stageComponent, prev) => {
+    const prevStage = unwrapKonvaNode(prev)
+    if (prevStage && typeof prevStage.off === 'function') {
+      prevStage.off('.viewport-cull')
+    }
+    const stage = unwrapKonvaNode(stageComponent)
+    if (!stage || typeof stage.on !== 'function') return
+    stage.on('dragmove.viewport-cull', scheduleViewportCulling)
+    stage.on('dragend.viewport-cull', scheduleViewportCulling)
+    stage.on('wheel.viewport-cull', scheduleViewportCulling)
+    stage.on('scaleXChange.viewport-cull', scheduleViewportCulling)
+    stage.on('scaleYChange.viewport-cull', scheduleViewportCulling)
+    stage.on('xChange.viewport-cull', scheduleViewportCulling)
+    stage.on('yChange.viewport-cull', scheduleViewportCulling)
+    if (isInfiniteCanvas.value) scheduleViewportCulling()
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  if (viewportCullingRaf != null) {
+    cancelAnimFrame(viewportCullingRaf)
+    viewportCullingRaf = null
+  }
+  const layer = getLayerNode()
+  if (layer && typeof layer.off === 'function') {
+    layer.off('.viewport-cull')
+  }
+  const stage = getStageNode()
+  if (stage && typeof stage.off === 'function') {
+    stage.off('.viewport-cull')
+  }
+})
+
 // Contorno activo siempre expresado como polígono
 const computeBoundary = () => {
+  const points = plantPolygon.value
+  const isInfinite = !!(points && points._isInfinite === true)
   return {
     type: 'polygon',
     mode: activeBounds.value.mode || 'fixed',
-    points: plantPolygon.value,
+    points,
     inset: insetPoly.value,
+    isInfinite,
   }
 }
 
@@ -931,9 +1232,13 @@ const getDynamicMinZoom = getMinZoom
 const handleWheel = (e) => {
   e.evt.preventDefault()
 
-  const stage = stageRef.value.getNode()
-  const oldScale = stage.scaleX()
+  const stage = getStageNode()
+  if (!stage || typeof stage.scaleX !== 'function' || typeof stage.getPointerPosition !== 'function') {
+    return
+  }
+  const oldScale = stage.scaleX() || 1
   const pointer = stage.getPointerPosition()
+  if (!pointer) return
 
   const scaleBy = 1.1
   const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
@@ -941,9 +1246,14 @@ const handleWheel = (e) => {
   const dynamicMinZoom = getDynamicMinZoom()
   const clampedScale = Math.max(dynamicMinZoom, Math.min(5, newScale))
 
+  const rawStageX = typeof stage.x === 'function' ? stage.x() : stage.x
+  const rawStageY = typeof stage.y === 'function' ? stage.y() : stage.y
+  const stageX = Number.isFinite(rawStageX) ? rawStageX : 0
+  const stageY = Number.isFinite(rawStageY) ? rawStageY : 0
+
   const mousePointTo = {
-    x: (pointer.x - stage.x()) / oldScale,
-    y: (pointer.y - stage.y()) / oldScale,
+    x: (pointer.x - stageX) / oldScale,
+    y: (pointer.y - stageY) / oldScale,
   }
 
   const newPos = {
@@ -951,8 +1261,9 @@ const handleWheel = (e) => {
     y: pointer.y - mousePointTo.y * clampedScale,
   }
 
-  canvasStore.configurarZoom(clampedScale, dynamicMinZoom)
-  canvasStore.configurarPan(newPos.x, newPos.y)
+  safeConfigurarZoom(clampedScale, dynamicMinZoom)
+  safeConfigurarPan(newPos.x, newPos.y)
+  scheduleViewportCulling()
 }
 
 const MAX_ZOOM = 5
@@ -962,22 +1273,33 @@ const canZoomOut = computed(() => (canvasStore.zoom || 1) > getDynamicMinZoom())
 
 const zoomBy = (factor) => {
   try {
-    const stage = stageRef.value.getNode()
-    const oldScale = stage.scaleX()
+    const stage = getStageNode()
+    if (!stage || typeof stage.scaleX !== 'function') return
+    const oldScale = stage.scaleX() || 1
     const dynamicMinZoom = getDynamicMinZoom()
     const newScale = Math.max(dynamicMinZoom, Math.min(MAX_ZOOM, oldScale * factor))
     // Mantener el centro de la vista
-    const center = { x: stage.width() / 2, y: stage.height() / 2 }
+    const rawWidth = typeof stage.width === 'function' ? stage.width() : stage.width
+    const rawHeight = typeof stage.height === 'function' ? stage.height() : stage.height
+    const center = {
+      x: (Number.isFinite(rawWidth) ? rawWidth : stageSize.value.width || 0) / 2,
+      y: (Number.isFinite(rawHeight) ? rawHeight : stageSize.value.height || 0) / 2,
+    }
+    const rawStageX = typeof stage.x === 'function' ? stage.x() : stage.x
+    const rawStageY = typeof stage.y === 'function' ? stage.y() : stage.y
+    const stageX = Number.isFinite(rawStageX) ? rawStageX : 0
+    const stageY = Number.isFinite(rawStageY) ? rawStageY : 0
     const mousePointTo = {
-      x: (center.x - stage.x()) / oldScale,
-      y: (center.y - stage.y()) / oldScale,
+      x: (center.x - stageX) / oldScale,
+      y: (center.y - stageY) / oldScale,
     }
     const newPos = {
       x: center.x - mousePointTo.x * newScale,
       y: center.y - mousePointTo.y * newScale,
     }
-    canvasStore.configurarZoom(newScale, dynamicMinZoom)
-    canvasStore.configurarPan(newPos.x, newPos.y)
+    safeConfigurarZoom(newScale, dynamicMinZoom)
+    safeConfigurarPan(newPos.x, newPos.y)
+    scheduleViewportCulling()
   } catch (err) {
     console.warn('Error during zoomBy:', err)
   }
@@ -1080,17 +1402,29 @@ const handleElementDoubleClick = (elemento) => {
 }
 
 const toLayerCoords = (pos) => {
-  const stage = stageRef.value.getNode()
-  const scale = stage.scaleX() || 1
-  const x = (pos.x - stage.x()) / scale
-  const y = (pos.y - stage.y()) / scale
+  const stage = getStageNode()
+  if (!stage) return { x: pos.x, y: pos.y }
+  const rawScale = typeof stage.scaleX === 'function' ? stage.scaleX() : stage.scaleX
+  const scale = rawScale && Number.isFinite(rawScale) ? rawScale : 1
+  const rawX = typeof stage.x === 'function' ? stage.x() : stage.x
+  const rawY = typeof stage.y === 'function' ? stage.y() : stage.y
+  const stageX = Number.isFinite(rawX) ? rawX : 0
+  const stageY = Number.isFinite(rawY) ? rawY : 0
+  const x = (pos.x - stageX) / scale
+  const y = (pos.y - stageY) / scale
   return { x, y }
 }
 
 const toStageCoords = (pos) => {
-  const stage = stageRef.value.getNode()
-  const scale = stage.scaleX() || 1
-  return { x: pos.x * scale + stage.x(), y: pos.y * scale + stage.y() }
+  const stage = getStageNode()
+  if (!stage) return { x: pos.x, y: pos.y }
+  const rawScale = typeof stage.scaleX === 'function' ? stage.scaleX() : stage.scaleX
+  const scale = rawScale && Number.isFinite(rawScale) ? rawScale : 1
+  const rawX = typeof stage.x === 'function' ? stage.x() : stage.x
+  const rawY = typeof stage.y === 'function' ? stage.y() : stage.y
+  const stageX = Number.isFinite(rawX) ? rawX : 0
+  const stageY = Number.isFinite(rawY) ? rawY : 0
+  return { x: pos.x * scale + stageX, y: pos.y * scale + stageY }
 }
 
 // Drag bound para cada elemento y forma (clamp mínimo al contorno)
@@ -1098,6 +1432,9 @@ const dragBoundForElement = (pos, elemento) => {
   try {
     const lp = toLayerCoords(pos)
     const boundary = computeBoundary()
+    if (boundary?.isInfinite) {
+      return pos
+    }
     const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
     const w = w_cm * CM_TO_PX
     const h = h_cm * CM_TO_PX
@@ -1167,6 +1504,7 @@ const {
   onShapeDragMove,
   onShapeDragEnd,
   registerDraggableRef,
+  innerSessions,
 } = useElementDrag({
   canvasStore,
   stageRef,
@@ -1217,8 +1555,10 @@ const {
 
 // Función auxiliar para convertir coordenadas del puntero a coordenadas de mundo
 const getWorldCoordinatesFromPointer = (dropEvent) => {
-  const stage = stageRef.value.getNode()
-  const rect = containerRef.value.getBoundingClientRect()
+  const stage = getStageNode()
+  if (!stage) return { x: 0, y: 0 }
+  const rect = containerRef.value?.getBoundingClientRect?.()
+  if (!rect) return { x: 0, y: 0 }
 
   // Obtener posición del puntero considerando zoom y pan
   const pointerPos = {
@@ -1227,8 +1567,16 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   }
 
   // Convertir a coordenadas de mundo (layer) considerando transformación del stage
-  const worldX = (pointerPos.x - stage.x()) / stage.scaleX()
-  const worldY = (pointerPos.y - stage.y()) / stage.scaleY()
+  const rawScaleX = typeof stage.scaleX === 'function' ? stage.scaleX() : stage.scaleX
+  const rawScaleY = typeof stage.scaleY === 'function' ? stage.scaleY() : stage.scaleY
+  const scaleX = rawScaleX && Number.isFinite(rawScaleX) ? rawScaleX : 1
+  const scaleY = rawScaleY && Number.isFinite(rawScaleY) ? rawScaleY : scaleX
+  const rawStageX = typeof stage.x === 'function' ? stage.x() : stage.x
+  const rawStageY = typeof stage.y === 'function' ? stage.y() : stage.y
+  const stageX = Number.isFinite(rawStageX) ? rawStageX : 0
+  const stageY = Number.isFinite(rawStageY) ? rawStageY : 0
+  const worldX = (pointerPos.x - stageX) / scaleX
+  const worldY = (pointerPos.y - stageY) / scaleY
 
   return { x: worldX, y: worldY }
 }
@@ -1237,8 +1585,8 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
 const runPreDropValidations = (elemento, dropEvent) => {
   if (!elemento) return { ok: false, reason: 'invalid' }
 
-  const contextoActual = canvasStore.contextoActual.tipo
-  const tipoElemento = elemento.tipo
+  const contextoActual = canvasStore?.contextoActual?.tipo || 'plantas'
+  const tipoElemento = elemento?.tipo
 
   // Reglas de jerarquía actualizadas
   const allowedByContext = {
@@ -1653,7 +2001,7 @@ watch(
 
     if (newId) {
       const elemento = canvasStore.elementoPorId(newId)
-      const stage = stageRef.value?.getNode()
+      const stage = getStageNode()
 
       // Esperamos a que el aura se renderice en el DOM de Konva
       nextTick(() => {
@@ -1673,8 +2021,9 @@ watch(
             y: -elemento.y * scale + stage.height() / 2 - (elemento.height * scale) / 2,
           }
 
-          canvasStore.configurarZoom(scale)
-          canvasStore.configurarPan(newPos.x, newPos.y)
+          safeConfigurarZoom(scale)
+          safeConfigurarPan(newPos.x, newPos.y)
+          scheduleViewportCulling()
 
           // ANIMAMOS EL AURA (su opacidad y escala)
           highlightAnimation.value = new Konva.Animation((frame) => {
@@ -1805,7 +2154,7 @@ const updateStageSize = () => {
 
 function centrarPlantaEnCanvas() {
   try {
-    const stage = stageRef.value?.getNode?.()
+    const stage = getStageNode()
     if (!stage) return
     const stageWidth = stageSize.value.width
     const stageHeight = stageSize.value.height
@@ -1813,7 +2162,8 @@ function centrarPlantaEnCanvas() {
     const layerHeight = layerConfig.value.height
     const centerX = (stageWidth - layerWidth * canvasStore.zoom) / 2
     const centerY = (stageHeight - layerHeight * canvasStore.zoom) / 2
-    canvasStore.configurarPan(centerX, centerY)
+    safeConfigurarPan(centerX, centerY)
+    scheduleViewportCulling()
   } catch {
     /* ignore */
   }
@@ -1887,8 +2237,8 @@ function recomputeBoundsAndIndex() {
 
 function forceRedraw() {
   try {
-    const layer = layerRef.value?.getNode?.()
-    const stage = stageRef.value?.getNode?.()
+    const layer = getLayerNode()
+    const stage = getStageNode()
     if (!layer || !stage) return
     layer.clearCache?.()
     stage.clearCache?.()
@@ -1940,11 +2290,11 @@ watch(
 // Ajustar la vista para encuadrar la planta activa
 const fitToPlanta = () => {
   try {
-    const stage = stageRef.value?.getNode?.()
+    const stage = getStageNode()
 
     if (!stage) {
       // Fallback seguro: usar min zoom y centrar
-      fitToMinZoom(stageRef.value?.getNode?.())
+      fitToMinZoom(getStageNode())
       return
     }
 
@@ -1975,34 +2325,40 @@ const fitToPlanta = () => {
       }
     } catch { /* ignore */ }
 
-    canvasStore.configurarZoom(z, z)
+    safeConfigurarZoom(z, z)
   } catch (e) {
     console.error('fitToPlanta error', e)
     try {
-      const stage = stageRef.value?.getNode?.()
+      const stage = getStageNode()
       if (stage) fitToMinZoom(stage)
     } catch {
       /* ignore */
     }
+  } finally {
+    scheduleViewportCulling()
   }
 }
 
 // Auto-ajustar siempre que cambia el contexto (planta / elemento / contenedor)
 watch(
-  () => [canvasStore.contextoActual.tipo, canvasStore.contextoActual.id],
+  () => {
+    const ctx = canvasStore?.contextoActual || {}
+    return [ctx.tipo, ctx.id]
+  },
   async () => {
     // Esperar a que el store recalcule canvasAdaptativo y layerConfig
     await nextTick()
     await nextTick()
 
     const dynamicMinZoom = getDynamicMinZoom()
-    canvasStore.configurarZoom(dynamicMinZoom, dynamicMinZoom)
+    safeConfigurarZoom(dynamicMinZoom, dynamicMinZoom)
 
-    const stage = stageRef.value?.getNode?.()
+    const stage = getStageNode()
     if (stage) {
       const centerX = stageSize.value.width / 2
       const centerY = stageSize.value.height / 2
-      canvasStore.configurarPan(centerX, centerY)
+      safeConfigurarPan(centerX, centerY)
+      scheduleViewportCulling()
     }
   },
   { immediate: false },
@@ -2102,6 +2458,10 @@ const onDelete = async (id) => {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   transition: all 0.2s ease;
+}
+
+.canvas-container.infinite-canvas {
+  overflow: visible;
 }
 
 .canvas-container.drag-over {

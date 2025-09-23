@@ -50,6 +50,21 @@ export function useElementDrag({
   const isElementDragging = ref(false)
   const stageDragEnabled = ref(true)
 
+  const unwrapKonvaNode = (maybeNode) => {
+    if (!maybeNode) return null
+    if (typeof maybeNode.getNode === 'function') {
+      try {
+        return maybeNode.getNode()
+      } catch {
+        return null
+      }
+    }
+    return maybeNode || null
+  }
+
+  const getStageNode = () => unwrapKonvaNode(stageRef?.value)
+  const getLayerNode = () => unwrapKonvaNode(layerRef?.value)
+
   // Tracking de posiciones
   const dragStartPositions = ref(new Map())
   const lastValidPositions = ref(new Map())
@@ -71,7 +86,7 @@ export function useElementDrag({
     rafId = requestAnimationFrame(() => {
       rafId = null
       if (needsDraw) {
-        const layerNode = layerRef.value?.getNode ? layerRef.value.getNode() : layerRef.value
+        const layerNode = getLayerNode()
         layerNode?.batchDraw?.()
         needsDraw = false
       }
@@ -90,7 +105,8 @@ export function useElementDrag({
     const MAX_ITERS = 3
     const boundary = computeBoundary() || {}
     const boundaryMode = boundary?.mode ?? 'fixed'
-    const clampToBoundary = boundaryMode !== 'elastic'
+    const boundaryIsInfinite = boundary?.isInfinite === true
+    const clampToBoundary = !boundaryIsInfinite && boundaryMode !== 'elastic'
     const boundaryType = boundary.type
     const W = boundaryType === 'rect' ? boundary.W : Infinity
     const H = boundaryType === 'rect' ? boundary.H : Infinity
@@ -224,7 +240,16 @@ export function useElementDrag({
       r = ref(null)
       draggableNodeRefs.set(id, r)
       // Enable caching on drag for this node
-      useCacheOnDrag(r)
+      useCacheOnDrag(r, {
+        isEnabled: () => {
+          try {
+            if (!canvasStore.estaEnPlanta) return true
+            return canvasStore.plantaActivaData?.isInfinite !== true
+          } catch {
+            return true
+          }
+        },
+      })
     }
     r.value = node
   }
@@ -274,10 +299,16 @@ export function useElementDrag({
 
     // Habilitar modo performance en layer y arrancar rAF loop
     try {
-      const stage = stageRef.value.getNode()
-      const layer = layerRef.value.getNode()
+      const stage = getStageNode()
+      const layer = getLayerNode()
+      if (!layer || !stage || typeof stage.findOne !== 'function') {
+        return
+      }
       const shape = stage.findOne(`#${elementId}`)
-      if (layer && shape) {
+      if (!shape) {
+        return
+      }
+      if (layer) {
         const ctx = enablePerfMode(layer, { shape })
         perfContexts.set(elementId, ctx)
 
@@ -480,12 +511,21 @@ export function useElementDrag({
 
     // Ejecutar validación y finalización con nueva lógica
     try {
-      const stage = stageRef.value.getNode()
-      const layer = layerRef.value.getNode()
+      const stage = getStageNode()
+      const layer = getLayerNode()
+      if (!stage || typeof stage.findOne !== 'function' || !layer) {
+        return
+      }
       const shape = stage.findOne(`#${elementId}`)
       if (shape && layer) {
-          const activeFinalize = getActiveBounds(canvasStore)
-          const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: activeFinalize.polygonPx }
+        const activeFinalize = getActiveBounds(canvasStore)
+        const areaBounds = {
+          minX: 0,
+          minY: 0,
+          maxX: layerConfig.value.width,
+          maxY: layerConfig.value.height,
+          polygon: activeFinalize.polygonPx,
+        }
         const elementoActual = canvasStore.elementosVisibles.find((e) => e.id === elementId)
         if (elementoActual) {
           // Candidato desde el shape (bbox de modelo)
@@ -653,12 +693,14 @@ export function useElementDrag({
     // Leer posición final del shape para persistir
     let finalX, finalY
     try {
-      const stage = stageRef.value.getNode()
-      const shape = stage.findOne(`#${elementId}`)
-      const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
-      if (shape && elemento) {
-        finalX = shape.x()
-        finalY = shape.y()
+      const stage = getStageNode()
+      if (stage && typeof stage.findOne === 'function') {
+        const shape = stage.findOne(`#${elementId}`)
+        const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
+        if (shape && elemento) {
+          finalX = shape.x()
+          finalY = shape.y()
+        }
       }
     } catch {
       /* ignore */
@@ -713,8 +755,8 @@ export function useElementDrag({
           const revertPos = lastGoodPos ||
             lastValidPositions.value.get(elementId) || { x: storeEl.x || 0, y: storeEl.y || 0 }
           try {
-            const stage2 = stageRef.value?.getNode?.()
-            const layer2 = layerRef.value?.getNode?.()
+            const stage2 = getStageNode()
+            const layer2 = getLayerNode()
             const shape2 = stage2?.findOne?.(`#${elementId}`)
             if (shape2) {
               shape2.x(revertPos.x)
@@ -930,5 +972,6 @@ export function useElementDrag({
 
     // Utils
     scheduleDraw,
+    innerSessions,
   }
 }

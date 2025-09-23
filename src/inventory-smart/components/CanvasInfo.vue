@@ -78,5 +78,11 @@ onUnmounted(() => {
   }
 })
 
-watch(() => [store.zoom, store.vistaActiva, store.contextoActual.id], () => nextTick(recompute))
+watch(
+  () => {
+    const ctx = store?.contextoActual || {}
+    return [store.zoom, store.vistaActiva, ctx.id]
+  },
+  () => nextTick(recompute),
+)
 </script>
