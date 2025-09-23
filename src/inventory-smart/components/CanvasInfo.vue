@@ -8,7 +8,7 @@
         position="bottom"
         :delay="300"
       >
-        <span class="elastic-badge">Elástico</span>
+        <span class="elastic-badge">Infinito</span>
       </UiTooltip>
     </template>
     <!-- <span v-if="store.estaEnPlanta && store.plantaActivaData">
