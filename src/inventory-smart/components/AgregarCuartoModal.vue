@@ -17,7 +17,7 @@
       <div class="px-6 py-4 flex-shrink-0">
         <div class="flex items-center justify-center">
           <h2 class="text-xl font-semibold text-primary">
-            Agregar {{ modo === 'cuarto' ? 'cuarto' : 'espacio' }}
+            {{ props.initialForm && typeof props.initialForm === 'object' ? 'Editar' : 'Agregar' }} {{ modo === 'cuarto' ? 'cuarto' : 'espacio' }}
           </h2>
         </div>
       </div>
@@ -768,6 +768,11 @@ const props = defineProps({
     required: true,
     validator: (value) => ['cuarto', 'espacio'].includes(value),
   },
+  // Formulario inicial opcional para modo edición
+  initialForm: {
+    type: Object,
+    default: null,
+  },
 })
 
 const emit = defineEmits(['close', 'save'])
@@ -942,17 +947,74 @@ const validarNivelesContraGlobal = () => {
     sumaAlto += Number(p.alto || 0)
     sumaCap += Number(p.capacidadCarga || 0)
   })
-  if (Math.abs(sumaAlto - altoG) > eps)
-    errs.push('La suma de los altos de los niveles/pisos no coincide con el alto total')
-  if (Math.abs(sumaCap - capG) > eps)
+  // Permitir que las sumas sean menores o iguales al total; solo marcar error si EXCEDEN
+  if (sumaAlto > altoG + eps)
+    errs.push('La suma de los altos de los niveles/pisos excede el alto total')
+  if (sumaCap > capG + eps)
     errs.push(
-      'La suma de las capacidades de carga de los niveles/pisos no coincide con la capacidad total',
+      'La suma de las capacidades de carga de los niveles/pisos excede la capacidad total',
     )
   return errs
 }
 
 // Métodos
 const inicializarFormulario = () => {
+  // Si viene un formulario inicial (editar), poblar desde ahí
+  const f = props.initialForm
+  if (f && typeof f === 'object') {
+    // Modo lo controla el padre, aquí solo tomamos los valores
+    const dg = f.datosGenerales || {}
+    datosGenerales.value = {
+      nombre: dg.nombre || '',
+      color: dg.color || '#3B82F6',
+      tipoSeleccionado: dg.tipoSeleccionado || '',
+      descripcion: dg.descripcion || '',
+      orientacion: dg.orientacion || '',
+      ubicacion: props.modo === 'espacio' ? (dg.ubicacion || '') : '',
+    }
+
+    const dim = f.dimensiones || {}
+    dimensiones.value = {
+      forma: dim.forma || '',
+      largo: dim.largo ?? null,
+      alto: dim.alto ?? null,
+      ancho: dim.ancho ?? null,
+      capacidadCarga: dim.capacidadCarga ?? null,
+    }
+
+    const niveles = Array.isArray(f.pisosNiveles) ? f.pisosNiveles : []
+    pisosNiveles.value = niveles.length
+      ? niveles.map((n, idx) => ({
+          id: idx + 1,
+          nombre: n.nombre || `${props.modo === 'cuarto' ? 'Piso' : 'Nivel'} ${idx + 1}`,
+          largo: n.largo ?? null,
+          alto: n.alto ?? null,
+          ancho: n.ancho ?? null,
+          capacidadCarga: n.capacidadCarga ?? null,
+          tiposProductos: Array.isArray(n.tiposProductos) ? n.tiposProductos.slice() : [],
+          tipoZona: n.tipoZona || 'almacenaje',
+          permiteFragiles: !!n.permiteFragiles,
+          _touched: { tiposProductos: false, tipoZona: false, nombre: false },
+        }))
+      : [
+          {
+            id: 1,
+            nombre: `${props.modo === 'cuarto' ? 'Piso' : 'Nivel'} 1`,
+            largo: null,
+            alto: null,
+            ancho: null,
+            capacidadCarga: null,
+            tiposProductos: [],
+            tipoZona: 'almacenaje',
+            permiteFragiles: false,
+            _touched: { tiposProductos: false, tipoZona: false, nombre: false },
+          },
+        ]
+    resetTouched()
+    return
+  }
+
+  // Caso creación (sin formulario inicial)
   datosGenerales.value = {
     nombre: '',
     color: '#3B82F6',
@@ -1068,6 +1130,14 @@ watch(
       inicializarFormulario()
     }
   },
+)
+
+watch(
+  () => props.initialForm,
+  (val) => {
+    if (props.visible && val) inicializarFormulario()
+  },
+  { deep: true },
 )
 
 inicializarFormulario()

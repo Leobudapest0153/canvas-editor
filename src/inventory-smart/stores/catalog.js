@@ -1,9 +1,59 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { ELEMENTOS_PREDEFINIDOS, JERARQUIA_PERMITIDA, CATALOGO } from '@/inventory-smart/utils/constants'
+import { toCatalogItemFromStructure } from '@/inventory-smart/composables/useStructureManager'
 
 export const useCatalogStore = defineStore('catalog', () => {
-  const items = ref(ELEMENTOS_PREDEFINIDOS)
+  // Normaliza items predefinidos (constants) para que cuartos y espacios tengan la misma estructura
+  // que los creados desde el modal (payload con root/elements, catalogKind, meta, etc.).
+  const normalizePredefined = (list) => {
+    try {
+      return (list || []).map((it) => {
+        if (!it || typeof it !== 'object') return it
+        if (it.tipo !== 'cuartos' && it.tipo !== 'elementos') return it
+
+        const kind = it.tipo === 'cuartos' ? 'room' : 'space'
+        const root = {
+          id: `${it.id}__root`,
+          nombre: it.nombre,
+          tipo: it.tipo,
+          categoria: it.categoria,
+          forma: it.forma,
+          orientacion: it.orientacion,
+          color: it.colorBase || it.color || '#3B82F6',
+          colorBase: it.colorBase || it.color || '#3B82F6',
+          dimensiones: { ...(it.dimensiones || {}) }, // ya en cm en constants
+          capacidadCarga: Number(it.capacidadCarga) || 0,
+          ubicacion: it.ubicacion || 'suelo',
+          descripcion: it.descripcion || '',
+          icono: it.icono || (kind === 'room' ? 'home' : 'box'),
+          hijos: [],
+          meta: { tienePisosGenerados: false },
+          x: 0,
+          y: 0,
+          // Opcionalmente podemos calcular width/height si fuera necesario en la UI
+        }
+        const structure = { root, payload: { rootId: root.id, elements: [root] }, meta: { kind, childrenCount: 0 } }
+        const mapped = toCatalogItemFromStructure({
+          name: it.nombre,
+          description: it.descripcion,
+          structure,
+          kind,
+          color: it.colorBase || it.color,
+        })
+        // Preservar id y props del item original
+        mapped.id = it.id
+        mapped.props = { ...(mapped.props || {}), ...(it.props || {}) }
+        mapped.createdAt = mapped.createdAt || new Date().toISOString()
+        mapped.updatedAt = mapped.updatedAt || new Date().toISOString()
+        return mapped
+      })
+    } catch {
+      return list || []
+    }
+  }
+
+  const items = ref(normalizePredefined(ELEMENTOS_PREDEFINIDOS))
   const searchText = ref('')
   const selectedCategory = ref(null)
   const selectedCatalog = ref('elementos')

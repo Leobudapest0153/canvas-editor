@@ -37,6 +37,7 @@
             role="tab"
             :aria-selected="selectedCatalog === 'elementos' && currentModo === 'cuarto'"
             :tabindex="selectedCatalog === 'elementos' ? 0 : -1"
+            v-if="isPlantaContext"
             @click="selectCuartos()"
             @keydown="onTabKeydown($event, 'cuartos')"
             @focus="focusedTab = 'cuartos'"
@@ -372,7 +373,7 @@ const selectCatalog = (value) => {
 
 const onTabKeydown = (e, current) => {
   // current puede ser 'espacios' | 'cuartos' | 'plantillas'
-  const order = ['espacios', 'cuartos', 'plantillas']
+  const order = tabsOrder.value
   const idx = order.indexOf(current)
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
     e.preventDefault()
@@ -412,6 +413,8 @@ const selectCuartos = () => {
 
 // Opciones de filtros en Plantillas
 const canvasStore = useCanvasStore()
+const isPlantaContext = computed(() => canvasStore.contextoActual?.tipo === 'plantas')
+const tabsOrder = computed(() => ['espacios', ...(isPlantaContext.value ? ['cuartos'] : []), 'plantillas'])
 const categoriasPlantillas = computed(() => {
   const a = canvasStore.catalogos?.tiposCuarto || []
   const b = canvasStore.catalogos?.tiposEspacio || []
@@ -437,6 +440,13 @@ onBeforeUnmount(() => {
 
 watch(selectedCatalog, (val) => {
   localStorage.setItem('inventory.selectedCatalog', val)
+})
+
+// Si salimos del contexto de planta, forzar modo 'espacio' (ocultamos Cuartos)
+watch(isPlantaContext, (enPlanta) => {
+  if (!enPlanta && currentModo.value === 'cuarto') {
+    selectEspacios()
+  }
 })
 
 // Resultado de búsqueda global (texto) sobre plantillas
