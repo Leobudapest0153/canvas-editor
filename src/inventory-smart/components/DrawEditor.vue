@@ -13,15 +13,15 @@
              @mousedown="onCanvasClick">
       <v-layer :config="{ listening: false }">
         <v-rect :config="{
-          x: 0,
-          y: 0,
-          width: worldWidth,
-          height: worldHeight,
+          x: backgroundRect.x,
+          y: backgroundRect.y,
+          width: backgroundRect.width,
+          height: backgroundRect.height,
           fill: '#f8fafc',
           stroke: '#cbd5e1',
           strokeWidth: 2 / stageScale
         }" />
-        <GridLayer :width="canvasW" :height="canvasH" :scale="stageScale" :stageX="stagePosition.x" :stageY="stagePosition.y" :pixelsPerUnit="PIXELS_PER_CM * 100" unit="m" :bbox="gridBBox" />
+        <GridLayer :width="canvasW" :height="canvasH" :scale="stageScale" :stageX="stagePosition.x" :stageY="stagePosition.y" :pixelsPerUnit="PIXELS_PER_CM * 100" unit="m" :bbox="canvasBBox" />
       </v-layer>
 
       <v-layer :config="{ listening: false }">
@@ -102,7 +102,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted, toRefs, onUnmounted } from 'vue'
+import { computed, reactive, ref, onMounted, toRefs, onUnmounted, watch, nextTick } from 'vue'
 import GridLayer from './GridLayer.vue'
 import RulersOverlay from './RulersOverlay.vue'
 
@@ -113,11 +113,13 @@ const props = defineProps({
   worldHeight: { type: Number, required: true },
   adding: { type: Boolean, default: false },
   deleting: { type: Boolean, default: false },
+  // Plantas infinitas → preview se encuadra al BBox de elementos con padding.
+  frameBBox: { type: Object, default: null },
 });
 
 const emit = defineEmits(['update:polygon', 'notice']);
 
-const { polygon, elements, worldWidth, worldHeight, adding, deleting } = toRefs(props);
+const { polygon, elements, worldWidth, worldHeight, adding, deleting, frameBBox } = toRefs(props);
 
 const PIXELS_PER_CM = 10
 const canvasW = ref(1400)
@@ -142,15 +144,64 @@ const worldViewRect = computed(() => {
   }
 })
 
-const gridBBox = computed(() => {
+const providedFrameBBox = computed(() => {
+  const box = frameBBox.value
+  if (!box) return null
+  const minX = Number(box.minX)
+  const minY = Number(box.minY)
+  const maxX = Number(box.maxX)
+  const maxY = Number(box.maxY)
+  if (![minX, minY, maxX, maxY].every((n) => Number.isFinite(n))) return null
+  if (maxX <= minX || maxY <= minY) return null
+  return { minX, minY, maxX, maxY }
+})
+
+const polygonBBox = computed(() => {
   const pts = polygon.value
-  if (!pts || pts.length < 1) return { minX: 0, minY: 0, maxX: 1, maxY: 1 }
+  if (!pts || pts.length < 1) return null
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const p of pts) {
     minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
     maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
   }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return null
+  if (maxX <= minX || maxY <= minY) return null
   return { minX, minY, maxX, maxY }
+})
+
+const worldBBox = computed(() => ({
+  minX: 0,
+  minY: 0,
+  maxX: Math.max(1, Number.isFinite(worldWidth.value) ? worldWidth.value : 0),
+  maxY: Math.max(1, Number.isFinite(worldHeight.value) ? worldHeight.value : 0),
+}))
+
+const canvasBBox = computed(() => providedFrameBBox.value || polygonBBox.value || worldBBox.value)
+
+watch(
+  () => frameBBox.value,
+  () => {
+    nextTick(() => fitStageToPolygon())
+  },
+  { deep: true },
+)
+
+const backgroundRect = computed(() => {
+  if (providedFrameBBox.value) {
+    const { minX, minY, maxX, maxY } = providedFrameBBox.value
+    return {
+      x: minX,
+      y: minY,
+      width: Math.max(1, maxX - minX),
+      height: Math.max(1, maxY - minY),
+    }
+  }
+  return {
+    x: 0,
+    y: 0,
+    width: Math.max(1, worldWidth.value),
+    height: Math.max(1, worldHeight.value),
+  }
 })
 
 const stageRef = ref(null)
@@ -161,7 +212,7 @@ const stagePosition = ref({ x: 0, y: 0 })
 function fitStageToPolygon() {
   const stage = stageRef.value?.getNode?.()
   if (!stage) return
-  const box = gridBBox.value
+  const box = canvasBBox.value
   const boxW = Math.max(1, box.maxX - box.minX)
   const boxH = Math.max(1, box.maxY - box.minY)
 

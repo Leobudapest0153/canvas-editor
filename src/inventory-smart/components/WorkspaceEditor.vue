@@ -39,12 +39,20 @@
         <div class="md:col-span-3 flex flex-col bg-slate-50/60">
           <div class="flex-grow min-h-0 p-3">
             <div class="h-full w-full overflow-auto rounded-lg bg-white">
+              <div
+                v-if="showInfiniteEmptyState"
+                class="flex h-full min-h-[280px] w-full items-center justify-center border-2 border-dashed border-slate-300 bg-slate-50 text-sm font-medium text-slate-500"
+              >
+                Planta sin elementos
+              </div>
               <DrawEditor
+                v-else
                 ref="canvasEditorRef"
                 :polygon="local.polygon"
                 :elements="local.elements"
                 :worldWidth="worldWidth"
                 :worldHeight="worldHeight"
+                :frameBBox="previewFrameBBox"
                 :adding="adding"
                 :deleting="deleting"
                 @update:polygon="onPolygonUpdate"
@@ -73,7 +81,7 @@
               </button>
               <button
                 class="px-3 py-2 cursor-pointer rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
-                @click="() => canvasEditorRef.fitStageToPolygon()"
+                @click="onFitPreview"
               >
                 Ajustar Vista
               </button>
@@ -270,6 +278,43 @@ let dimensionChangeDebounce = null
 // Hint cuando se cambia de elástico -> limitado
 const showLimitedHint = ref(false)
 
+const INFINITE_PREVIEW_PADDING = 14
+
+const previewFrameBBox = computed(() => {
+  // Plantas infinitas → preview se encuadra al BBox de elementos con padding.
+  if (!local.isInfinite) return null
+  const items = Array.isArray(local.elements) ? local.elements : []
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let hasValid = false
+  for (const el of items) {
+    const x = Number(el?.x)
+    const y = Number(el?.y)
+    const width = Number(el?.width)
+    const height = Number(el?.height)
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+      continue
+    }
+    hasValid = true
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    maxX = Math.max(maxX, x + width)
+    maxY = Math.max(maxY, y + height)
+  }
+  if (!hasValid) return null
+  const padding = INFINITE_PREVIEW_PADDING
+  return {
+    minX: minX - padding,
+    minY: minY - padding,
+    maxX: maxX + padding,
+    maxY: maxY + padding,
+  }
+})
+
+const showInfiniteEmptyState = computed(() => local.isInfinite && !previewFrameBBox.value)
+
 function defaultRect(w_cm, l_cm) {
   const w = w_cm * PIXELS_PER_CM
   const l = l_cm * PIXELS_PER_CM
@@ -352,6 +397,10 @@ const deleting = ref(false)
 const resetMode = () => {
   adding.value = false
   deleting.value = false
+}
+
+const onFitPreview = () => {
+  canvasEditorRef.value?.fitStageToPolygon()
 }
 
 function toggleAddMode() {
