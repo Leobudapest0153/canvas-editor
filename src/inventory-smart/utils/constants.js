@@ -422,7 +422,7 @@ export const FACTOR_UTILIZACION = 0.9 // porcentaje máximo de ocupación de ár
 
 // === CONFIGURACIÓN DE AUTOSAVE ===
 export const AUTOSAVE_CONFIG = {
-  INTERVAL_MS: 60000, // 30 segundos
+  INTERVAL_MS: 60000, // 60 segundos
   MAX_BACKUPS: 10, // máximo número de copias de seguridad
   STORAGE_KEY: 'canvas_autosave_backups',
   ENABLED: true, // habilitar/deshabilitar autosave

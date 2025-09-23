@@ -27,7 +27,8 @@
             :class="[
               'relative m-2 flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 hover:border-primary-400 flex-shrink-0',
               {
-                'bg-primary-200 border-primary-200 shadow-md': planta.id === canvasStore.plantaActiva,
+                'bg-primary-200 border-primary-200 shadow-md':
+                  planta.id === canvasStore.plantaActiva,
                 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300':
                   planta.id !== canvasStore.plantaActiva,
               },
@@ -49,7 +50,13 @@
                   {{ contarElementosEnPlanta(planta.id) }} elementos
                 </p>
                 <p class="text-xs text-gray-400 m-0 font-medium">
-                  {{ formatLengthsCm([planta.dimensiones?.ancho || 0, planta.dimensiones?.largo || 0, planta.dimensiones?.alto || 0]) }}
+                  {{
+                    formatLengthsCm([
+                      planta.dimensiones?.ancho || 0,
+                      planta.dimensiones?.largo || 0,
+                      planta.dimensiones?.alto || 0,
+                    ])
+                  }}
                 </p>
               </div>
             </div>
@@ -81,11 +88,7 @@
         </div>
 
         <!-- Botón de agregar planta - siempre visible -->
-        <UiTooltip
-          label="Agregar nueva planta de almacén"
-          :delay="200"
-          position="right"
-        >
+        <UiTooltip label="Agregar nueva planta de almacén" :delay="200" position="right">
           <button
             @click="canvasStore.abrirEditor()"
             class="flex-shrink-0 inline-flex items-center justify-center w-12 h-12 bg-primary hover:bg-primary-900 text-white rounded-lg shadow-md hover:shadow-lg cursor-pointer transition-colors"
@@ -156,47 +159,39 @@
         <!-- -- -- -->
 
         <!-- Icono de Backups (gris) -->
-        <UiTooltip
-          label="Gestionar copias de seguridad"
-          position="bottom"
-          :delay="200"
-        >
-        <button
-          type="button"
-          class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-500 text-gray-100 hover:text-white hover:bg-gray-600 rounded-lg transition-colors cursor-pointer"
-          @click="openBackupModal"
-        >
-          <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path
-              fill="currentColor"
-              d="M12 21q-3.15 0-5.575-1.912T3.275 14.2q-.1-.375.15-.687t.675-.363q.4-.05.725.15t.45.6q.6 2.25 2.475 3.675T12 19q2.925 0 4.963-2.037T19 12t-2.037-4.962T12 5q-1.725 0-3.225.8T6.25 8H8q.425 0 .713.288T9 9t-.288.713T8 10H4q-.425 0-.712-.288T3 9V5q0-.425.288-.712T4 4t.713.288T5 5v1.35q1.275-1.6 3.113-2.475T12 3q1.875 0 3.513.713t2.85 1.924t1.925 2.85T21 12t-.712 3.513t-1.925 2.85t-2.85 1.925T12 21m1-9.4l2.5 2.5q.275.275.275.7t-.275.7t-.7.275t-.7-.275l-2.8-2.8q-.15-.15-.225-.337T11 11.975V8q0-.425.288-.712T12 7t.713.288T13 8z"
-            />
-          </svg>
-          <span class="ml-2">Restaurar</span>
-        </button>
+        <UiTooltip label="Gestionar copias de seguridad" position="bottom" :delay="200">
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-500 text-gray-100 hover:text-white hover:bg-gray-600 rounded-lg transition-colors cursor-pointer"
+            @click="openBackupModal"
+          >
+            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M12 21q-3.15 0-5.575-1.912T3.275 14.2q-.1-.375.15-.687t.675-.363q.4-.05.725.15t.45.6q.6 2.25 2.475 3.675T12 19q2.925 0 4.963-2.037T19 12t-2.037-4.962T12 5q-1.725 0-3.225.8T6.25 8H8q.425 0 .713.288T9 9t-.288.713T8 10H4q-.425 0-.712-.288T3 9V5q0-.425.288-.712T4 4t.713.288T5 5v1.35q1.275-1.6 3.113-2.475T12 3q1.875 0 3.513.713t2.85 1.924t1.925 2.85T21 12t-.712 3.513t-1.925 2.85t-2.85 1.925T12 21m1-9.4l2.5 2.5q.275.275.275.7t-.275.7t-.7.275t-.7-.275l-2.8-2.8q-.15-.15-.225-.337T11 11.975V8q0-.425.288-.712T12 7t.713.288T13 8z"
+              />
+            </svg>
+            <span class="ml-2">Restaurar</span>
+          </button>
         </UiTooltip>
 
         <!-- Botón Guardar Cambios -->
-        <UiTooltip
-          label="Guardar cambios actuales"
-          position="bottom"
-          :delay="200"
-        >
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
-          @click="guardarCambios"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-            />
-          </svg>
-          <span>Guardar Cambios</span>
-        </button>
+        <UiTooltip label="Guardar cambios actuales" position="bottom" :delay="200">
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
+            @click="guardarCambios"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+              />
+            </svg>
+            <span>Guardar Cambios</span>
+          </button>
         </UiTooltip>
       </div>
     </div>
@@ -426,45 +421,39 @@
       :style="{ top: menuPosY + 'px', left: menuPosX + 'px' }"
       v-click-outside="() => cerrarMenuPlanta()"
     >
-    <UiTooltip
-      label="Editar planta"
-      position="right"
-    >
-      <button
-        @click="editarPlanta(menuAbiertoPlanta)"
-        class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-all border-none bg-transparent cursor-pointer"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-          />
-        </svg>
-        <span>Editar</span>
-      </button>
-    </UiTooltip>
-    <UiTooltip
-      label="Eliminar planta"
-      position="right"
-    >
-      <button
-        @click="confirmarEliminarPlantaMenu(menuAbiertoPlanta)"
-        :disabled="canvasStore.plantas.length <= 1"
-        class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all border-none bg-transparent cursor-pointer"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-          />
-        </svg>
-        <span>Eliminar</span>
-      </button>
-    </UiTooltip>
+      <UiTooltip label="Editar planta" position="right">
+        <button
+          @click="editarPlanta(menuAbiertoPlanta)"
+          class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-all border-none bg-transparent cursor-pointer"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+            />
+          </svg>
+          <span>Editar</span>
+        </button>
+      </UiTooltip>
+      <UiTooltip label="Eliminar planta" position="right">
+        <button
+          @click="confirmarEliminarPlantaMenu(menuAbiertoPlanta)"
+          :disabled="canvasStore.plantas.length <= 1"
+          class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all border-none bg-transparent cursor-pointer"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+          <span>Eliminar</span>
+        </button>
+      </UiTooltip>
     </div>
   </teleport>
 
@@ -489,9 +478,12 @@ import { useToast } from '@/inventory-smart/composables/useToast'
 import HistorialModal from './HistorialModal.vue'
 import ImportExportModal from './ImportExportModal.vue'
 import BackupModal from './BackupModal.vue'
-import { usePlantResizeGuard, pack as packShelf } from '@/inventory-smart/composables/usePlantResizeGuard'
+import {
+  usePlantResizeGuard,
+  pack as packShelf,
+} from '@/inventory-smart/composables/usePlantResizeGuard'
 import { CM_TO_PX, MARGIN_CM, FACTOR_UTILIZACION } from '@/inventory-smart/utils/constants'
-import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue';
+import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import { formatLengthCm, formatLengthsCm } from '../utils/units'
 
 // Store
@@ -558,7 +550,8 @@ const onDimChange = () => {
     if (res.status === 'block') {
       preview.value = {
         status: 'block',
-        message: 'No hay suficiente espacio con las nuevas dimensiones. Ajusta el tamaño o mueve elementos.',
+        message:
+          'No hay suficiente espacio con las nuevas dimensiones. Ajusta el tamaño o mueve elementos.',
         placements: [],
       }
     } else if (res.status === 'auto_adjust') {
@@ -606,31 +599,12 @@ const closeBackupModal = () => {
 
 const guardarCambios = async () => {
   try {
-    // Serializar el estado actual del canvas
-    const configSerializada = canvasStore.serialize()
-
-    // Emitir el evento al componente padre con la configuración serializada
+    const wasEnabled = autoSave?.isEnabled?.value === true
+    autoSave?.stopAutoSave?.()
+    const configSerializada = canvasStore.serialize(true)
+    if (wasEnabled) autoSave?.startAutoSave?.()
     emit('configChanged', configSerializada)
-
-    // Reiniciar copias de seguridad: detener autosave, limpiar y crear una nueva copia desde el estado actual
-    try {
-      const wasEnabled = autoSave?.isEnabled?.value === true
-      // Pausar autosave para evitar carreras
-      autoSave?.stopAutoSave?.()
-      // Limpiar todas las copias previas
-      await autoSave?.clearAllBackups?.()
-      // Crear un backup fresco con la configuración actual
-      await autoSave?.performBackup?.()
-      // Reanudar autosave si estaba activo
-      if (wasEnabled) autoSave?.startAutoSave?.()
-    } catch (e) {
-      console.warn('No se pudo reiniciar las copias de seguridad tras guardar', e)
-    }
-
-    // Mostrar mensaje de éxito
     showToast('Cambios guardados correctamente', 'success')
-
-    console.log('Configuración del canvas serializada, emitida y backups reiniciados')
   } catch (error) {
     console.error('Error al guardar cambios:', error)
     showToast('Error al guardar los cambios', 'error')

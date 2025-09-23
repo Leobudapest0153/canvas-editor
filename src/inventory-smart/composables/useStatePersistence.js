@@ -47,7 +47,7 @@ export const useStatePersistence = () => {
    * @returns {string} JSON string con todo el estado
    */
   const serialize = (state, options = {}) => {
-    const { validateBeforeSerialize = true, includeMetrics = true } = options
+    const { validateBeforeSerialize = true, includeMetrics = true, saveTimestamp = false } = options
 
     if (validateBeforeSerialize) {
       const preValidation = validateStateBeforeSerialization(state)
@@ -61,11 +61,14 @@ export const useStatePersistence = () => {
       }
     }
 
+    // Timestamp actual en ISO 8601
+    const timestamp = new Date().toISOString()
+
     const serializedState = {
       // Información básica del canvas
       meta: {
         version: EXPORT_FORMAT_VERSION,
-        timestamp: new Date().toISOString(),
+        timestamp: timestamp,
         app: 'inventory-smart',
         ...(includeMetrics && {
           metrics: calculateStateMetrics(state)
@@ -198,7 +201,28 @@ export const useStatePersistence = () => {
       serializedState.meta.metrics.totalPlantillas = state.templates?.length || 0
     }
 
+    // Guardar timestamp en localStorage si se solicita
+    if (saveTimestamp) {
+      saveLastSerializationTimestamp(timestamp)
+    }
+
     return JSON.stringify(serializedState, null, 2)
+  }
+
+  /**
+   * Guardar timestamp de última serialización en localStorage
+   * @param {string} timestamp - Timestamp ISO 8601
+   */
+  const saveLastSerializationTimestamp = (timestamp) => {
+    localStorage.setItem('canvas_last_serialization', timestamp)
+  }
+
+  /**
+   * Obtener timestamp de última serialización desde localStorage
+   * @returns {string|null} - Timestamp ISO 8601 o null si no existe
+   */
+  const getLastSerializationTimestamp = () => {
+    return localStorage.getItem('canvas_last_serialization')
   }
 
   /**
@@ -375,14 +399,14 @@ export const useStatePersistence = () => {
       // === RESTAURAR CATÁLOGOS ===
       if (state.catalogos) {
         const catalogosRestaurados = {
-          tiposEspacio: Array.isArray(state.catalogos.tiposEspacio) 
-            ? state.catalogos.tiposEspacio 
+          tiposEspacio: Array.isArray(state.catalogos.tiposEspacio)
+            ? state.catalogos.tiposEspacio
             : DEFAULT_TIPOS_ESPACIO,
-          tiposCuarto: Array.isArray(state.catalogos.tiposCuarto) 
-            ? state.catalogos.tiposCuarto 
+          tiposCuarto: Array.isArray(state.catalogos.tiposCuarto)
+            ? state.catalogos.tiposCuarto
             : DEFAULT_TIPOS_CUARTO,
-          tiposProductoAdmitidos: Array.isArray(state.catalogos.tiposProductoAdmitidos) 
-            ? state.catalogos.tiposProductoAdmitidos 
+          tiposProductoAdmitidos: Array.isArray(state.catalogos.tiposProductoAdmitidos)
+            ? state.catalogos.tiposProductoAdmitidos
             : DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
         }
         storeActions.setCatalogos(catalogosRestaurados)
@@ -1071,10 +1095,10 @@ export const useStatePersistence = () => {
       return false
     }
 
-    const hasValidItems = catalogo.every(item => 
-      item && 
-      typeof item === 'object' && 
-      typeof item.id === 'string' && 
+    const hasValidItems = catalogo.every(item =>
+      item &&
+      typeof item === 'object' &&
+      typeof item.id === 'string' &&
       typeof item.nombre === 'string'
     )
 
@@ -1093,6 +1117,9 @@ export const useStatePersistence = () => {
     persist,
     load,
     clear,
+
+    // Timestamp
+    getLastSerializationTimestamp,
 
     // Utilidades de validación
     validateStructure,

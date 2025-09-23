@@ -1201,7 +1201,7 @@ export const useCanvasStore = defineStore('canvas', () => {
    * Serializa el estado completo del canvas a JSON
    * @returns {string} JSON string con todo el estado
    */
-  const serialize = () => {
+  const serialize = (saveTimestamp = false) => {
     const state = {
       plantas: plantas.value.map(p => p?._custom?.value || p),
       elementos: elementos.value.map(e => e?._custom?.value || e),
@@ -1209,7 +1209,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
       catalogos: catalogos.value,
     }
-    const jsonStr = _serialize(state)
+    const jsonStr = _serialize(state, { validateBeforeSerialize: true, includeMetrics: true, saveTimestamp })
     try {
       const parsed = JSON.parse(jsonStr)
       if (state.templates.length > 0) {

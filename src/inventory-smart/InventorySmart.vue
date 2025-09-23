@@ -71,24 +71,14 @@ import ConfirmModal from './components/ConfirmModal.vue'
 import LoaderOverlay from './components/LoaderOverlay.vue'
 import { AUTOSAVE_CONFIG } from '@/inventory-smart/utils/constants'
 import ConfirmReplaceModal from '@/inventory-smart/components/modals/ConfirmReplaceModal.vue'
-import { useServicesStore, SERVICE_TYPES } from './stores/services.js'
+import { useServicesStore } from './stores/services.js'
+import { useStatePersistence } from './composables/useStatePersistence'
 
 const props = defineProps({
   configCanvas: {
     type: [String, null],
     default: () => '',
   },
-  /**
-   * Array con función de servicio para obtener productos de contenedores.
-   * El servicio debe ser de tipo 'container_products' y recibir:
-   * - containerId: ID/código del contenedor
-   * - filter: filtro de texto opcional
-   * - pagination: datos de paginación opcionales
-   *
-   * La respuesta debe incluir: products[], totalCount, pagination
-   *
-   * @type {ExternalService[]}
-   */
   externalServices: {
     type: Array,
     default: () => [],
@@ -156,6 +146,8 @@ const externalServicesAPI = {
 // Estado del modal de aviso de reemplazo por servidor
 const showReplaceNotice = ref(false)
 let pendingServerConfig = null
+// Flag para evitar ejecuciones duplicadas del handler (confirmar + cerrar)
+const isApplyingServerConfig = ref(false)
 
 // Helper: obtener la instancia de autosave registrada en el store
 const getAutoSaveInstance = () => {
@@ -181,14 +173,17 @@ const clearLocalBackups = async () => {
 }
 
 const applyPendingServerConfig = async () => {
+  // Evitar ejecuciones duplicadas (p. ej., si el modal emite confirmar y luego cerrar)
+  if (isApplyingServerConfig.value) return
   if (!pendingServerConfig) {
     showReplaceNotice.value = false
     return
   }
+  isApplyingServerConfig.value = true
   try {
     showToast('Aplicando configuración del servidor…', 'info')
     const instance = getAutoSaveInstance()
-    const wasEnabled = instance?.isEnabled?.value === true
+    const wasEnabled = instance?.isEnabled === true
     // Pausar autosave si aplica
     instance?.stopAutoSave?.()
     // Al aplicar servidor, limpiar backups locales
@@ -203,6 +198,7 @@ const applyPendingServerConfig = async () => {
   } finally {
     pendingServerConfig = null
     showReplaceNotice.value = false
+    isApplyingServerConfig.value = false
   }
 }
 
@@ -282,9 +278,11 @@ const getConfigTimestamp = (jsonString) => {
   try {
     const data = JSON.parse(jsonString)
     const ts = data?.meta?.timestamp
+    console.log('Parsed timestamp:', ts)
     const t = ts ? Date.parse(ts) : NaN
     return Number.isFinite(t) ? t : null
   } catch (e) {
+    console.warn('No se pudo parsear timestamp de configuración', e)
     return null
   }
 }
@@ -354,6 +352,7 @@ watch(
   () => props.configCanvas,
   async (newConfig, oldConfig) => {
     try {
+      console.log('🔄 Configuración cambiada; importando…')
       // Si no se provee una configuracion inicial
       if (!newConfig) {
         const mensaje = oldConfig ? null : 'Iniciando área de trabajo'
@@ -375,10 +374,11 @@ watch(
       // Comparar timestamps entre servidor y backup local más reciente
       const serverTs = getConfigTimestamp(newConfig)
       const latestBackup = getLatestLocalBackup()
-      const backupTs = latestBackup?.ts ?? null
+      const { getLastSerializationTimestamp } = useStatePersistence()
+      const latestBackupTimestamp = Date.parse(getLastSerializationTimestamp())
 
       // Si hay backup y es más reciente que el servidor -> restaurar backup automáticamente
-      if (latestBackup && backupTs && (!serverTs || backupTs > serverTs)) {
+      if (latestBackup && latestBackupTimestamp && (!latestBackupTimestamp || latestBackupTimestamp > serverTs)) {
         const restored = canvasStore.deserialize(latestBackup.data)
         if (restored) {
           showToast(
@@ -390,7 +390,7 @@ watch(
       }
 
       // Si el servidor es más reciente que el backup local -> solo avisar y aplicar servidor
-      if (serverTs && latestBackup && backupTs && serverTs > backupTs) {
+      if (serverTs && latestBackup && latestBackupTimestamp && serverTs > latestBackupTimestamp) {
         pendingServerConfig = newConfig
         showReplaceNotice.value = true
         return
@@ -400,7 +400,7 @@ watch(
       const mensaje = oldConfig ? null : 'Iniciando área de trabajo'
       if (mensaje) showToast(mensaje, 'info' )
       const instance = getAutoSaveInstance()
-      const wasEnabled = instance?.isEnabled?.value === true
+      const wasEnabled = instance?.isEnabled === true
       instance?.stopAutoSave?.()
       await clearLocalBackups()
       const ok = canvasStore.deserialize(newConfig)
@@ -414,7 +414,6 @@ watch(
       console.error('Error al importar la configuración:', error)
     }
   },
-  { immediate: true },
 )
 </script>
 

@@ -135,11 +135,11 @@
                     <div class="text-sm font-medium text-slate-800">
                       {{ backup.formattedDate }}
                     </div>
-                    <div class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">
+                    <!-- <div class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs">
                       {{ formatearTamaño(backup.size) }}
-                    </div>
+                    </div> -->
                     <div v-if="backup.isServerVersion" class="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs">
-                      Versión del servidor
+                      Último guardado
                     </div>
                   </div>
 
@@ -259,7 +259,15 @@ const limpiarMensaje = () => {
 }
 
 const formatearFecha = (fecha) => {
-  return new Date(fecha).toLocaleString('es-ES', { timeZone: 'UTC', hour12: true })
+  return new Date(fecha).toLocaleString('es-ES', {
+      hour12: true,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }
+  )
 }
 
 const formatearTamaño = (bytes) => {
