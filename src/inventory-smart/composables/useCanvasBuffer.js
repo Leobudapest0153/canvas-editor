@@ -11,15 +11,19 @@
  * - Gestión de estado del buffer
  */
 
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
 import { useWeightValidation } from './useWeightValidation'
 import { buildStructureFromCanvasElement, instantiateStructureOnCanvas } from '@/inventory-smart/composables/useStructureManager'
-import { limpiarDatosUso } from '@/inventory-smart/composables/useSimulateProducts'
+import { limpiarDatosUso, limpiarDatosUsoEstructura } from '@/inventory-smart/composables/useSimulateProducts'
 import { useToast } from './useToast'
 
 // Estado global del buffer (singleton)
 const bufferItems = ref([])
+
+watch(bufferItems, (newVal) => {
+  console.log('📋 Buffer actualizado - elementos en buffer:', newVal)
+}, { deep: true })
 
 export const useCanvasBuffer = () => {
   const canvasStore = useCanvasStore()
@@ -38,6 +42,7 @@ export const useCanvasBuffer = () => {
 
     // Limpiar datos de uso antes de guardar en el buffer
     const elementoLimpio = limpiarDatosUso(elemento, canvasStore.elementoPorId)
+    console.log('📋 Preparando elemento para buffer:', elementoLimpio)
 
     return {
       id: `buffer_${currentTimestamp}_${Math.random().toString(36).substr(2, 9)}`,
@@ -114,6 +119,22 @@ export const useCanvasBuffer = () => {
       return false
     }
 
+    // Limpiar datos de uso de todos los elementos de la estructura antes de guardarla en el buffer
+    let cleanedAllElementsMap = clonedStructure.allElements
+    try {
+      const cleaned = limpiarDatosUsoEstructura({ elements: Array.from(clonedStructure.allElements.values()) })
+      cleanedAllElementsMap = new Map(cleaned.elements.map(e => [e.id, e]))
+    } catch (e) {
+      // Fallback defensivo: eliminar "uso" a mano si algo falla
+      cleanedAllElementsMap = new Map(
+        Array.from(clonedStructure.allElements.values()).map(e => {
+          const c = { ...e }
+          delete c.uso
+          return [c.id, c]
+        })
+      )
+    }
+
     const sourceInfo = {
       action: 'copied',
       description,
@@ -121,7 +142,7 @@ export const useCanvasBuffer = () => {
       originalPosition: { x: elemento.x, y: elemento.y },
       isStructure: true, // Marca que es una estructura completa
       childrenCount: elemento.hijos ? elemento.hijos.length : 0,
-      allElements: clonedStructure.allElements, // Guardar todos los elementos de la estructura
+      allElements: cleanedAllElementsMap, // Guardar todos los elementos (sin datos de uso)
     }
 
     const success = addToBuffer(clonedStructure.rootElement, sourceInfo)
@@ -168,25 +189,6 @@ export const useCanvasBuffer = () => {
   }
 
   /**
-   * Regenera las posiciones de los pisos internos cuando se instancia una plantilla
-   * con un elemento que tiene pisos generados automáticamente
-   */
-  // Ya no es necesario: la regeneración de pisos la gestiona instantiateStructureOnCanvas
-  const regenerarPisosEnPlantilla = () => {}
-
-  /**
-   * Agregar elemento directamente sin depender del contexto de navegación
-   */
-  // Ya no se expone inserción directa; lo maneja instantiateStructureOnCanvas
-  const addElementDirectly = () => null
-
-  /**
-   * Regenerar IDs únicos para una estructura antes del pegado
-   */
-  // Regeneración de IDs ahora la realiza instantiateStructureOnCanvas internamente
-  const regenerateUniqueIds = (allElementsMap) => ({ newElementsMap: allElementsMap, newIdMapping: new Map() })
-
-  /**
    * Pegar estructura completa desde buffer al canvas actual
    */
   const pasteFromBuffer = (bufferItemId, position = { x: 100, y: 100 }) => {
@@ -231,7 +233,12 @@ export const useCanvasBuffer = () => {
       console.log('📋 Pegando estructura completa con', sourceInfo.allElements.size, 'elementos')
       const payload = {
         rootId: elemento.id,
-        elements: Array.from(sourceInfo.allElements.values()).map(e => ({ ...JSON.parse(JSON.stringify(e)) })),
+        // Asegurar que no se cuelen datos de uso en pegados antiguos guardados sin limpiar
+        elements: Array.from(sourceInfo.allElements.values()).map(e => {
+          const copy = { ...JSON.parse(JSON.stringify(e)) }
+          delete copy.uso
+          return copy
+        }),
       }
       const rootElementId = instantiateStructureOnCanvas(canvasStore, payload, position)
       if (rootElementId) {
@@ -301,7 +308,16 @@ export const useCanvasBuffer = () => {
       console.warn('⚠️ Payload de plantilla inválido')
       return false
     }
-    return instantiateStructureOnCanvas(canvasStore, payload, position)
+    // Limpiar datos de uso si vienen presentes en la plantilla
+    const cleanedPayload = {
+      ...payload,
+      elements: payload.elements.map(e => {
+        const copy = { ...e }
+        delete copy.uso
+        return copy
+      })
+    }
+    return instantiateStructureOnCanvas(canvasStore, cleanedPayload, position)
   }
 
   /**
