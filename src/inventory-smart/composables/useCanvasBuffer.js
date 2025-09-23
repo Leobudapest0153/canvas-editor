@@ -15,6 +15,7 @@ import { ref, computed } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
 import { useWeightValidation } from './useWeightValidation'
 import { buildStructureFromCanvasElement, instantiateStructureOnCanvas } from '@/inventory-smart/composables/useStructureManager'
+import { limpiarDatosUso } from '@/inventory-smart/composables/useSimulateProducts'
 import { useToast } from './useToast'
 
 // Estado global del buffer (singleton)
@@ -34,10 +35,14 @@ export const useCanvasBuffer = () => {
    */
   const createBufferItem = (elemento, sourceInfo = {}) => {
     const currentTimestamp = Date.now()
+
+    // Limpiar datos de uso antes de guardar en el buffer
+    const elementoLimpio = limpiarDatosUso(elemento, canvasStore.elementoPorId)
+
     return {
       id: `buffer_${currentTimestamp}_${Math.random().toString(36).substr(2, 9)}`,
       originalId: elemento.id,
-      elemento: JSON.parse(JSON.stringify(elemento)), // Deep clone
+      elemento: JSON.parse(JSON.stringify(elementoLimpio)), // Deep clone del elemento limpio
       sourceInfo: {
         plantaId: elemento.plantaId || canvasStore.plantaActiva,
         position: { x: elemento.x, y: elemento.y },

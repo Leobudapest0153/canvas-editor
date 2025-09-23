@@ -28,7 +28,7 @@ describe('Post-apply validation pass en redimensionado de planta', () => {
   it('(1) elemento en esquina que queda fuera tras reducir termina dentro automáticamente', () => {
     const store = useCanvasStore()
     store.plantas = [
-      { id: 'planta_1', nombre: 'PB', descripcion: '', elementos: [], activa: true, dimensiones: { ancho: 200, largo: 200, alto: 280 }, pesoMaximoSoportado: 3000 },
+      { id: 'planta_1', nombre: 'PB', descripcion: '', elementos: [], activa: true, dimensiones: { ancho: 200, largo: 200, alto: 280 }, capacidadCargaSoportado: 3000 },
     ]
     store.plantaActiva = 'planta_1'
 
@@ -39,7 +39,7 @@ describe('Post-apply validation pass en redimensionado de planta', () => {
 
     const wrapper = shallowMount(PlantasPanel, { global: { stubs: { HistorialModal: true, ImportExportModal: true, Teleport: true } } })
     wrapper.vm.mostrarModalEditar = true
-    wrapper.vm.formularioPlanta = { nombre: 'PB', descripcion: '', dimensiones: { ancho: 150, largo: 200, alto: 280 }, pesoMaximoSoportado: 3000 }
+    wrapper.vm.formularioPlanta = { nombre: 'PB', descripcion: '', dimensiones: { ancho: 150, largo: 200, alto: 280 }, capacidadCargaSoportado: 3000 }
 
     wrapper.vm.guardarPlanta()
 
@@ -57,7 +57,7 @@ describe('Post-apply validation pass en redimensionado de planta', () => {
   it('(2) ok-but-out-of-bounds se convierte en auto_adjust', () => {
     const store = useCanvasStore()
     store.plantas = [
-      { id: 'planta_1', nombre: 'PB', descripcion: '', elementos: [], activa: true, dimensiones: { ancho: 300, largo: 200, alto: 280 }, pesoMaximoSoportado: 3000 },
+      { id: 'planta_1', nombre: 'PB', descripcion: '', elementos: [], activa: true, dimensiones: { ancho: 300, largo: 200, alto: 280 }, capacidadCargaSoportado: 3000 },
     ]
     store.plantaActiva = 'planta_1'
 
@@ -69,7 +69,7 @@ describe('Post-apply validation pass en redimensionado de planta', () => {
 
     const wrapper = shallowMount(PlantasPanel, { global: { stubs: { HistorialModal: true, ImportExportModal: true, Teleport: true } } })
     wrapper.vm.mostrarModalEditar = true
-    wrapper.vm.formularioPlanta = { nombre: 'PB', descripcion: '', dimensiones: { ancho: 200, largo: 200, alto: 280 }, pesoMaximoSoportado: 3000 }
+    wrapper.vm.formularioPlanta = { nombre: 'PB', descripcion: '', dimensiones: { ancho: 200, largo: 200, alto: 280 }, capacidadCargaSoportado: 3000 }
 
     // Simulate preview ok (no assert necesario, solo confirmamos)
     wrapper.vm.onDimChange()
@@ -86,7 +86,7 @@ describe('Post-apply validation pass en redimensionado de planta', () => {
   it('(3) fallo de pack revierte planta', () => {
     const store = useCanvasStore()
     store.plantas = [
-      { id: 'planta_1', nombre: 'PB', descripcion: '', elementos: [], activa: true, dimensiones: { ancho: 300, largo: 300, alto: 280 }, pesoMaximoSoportado: 3000 },
+      { id: 'planta_1', nombre: 'PB', descripcion: '', elementos: [], activa: true, dimensiones: { ancho: 300, largo: 300, alto: 280 }, capacidadCargaSoportado: 3000 },
     ]
     store.plantaActiva = 'planta_1'
 
@@ -98,7 +98,7 @@ describe('Post-apply validation pass en redimensionado de planta', () => {
 
     const wrapper = shallowMount(PlantasPanel, { global: { stubs: { HistorialModal: true, ImportExportModal: true, Teleport: true } } })
     wrapper.vm.mostrarModalEditar = true
-    wrapper.vm.formularioPlanta = { nombre: 'PB', descripcion: '', dimensiones: { ancho: 200, largo: 200, alto: 280 }, pesoMaximoSoportado: 3000 }
+    wrapper.vm.formularioPlanta = { nombre: 'PB', descripcion: '', dimensiones: { ancho: 200, largo: 200, alto: 280 }, capacidadCargaSoportado: 3000 }
 
     // Confirm
     wrapper.vm.guardarPlanta()

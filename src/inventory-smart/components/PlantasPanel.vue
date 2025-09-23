@@ -327,12 +327,12 @@
 
           <!-- Peso máximo soportado -->
           <div class="mb-6">
-            <label for="pesoMaximo" class="block text-sm font-medium text-gray-700 mb-2"
+            <label for="capacidadCarga" class="block text-sm font-medium text-gray-700 mb-2"
               >Peso máximo soportado (kg)</label
             >
             <input
-              id="pesoMaximo"
-              v-model.number="formularioPlanta.pesoMaximoSoportado"
+              id="capacidadCarga"
+              v-model.number="formularioPlanta.capacidadCargaSoportado"
               type="number"
               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 focus:ring-3 focus:ring-primary-100 transition-all"
               placeholder="3000"
@@ -531,7 +531,7 @@ const formularioPlanta = ref({
     ancho: 800,
     largo: 1000,
   },
-  pesoMaximoSoportado: 3000,
+  capacidadCargaSoportado: 3000,
 })
 
 // Guard de redimensionado ligado al estado actual
@@ -710,7 +710,7 @@ const editarPlanta = (plantaId) => {
         ancho: planta.dimensiones?.ancho || 800,
         largo: planta.dimensiones?.largo || 1000,
       },
-      pesoMaximoSoportado: planta.pesoMaximoSoportado || 3000,
+      capacidadCargaSoportado: planta.capacidadCargaSoportado || 3000,
     }
     mostrarModalEditar.value = true
     cerrarMenuPlanta()
@@ -820,7 +820,7 @@ const guardarPlanta = async () => {
         nombre: formularioPlanta.value.nombre.trim(),
         descripcion: formularioPlanta.value.descripcion.trim(),
         dimensiones: { ...dims },
-        pesoMaximoSoportado: formularioPlanta.value.pesoMaximoSoportado,
+        capacidadCargaSoportado: formularioPlanta.value.capacidadCargaSoportado,
       })
 
       // 2) Post-apply validation pass
@@ -914,7 +914,7 @@ const guardarPlanta = async () => {
         nombre: formularioPlanta.value.nombre.trim(),
         descripcion: formularioPlanta.value.descripcion.trim(),
         dimensiones: formularioPlanta.value.dimensiones,
-        pesoMaximoSoportado: formularioPlanta.value.pesoMaximoSoportado,
+        capacidadCargaSoportado: formularioPlanta.value.capacidadCargaSoportado,
       })
       canvasStore.navegarAPlanta(nuevaPlantaId)
       canvasStore.saveToHistory('Nueva planta creada')
@@ -939,7 +939,7 @@ const cerrarModales = () => {
       ancho: 800,
       largo: 1000,
     },
-    pesoMaximoSoportado: 3000,
+    capacidadCargaSoportado: 3000,
   }
 }
 

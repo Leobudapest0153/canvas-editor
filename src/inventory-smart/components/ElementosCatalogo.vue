@@ -183,7 +183,7 @@
               </div>
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
-                <span class="spec-value text-gray-700">{{ elemento.pesoMaximo }}kg</span>
+                <span class="spec-value text-gray-700">{{ elemento.capacidadCarga }}kg</span>
               </div>
               <!-- <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
@@ -194,8 +194,11 @@
             <!-- Badge de tipo y categoría -->
             <div class="mt-2 flex gap-1">
               <span
-                class="inline-block px-2 py-1 text-xs rounded-full text-white"
-                :style="{ backgroundColor: getColorPorTipo(elemento.tipo) }"
+                class="inline-block px-2 py-1 text-xs rounded-full"
+                :style="{
+                  backgroundColor: getColorPorTipo(elemento.tipo),
+                  color: getContrastTextColor(getColorPorTipo(elemento.tipo))
+                }"
               >
                 {{ getTipoNombre(elemento.tipo) }}
               </span>
@@ -285,6 +288,7 @@ import {
   TIPOS_ENTIDAD,
   getColorPorTipo,
   getColorCategoria,
+  getContrastTextColor,
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
 } from '@/inventory-smart/utils/constants'
@@ -376,7 +380,7 @@ const nuevoElemento = ref({
     largo: 100,
     alto: 75,
   },
-  pesoMaximo: 50,
+  capacidadCarga: 50,
   ubicacion: 'suelo',
   descripcion: '',
   icono: 'box',
