@@ -553,6 +553,25 @@
           }"
         />
       </v-layer>
+      <!-- Capa de indicadores de uso (por encima del transformer) -->
+      <v-layer ref="indicatorsLayerRef" :config="{ listening: false }">
+        <!-- Indicadores de uso para todos los elementos visibles -->
+        <template v-for="elemento in elementosVisiblesEnCanvas" :key="`indicator-${elemento.id}`">
+          <v-circle
+            v-if="getUsageIndicatorColor(elemento)"
+            :config="{
+              x: elemento.x + getDrawWidth(elemento) - 1 / canvasStore.zoom,
+              y: elemento.y - 1 / canvasStore.zoom,
+              radius: 8 / canvasStore.zoom,
+              fill: getUsageIndicatorColor(elemento),
+              stroke: '#ffffff',
+              strokeWidth: 2 / canvasStore.zoom,
+              listening: false,
+              opacity: 0.9,
+            }"
+          />
+        </template>
+      </v-layer>
     </v-stage>
 
     <rulers-overlay
@@ -643,6 +662,7 @@ import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
+import { getUsageIndicatorColor } from '@/inventory-smart/composables/useSimulateProducts'
 import { useObjectSnapping } from '@/inventory-smart/composables/useObjectSnapping'
 import { usePlacementGuards } from '@/inventory-smart/composables/usePlacementGuards'
 import FloatingToolbar from '@/inventory-smart/components/FloatingToolbar.vue'
@@ -675,6 +695,7 @@ const stageRef = ref(null)
 const layerRef = ref(null)
 const backgroundLayerRef = ref(null)
 const overlaysLayerRef = ref(null)
+const indicatorsLayerRef = ref(null)
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -776,7 +797,7 @@ const getElementPixelDimensions = (elemento) => {
       height: toPrecisionCm(cmToPx(heightCm, viewport.cmPerPx)),
     }
   }
-
+  console.warn('Elemento sin dimensiones definidas:', elemento)
   // Fallback a valores por defecto (solo para elementos sin dimensiones definidas)
   return { width: 100, height: 60 }
 }
@@ -1483,7 +1504,7 @@ const createElementFromDrop = (data, dropEvent) => {
     orientacion: Number(elemento.orientacion) || 0,
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
     alturaRespectoAlSuelo: elemento.alturaRespectoAlSuelo || 0,
-    pesoMaximo: elemento.pesoMaximo || 0,
+    capacidadCarga: elemento.capacidadCarga || 0,
     volumenMaximo: (anchoCm * largoCmFinal * altoCm) / 100,
     dimensionLock: false,
     systemTypeKey: elemento.id,
@@ -1587,45 +1608,111 @@ const getElementLabelText = (elemento) => {
   return code || elemento?.nombre || elemento?.tipo || 'Elemento'
 }
 
-// Si el elemento es más alto que ancho (h > w), se muestra el texto en vertical (rotado -90°);
+/**
+ * Calcula las propiedades optimizadas para el texto/etiqueta de un elemento
+ * Considera dimensiones, zoom, longitud del texto y orientación para mejor legibilidad
+ */
 const computeLabelProps = (elemento) => {
+  // Validaciones iniciales
+  if (!elemento) {
+    return {
+      x: 0, y: 0, width: 0, height: 0,
+      text: '', fontSize: 0, listening: false
+    }
+  }
+
   const w = getDrawWidth(elemento)
   const h = getDrawHeight(elemento)
-  const minSide = Math.max(0, Math.min(w, h))
-  const base = Math.min(280, Math.max(100, minSide * 0.22))
+
+  // Validar dimensiones mínimas
+  if (w <= 0 || h <= 0) {
+    return {
+      x: 0, y: 0, width: w, height: h,
+      text: '', fontSize: 0, listening: false
+    }
+  }
+
   const displayText = getElementLabelText(elemento)
-  let cfg = {
-    x: 0,
-    y: 0,
-    width: w,
-    height: h,
+  const zoom = canvasStore.zoom || 1
+
+  // Calcular fontSize dinámico considerando múltiples factores
+  const minSide = Math.min(w, h)
+  const maxSide = Math.max(w, h)
+  const aspectRatio = maxSide / minSide
+
+  // Margen interno para evitar que el texto toque los bordes
+  const padding = Math.max(2, minSide * 0.03)
+  const availableWidth = w - (padding * 2)
+  const availableHeight = h - (padding * 2)
+
+  // Base inicial del tamaño según el lado menor, con margen considerado
+  let baseFontSize = Math.max(10, Math.min(availableWidth, availableHeight) * 0.12)
+
+  // Factor de ajuste por relación de aspecto - elementos muy alargados necesitan texto más pequeño
+  const aspectFactor = aspectRatio > 4 ? 0.75 : aspectRatio > 3 ? 0.85 : aspectRatio > 2 ? 0.92 : 1
+  baseFontSize *= aspectFactor
+
+  // Factor de ajuste por longitud del texto - menos agresivo
+  const textLength = displayText?.length || 0
+  const lengthFactor = textLength > 30 ? 0.7 : textLength > 25 ? 0.8 : textLength > 20 ? 0.85 : textLength > 15 ? 0.9 : textLength > 10 ? 0.95 : 1
+  baseFontSize *= lengthFactor
+
+  // Estimación aproximada del ancho del texto para verificar que cabe
+  const estimatedTextWidth = textLength * baseFontSize * 0.5 // Menos conservadora
+  if (estimatedTextWidth > availableWidth && availableWidth > 0) {
+    baseFontSize = Math.max(baseFontSize * 0.8, (availableWidth / textLength) * 1.4) // Menos reducción
+  }
+
+  // Límites mínimos y máximos para legibilidad, considerando zoom
+  const minFontSize = Math.max(8, 10 / zoom)
+  const maxFontSize = Math.min(60, availableHeight * 0.4)
+  const fontSize = Math.max(minFontSize, Math.min(maxFontSize, baseFontSize))
+
+  // Configuración base del texto
+  const baseConfig = {
+    x: padding,
+    y: padding,
+    width: availableWidth,
+    height: availableHeight,
     rotation: 0,
     text: displayText,
     align: 'center',
     verticalAlign: 'middle',
     fontStyle: 'bold',
-    fontFamily: 'Arial',
-    fontSize: base,
+    fontFamily: 'Arial, sans-serif',
+    fontSize: fontSize,
     listening: false,
     fill: '#111827',
-    shadowColor: 'black',
-    shadowBlur: 2,
+    shadowColor: 'rgba(0, 0, 0, 0.8)',
+    shadowBlur: Math.max(1, 2 / zoom),
     shadowOpacity: 0.6,
-    lineHeight: 1.15,
+    lineHeight: 1.1,
+    wrap: 'word',
+    ellipsis: true,
+    padding: 2,
   }
 
-  if (h > w && w > 0 && h > 0) {
-    cfg = {
-      ...cfg,
-      x: 0,
-      y: h,
-      width: h,
-      height: w,
+  // Determinar si debe rotarse el texto (elemento muy vertical)
+  const shouldRotate = h > w * 1.8 && w > 0 && h > 0 && textLength <= 15
+
+  if (shouldRotate) {
+    // Para texto rotado, usar dimensiones intercambiadas con padding
+    const rotatedWidth = availableHeight
+    const rotatedHeight = availableWidth
+
+    return {
+      ...baseConfig,
+      x: w / 2,
+      y: h / 2,
+      width: rotatedWidth,
+      height: rotatedHeight,
       rotation: -90,
+      offsetX: rotatedWidth / 2,
+      offsetY: rotatedHeight / 2,
     }
   }
 
-  return cfg
+  return baseConfig
 }
 
 watch(

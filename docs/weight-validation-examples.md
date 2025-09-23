@@ -27,7 +27,7 @@ const resultado = validarCapacidadMaximaVsPesoActual('elemento-123', 'elementos'
 ```javascript
 const { validarPesoMaximoElemento } = useWeightValidation()
 
-// Validar pesoMaximo de un elemento específico
+// Validar capacidadCarga de un elemento específico
 const resultado = validarPesoMaximoElemento('estanteria-001', 100)
 
 // Resultado válido:
@@ -45,7 +45,7 @@ const resultado = validarPesoMaximoElemento('estanteria-001', 100)
 ```javascript
 const { validarPesoMaximoSoportadoPlanta } = useWeightValidation()
 
-// Validar pesoMaximoSoportado de una planta específica
+// Validar capacidadCargaSoportado de una planta específica
 const resultado = validarPesoMaximoSoportadoPlanta('planta-almacen', 500)
 
 // Resultado con capacidad ilimitada:
@@ -84,7 +84,7 @@ const validarCambioPesoMaximo = (nuevoPesoMaximo) => {
 ```javascript
 // Watch para validar automáticamente cuando cambian los valores
 watch(
-  () => edited.value.pesoMaximo,
+  () => edited.value.capacidadCarga,
   (nuevoPesoMaximo) => {
     if (elementoSeleccionado.value) {
       const resultado = validarPesoMaximoElemento(
@@ -93,7 +93,7 @@ watch(
       )
       
       // Actualizar UI con el resultado
-      pesoMaximoError.value = resultado.valido ? null : resultado.mensaje
+      capacidadCargaError.value = resultado.valido ? null : resultado.mensaje
     }
   }
 )
@@ -106,7 +106,7 @@ const guardarCambios = async () => {
   // Validar peso máximo antes de guardar
   const resultadoPeso = validarPesoMaximoElemento(
     elementoSeleccionado.value.id,
-    edited.value.pesoMaximo
+    edited.value.capacidadCarga
   )
   
   if (!resultadoPeso.valido) {
