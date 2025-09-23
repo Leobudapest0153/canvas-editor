@@ -1887,7 +1887,9 @@ const updateStageSize = () => {
   centrarPlantaEnCanvas()
 }
 
-function centrarPlantaEnCanvas() {
+function centrarPlantaEnCanvas(options = {}) {
+  const { force = false } = options
+  if (isInfinitePlant.value && !force) return
   try {
     const stage = stageRef.value?.getNode?.()
     if (!stage) return
@@ -1957,13 +1959,15 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
 })
 
-function recomputeBoundsAndIndex() {
+function recomputeBoundsAndIndex({ skipCenter = false } = {}) {
   try {
     conflictsApi.clear()
     dragLastValidPositions.value.clear()
     isElementDragging.value = false
     stageDragEnabled.value = true
-    nextTick(() => centrarPlantaEnCanvas())
+    if (!skipCenter) {
+      nextTick(() => centrarPlantaEnCanvas())
+    }
   } catch {
     console.error('Error recomputando bounds e índice de elementos')
   }
@@ -2002,7 +2006,7 @@ watch(
   () => [layerConfig.value.width, layerConfig.value.height],
   async () => {
     await nextTick()
-    recomputeBoundsAndIndex()
+    recomputeBoundsAndIndex({ skipCenter: isInfinitePlant.value })
     await nextTick()
     forceRedraw()
   },
@@ -2037,7 +2041,8 @@ const fitToPlanta = () => {
 
     // Sincronizar llamada explícita para compatibilidad con pruebas:
     // intentar usar el bbox del polígono crudo (sin interpretar unidades)
-    let z = getDynamicMinZoom()
+    const dynamicMinZoom = getDynamicMinZoom()
+    let z = dynamicMinZoom
     try {
       const poly = canvasStore.plantaActivaData?.poligono
       if (Array.isArray(poly) && poly.length >= 3) {
@@ -2059,7 +2064,11 @@ const fitToPlanta = () => {
       }
     } catch { /* ignore */ }
 
-    canvasStore.configurarZoom(z, z)
+    if (isInfinitePlant.value) {
+      canvasStore.configurarZoom(canvasStore.zoom, dynamicMinZoom)
+    } else {
+      canvasStore.configurarZoom(z, z)
+    }
   } catch (e) {
     console.error('fitToPlanta error', e)
     try {
