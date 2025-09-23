@@ -117,7 +117,7 @@
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
-            @dblclick="() => handleElementDoubleClick(elemento)"
+            @dblclick="(e) => handleElementDoubleClick(e, elemento)"
             @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
             @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
             @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
@@ -253,7 +253,7 @@
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
-            @dblclick="() => handleElementDoubleClick(elemento)"
+            @dblclick="(e) => handleElementDoubleClick(e, elemento)"
             @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
             @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
             @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
@@ -309,7 +309,7 @@
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
-            @dblclick="() => handleElementDoubleClick(elemento)"
+            @dblclick="(e) => handleElementDoubleClick(e, elemento)"
             @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
             @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
             @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
@@ -1078,7 +1078,8 @@ const selectElement = (element) => {
   }
 }
 
-const handleElementDoubleClick = (elemento) => {
+const handleElementDoubleClick = (evt, elemento) => {
+  if (evt.evt.button !== 0) return // Solo botón izquierdo
   if (elemento?.restrictions && elemento.restrictions.includes('enter')) return
   console.log('Double-click en elemento:', elemento.nombre)
 
