@@ -63,7 +63,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 600,
       alto: 10, // será igualado a planta.alto
     },
-    pesoMaximo: 0,
+    capacidadCarga: 0,
     ubicacion: 'suelo',
     descripcion: 'Pasillo de circulación',
     icono: 'road',
@@ -84,11 +84,20 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 400,
       alto: 250,
     },
-    pesoMaximo: 0,
+    capacidadCarga: 500,
     ubicacion: 'suelo',
     descripcion: 'Cuarto especial',
     icono: 'home',
     props: { system: true, catalogVisible: true },
+    // Un piso por defecto con tipos de productos
+    pisosNiveles: [
+      {
+        nombre: 'Piso 1',
+        tiposProductos: ['refrigerados', 'congelados'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
 
   // Piso base (navegable)
@@ -105,7 +114,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 100,
       alto: 10,
     },
-    pesoMaximo: 0,
+    capacidadCarga: 500,
     ubicacion: 'suelo',
     descripcion: 'Piso interno de cuarto',
     icono: 'brick',
@@ -117,7 +126,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
   // Anaqueles
   {
     id: 'anaquel_metalico_grande',
-    nombre: 'Anaquel 2 x 2',
+    nombre: 'Anaquel',
     tipo: 'elementos', // NUEVO CAMPO
     categoria: 'anaquel_metal',
     forma: 'rectangular',
@@ -128,11 +137,20 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 200,
       alto: 180,
     },
-    pesoMaximo: 500, // kg
+    capacidadCarga: 500, // kg
     ubicacion: 'suelo',
     descripcion: 'Anaquel metálico de alta capacidad para almacenamiento pesado',
     icono: 'rack',
     props: { system: true },
+    // Un nivel por defecto con tipos de productos
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos', 'voluminosos'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
 
   // Estante de pared
@@ -149,12 +167,20 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 25,
       alto: 20,
     },
-    pesoMaximo: 50, // kg
+    capacidadCarga: 50, // kg
     ubicacion: 'pared',
     alturaRespectoAlSuelo: 150, // cm - altura típica para estantes de pared
     descripcion: 'Estante montado en pared para almacenamiento ligero',
     icono: 'shelf',
     props: { system: true },
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos', 'fragiles'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: true,
+      },
+    ],
   },
 
   // Armario de pared
@@ -171,12 +197,20 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 30,
       alto: 80,
     },
-    pesoMaximo: 100, // kg
+    capacidadCarga: 100, // kg
     ubicacion: 'pared',
     alturaRespectoAlSuelo: 50, // cm - altura moderada para armarios
     descripcion: 'Armario montado en pared para almacenamiento vertical',
     icono: 'cabinet',
     props: { system: true },
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
 
   // Barril
@@ -193,11 +227,19 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 60,
       alto: 90,
     },
-    pesoMaximo: 200, // kg
+    capacidadCarga: 200, // kg
     ubicacion: 'suelo',
     descripcion: 'Barril estándar de madera',
     icono: 'barrel',
     props: { system: true },
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
 
   // === CONTENEDORES (solo pueden ir en elementos) ===
@@ -216,7 +258,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 10,
       alto: 10,
     },
-    pesoMaximo: 1,
+    capacidadCarga: 1,
     ubicacion: 'interior',
     descripcion: 'Contenedor básico para almacenamiento organizado (nivel de elemento)',
     icono: 'box',
@@ -480,3 +522,28 @@ export const WEIGHT = {
 // === VERSIONADO DE EXPORT / SCHEMAS ===
 export const EXPORT_FORMAT_VERSION = '1.1.0'
 export const SCHEMA_VERSION_PLANTILLAS = 1
+
+// === FUNCIONES DE COLOR ===
+
+/**
+ * Determina si usar texto blanco o negro basado en la luminosidad del color de fondo
+ * @param {string} hexColor - Color en formato hexadecimal (ej: '#1C1E4D')
+ * @returns {string} - '#ffffff' para texto blanco o '#000000' para texto negro
+ */
+export const getContrastTextColor = (hexColor) => {
+  if (!hexColor || typeof hexColor !== 'string') return '#ffffff'
+
+  // Remover el # si está presente
+  const hex = hexColor.replace('#', '')
+
+  // Convertir a RGB
+  const r = parseInt(hex.substr(0, 2), 16)
+  const g = parseInt(hex.substr(2, 2), 16)
+  const b = parseInt(hex.substr(4, 2), 16)
+
+  // Calcular luminosidad usando la fórmula estándar
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+
+  // Si la luminosidad es menor a 0.5, usar texto blanco, sino negro
+  return luminance < 0.5 ? '#ffffff' : '#000000'
+}

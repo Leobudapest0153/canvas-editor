@@ -140,6 +140,21 @@
               elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria),
           }"
         >
+          <!-- Botón de acciones (tres puntos) -->
+          <button
+            type="button"
+            class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded cursor-pointer"
+            aria-haspopup="menu"
+            :aria-expanded="kebabMenu.visible && kebabMenu.item?.id === elemento.id ? 'true' : 'false'"
+            :aria-controls="`el-menu-${elemento.id}`"
+            title="Acciones"
+            v-if="!isKebabRestricted(elemento)"
+            @click.stop="toggleKebab($event, elemento)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+              <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 14a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
+            </svg>
+          </button>
           <!-- Preview del elemento -->
           <div class="flex items-center justify-center mb-3">
             <component
@@ -168,7 +183,7 @@
               </div>
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
-                <span class="spec-value text-gray-700">{{ elemento.pesoMaximo }}kg</span>
+                <span class="spec-value text-gray-700">{{ elemento.capacidadCarga }}kg</span>
               </div>
               <!-- <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
@@ -179,8 +194,11 @@
             <!-- Badge de tipo y categoría -->
             <div class="mt-2 flex gap-1">
               <span
-                class="inline-block px-2 py-1 text-xs rounded-full text-white"
-                :style="{ backgroundColor: getColorPorTipo(elemento.tipo) }"
+                class="inline-block px-2 py-1 text-xs rounded-full"
+                :style="{
+                  backgroundColor: getColorPorTipo(elemento.tipo),
+                  color: getContrastTextColor(getColorPorTipo(elemento.tipo))
+                }"
               >
                 {{ getTipoNombre(elemento.tipo) }}
               </span>
@@ -214,6 +232,31 @@
       </div>
     </div>
 
+    <!-- Menú contextual para elementos (kebab) -->
+    <div
+      v-if="kebabMenu.visible"
+      class="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-1"
+      :style="{ left: kebabMenu.x + 'px', top: kebabMenu.y + 'px' }"
+      role="menu"
+      :id="`el-menu-${kebabMenu.item?.id || 'ctx'}`"
+      @keydown.esc.stop.prevent="closeKebab"
+    >
+      <button
+        class="block cursor-pointer w-full text-left px-3 py-2 rounded hover:bg-gray-50"
+        role="menuitem"
+        @click.stop="startEdit(kebabMenu.item)"
+      >
+        Editar
+      </button>
+      <button
+        class="block cursor-pointer w-full text-left px-3 py-2 rounded text-red-600 hover:bg-red-50"
+        role="menuitem"
+        @click.stop="handleDeleteItem(kebabMenu.item)"
+      >
+        Eliminar
+      </button>
+    </div>
+
     <ElementEditor
       :visible="mostrarModalCrear"
       :categorias="categoriasDisponibles"
@@ -226,8 +269,9 @@
 
     <AgregarCuartoModal
       :visible="mostrarModalAgregarEspacio"
-      :modo
-      @close="mostrarModalAgregarEspacio = false"
+      :modo="editingItem ? (editingForm?.modo || modo) : modo"
+      :initialForm="editingItem ? editingForm : null"
+      @close="cancelEdit"
       @save="onGuardarEspacio"
     />
   </div>
@@ -244,23 +288,28 @@ import {
   TIPOS_ENTIDAD,
   getColorPorTipo,
   getColorCategoria,
+  getContrastTextColor,
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
 } from '@/inventory-smart/utils/constants'
-import { CATALOGO } from '@/inventory-smart/utils/constants'
-import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
+// import { CATALOGO, SCALE_WITH_PARENT_KEYS } from '@/inventory-smart/utils/constants'
+// import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
 
 import ElementEditor from './modals/ElementEditor.vue'
 import AgregarCuartoModal from './AgregarCuartoModal.vue'
 import {
   buildStructureFromForm,
   toCatalogItemFromStructure,
+  toFormFromCatalogItem,
+  buildUpdatedCatalogItem,
+  removeCatalogItem,
 } from '@/inventory-smart/composables/useStructureManager'
 import { formatLengthsCm } from '../utils/units'
 import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
 import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
 import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 
 // Props
 const props = defineProps({
@@ -278,6 +327,7 @@ const { showToast } = useToast();
 const catalogStore = useCatalogStore()
 const { filteredCatalogItems, catalogContext, searchText, selectedCategory, items } =
   storeToRefs(catalogStore)
+const confirmDialog = useConfirmDialog()
 
 // Estado local
 const filtroTexto = searchText
@@ -315,6 +365,9 @@ const handleClickOutside = (event) => {
 }
 const mostrarModalCrear = ref(false)
 const mostrarModalAgregarEspacio = ref(false)
+const editingItem = ref(null) // item que se edita
+const editingForm = ref(null) // formulario derivado del item
+const kebabMenu = ref({ visible: false, x: 0, y: 0, item: null })
 
 // Formulario para nuevo elemento
 const nuevoElemento = ref({
@@ -327,7 +380,7 @@ const nuevoElemento = ref({
     largo: 100,
     alto: 75,
   },
-  pesoMaximo: 50,
+  capacidadCarga: 50,
   ubicacion: 'suelo',
   descripcion: '',
   icono: 'box',
@@ -427,21 +480,32 @@ const onGuardarElemento = (elemento) => {
 
 const onGuardarEspacio = (datosEspacio) => {
   try {
-    const structure = buildStructureFromForm(datosEspacio)
-    const kind = datosEspacio.tipo === 'cuarto' ? 'room' : 'space'
-    const item = toCatalogItemFromStructure({
-      name: datosEspacio.datosGenerales?.nombre,
-      description: datosEspacio.datosGenerales?.descripcion,
-      structure,
-      kind,
-      color: datosEspacio.datosGenerales?.color,
-    })
-    items.value.push(item)
+    if (editingItem.value) {
+      // Editar existente
+      const updated = buildUpdatedCatalogItem(editingItem.value, datosEspacio)
+      const idx = items.value.findIndex((it) => it.id === editingItem.value.id)
+      if (idx !== -1) items.value[idx] = updated
+    } else {
+      // Crear nuevo
+      const structure = buildStructureFromForm(datosEspacio)
+      const kind = datosEspacio.tipo === 'cuarto' ? 'room' : 'space'
+      const item = toCatalogItemFromStructure({
+        name: datosEspacio.datosGenerales?.nombre,
+        description: datosEspacio.datosGenerales?.descripcion,
+        structure,
+        kind,
+        color: datosEspacio.datosGenerales?.color,
+      })
+      items.value.push(item)
+    }
     categoriaSeleccionada.value = null
     filtroTexto.value = ''
     mostrarModalAgregarEspacio.value = false
   } catch (e) {
-    console.error('No se pudo crear estructura desde formulario', e)
+    console.error('No se pudo procesar estructura desde formulario', e)
+  } finally {
+    editingItem.value = null
+    editingForm.value = null
   }
 }
 
@@ -481,24 +545,36 @@ const getIconComponentForElement = (elemento) => {
   }
 }
 
-// Dims preview para elementos de sistema por defecto
-const isSystemDefaultItem = (item) =>
-  !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
-
-const getCardDims = (item) => {
-  try {
-    if (!item?.dimensiones) return { ancho: 0, largo: 0, alto: 0 }
-    if (!isSystemDefaultItem(item)) return item.dimensiones
-    const planta = canvasStore.plantaActivaData
-    const dimsPlanta = planta?.dimensiones
-    if (!dimsPlanta) return item.dimensiones
-    const parentDims = { w: dimsPlanta.ancho, h: dimsPlanta.largo, d: dimsPlanta.alto }
-    const dims = computeDimsByAxisScale(item.id, parentDims, { snap: true })
-    return dims || item.dimensiones
-  } catch {
-    return item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
-  }
+// Tipos para los que se oculta el menú de acciones
+const isKebabRestricted = (item) => {
+  const t = item?.tipo
+  return t === 'pasillos' || t === 'contenedores' || t === 'pisos'
 }
+
+// const isSystemDefaultItem = (item) =>
+//   !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
+
+// const getCardDims = (item) => {
+//   try {
+//     if (!item?.dimensiones) return { ancho: 0, largo: 0, alto: 0 }
+//     // Solo escalar para tipos explícitos (pasillo/cuarto/piso). Para elementos regulares
+//     // como estantes o anaqueles, mostrar dimensiones base del catálogo.
+//     if (!(isSystemDefaultItem(item) && SCALE_WITH_PARENT_KEYS.includes(item.id))) {
+//       return item.dimensiones
+//     }
+//     const planta = canvasStore.plantaActivaData
+//     const dimsPlanta = planta?.dimensiones
+//     if (!dimsPlanta) return item.dimensiones
+//     const parentDims = { w: dimsPlanta.ancho, h: dimsPlanta.largo, d: dimsPlanta.alto }
+//     const dims = computeDimsByAxisScale(item.id, parentDims, { snap: true })
+//     return dims || item.dimensiones
+//   } catch {
+//     return item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
+//   }
+// }
+
+// Comportamiento actual: sin escalado, siempre dimensiones base del catálogo
+const getCardDims = (item) => item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
 
 // Drag and Drop
 const iniciarArrastre = (elemento, event) => {
@@ -629,6 +705,65 @@ watch(
   },
   { immediate: true },
 )
+
+// --- Lógica del menú kebab y edición/eliminación ---
+const toggleKebab = (evt, item) => {
+  evt.preventDefault()
+  if (isKebabRestricted(item)) return
+  const isSame = kebabMenu.value.visible && kebabMenu.value.item?.id === item.id
+  kebabMenu.value = isSame
+    ? { visible: false, x: 0, y: 0, item: null }
+    : { visible: true, x: evt.clientX, y: evt.clientY, item }
+}
+
+const closeKebab = () => {
+  kebabMenu.value = { visible: false, x: 0, y: 0, item: null }
+}
+
+const startEdit = (item) => {
+  if (!item) return closeKebab()
+  const form = toFormFromCatalogItem(item)
+  if (!form) return closeKebab()
+  editingItem.value = item
+  editingForm.value = form
+  mostrarModalAgregarEspacio.value = true
+  closeKebab()
+}
+
+const cancelEdit = () => {
+  mostrarModalAgregarEspacio.value = false
+  editingItem.value = null
+  editingForm.value = null
+}
+
+const handleDeleteItem = async (item) => {
+  if (!item) return closeKebab()
+  const ok = await confirmDialog.confirm({
+    title: 'Eliminar elemento',
+    message: `Se eliminará “${item.nombre}” del catálogo. Esta acción no afectará elementos ya colocados.`,
+    confirmLabel: 'Eliminar',
+    cancelLabel: 'Cancelar',
+  })
+  if (!ok) return closeKebab()
+  removeCatalogItem(items.value, item.id)
+  closeKebab()
+}
+
+// Cerrar kebab al hacer click fuera
+const onGlobalClickKebab = (e) => {
+  if (!kebabMenu.value.visible) return
+  const menuId = `el-menu-${kebabMenu.value.item?.id || 'ctx'}`
+  const path = e.composedPath ? e.composedPath() : (e.path || [])
+  const clickedInside = path.some((n) => n?.id === menuId)
+  if (!clickedInside) closeKebab()
+}
+
+onMounted(() => {
+  window.addEventListener('click', onGlobalClickKebab, { capture: true })
+})
+onUnmounted(() => {
+  window.removeEventListener('click', onGlobalClickKebab, { capture: true })
+})
 </script>
 
 <style scoped>

@@ -58,7 +58,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         ancho: 1500, // cm
         largo: 1500, // cm
       },
-      pesoMaximoSoportado: 5000, // kg
+      capacidadCargaSoportado: 5000, // kg
       poligono: [
         {
           x: 0,
@@ -626,64 +626,66 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
-    // Actualización directa SIN validaciones de colocación/vecinos.
-    // patch típico: { dimensiones: { alto: number, ancho?: number, largo?: number }, alturaRespectoAlSuelo?: number }
-    const actualizarElementoSinValidacion = (id, patch = {}, saveHistory = true, description = 'Actualización sin validación') => {
-      try {
-        const idx = elementos.value.findIndex(e => e && e.id === id);
-        if (idx === -1) {
-          console.warn('[actualizarElementoSinValidacion] Elemento no encontrado:', id);
-          return false;
-        }
-
-        console.log('[actualizarElementoSinValidacion] Actualizando elemento:', id, 'con patch:', patch);
-
-        const prev = elementos.value[idx];
-
-        const next = {
-          ...prev,
-          ...patch,
-          dimensiones: {
-            ...(prev?.dimensiones || {}),
-            ...(patch?.dimensiones || {}),
-          },
-        };
-
-        // Normalizaciones en cm
-        if (next.dimensiones) {
-          for (const k of ['ancho', 'largo', 'alto']) {
-            if (next.dimensiones[k] != null && Number.isFinite(Number(next.dimensiones[k]))) {
-              next.dimensiones[k] = Math.round(Number(next.dimensiones[k]));
-            }
-          }
-        }
-        if (patch.alturaRespectoAlSuelo != null && Number.isFinite(Number(patch.alturaRespectoAlSuelo))) {
-          next.alturaRespectoAlSuelo = Math.max(0, Math.round(Number(patch.alturaRespectoAlSuelo)));
-        }
-        // Normalizaciones en px
-        for (const k of ['x', 'y', 'width', 'height']) {
-          if (patch[k] != null && Number.isFinite(Number(patch[k]))) {
-            let v = Math.round(Number(patch[k]));
-            if (k === 'width' || k === 'height') v = Math.max(1, v);
-            if (k === 'x' || k === 'y') v = Math.max(0, v);
-            next[k] = v;
-          }
-        }
-        elementos.value.splice(idx, 1, next);
-
-        if (saveHistory) {
-          if (typeof registrarEnHistorial === 'function') {
-            registrarEnHistorial({ tipo: 'update', id, antes: prev, despues: next, descripcion: description });
-          } else if (typeof addToHistory === 'function') {
-            addToHistory({ type: 'update', id, before: prev, after: next, description });
-          }
-        }
-        return true;
-      } catch (err) {
-        console.error('[actualizarElementoSinValidacion] Error:', err);
+  // Actualización directa SIN validaciones de colocación/vecinos.
+  // patch típico: { dimensiones: { alto: number, ancho?: number, largo?: number }, alturaRespectoAlSuelo?: number }
+  const actualizarElementoSinValidacion = (id, patch = {}, description = 'Actualización sin validación') => {
+    try {
+      const idx = elementos.value.findIndex(e => e && e.id === id);
+      if (idx === -1) {
+        console.warn('[actualizarElementoSinValidacion] Elemento no encontrado:', id);
         return false;
       }
-    };
+
+      const prev = elementos.value[idx];
+
+      const next = {
+        ...prev,
+        ...patch,
+        dimensiones: {
+          ...(prev?.dimensiones || {}),
+          ...(patch?.dimensiones || {}),
+        },
+      };
+
+      // Normalizaciones en cm
+      if (next.dimensiones) {
+        for (const k of ['ancho', 'largo', 'alto']) {
+          if (next.dimensiones[k] != null && Number.isFinite(Number(next.dimensiones[k]))) {
+            next.dimensiones[k] = Math.round(Number(next.dimensiones[k]));
+          }
+        }
+      }
+      if (patch.alturaRespectoAlSuelo != null && Number.isFinite(Number(patch.alturaRespectoAlSuelo))) {
+        next.alturaRespectoAlSuelo = Math.max(0, Math.round(Number(patch.alturaRespectoAlSuelo)));
+      }
+
+      // Normalizaciones en px
+      for (const k of ['x', 'y', 'width', 'height']) {
+        if (patch[k] != null && Number.isFinite(Number(patch[k]))) {
+          let v = Math.round(Number(patch[k]));
+          if (k === 'width' || k === 'height') v = Math.max(1, v);
+          if (k === 'x' || k === 'y') v = Math.max(0, v);
+          next[k] = v;
+        }
+      }
+
+      elementos.value.splice(idx, 1, next);
+
+      // if (saveHistory) {
+      //   if (typeof registrarEnHistorial === 'function') {
+      //     registrarEnHistorial({ tipo: 'update', id, antes: prev, despues: next, descripcion: description });
+      //   } else if (typeof addToHistory === 'function') {
+      //     addToHistory({ type: 'update', id, before: prev, after: next, description });
+      //   }
+      // }
+
+      return true;
+    } catch (err) {
+      console.error('[actualizarElementoSinValidacion] Error:', err);
+      return false;
+    }
+  };
+
 
 
   const actualizarElemento = (elementoId, propiedades, saveHistory = false, description = null) => {
@@ -860,7 +862,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         ancho: nuevaPlanta.dimensiones?.ancho || 0,
         largo: nuevaPlanta.dimensiones?.largo || 0,
       },
-      pesoMaximoSoportado: nuevaPlanta.pesoMaximoSoportado || 3000,
+      capacidadCargaSoportado: nuevaPlanta.capacidadCargaSoportado || 3000,
       ...nuevaPlanta,
     })
     return id

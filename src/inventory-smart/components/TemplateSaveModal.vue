@@ -59,6 +59,7 @@ import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWit
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { buildStructureFromCanvasElement } from '@/inventory-smart/composables/useStructureManager'
+import { limpiarDatosUsoEstructura } from '@/inventory-smart/composables/useSimulateProducts'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -93,9 +94,13 @@ function initFromElement(id) {
   // Unificar serialización vía StructureManager
   const struct = buildStructureFromCanvasElement(canvasStore, id)
   if (!struct) return
-  const elementsArr = struct.payload.elements
+
+  // Limpiar datos de uso antes de guardar la plantilla
+  const structLimpia = limpiarDatosUsoEstructura(struct.payload)
+
+  const elementsArr = structLimpia.elements
   templatePayload.value = {
-    rootId: struct.payload.rootId,
+    rootId: structLimpia.rootId,
     elements: elementsArr,
   }
   templateSummary.value = {
@@ -137,7 +142,7 @@ function saveTemplate() {
         height: templateSummary.value.height,
         depth: templateSummary.value.depth,
         childrenCount: templateSummary.value.childrenCount,
-        weight: root.pesoMaximo,
+        weight: root.capacidadCarga,
         location: root.ubicacion,
       },
       payload: templatePayload.value,

@@ -96,7 +96,7 @@ export const useStatePersistence = () => {
             largo: Math.max(1, planta.dimensiones?.largo || 500),
           },
           poligono: Array.isArray(planta.poligono) ? planta.poligono : [],
-          pesoMaximoSoportado: Math.max(0, planta.pesoMaximoSoportado || 5000),
+          capacidadCargaSoportado: Math.max(0, planta.capacidadCargaSoportado || 5000),
           elementos: Array.isArray(planta.elementos) ? planta.elementos : [],
           activa: Boolean(planta.activa),
           propiedadesPersonalizadas: planta.propiedadesPersonalizadas || {},
@@ -151,7 +151,7 @@ export const useStatePersistence = () => {
           colorBase: elemento.colorBase || '#3b82f6',
           forma: elemento.forma || 'rectangular',
           visible: elemento.visible !== false,
-          pesoMaximo: Math.max(0, elemento.pesoMaximo || 0),
+          capacidadCarga: Math.max(0, elemento.capacidadCarga || 0),
           volumenMaximo: Math.max(0, elemento.volumenMaximo || 0),
           ubicacion: elemento.ubicacion || 'suelo',
 
@@ -416,7 +416,7 @@ export const useStatePersistence = () => {
               largo: Math.max(1, plantaData.dimensiones.largo || 500),
             },
             poligono: Array.isArray(plantaData.poligono) ? plantaData.poligono : [],
-            pesoMaximoSoportado: Math.max(0, plantaData.pesoMaximoSoportado || 5000),
+            capacidadCargaSoportado: Math.max(0, plantaData.capacidadCargaSoportado || 5000),
             elementos: Array.isArray(plantaData.elementos) ? plantaData.elementos : [],
             activa: plantaData.activa === true,
             propiedadesPersonalizadas: plantaData.propiedadesPersonalizadas || {},
@@ -506,7 +506,7 @@ export const useStatePersistence = () => {
             visible: elementoData.visible !== false,
 
             // Propiedades físicas
-            pesoMaximo: Math.max(0, elementoData.pesoMaximo || 0),
+            capacidadCarga: Math.max(0, elementoData.capacidadCarga || 0),
             volumenMaximo: Math.max(0, elementoData.volumenMaximo || 0),
             ubicacion: elementoData.ubicacion || 'suelo',
             alturaRespectoAlSuelo: typeof elementoData.alturaRespectoAlSuelo === 'number'
@@ -729,8 +729,8 @@ export const useStatePersistence = () => {
           }
 
           // Campos opcionales con validación de tipo
-          if (planta.pesoMaximoSoportado && typeof planta.pesoMaximoSoportado !== 'number') {
-            validationResult.warnings.push(`${context}: pesoMaximoSoportado debe ser un número`)
+          if (planta.capacidadCargaSoportado && typeof planta.capacidadCargaSoportado !== 'number') {
+            validationResult.warnings.push(`${context}: capacidadCargaSoportado debe ser un número`)
           }
           if (planta.poligono && !Array.isArray(planta.poligono)) {
             validationResult.warnings.push(`${context}: polígono debe ser un array`)
