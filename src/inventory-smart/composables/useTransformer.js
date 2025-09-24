@@ -3,6 +3,7 @@ import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { CM_TO_PX, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { circleInPolygon, isRectCompletelyInPolygon } from '@/inventory-smart/utils/polygonBounds'
+import { deriveAreaBounds, getActiveBounds } from '@/inventory-smart/utils/activeBounds'
 import { correctTransformValues } from '@/inventory-smart/utils/precision'
 import { toTransformerPrecision } from '../utils/fixedDimensions'
 
@@ -652,30 +653,16 @@ export function useTransformer({
 
       const layerWidth = layerConfig?.value?.width ?? 0
       const layerHeight = layerConfig?.value?.height ?? 0
-
-      const areaBounds = boundary
-        ? boundary.mode === 'elastic'
-          ? {
-              minX: 0,
-              minY: 0,
-              mode: 'elastic',
-              ...(polygonForBounds ? { polygon: polygonForBounds } : {}),
-            }
-          : {
-              minX: 0,
-              minY: 0,
-              mode: boundary.mode || 'fixed',
-              maxX: layerWidth,
-              maxY: layerHeight,
-              ...(polygonForBounds ? { polygon: polygonForBounds } : {}),
-            }
-        : {
-            minX: 0,
-            minY: 0,
-            mode: 'fixed',
-            maxX: layerWidth,
-            maxY: layerHeight,
-          }
+      const activeBounds = getActiveBounds(canvasStore)
+      const areaBounds = deriveAreaBounds(activeBounds, layerWidth, layerHeight)
+      if (boundary?.mode === 'elastic') {
+        areaBounds.mode = 'elastic'
+      } else if (boundary?.mode) {
+        areaBounds.mode = boundary.mode
+      }
+      if (polygonForBounds) {
+        areaBounds.polygon = polygonForBounds
+      }
       const elementoParaValidacion =
         elementoSnapshot?.forma === 'circular'
           ? {

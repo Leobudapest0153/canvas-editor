@@ -14,7 +14,7 @@ import { finalizePlacement } from '@/inventory-smart/utils/finalizeDrag'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
 import { GRID_SIZE, CM_TO_PX } from '@/inventory-smart/utils/constants'
-import { getActiveBounds } from '@/inventory-smart/utils/activeBounds'
+import { getActiveBounds, deriveAreaBounds } from '@/inventory-smart/utils/activeBounds'
 import {
   detectConflictsFor,
   computeMTD,
@@ -294,7 +294,7 @@ export function useElementDrag({
         const onValidateLight = throttle2((bbox) => {
           // Overlay rojo/ok basado en el MISMO predicado de validez (modelo puro)
           const active = getActiveBounds(canvasStore)
-          const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: active.polygonPx }
+          const areaBounds = deriveAreaBounds(active, layerConfig.value.width, layerConfig.value.height)
           const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
           if (!elemento) return
           const moving = {
@@ -339,10 +339,8 @@ export function useElementDrag({
           if (!shape) return
           const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
           if (!elemento) return
-          const W = layerConfig.value.width
-          const H = layerConfig.value.height
           const activeForFrame = getActiveBounds(canvasStore)
-          const areaBounds = { minX: 0, minY: 0, maxX: W, maxY: H, polygon: activeForFrame.polygonPx }
+          const areaBounds = deriveAreaBounds(activeForFrame, layerConfig.value.width, layerConfig.value.height)
 
           // Para círculos, desiredPos ya es top-left (convertido en updateElementPosition)
           const asRect =
@@ -379,7 +377,7 @@ export function useElementDrag({
           if (!elemento) return false
           const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
           const activeForValidate = getActiveBounds(canvasStore)
-          const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: activeForValidate.polygonPx }
+          const areaBounds = deriveAreaBounds(activeForValidate, layerConfig.value.width, layerConfig.value.height)
           return isPlacementValid({ pos, movingEl: elemento, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
         }
 
@@ -484,8 +482,8 @@ export function useElementDrag({
       const layer = layerRef.value.getNode()
       const shape = stage.findOne(`#${elementId}`)
       if (shape && layer) {
-          const activeFinalize = getActiveBounds(canvasStore)
-          const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: activeFinalize.polygonPx }
+        const activeFinalize = getActiveBounds(canvasStore)
+        const areaBounds = deriveAreaBounds(activeFinalize, layerConfig.value.width, layerConfig.value.height)
         const elementoActual = canvasStore.elementosVisibles.find((e) => e.id === elementId)
         if (elementoActual) {
           // Candidato desde el shape (bbox de modelo)
@@ -682,8 +680,8 @@ export function useElementDrag({
 
       if (storeEl && posDiff) {
         // Validar que la posición final está dentro del área y es válida según el validador común
-  const active2 = getActiveBounds(canvasStore)
-  const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: active2.polygonPx }
+        const active2 = getActiveBounds(canvasStore)
+        const areaBounds = deriveAreaBounds(active2, layerConfig.value.width, layerConfig.value.height)
         const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
         const isValidNow = isPlacementValid({
           pos: { x: finalX, y: finalY },

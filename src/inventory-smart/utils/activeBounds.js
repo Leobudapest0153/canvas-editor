@@ -118,3 +118,60 @@ export function getActiveBounds(canvasStore) {
   }
   return { mode: isInfinite ? 'elastic' : 'fixed', boundsPx: { width, height }, polygonPx }
 }
+
+function computePolygonBBox(points) {
+  if (!Array.isArray(points) || points.length < 3) return null
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let hasFinite = false
+  for (const point of points) {
+    const x = Number(point?.x ?? point?.[0])
+    const y = Number(point?.y ?? point?.[1])
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+    hasFinite = true
+    if (x < minX) minX = x
+    if (y < minY) minY = y
+    if (x > maxX) maxX = x
+    if (y > maxY) maxY = y
+  }
+  if (!hasFinite) return null
+  return { minX, minY, maxX, maxY }
+}
+
+export function deriveAreaBounds(active, fallbackWidth = 0, fallbackHeight = 0) {
+  const mode = active?.mode || 'fixed'
+  const polygon = Array.isArray(active?.polygonPx) && active.polygonPx.length >= 3 ? active.polygonPx : null
+  const polygonIsInfinite = !!(polygon && polygon._isInfinite === true)
+
+  let minX = 0
+  let minY = 0
+  let maxX = Number(fallbackWidth) || 0
+  let maxY = Number(fallbackHeight) || 0
+
+  if (polygon && !polygonIsInfinite) {
+    const bbox = computePolygonBBox(polygon)
+    if (bbox) {
+      minX = bbox.minX
+      minY = bbox.minY
+      maxX = bbox.maxX
+      maxY = bbox.maxY
+    }
+  } else if (active?.boundsPx) {
+    const width = Number(active.boundsPx.width)
+    const height = Number(active.boundsPx.height)
+    if (Number.isFinite(width) && width > 0) {
+      maxX = width
+    }
+    if (Number.isFinite(height) && height > 0) {
+      maxY = height
+    }
+  }
+
+  const area = { minX, minY, maxX, maxY, mode }
+  if (polygon) {
+    area.polygon = polygon
+  }
+  return area
+}
