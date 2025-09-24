@@ -21,7 +21,7 @@ const TYPE_PREFIX = {
   cuartos: 'CRT',
   pisos: 'PIS',
   elementos: 'ELM',
-  contenedores: 'CNT',
+  contenedores: 'NVL',
 }
 
 function getPrefix(tipo = '') {

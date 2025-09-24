@@ -1010,7 +1010,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       return null
     }
     if (contextoActual === 'contenedores') {
-      showToast('Los contenedores no pueden contener nada')
+      showToast('Los niveles no pueden contener más elementos')
       return null
     }
 

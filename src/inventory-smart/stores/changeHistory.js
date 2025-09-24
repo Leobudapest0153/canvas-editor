@@ -8,7 +8,7 @@ const deepClone = (obj) => JSON.parse(JSON.stringify(obj || null))
 // Campos considerados para diffs de elementos y plantas
 const FIELDS_PLANTA = ['nombre', 'descripcion', 'dimensiones', 'capacidadCargaSoportado']
 const FIELDS_ELEMENTO = [
-  'nombre', 'tipo', 'categoria', 'dimensiones',
+  'nombre', 'categoria', 'dimensiones',
   'alturaRespectoAlSuelo', 'orientacion', 'hijos', 'codigo', 'codigoEsl'
 ]
 
@@ -68,32 +68,32 @@ export const useChangeHistoryStore = defineStore('changeHistory', () => {
     // Plantas creadas/actualizadas/eliminadas
     for (const [id, p] of currPlantas.entries()) {
       if (!prevPlantas.has(id)) {
-        changes.push({ entityType: 'planta', op: 'create', id, name: p.nombre, fields: diffFields(null, p, FIELDS_PLANTA) })
+        changes.push({ entityType: p.tipo, op: 'create', id, name: p.nombre, fields: diffFields(null, p, FIELDS_PLANTA) })
       } else {
         const before = prevPlantas.get(id)
         const fields = diffFields(before, p, FIELDS_PLANTA)
-        if (fields.length) changes.push({ entityType: 'planta', op: 'update', id, name: p.nombre, fields })
+        if (fields.length) changes.push({ entityType: p.tipo, op: 'update', id, name: p.nombre, fields })
       }
     }
     for (const [id, p] of prevPlantas.entries()) {
       if (!currPlantas.has(id)) {
-        changes.push({ entityType: 'planta', op: 'delete', id, name: p.nombre, fields: [] })
+        changes.push({ entityType: p.tipo, op: 'delete', id, name: p.nombre, fields: [] })
       }
     }
 
     // Elementos creados/actualizados/eliminados
     for (const [id, e] of currElems.entries()) {
       if (!prevElems.has(id)) {
-        changes.push({ entityType: 'elemento', op: 'create', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields: diffFields(null, e, FIELDS_ELEMENTO) })
+        changes.push({ entityType: e.tipo, op: 'create', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields: diffFields(null, e, FIELDS_ELEMENTO) })
       } else {
         const before = prevElems.get(id)
         const fields = diffFields(before, e, FIELDS_ELEMENTO)
-        if (fields.length) changes.push({ entityType: 'elemento', op: 'update', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields })
+        if (fields.length) changes.push({ entityType: e.tipo, op: 'update', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields })
       }
     }
     for (const [id, e] of prevElems.entries()) {
       if (!currElems.has(id)) {
-        changes.push({ entityType: 'elemento', op: 'delete', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields: [] })
+        changes.push({ entityType: e.tipo, op: 'delete', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields: [] })
       }
     }
 
@@ -164,7 +164,7 @@ export const useChangeHistoryStore = defineStore('changeHistory', () => {
   const getPaginated = ({ page = 1, pageSize = 10, plantaId = null } = {}) => {
     let items = entries.value
     if (plantaId) {
-      items = items.filter((e) => e.changes.some((c) => (c.entityType === 'planta' && c.id === plantaId) || (c.entityType === 'elemento' && c.plantaId === plantaId)))
+      items = items.filter((e) => e.changes.some((c) => (c.entityType === 'plantas' && c.id === plantaId) || (c.entityType !== 'plantas' && c.plantaId === plantaId)))
     }
     const total = items.length
     const totalPages = Math.max(1, Math.ceil(total / pageSize))

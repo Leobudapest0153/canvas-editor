@@ -501,7 +501,7 @@
           :config="{
             x: 10,
             y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
-            text: `Contenedores: ${elementosVisiblesEnCanvas.length}`,
+            text: `Niveles: ${elementosVisiblesEnCanvas.length}`,
             fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#dc2626',
@@ -513,7 +513,7 @@
           :config="{
             x: 10,
             y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
-            text: `Items: ${elementosVisiblesEnCanvas.length} (elementos + contenedores)`,
+            text: `Items: ${elementosVisiblesEnCanvas.length} (elementos + niveles)`,
             fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#dc2626',
@@ -1272,8 +1272,8 @@ const runPreDropValidations = (elemento, dropEvent) => {
       plantas: 'Aquí solo puedes agregar cuartos, elementos o pasillos.',
       cuartos: 'Aquí solo puedes agregar pisos.',
       pisos: 'Aquí solo puedes agregar elementos.',
-      elementos: 'Dentro de elementos solo se permiten contenedores.',
-      contenedores: 'No puedes agregar elementos dentro de contenedores.',
+      elementos: 'Dentro de elementos solo se permiten niveles.',
+      contenedores: 'No puedes agregar elementos dentro de niveles.',
       pasillos: 'No puedes agregar elementos dentro de pasillos.',
     }
     showToast(msgMap[contextoActual] || 'No puedes agregar este tipo aquí.', 'error')

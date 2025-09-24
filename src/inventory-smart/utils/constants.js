@@ -17,12 +17,12 @@
     * presente open-properties)
   */
 export const TIPOS_ENTIDAD = [
-  { id: 'plantas', nombre: 'Plantas', color: '#10b981', icono: '🏢', restrictions: [] },
-  { id: 'cuartos', nombre: 'Cuartos', color: '#0ea5e9', icono: '🏠', restrictions: [] },
-  { id: 'pisos', nombre: 'Pisos', color: '#22c55e', icono: '🧱', restrictions: ['read-only-properties', 'right-click', 'drag'] },
-  { id: 'pasillos', nombre: 'Pasillos', color: '#111827', icono: '🛣️', restrictions: [] },
-  { id: 'elementos', nombre: 'Elementos', color: '#1C1E4D', icono: '📦', restrictions: [] },
-  { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', icono: '🗃️', restrictions: ['read-only-properties', 'right-click', 'drag'] },
+  { id: 'plantas', nombre: 'Plantas', nombreSingular: 'Planta', color: '#10b981', icono: '🏢', restrictions: [] },
+  { id: 'cuartos', nombre: 'Cuartos', nombreSingular: 'Cuarto', color: '#0ea5e9', icono: '🏠', restrictions: [] },
+  { id: 'pisos', nombre: 'Pisos', nombreSingular: 'Piso', color: '#22c55e', icono: '🧱', restrictions: ['read-only-properties', 'right-click', 'drag'] },
+  { id: 'pasillos', nombre: 'Pasillos', nombreSingular: 'Pasillo', color: '#111827', icono: '🛣️', restrictions: [] },
+  { id: 'elementos', nombre: 'Elementos', nombreSingular: 'Elemento', color: '#1C1E4D', icono: '📦', restrictions: [] },
+  { id: 'contenedores', nombre: 'Niveles', nombreSingular: 'Nivel', color: '#dc2626', icono: '🗃️', restrictions: ['read-only-properties', 'right-click', 'drag'] },
 ]
 
 // === REGLAS DE JERARQUÍA ===
@@ -275,7 +275,7 @@ export const CATEGORIAS_ELEMENTOS = [
 ]
 
 export const CATEGORIAS_CONTENEDORES = [
-  { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', tipo: 'contenedores' },
+  { id: 'contenedores', nombre: 'Niveles', color: '#dc2626', tipo: 'contenedores' },
 ]
 
 export const CATEGORIAS_CUARTOS = [
@@ -296,7 +296,7 @@ export const CATEGORIAS = [
   { id: 'estantes', nombre: 'Estantes', color: '#10b981' },
   { id: 'mesas', nombre: 'Mesas', color: '#f59e0b' },
   { id: 'armarios', nombre: 'Armarios', color: '#7c3aed' },
-  { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626' },
+  { id: 'contenedores', nombre: 'Niveles', color: '#dc2626' },
   { id: 'cuartos', nombre: 'Cuartos', color: '#0ea5e9' },
   { id: 'pisos', nombre: 'Pisos', color: '#22c55e' },
   { id: 'pasillos', nombre: 'Pasillos', color: '#111827' },
@@ -337,6 +337,14 @@ export const DEFAULT_TIPOS_CUARTO = [
   { id: 'almacenamiento', nombre: 'Almacenamiento' },
   { id: 'zona_de_descarga', nombre: 'Zona de Descarga' },
   { id: 'almacenaje', nombre: 'Almacenaje' }
+]
+
+export const DEFAULT_TIPOS_CONTENEDOR = [
+  { id: 'contenedor', nombre: 'Nivel' },
+]
+
+export const DEFAULT_TIPOS_PISO = [
+  { id: 'piso', nombre: 'Piso' },
 ]
 
 // === TODAS LAS CATEGORÍAS UNIFICADAS ===

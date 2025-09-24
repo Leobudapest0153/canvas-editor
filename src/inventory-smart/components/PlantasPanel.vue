@@ -173,11 +173,22 @@
         </UiTooltip>-->
         <!-- -- -- -->
 
+        <!-- Botón Regresar -->
+        <UiTooltip label="Salir del editor" position="bottom" :delay="200">
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500 rounded-lg transition-colors cursor-pointer"
+            @click="() => (false)"
+          >
+            <span>Regresar</span>
+          </button>
+        </UiTooltip>
+
         <!-- Botón Historial de cambios -->
         <UiTooltip label="Historial de cambios" position="bottom" :delay="200">
           <button
             type="button"
-            class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-500 text-gray-100 hover:text-white hover:bg-gray-600 rounded-lg transition-colors cursor-pointer"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
             @click="openChangeHistoryModal"
           >
             <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -194,7 +205,7 @@
         <UiTooltip label="Guardar cambios actuales" position="bottom" :delay="200">
           <button
             type="button"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-success hover:bg-success-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
             @click="guardarCambios"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -105,7 +105,7 @@
 
         <!-- Lista de Entradas -->
         <div v-else class="space-y-3 max-h-96 overflow-y-auto">
-          <div v-for="entry in items" :key="entry.id" class="p-4 rounded-lg bg-slate-50">
+          <div v-for="entry in items" :key="entry.id" class="p-4 rounded-lg bg-[#f8fafc]">
             <!-- Header de cada entrada -->
             <button
               class="w-full cursor-pointer flex items-center justify-between text-left focus:outline-none"
@@ -170,7 +170,7 @@
                 <div
                   v-for="ch in entry.changes"
                   :key="ch.entityType + ':' + ch.op + ':' + ch.id"
-                  class="bg-slate-50 rounded-lg p-3"
+                  class="bg-[#f8fafc] rounded-lg p-3"
                 >
                   <div class="flex items-center gap-2 mb-2">
                     <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs"
@@ -178,8 +178,8 @@
                       <span v-html="svgFor(ch.op)"></span>
                     </div>
                     <div class="flex items-center gap-2">
-                      <div class="text-sm font-bold text-slate-800">
-                        {{ labelOp(ch.op) }} {{ labelEntity(ch.entityType) }}
+                      <div class="text-sm font-bold text-primary-800">
+                        {{ labelOp(ch.op) }} {{ labelEntity(ch.entityType, ch) }}
                       </div>
                       <div class="text-xs text-slate-500">
                         {{ ch.code || ch.name || ch.id }}
@@ -195,13 +195,13 @@
                         :key="f.path"
                         class="text-xs"
                       >
-                        <div class="flex items-start gap-3">
+                        <div class="flex items-center gap-3">
                           <span class="min-w-[140px] text-primary font-medium"
-                            >{{ getFieldLabel(f.path) }}:</span
+                            >{{ getFieldLabel(f.path, { tipo: getElementType(ch) }) }}:</span
                           >
                           <div class="flex-1">
                             <div class="flex items-center gap-2 font-medium text-slate-400">
-                              <span class="line-through px-2 py-1 rounded">{{
+                              <span class="px-2 py-1 rounded">{{
                                 formatValue(f.before, f.path)
                               }}</span>
                               <svg
@@ -270,7 +270,8 @@ import { ref, computed, watch } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useExternalServices } from '@/inventory-smart/composables/useExternalServices'
 import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
-import { getFieldLabel } from '@/inventory-smart/constants/fieldLabels'
+import { getFieldLabel, formatTipoValue } from '@/inventory-smart/constants/fieldLabels'
+import { TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
@@ -337,7 +338,21 @@ const formatDate = (iso) => {
 }
 const labelOp = (op) =>
   ({ create: 'Se creó', update: 'Se modificó', delete: 'Se eliminó' })[op] || op
-const labelEntity = (t) => ({ planta: 'planta', elemento: 'elemento' })[t] || t
+
+const getElementType = (change) => {
+  if (!change) return null
+  const tipoField = change.fields?.find(f => f.path === 'tipo')
+  return tipoField?.after || tipoField?.before
+}
+
+const labelEntity = (entityType, change) => {
+  if (entityType === 'plantas') return 'planta'
+  const tipoEntidad = TIPOS_ENTIDAD.find(t => t.id === entityType)
+  if (tipoEntidad) {
+    return tipoEntidad.nombreSingular.toLowerCase()
+  }
+  return entityType
+}
 const shortJson = (v) => {
   const s = typeof v === 'string' ? v : JSON.stringify(v)
   return s && s.length > 60 ? s.slice(0, 60) + '…' : s
@@ -353,7 +368,20 @@ const svgFor = (op) => {
 const formatValue = (v, path) => {
   if (v == null) return '—'
   const last = path.split('.').pop()
-  if (['ancho', 'largo', 'alto', 'width', 'height', 'depth'].includes(last)) return `${v} cm`
+
+  // Caso especial para hijos: mostrar conteo
+  if (last === 'hijos' && Array.isArray(v)) {
+    return `${v.length}`
+  }
+
+  // Caso especial para tipos: mostrar nombre amigable
+  if (last === 'categoria' || last === 'tipo' && typeof v === 'string') {
+    return formatTipoValue(v)
+  }
+
+  // Agregar 'cm' para campos de medidas
+  if (['ancho', 'largo', 'alto', 'alturaRespectoAlSuelo'].includes(last)) return `${v} cm`
+
   if (last === 'dimensiones' && v && typeof v === 'object') {
     const a = v.ancho ?? v.width ?? v.w
     const l = v.largo ?? v.length ?? v.depth ?? v.d
