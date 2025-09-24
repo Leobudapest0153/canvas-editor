@@ -87,7 +87,7 @@ describe('wall placement integration', () => {
     el.dimensiones.ancho = 10
     el.dimensiones.largo = 10
     el.dimensiones.alto = 10
-    el.pesoMaximo = 5
+    el.capacidadCarga = 5
     el.alturaRespectoAlSuelo = 0
 
     await wrapper.find('form').trigger('submit.prevent')

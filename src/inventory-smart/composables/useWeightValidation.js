@@ -5,7 +5,7 @@
  * Soporta dos tipos de validación:
  *
  * 1. VALIDACIÓN TEÓRICA (por defecto):
- *    - Basada en capacidades máximas (pesoMaximo)
+ *    - Basada en capacidades máximas (capacidadCarga)
  *    - Útil para planificación y límites estructurales
  *    - Evita configuraciones físicamente imposibles
  *
@@ -15,8 +15,8 @@
  *    - Refleja el estado actual del sistema
  *
  * IMPORTANTE:
- * - Para plantas: 'pesoMaximoSoportado' es el peso máximo que puede soportar.
- * - Para elementos: 'pesoMaximo' es la capacidad de carga teórica, no su peso físico real.
+ * - Para plantas: 'capacidadCargaSoportado' es el peso máximo que puede soportar.
+ * - Para elementos: 'capacidadCarga' es la capacidad de carga teórica, no su peso físico real.
  * - Para uso real: 'uso.peso' representa el peso actual utilizado en kg.
  *
  * Responsabilidades:
@@ -75,7 +75,7 @@ export function useWeightValidation() {
         return // Saltar este elemento
       }
 
-      const pesoElemento = Number(elemento.pesoMaximo || 0)
+      const pesoElemento = Number(elemento.capacidadCarga || 0)
 
       if (!isNaN(pesoElemento)) {
         pesoTotal += pesoElemento
@@ -148,24 +148,24 @@ export function useWeightValidation() {
    *
    * @param {Object} elemento - Elemento a validar
    * @param {number} nuevoPesoMaximo - Nuevo peso máximo propuesto
-   * @returns {Object} { valido: boolean, pesoUsoReal: number, pesoMaximoPropuesto: number, diferencia: number }
+   * @returns {Object} { valido: boolean, pesoUsoReal: number, capacidadCargaPropuesto: number, diferencia: number }
    */
   const validarPesoMaximoVsUsoReal = (elemento, nuevoPesoMaximo) => {
     // Obtener el peso real usado del elemento
     const pesoUsoReal = Number(elemento.uso?.peso || 0)
-    const pesoMaximoPropuesto = Number(nuevoPesoMaximo || 0)
+    const capacidadCargaPropuesto = Number(nuevoPesoMaximo || 0)
 
     // El peso máximo no puede ser menor al uso real actual
-    const esValido = pesoMaximoPropuesto >= pesoUsoReal
+    const esValido = capacidadCargaPropuesto >= pesoUsoReal
 
     return {
       valido: esValido,
       pesoUsoReal,
-      pesoMaximoPropuesto,
-      diferencia: pesoUsoReal - pesoMaximoPropuesto,
+      capacidadCargaPropuesto,
+      diferencia: pesoUsoReal - capacidadCargaPropuesto,
       mensaje: esValido
         ? 'El peso máximo es válido'
-        : `El peso máximo (${pesoMaximoPropuesto}kg) no puede ser menor al uso real actual (${pesoUsoReal}kg)`
+        : `El peso máximo (${capacidadCargaPropuesto}kg) no puede ser menor al uso real actual (${pesoUsoReal}kg)`
     }
   }
 
@@ -181,7 +181,7 @@ export function useWeightValidation() {
    * @param {boolean} options.validacionTeorica - Si true, valida capacidad teórica máxima. Si false, valida solo uso real
    * @param {boolean} options.strict - Alias para validacionTeorica (mantiene compatibilidad)
    * @param {boolean} options.esEdicion - Si true, excluye el elemento actual del cálculo (para evitar doble conteo al editar)
-   * @returns {Object} { valido: boolean, pesoActual: number, pesoMaximo: number, exceso: number }
+   * @returns {Object} { valido: boolean, pesoActual: number, capacidadCarga: number, exceso: number }
    */
   const validarPesoElemento = (nuevoElemento, padreId, padreType, options = {}) => {
     // Normalizar opciones (permitir tanto 'strict' como 'validacionTeorica' por compatibilidad)
@@ -189,7 +189,7 @@ export function useWeightValidation() {
 
     // Obtener el peso del nuevo elemento
     const pesoNuevoElemento = validacionTeorica
-      ? Number(nuevoElemento.pesoMaximo || 0)  // Capacidad teórica
+      ? Number(nuevoElemento.capacidadCarga || 0)  // Capacidad teórica
       : Number(nuevoElemento.uso?.peso || 0)   // Uso real
 
     // Calcular el peso actual total según el tipo de validación
@@ -217,39 +217,39 @@ export function useWeightValidation() {
     }
 
     // Obtener el peso máximo soportado del padre
-    let pesoMaximoSoportado = 0
+    let capacidadCargaSoportado = 0
 
     if (padreType === 'plantas') {
       const planta = canvasStore.plantaPorId(padreId)
-      pesoMaximoSoportado = planta?.pesoMaximoSoportado || 0
+      capacidadCargaSoportado = planta?.capacidadCargaSoportado || 0
     } else {
       const padre = canvasStore.elementoPorId(padreId)
-      pesoMaximoSoportado = padre?.pesoMaximo || 0
+      capacidadCargaSoportado = padre?.capacidadCarga || 0
     }
 
     // Si el peso máximo es 0 o no está definido, no hay límite
-    if (pesoMaximoSoportado === 0) {
+    if (capacidadCargaSoportado === 0) {
       return {
         valido: true,
         pesoActual: pesoActualTotal,
         pesoNuevo: pesoNuevoElemento,
         pesoTotal: pesoTotalFinal,
-        pesoMaximo: pesoMaximoSoportado,
+        capacidadCarga: capacidadCargaSoportado,
         exceso: 0,
         limiteDePeso: false,
       }
     }
 
     // Verificar si el peso total excede el máximo soportado
-    const excesoDePeso = Math.max(0, pesoTotalFinal - pesoMaximoSoportado)
-    const esValido = pesoTotalFinal <= pesoMaximoSoportado
+    const excesoDePeso = Math.max(0, pesoTotalFinal - capacidadCargaSoportado)
+    const esValido = pesoTotalFinal <= capacidadCargaSoportado
 
     return {
       valido: esValido,
       pesoActual: pesoActualTotal,
       pesoNuevo: pesoNuevoElemento,
       pesoTotal: pesoTotalFinal,
-      pesoMaximo: pesoMaximoSoportado,
+      capacidadCarga: capacidadCargaSoportado,
       exceso: excesoDePeso,
       limiteDePeso: true,
     }
@@ -285,18 +285,18 @@ export function useWeightValidation() {
     }
 
     // Obtener el peso máximo soportado del padre
-    let pesoMaximoSoportado = 0
+    let capacidadCargaSoportado = 0
 
     if (padreType === 'plantas') {
       const planta = canvasStore.plantaPorId(padreId)
-      pesoMaximoSoportado = planta?.pesoMaximoSoportado || 0
+      capacidadCargaSoportado = planta?.capacidadCargaSoportado || 0
     } else {
       const padre = canvasStore.elementoPorId(padreId)
-      pesoMaximoSoportado = padre?.pesoMaximo || 0
+      capacidadCargaSoportado = padre?.capacidadCarga || 0
     }
 
     // Si el peso máximo es 0 o no está definido, capacidad ilimitada
-    if (pesoMaximoSoportado === 0) {
+    if (capacidadCargaSoportado === 0) {
       return {
         disponible: Infinity,
         usado: pesoUsado,
@@ -307,17 +307,17 @@ export function useWeightValidation() {
     }
 
     // Calcular el peso disponible
-    const pesoDisponible = Math.max(0, pesoMaximoSoportado - pesoUsado)
+    const pesoDisponible = Math.max(0, capacidadCargaSoportado - pesoUsado)
 
     // Calcular el porcentaje usado
-    const porcentajeUsado = pesoMaximoSoportado > 0
-      ? Math.min(100, (pesoUsado / pesoMaximoSoportado) * 100)
+    const porcentajeUsado = capacidadCargaSoportado > 0
+      ? Math.min(100, (pesoUsado / capacidadCargaSoportado) * 100)
       : 0
 
     return {
       disponible: pesoDisponible,
       usado: pesoUsado,
-      maximo: pesoMaximoSoportado,
+      maximo: capacidadCargaSoportado,
       porcentajeUsado,
       limiteDePeso: true,
     }
@@ -328,17 +328,17 @@ export function useWeightValidation() {
    *
    * @param {Object} elemento - Elemento a validar
    * @param {number} nuevoPesoMaximo - Nueva capacidad máxima propuesta
-   * @returns {Object} { valido: boolean, pesoHijos: number, pesoMaximoPropuesto: number, deficit: number }
+   * @returns {Object} { valido: boolean, pesoHijos: number, capacidadCargaPropuesto: number, deficit: number }
    */
   const validarCapacidadVsHijos = (elemento, nuevoPesoMaximo) => {
-    const pesoMaximoPropuesto = Number(nuevoPesoMaximo || 0)
+    const capacidadCargaPropuesto = Number(nuevoPesoMaximo || 0)
 
     // Si no hay límite de peso, siempre es válido
-    if (pesoMaximoPropuesto === 0) {
+    if (capacidadCargaPropuesto === 0) {
       return {
         valido: true,
         pesoHijos: 0,
-        pesoMaximoPropuesto,
+        capacidadCargaPropuesto,
         deficit: 0,
         sinLimite: true
       }
@@ -350,18 +350,18 @@ export function useWeightValidation() {
       : 0
 
     // Verificar si la capacidad es suficiente
-    const esValido = pesoHijos <= pesoMaximoPropuesto
-    const deficit = Math.max(0, pesoHijos - pesoMaximoPropuesto)
+    const esValido = pesoHijos <= capacidadCargaPropuesto
+    const deficit = Math.max(0, pesoHijos - capacidadCargaPropuesto)
 
     return {
       valido: esValido,
       pesoHijos,
-      pesoMaximoPropuesto,
+      capacidadCargaPropuesto,
       deficit,
       sinLimite: false,
       mensaje: esValido
         ? 'La capacidad es suficiente para los elementos que contiene'
-        : `La capacidad máxima (${pesoMaximoPropuesto}kg) es insuficiente para el máximo que pueden soportar los hijos (${pesoHijos}kg). Falta: ${deficit.toFixed(2)}kg.`
+        : `La capacidad máxima (${capacidadCargaPropuesto}kg) es insuficiente para el máximo que pueden soportar los hijos (${pesoHijos}kg). Falta: ${deficit.toFixed(2)}kg.`
     }
   }
 
@@ -403,10 +403,10 @@ export function useWeightValidation() {
 
     if (tipo === 'plantas') {
       const planta = canvasStore.plantaPorId(id)
-      return planta && planta.pesoMaximoSoportado > 0
+      return planta && planta.capacidadCargaSoportado > 0
     } else {
       const elemento = canvasStore.elementoPorId(id)
-      return elemento && elemento.pesoMaximo > 0
+      return elemento && elemento.capacidadCarga > 0
     }
   })
 

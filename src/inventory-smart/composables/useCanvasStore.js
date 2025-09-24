@@ -21,13 +21,14 @@ import { ref, computed, watch } from 'vue'
 import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
+import { useStatePersistence, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS } from '@/inventory-smart/composables/useStatePersistence'
 import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
   validateZStacking,
   errorsPlacement,
 } from '@/inventory-smart/validation/placementOrchestrator'
+import { proposeLevelChange, applyLevelChange } from '@/inventory-smart/composables/useLevelStacking'
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'
@@ -57,7 +58,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         ancho: 1500, // cm
         largo: 1500, // cm
       },
-      pesoMaximoSoportado: 5000, // kg
+      capacidadCargaSoportado: 5000, // kg
       // Nuevo flag para plantas elásticas (por defecto false)
       isInfinite: false,
       poligono: [
@@ -116,7 +117,36 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Edición de niveles
   const nivelAEditar = ref(null);
 
+  const confirmacionAlturasNivelesModal = ref(false);
+  const propuestaAlturasNiveles = ref(null);
+
   const isDraggable = ref(true)
+
+  // === CATÁLOGOS DINÁMICOS (persistidos via useStatePersistence) ===
+  const catalogos = ref({
+    tiposEspacio: DEFAULT_TIPOS_ESPACIO,
+    tiposCuarto: DEFAULT_TIPOS_CUARTO,
+    tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+  })
+
+  const setCatalogos = (cats) => {
+    try {
+      const safe = {
+        tiposEspacio: Array.isArray(cats?.tiposEspacio) ? cats.tiposEspacio : DEFAULT_TIPOS_ESPACIO,
+        tiposCuarto: Array.isArray(cats?.tiposCuarto) ? cats.tiposCuarto : DEFAULT_TIPOS_CUARTO,
+        tiposProductoAdmitidos: Array.isArray(cats?.tiposProductoAdmitidos)
+          ? cats.tiposProductoAdmitidos
+          : DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+      }
+      catalogos.value = safe
+    } catch {
+      catalogos.value = {
+        tiposEspacio: DEFAULT_TIPOS_ESPACIO,
+        tiposCuarto: DEFAULT_TIPOS_CUARTO,
+        tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+      }
+    }
+  }
   // Configuración de grilla y snap
   // Por defecto desactivamos la cuadrícula (0 = sin cuadricula visual ni snap a grilla)
   const gridSize = ref(0) // px entre líneas de grilla (0 desactiva)
@@ -647,6 +677,66 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+  // Actualización directa SIN validaciones de colocación/vecinos.
+  // patch típico: { dimensiones: { alto: number, ancho?: number, largo?: number }, alturaRespectoAlSuelo?: number }
+  const actualizarElementoSinValidacion = (id, patch = {}, description = 'Actualización sin validación') => {
+    try {
+      const idx = elementos.value.findIndex(e => e && e.id === id);
+      if (idx === -1) {
+        console.warn('[actualizarElementoSinValidacion] Elemento no encontrado:', id);
+        return false;
+      }
+
+      const prev = elementos.value[idx];
+
+      const next = {
+        ...prev,
+        ...patch,
+        dimensiones: {
+          ...(prev?.dimensiones || {}),
+          ...(patch?.dimensiones || {}),
+        },
+      };
+
+      // Normalizaciones en cm
+      if (next.dimensiones) {
+        for (const k of ['ancho', 'largo', 'alto']) {
+          if (next.dimensiones[k] != null && Number.isFinite(Number(next.dimensiones[k]))) {
+            next.dimensiones[k] = Math.round(Number(next.dimensiones[k]));
+          }
+        }
+      }
+      if (patch.alturaRespectoAlSuelo != null && Number.isFinite(Number(patch.alturaRespectoAlSuelo))) {
+        next.alturaRespectoAlSuelo = Math.max(0, Math.round(Number(patch.alturaRespectoAlSuelo)));
+      }
+
+      // Normalizaciones en px
+      for (const k of ['x', 'y', 'width', 'height']) {
+        if (patch[k] != null && Number.isFinite(Number(patch[k]))) {
+          let v = Math.round(Number(patch[k]));
+          if (k === 'width' || k === 'height') v = Math.max(1, v);
+          if (k === 'x' || k === 'y') v = Math.max(0, v);
+          next[k] = v;
+        }
+      }
+
+      elementos.value.splice(idx, 1, next);
+
+      // if (saveHistory) {
+      //   if (typeof registrarEnHistorial === 'function') {
+      //     registrarEnHistorial({ tipo: 'update', id, antes: prev, despues: next, descripcion: description });
+      //   } else if (typeof addToHistory === 'function') {
+      //     addToHistory({ type: 'update', id, before: prev, after: next, description });
+      //   }
+      // }
+
+      return true;
+    } catch (err) {
+      console.error('[actualizarElementoSinValidacion] Error:', err);
+      return false;
+    }
+  };
+
   const actualizarElemento = (elementoId, propiedades, saveHistory = false, description = null) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (!elemento) return false
@@ -704,7 +794,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     try {
       const state = {
         plantas: plantas.value,
-        elementos: elementos.value
+        elementos: elementos.value,
+        catalogos: catalogos.value,
       }
       const data = _serialize(state)
       return _persist(data)
@@ -820,7 +911,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         ancho: nuevaPlanta.dimensiones?.ancho || 0,
         largo: nuevaPlanta.dimensiones?.largo || 0,
       },
-      pesoMaximoSoportado: nuevaPlanta.pesoMaximoSoportado || 3000,
+      capacidadCargaSoportado: nuevaPlanta.capacidadCargaSoportado || 3000,
       // Flag de planta elástica: por defecto false
       isInfinite: false,
       ...nuevaPlanta,
@@ -1167,6 +1258,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       elementos: elementos.value.map(e => e?._custom?.value || e),
       templates: catalogStore.templates?.map?.(t => t?._custom?.value || t) || [],
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
+      catalogos: catalogos.value,
     }
     const jsonStr = _serialize(state)
     try {
@@ -1210,6 +1302,9 @@ export const useCanvasStore = defineStore('canvas', () => {
       },
       addElemento: (elementoData) => {
         elementos.value.push(elementoData)
+      },
+      setCatalogos: (cats) => {
+        setCatalogos(cats)
       },
       setInitialNavigation: (plantaId, plantaNombre) => {
         // Establecer la primera planta como activa siempre
@@ -1313,6 +1408,90 @@ export const useCanvasStore = defineStore('canvas', () => {
   const cerrarCuartoNivelesPropiedades = () => {
     gestionPisosPropiedadesModal.value = false;
     nivelAEditar.value = null;
+  }
+
+  const guardarCuartoNivelesPropiedades = (nivelActualizado, id) => {
+    if (!id) {
+      console.error('No hay ID de nivel a editar');
+      return;
+    }
+    const level = elementos.value.find(e => e.id === id);
+    if (!level) {
+      console.error('Nivel no encontrado');
+      return;
+    }
+
+    if (nivelActualizado?.dimensiones?.alto > elementos.value.find(e => e.id === level.padre)?.dimensiones?.alto) {
+      showToast('La altura del nivel no puede exceder la altura del cuarto', 'error');
+      return;
+    }
+
+    // 1) Proponer cambio (solo nos importa dimensiones aquí; alto es clave)
+    const res = proposeLevelChange(elementos.value, id, nivelActualizado || {});
+    if (res.status === 'error') {
+      showToast(res.message || 'No se pudo aplicar el cambio', 'error');
+      return;
+    }
+
+    if (res.status === 'ok') {
+      // 2) Aplicar directamente
+      const ok = applyLevelChange(
+        elementos.value,
+        res.draft,
+        'ok',
+        (eid, patch, save, desc) => actualizarElementoSinValidacion(eid, patch, save, desc)
+      );
+      if (!ok.ok) {
+        showToast(ok.message || 'Fallo aplicando el cambio', 'error');
+        return;
+      }
+      showToast('Nivel actualizado', 'success');
+      cerrarCuartoNivelesPropiedades();
+      return;
+    }
+
+    if (res.status === 'needs_confirmation') {
+      // 3) Guardar propuesta y abrir submodal de confirmación (no cerrar el modal principal)
+      propuestaAlturasNiveles.value = res.draft;
+      confirmacionAlturasNivelesModal.value = true;
+      // Opcional: notificación informativa
+      showToast('Se requiere confirmación para ajustar otros niveles', 'info');
+      return;
+    }
+  }
+
+  const confirmarPropuestaAlturasNiveles = (estrategia /* 'clamp' | 'redistribute' */) => {
+    if (!propuestaAlturasNiveles.value) {
+      showToast('No hay propuesta pendiente', 'error');
+      return false;
+    }
+    const draft = propuestaAlturasNiveles.value;
+
+    const ok = applyLevelChange(
+      elementos.value,
+      draft,
+      estrategia,
+      (eid, patch, save, desc) => actualizarElementoSinValidacion(eid, patch, save, desc)
+    );
+
+    if (!ok.ok) {
+      showToast(ok.message || 'Fallo aplicando el cambio', 'error');
+      return false;
+    }
+
+    // Limpiar estado y cerrar ambos modales
+    confirmacionAlturasNivelesModal.value = false;
+    propuestaAlturasNiveles.value = null;
+
+    showToast('Niveles ajustados', 'success');
+    cerrarCuartoNivelesPropiedades();
+    return true;
+  }
+
+  const cancelarPropuestaAlturasNiveles = () => {
+    confirmacionAlturasNivelesModal.value = false;
+    // Mantener el modal principal abierto para que el usuario corrija manualmente
+    return true;
   }
 
   /* Funciones de filtros*/
@@ -1515,6 +1694,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     elementoAura,
     isDraggable,
     cambiosNoAplicados,
+  // Catálogos dinámicos
+  catalogos,
+  setCatalogos,
     gestionPisosPropiedadesModal,
     nivelAEditar,
 
@@ -1612,5 +1794,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     // == Edición de plantas desde las propiedades
     abrirCuartoNivelesPropiedades,
     cerrarCuartoNivelesPropiedades,
+    guardarCuartoNivelesPropiedades,
+    confirmarPropuestaAlturasNiveles,
+    cancelarPropuestaAlturasNiveles,
+    propuestaAlturasNiveles,
+    confirmacionAlturasNivelesModal,
+    actualizarElementoSinValidacion,
   }
 })

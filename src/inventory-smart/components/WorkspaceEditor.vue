@@ -671,7 +671,7 @@ watch(
       localRectYMeters.value = planta.dimensiones.alto / 100
 
       // local.height = planta.dimensiones.alto;
-      // local.maxWeight = planta.pesoMaximoSoportado;
+      // local.maxWeight = planta.capacidadCargaSoportado;
       isManuallyEdited.value = true
     } else {
       resetLocalState()
@@ -1150,7 +1150,7 @@ function onSave() {
   const plantaData = {
     id: local.id,
     nombre: local.name.trim(),
-    pesoMaximoSoportado: local.maxWeight,
+    capacidadCargaSoportado: local.maxWeight,
     isInfinite: false,
     dimensiones: {
       // Alto desde input en metros -> cm

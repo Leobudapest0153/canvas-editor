@@ -75,7 +75,11 @@
           <!-- Contenido del elemento -->
           <div class="item-content">
             <div class="item-visual">
-              <div class="item-preview" :style="{ backgroundColor: item.elemento.color }"></div>
+              <component
+                :is="getIconComponent(item.elemento)"
+                :backgroundColor="item.elemento.color || item.elemento.colorBase || '#E0E0E0'"
+                class="item-preview"
+              />
             </div>
 
             <div class="item-info">
@@ -136,10 +140,15 @@ import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import { toPrecisionCm } from '@/inventory-smart/utils/fixedDimensions'
+import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
+import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
+import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
+import { useToast } from '@/inventory-smart/composables/useToast'
 
 // Composables
 const buffer = useCanvasBuffer()
 const canvasStore = useCanvasStore()
+const { showToast } = useToast()
 
 // Estado local
 const isDragging = ref(false)
@@ -153,6 +162,17 @@ const itemCount = computed(() => buffer.itemCount.value)
 const getPlantaName = (plantaId) => {
   const planta = canvasStore.plantaPorId(plantaId)
   return planta?.nombre || 'Planta desconocida'
+}
+
+const getIconComponent = (elemento) => {
+  // Determinar el componente de icono basado en tipo y ubicación
+  if (elemento.tipo === 'cuartos') {
+    return RoomIcon
+  } else if (elemento.ubicacion === 'pared') {
+    return SpaceOnWallIcon
+  } else {
+    return SpaceIcon
+  }
 }
 
 const getFullTimestamp = (item) => {
@@ -183,6 +203,11 @@ const handleRemove = (bufferItemId) => {
 
 // Drag & Drop
 const handleDragStart = (event, item) => {
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes agregar nuevos elementos si hay cambios pendientes de guardar', 'warn');
+    event.preventDefault()
+    return
+  }
   isDragging.value = true
   // Configurar datos de drag
   const dragData = {
@@ -368,10 +393,10 @@ const handleDragEnd = () => {
 }
 
 .item-preview {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.25rem;
-  border: 1px solid #d1d5db;
+  width: 2.5rem;
+  height: 2.5rem;
+  /* border-radius: 0.25rem;
+  border: 1px solid #d1d5db; */
   display: flex;
   align-items: center;
   justify-content: center;

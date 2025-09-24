@@ -37,6 +37,7 @@
             role="tab"
             :aria-selected="selectedCatalog === 'elementos' && currentModo === 'cuarto'"
             :tabindex="selectedCatalog === 'elementos' ? 0 : -1"
+            v-if="isPlantaContext"
             @click="selectCuartos()"
             @keydown="onTabKeydown($event, 'cuartos')"
             @focus="focusedTab = 'cuartos'"
@@ -147,7 +148,7 @@
           </transition>
         </div>
       </div>
-      
+
       <!-- Contenido principal - SIEMPRE se muestra -->
       <div class="elementos-lista flex-1 overflow-y-auto p-4">
         <!-- Mensaje vacío cuando no hay plantillas - CENTRADO Y MÁS ARRIBA -->
@@ -202,15 +203,11 @@
               </button>
 
               <div class="elemento-preview flex items-center justify-center mb-3">
-                <div
-                  :class="[
-                    'preview-shape rounded-sm flex items-center justify-center relative shadow-sm border border-white/20',
-                    'w-12 h-8',
-                  ]"
-                  :style="{ backgroundColor: getTemplateColor(tpl) }"
-                >
-                  <component :is="getIconComponent('box')" class="w-4 h-4 text-white" />
-                </div>
+                <component
+                  :is="getIconComponentForTemplate(tpl)"
+                  :backgroundColor="getTemplateColor(tpl)"
+                  class="w-12 h-8"
+                />
               </div>
 
               <div class="elemento-info space-y-1">
@@ -228,26 +225,29 @@
                     <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
                     <span class="spec-value text-gray-700">{{ formatTemplateWeight(tpl) }}</span>
                   </div>
-                  <div class="spec-item flex justify-between text-xs">
+                  <!-- <div class="spec-item flex justify-between text-xs">
                     <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
                     <span class="spec-value text-gray-700 capitalize">{{ formatTemplateLocation(tpl) }}</span>
-                  </div>
+                  </div> -->
                 </div>
 
                 <div class="mt-2 flex gap-1">
                   <span
-                    class="inline-block px-2 py-1 text-xs rounded-full text-white"
-                    :style="{ backgroundColor: getTemplateColor(tpl) }"
+                    class="inline-block px-2 py-1 text-xs rounded-full"
+                    :style="{
+                      backgroundColor: getTemplateColor(tpl),
+                      color: getContrastTextColor(getTemplateColor(tpl))
+                    }"
                   >
                     Plantillas
                   </span>
-                  <span
+                  <!-- <span
                     v-for="tag in tpl.tags"
                     :key="tag"
                     class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700"
                   >
                     {{ tag }}
-                  </span>
+                  </span> -->
                 </div>
               </div>
             </div>
@@ -302,10 +302,14 @@ import { ref, onMounted, watch, computed, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
-import { getColorCategoria, TODAS_LAS_CATEGORIAS, UBICACIONES_DISPONIBLES } from '@/inventory-smart/utils/constants'
+import { getColorCategoria, UBICACIONES_DISPONIBLES, getContrastTextColor } from '@/inventory-smart/utils/constants'
+import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
+import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
+import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
+import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
 
 const catalogStore = useCatalogStore()
 const { selectedCatalog, searchText, templates } = storeToRefs(catalogStore)
@@ -369,7 +373,7 @@ const selectCatalog = (value) => {
 
 const onTabKeydown = (e, current) => {
   // current puede ser 'espacios' | 'cuartos' | 'plantillas'
-  const order = ['espacios', 'cuartos', 'plantillas']
+  const order = tabsOrder.value
   const idx = order.indexOf(current)
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
     e.preventDefault()
@@ -408,7 +412,14 @@ const selectCuartos = () => {
 }
 
 // Opciones de filtros en Plantillas
-const categoriasPlantillas = computed(() => TODAS_LAS_CATEGORIAS)
+const canvasStore = useCanvasStore()
+const isPlantaContext = computed(() => canvasStore.contextoActual?.tipo === 'plantas')
+const tabsOrder = computed(() => ['espacios', ...(isPlantaContext.value ? ['cuartos'] : []), 'plantillas'])
+const categoriasPlantillas = computed(() => {
+  const a = canvasStore.catalogos?.tiposCuarto || []
+  const b = canvasStore.catalogos?.tiposEspacio || []
+  return [...a, ...b]
+})
 const ubicacionesPlantillas = computed(() => UBICACIONES_DISPONIBLES)
 
 onMounted(() => {
@@ -429,6 +440,13 @@ onBeforeUnmount(() => {
 
 watch(selectedCatalog, (val) => {
   localStorage.setItem('inventory.selectedCatalog', val)
+})
+
+// Si salimos del contexto de planta, forzar modo 'espacio' (ocultamos Cuartos)
+watch(isPlantaContext, (enPlanta) => {
+  if (!enPlanta && currentModo.value === 'cuarto') {
+    selectEspacios()
+  }
 })
 
 // Resultado de búsqueda global (texto) sobre plantillas
@@ -496,7 +514,17 @@ const getTemplateDims = (tpl) => ({
   alto: tpl.meta?.height || 0,
 })
 
-const getIconComponent = () => 'svg'
+const getIconComponentForTemplate = (tpl) => {
+  // Determinar el componente de icono basado en el elemento raíz de la plantilla
+  const root = getTemplateRoot(tpl)
+  if (root.tipo === 'cuartos') {
+    return RoomIcon
+  } else if (root.ubicacion === 'pared') {
+    return SpaceOnWallIcon
+  } else {
+    return SpaceIcon
+  }
+}
 
 const getTemplateRoot = (tpl) => {
   const elems = tpl.payload?.elements || []
@@ -511,7 +539,7 @@ const getTemplateColor = (tpl) => {
 const getTemplateWeightVal = (tpl) => {
   if (tpl.meta?.weight != null) return tpl.meta.weight
   const root = getTemplateRoot(tpl)
-  return root.pesoMaximo
+  return root.capacidadCarga
 }
 
 const getTemplateLocationVal = (tpl) => {
