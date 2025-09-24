@@ -28,7 +28,7 @@ import {
   validateZStacking,
   errorsPlacement,
 } from '@/inventory-smart/validation/placementOrchestrator'
-import { proposeLevelChange, applyLevelChange } from '@/inventory-smart/composables/useLevelStacking'
+import { proposeLevelChange, applyLevelChange, proposeCreateLevelInRoom, applyCreateLevelInRoom } from '@/inventory-smart/composables/useLevelStacking'
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'
@@ -626,64 +626,65 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
-  // Actualización directa SIN validaciones de colocación/vecinos.
-  // patch típico: { dimensiones: { alto: number, ancho?: number, largo?: number }, alturaRespectoAlSuelo?: number }
-  const actualizarElementoSinValidacion = (id, patch = {}, saveHistory = true, description = 'Actualización sin validación') => {
-    try {
-      const idx = elementos.value.findIndex(e => e && e.id === id);
-      if (idx === -1) {
-        console.warn('[actualizarElementoSinValidacion] Elemento no encontrado:', id);
-        return false;
-      }
+    // Actualización directa SIN validaciones de colocación/vecinos.
+    // patch típico: { dimensiones: { alto: number, ancho?: number, largo?: number }, alturaRespectoAlSuelo?: number }
+    const actualizarElementoSinValidacion = (id, patch = {}, saveHistory = true, description = 'Actualización sin validación') => {
+      try {
+        const idx = elementos.value.findIndex(e => e && e.id === id);
+        if (idx === -1) {
+          console.warn('[actualizarElementoSinValidacion] Elemento no encontrado:', id);
+          return false;
+        }
 
-      console.log('[actualizarElementoSinValidacion] Actualizando elemento:', id, 'con patch:', patch);
+        console.log('[actualizarElementoSinValidacion] Actualizando elemento:', id, 'con patch:', patch);
 
-      const prev = elementos.value[idx];
+        const prev = elementos.value[idx];
 
-      const next = {
-        ...prev,
-        ...patch,
-        dimensiones: {
-          ...(prev?.dimensiones || {}),
-          ...(patch?.dimensiones || {}),
-        },
-      };
+        const next = {
+          ...prev,
+          ...patch,
+          dimensiones: {
+            ...(prev?.dimensiones || {}),
+            ...(patch?.dimensiones || {}),
+          },
+        };
 
-      // Normalizaciones en cm
-      if (next.dimensiones) {
-        for (const k of ['ancho', 'largo', 'alto']) {
-          if (next.dimensiones[k] != null && Number.isFinite(Number(next.dimensiones[k]))) {
-            next.dimensiones[k] = Math.round(Number(next.dimensiones[k]));
+        // Normalizaciones en cm
+        if (next.dimensiones) {
+          for (const k of ['ancho', 'largo', 'alto']) {
+            if (next.dimensiones[k] != null && Number.isFinite(Number(next.dimensiones[k]))) {
+              next.dimensiones[k] = Math.round(Number(next.dimensiones[k]));
+            }
           }
         }
-      }
-      if (patch.alturaRespectoAlSuelo != null && Number.isFinite(Number(patch.alturaRespectoAlSuelo))) {
-        next.alturaRespectoAlSuelo = Math.max(0, Math.round(Number(patch.alturaRespectoAlSuelo)));
-      }
-      // Normalizaciones en px
-      for (const k of ['x', 'y', 'width', 'height']) {
-        if (patch[k] != null && Number.isFinite(Number(patch[k]))) {
-          let v = Math.round(Number(patch[k]));
-          if (k === 'width' || k === 'height') v = Math.max(1, v);
-          if (k === 'x' || k === 'y') v = Math.max(0, v);
-          next[k] = v;
+        if (patch.alturaRespectoAlSuelo != null && Number.isFinite(Number(patch.alturaRespectoAlSuelo))) {
+          next.alturaRespectoAlSuelo = Math.max(0, Math.round(Number(patch.alturaRespectoAlSuelo)));
         }
-      }
-      elementos.value.splice(idx, 1, next);
+        // Normalizaciones en px
+        for (const k of ['x', 'y', 'width', 'height']) {
+          if (patch[k] != null && Number.isFinite(Number(patch[k]))) {
+            let v = Math.round(Number(patch[k]));
+            if (k === 'width' || k === 'height') v = Math.max(1, v);
+            if (k === 'x' || k === 'y') v = Math.max(0, v);
+            next[k] = v;
+          }
+        }
+        elementos.value.splice(idx, 1, next);
 
-      if (saveHistory) {
-        if (typeof registrarEnHistorial === 'function') {
-          registrarEnHistorial({ tipo: 'update', id, antes: prev, despues: next, descripcion: description });
-        } else if (typeof addToHistory === 'function') {
-          addToHistory({ type: 'update', id, before: prev, after: next, description });
+        if (saveHistory) {
+          if (typeof registrarEnHistorial === 'function') {
+            registrarEnHistorial({ tipo: 'update', id, antes: prev, despues: next, descripcion: description });
+          } else if (typeof addToHistory === 'function') {
+            addToHistory({ type: 'update', id, before: prev, after: next, description });
+          }
         }
+        return true;
+      } catch (err) {
+        console.error('[actualizarElementoSinValidacion] Error:', err);
+        return false;
       }
-      return true;
-    } catch (err) {
-      console.error('[actualizarElementoSinValidacion] Error:', err);
-      return false;
-    }
-  };
+    };
+
 
   const actualizarElemento = (elementoId, propiedades, saveHistory = false, description = null) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
@@ -1117,6 +1118,74 @@ export const useCanvasStore = defineStore('canvas', () => {
     return nuevoElemento.id
   }
 
+  const agregarElementoSinValidacion = (_id, nuevoElemento, saveHistory = true, description = 'Inserción sin validación') => {
+    try {
+      console.log('[insertarElementoSinValidacion] Insertando elemento:', nuevoElemento)
+      if (!nuevoElemento || !nuevoElemento.id) {
+        console.warn('[insertarElementoSinValidacion] Elemento inválido o sin id:', nuevoElemento);
+        return false;
+      }
+
+      // Copia defensiva
+      const next = { ...nuevoElemento };
+
+      // Normalizaciones en cm
+      if (next.dimensiones) {
+        for (const k of ['ancho', 'largo', 'alto']) {
+          if (next.dimensiones[k] != null && Number.isFinite(Number(next.dimensiones[k]))) {
+            next.dimensiones[k] = Math.round(Number(next.dimensiones[k]));
+          }
+        }
+      }
+
+      // Altura respecto al suelo
+      if (next.alturaRespectoAlSuelo != null && Number.isFinite(Number(next.alturaRespectoAlSuelo))) {
+        next.alturaRespectoAlSuelo = Math.max(0, Math.round(Number(next.alturaRespectoAlSuelo)));
+      }
+
+      // Normalizaciones en px
+      for (const k of ['x', 'y', 'width', 'height']) {
+        if (next[k] != null && Number.isFinite(Number(next[k]))) {
+          let v = Math.round(Number(next[k]));
+          if (k === 'width' || k === 'height') v = Math.max(1, v);
+          if (k === 'x' || k === 'y') v = Math.max(0, v);
+          next[k] = v;
+        }
+      }
+
+      // Insertar directamente en el store
+      elementos.value.push(next);
+
+      // Agregar hijo al padre si aplica
+      if (next.padre) {
+        const padre = elementos.value.find((el) => el.id === next.padre);
+        if (padre) {
+          if (!Array.isArray(padre.hijos)) {
+            padre.hijos = [];
+          }
+          if (!padre.hijos.includes(next.id)) {
+            padre.hijos.push(next.id);
+          }
+        }
+      }
+
+      // Guardar en historial
+      if (saveHistory) {
+        if (typeof registrarEnHistorial === 'function') {
+          registrarEnHistorial({ tipo: 'insert', id: next.id, despues: next, descripcion: description });
+        } else if (typeof addToHistory === 'function') {
+          addToHistory({ type: 'insert', id: next.id, after: next, description });
+        }
+      }
+
+      return next.id;
+    } catch (err) {
+      console.error('[insertarElementoSinValidacion] Error:', err);
+      return false;
+    }
+  };
+
+
   const eliminarElemento = (elementoId) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     const index = elementos.value.findIndex((el) => el.id === elementoId)
@@ -1345,10 +1414,21 @@ export const useCanvasStore = defineStore('canvas', () => {
     plantaEnEdicion.value = null
   }
 
-  const abrirCuartoNivelesPropiedades = (idNivel) => {
-    // Solo es para edición
-    if (idNivel) {
-      nivelAEditar.value = elementos.value.find((e) => e.id === idNivel);
+  const abrirCuartoNivelesPropiedades = (idElemento) => {
+    const elemento = elementos.value.find((e) => e.id === idElemento);
+    if (!elemento) {
+      console.error('Elemento no encontrado:', idElemento);
+      return;
+    }
+    // El elemento es un padre
+    if (['elementos', 'cuartos'].includes(elemento.tipo)) {
+      console.log('Vamos a editar un hijo guardando el id del padre:', idElemento);
+      nivelAEditar.value = { padre: idElemento }
+    }
+    // El elemento es un nivel hijo
+    if (['pisos', 'contenedores'].includes(elemento.tipo)) {
+      console.log('Vamos a editar un nivel hijo:', idElemento);
+      nivelAEditar.value = { ...elemento }
     }
     gestionPisosPropiedadesModal.value = true;
   }
@@ -1359,22 +1439,45 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   const guardarCuartoNivelesPropiedades = (nivelActualizado, id) => {
-    if (!id) {
-    }
-    const level = elementos.value.find(e => e.id === id);
-    if (!level) {
-      console.error('Nivel no encontrado');
+
+    const parent = elementos.value.find(e => e.id === nivelAEditar.value.padre);
+    console.log('Parent del nivel a editar:', parent);
+    if (nivelActualizado?.dimensiones?.alto > parent?.dimensiones?.alto) {
+      showToast('La altura del nivel no puede exceder la altura del cuarto', 'error');
       return;
     }
+    // Si no hay id, es un nuevo nivel
+    if (!id) {
+      const res = proposeLevelChange(elementos.value, 'Nuevo', nivelActualizado || {}, nivelAEditar.value.padre);
+      console.log('Propuesta de nuevo nivel:', res);
 
+      if (res.status === 'ok') {
+        console.log('Aplicando nuevo nivel directamente:', res.draft);
+        res.draft.padre = nivelAEditar.value.padre;
+        const ok = applyLevelChange(
+          elementos.value,
+          res.draft,
+          'ok',
+          {
+            add: agregarElementoSinValidacion,
+            update: actualizarElementoSinValidacion
+          }
+        );
+      }
+      if (res.status === 'needs_confirmation') {
+        console.log('Nuevo nivel requiere confirmación:', res.draft);
+        propuestaAlturasNiveles.value = res.draft;
+        confirmacionAlturasNivelesModal.value = true;
+        showToast('Se requiere confirmación para ajustar otros niveles', 'info');
+        return;
+      }
 
-    if (nivelActualizado?.dimensiones?.alto > elementos.value.find(e => e.id === level.padre)?.dimensiones?.alto) {
-      showToast('La altura del nivel no puede exceder la altura del cuarto', 'error');
+      cerrarCuartoNivelesPropiedades();
       return;
     }
 
     // 1) Proponer cambio (solo nos importa dimensiones aquí; alto es clave)
-    const res = proposeLevelChange(elementos.value, id, nivelActualizado || {});
+    const res = proposeLevelChange(elementos.value, id, nivelActualizado || {}, nivelAEditar.value.padre);
     if (res.status === 'error') {
       showToast(res.message || 'No se pudo aplicar el cambio', 'error');
       return;
@@ -1386,7 +1489,10 @@ export const useCanvasStore = defineStore('canvas', () => {
         elementos.value,
         res.draft,
         'ok',
-        (eid, patch, save, desc) => actualizarElementoSinValidacion(eid, patch, save, desc)
+          {
+            add: agregarElementoSinValidacion,
+            update: actualizarElementoSinValidacion
+          }
       );
       if (!ok.ok) {
         showToast(ok.message || 'Fallo aplicando el cambio', 'error');
@@ -1414,11 +1520,19 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
     const draft = propuestaAlturasNiveles.value;
 
+    // Agregar padre si falta (caso nuevo nivel)
+    if (!draft.padre && nivelAEditar.value?.padre) {
+      draft.padre = nivelAEditar.value.padre;
+    }
+
     const ok = applyLevelChange(
       elementos.value,
       draft,
       estrategia,
-      (eid, patch, save, desc) => actualizarElementoSinValidacion(eid, patch, save, desc)
+      {
+        add: agregarElementoSinValidacion,
+        update: actualizarElementoSinValidacion
+      }
     );
 
     if (!ok.ok) {

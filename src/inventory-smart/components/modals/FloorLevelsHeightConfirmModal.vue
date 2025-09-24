@@ -31,19 +31,26 @@
                 <span class="text-gray-500 mr-1"> {{ (props.draft?.alturasActuales?.[id] / 100).toFixed(2) ?? '-' }}m</span>
                 <span class="text-gray-400">→</span>
                 <span class="ml-1">
-                  {{ (props.draft?.clamp?.alturas?.[id] / 100).toFixed(2) ?? '-' }}m
+                  {{ props.draft?.clamp?.alturas?.[id] == 1 ? '0.00' : (props.draft?.clamp?.alturas?.[id] / 100).toFixed(2) ?? '-' }}m
                 </span>
               </div>
             </div>
           </div>
-          <div class="flex-1 max-h-max flex justify-between w-full items-center" :class="{'!justify-end': !notChanges}">
+          <div class="flex-1 max-h-max flex justify-between w-full items-center mt-auto h-auto" :class="{'!justify-end': !notChanges}">
             <h1
               v-if="notChanges"
               class="text-sm text-gray-500 italic"
             >
               No hay cambios que aplicar
             </h1>
+            <h1
+              v-if="invalidLevels"
+              class="text-sm text-gray-500 italic"
+            >
+              Hay espacio suficiente para el nivel
+            </h1>
             <button
+              v-if="!notChanges && !invalidLevels"
               class="mt-auto bg-primary-700 text-white px-4 py-2 max-w-max max-h-max rounded self-end flex-1 cursor-pointer"
               @click="$emit('confirm', 'clamp')"
             >
@@ -99,8 +106,19 @@ defineEmits(['confirm', 'cancel']);
 const canvasStore = useCanvasStore();
 
 const notChanges = computed(() => {
-  const current = canvasStore.nivelAEditar.dimensiones.alto;
-  const modify = props.draft?.clamp?.alturas?.[canvasStore.nivelAEditar.id];
+  const id = canvasStore.nivelAEditar?.id;
+  if (!id) return false;
+
+  const current = props.draft?.alturasActuales?.[id];
+  const modify = props.draft?.clamp?.alturas?.[id];
+
+  if (current == null || modify == null) return false;
   return current === modify;
+});
+
+const invalidLevels = computed(() => {
+  return Object.entries(props.draft?.clamp?.alturas || {}).some(([id, altura]) => {
+    return id == 'Nuevo' && altura <= 1;
+  });
 });
 </script>

@@ -1,7 +1,9 @@
 import { CM_TO_PX } from '@/inventory-smart/utils/constants';
+import { buildChildFromDraft } from '@/inventory-smart/composables/useStructureManager';
 
 // Altura mínima por nivel en cm
 const MIN_LEVEL_CM = 1;
+const uid = (prefix) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 
 // Util: suma segura
 function sum(arr) {
@@ -130,12 +132,12 @@ function roundHeightsPreserveSum(heightsById, targetSum) {
 }
 
 // Localiza cuarto padre y niveles ordenados (orden de creación) a partir del nivel objetivo
-function getRoomAndLevels(elements, levelId) {
+function getRoomAndLevels(elements, parentId) {
   const byId = (id) => elements.find(e => e?.id === id);
-  const level = byId(levelId);
-  if (!level) return { error: 'Nivel no encontrado' };
+  //const level = byId(levelId);
+  //if (!level) return { error: 'Nivel no encontrado' };
 
-  const room = byId(level.padre);
+  const room = byId(parentId);
   if (!room || !['cuartos', 'elementos'].includes(room.tipo)) return { error: 'Cuarto padre no encontrado' };
 
   const orderIds = (room.hijos || [])
@@ -143,16 +145,202 @@ function getRoomAndLevels(elements, levelId) {
     .filter(e => e && ['contenedores', 'pisos'].includes(e.tipo))
     .map(e => e.id);
 
-  return { room, level, orderIds, byId };
+  return { room, orderIds, byId };
+}
+
+// Localiza cuarto y niveles cuando aún NO existe el nivel (por roomId)
+function getRoomAndLevelsByRoomId(elements, roomId) {
+  const byId = (id) => elements.find(e => e?.id === id);
+  const room = byId(roomId);
+  if (!room || !['cuartos', 'elementos'].includes(room.tipo)) {
+    return { error: 'Cuarto no encontrado' };
+  }
+  const orderIds = (room.hijos || [])
+    .map(id => byId(id))
+    .filter(e => e && ['contenedores', 'pisos'].includes(e.tipo))
+    .map(e => e.id);
+
+  return { room, orderIds, byId };
+}
+
+export function proposeCreateLevelInRoom(elements, roomId, levelPatch) {
+  const { room, orderIds, byId, error } = getRoomAndLevelsByRoomId(elements, roomId);
+  if (error) return { status: 'error', message: error };
+
+  const newDims = levelPatch?.dimensiones || {};
+
+  // Validación footprint contra cuarto
+  const footprintCheck = validateFootprintWithinRoom(newDims, /*currentLevel*/ null, room);
+  if (!footprintCheck.ok) {
+    return { status: 'error', message: footprintCheck.message || 'Dimensiones exceden límites del cuarto.' };
+  }
+
+  // Alturas actuales
+  const heightsCurrent = {};
+  for (const id of orderIds) heightsCurrent[id] = Number(byId(id)?.dimensiones?.alto) || 0;
+  const hNew = Number(newDims?.alto);
+  if (!Number.isFinite(hNew) || hNew <= 0) {
+    return { status: 'error', message: 'Debes definir una altura válida (cm) para el nuevo nivel.' };
+  }
+
+  // Altura de cuarto
+  const Hc = Number(room?.dimensiones?.alto);
+  if (!Number.isFinite(Hc) || Hc <= 0) {
+    return { status: 'error', message: 'El cuarto no tiene altura válida definida.' };
+  }
+
+  const H_otros = sum(Object.values(heightsCurrent));
+  const H_total = H_otros + hNew;
+
+  // Nombres
+  const nombresPorId = Object.fromEntries(orderIds.map(id => [id, byId(id)?.nombre || id]));
+  nombresPorId[NEW_LEVEL_ID] = levelPatch?.nombre || 'Nuevo nivel';
+
+  const orderWithNew = [...orderIds, NEW_LEVEL_ID];
+
+  const draftBase = {
+    isCreation: true,
+    roomId: room.id,
+    roomHeightCm: Hc,
+    targetId: NEW_LEVEL_ID,
+    targetPatch: levelPatch,
+    nivelesOrden: orderWithNew,
+    alturasActuales: { ...heightsCurrent, [NEW_LEVEL_ID]: 0 },
+    basesActuales: computeStackBaseZ(orderIds, heightsCurrent), // sin el nuevo
+    nombresPorId,
+  };
+
+  // Si cabe sin overflow
+  if (H_total <= Hc + 1e-6) {
+    const alturasOkRaw = { ...heightsCurrent, [NEW_LEVEL_ID]: hNew };
+    const alturasOk = roundHeightsPreserveSum(alturasOkRaw, sum(Object.values(alturasOkRaw)));
+    const basesOk = computeStackBaseZ(orderWithNew, alturasOk);
+    return {
+      status: 'ok',
+      draft: { ...draftBase, alturasOk, basesOk },
+    };
+  }
+
+  // Overflow → propuestas
+  const D = H_total - Hc;
+
+  // Clamp: recortar SOLO el nuevo nivel
+  const clampRaw = { ...heightsCurrent, [NEW_LEVEL_ID]: Math.max(MIN_LEVEL_CM, hNew - D) };
+  const clampSum = sum(Object.values(clampRaw));
+  const alturasClamp = roundHeightsPreserveSum(clampRaw, clampSum);
+  const basesClamp = computeStackBaseZ(orderWithNew, alturasClamp);
+
+  // Redistribuir: reducir otros proporcionalmente
+  const others = orderIds.map(id => ({ id, h: heightsCurrent[id] }));
+  const { newHeightsById, leftover } = redistributeProportionally(others, D, MIN_LEVEL_CM);
+
+  const redistRaw = { ...heightsCurrent, [NEW_LEVEL_ID]: hNew };
+  for (const [oid, h] of Object.entries(newHeightsById)) redistRaw[oid] = h;
+
+  // Si no hubo margen suficiente en otros, fallback a clamp
+  const finalRedistRaw = leftover <= 1e-6 ? redistRaw : clampRaw;
+  const redistSum = sum(Object.values(finalRedistRaw));
+  const alturasRedistrib = roundHeightsPreserveSum(finalRedistRaw, redistSum);
+  const basesRedistrib = computeStackBaseZ(orderWithNew, alturasRedistrib);
+
+  return {
+    status: 'needs_confirmation',
+    draft: {
+      ...draftBase,
+      deficitCm: Math.round(D),
+      clamp: { alturas: alturasClamp, bases: basesClamp },
+      redistribute: { alturas: alturasRedistrib, bases: basesRedistrib },
+    },
+  };
+}
+
+// Aplicar creación: actualiza existentes y crea el nuevo
+// makeIdFn: () => string
+// insertFn: (newElement, roomId, saveHistory?, description?) => boolean
+// updateFn: (id, patch, saveHistory?, description?) => boolean
+export function applyCreateLevelInRoom(elements, draft, strategy, makeIdFn, insertFn, updateFn) {
+  if (!draft?.isCreation || !['ok', 'clamp', 'redistribute'].includes(strategy)) {
+    return { ok: false, message: 'Draft de creación inválido o estrategia no soportada.' };
+  }
+
+  let alturas, bases;
+  if (strategy === 'ok') {
+    alturas = draft.alturasOk; bases = draft.basesOk;
+  } else if (strategy === 'clamp') {
+    alturas = draft.clamp?.alturas; bases = draft.clamp?.bases;
+  } else {
+    alturas = draft.redistribute?.alturas; bases = draft.redistribute?.bases;
+  }
+  if (!alturas || !bases) return { ok: false, message: 'No hay alturas/bases para aplicar.' };
+
+  const cm2px = (v) => Math.round((Number(v) || 0) * CM_TO_PX);
+  const roomHeightPx = cm2px(draft.roomHeightCm);
+
+  // 1) Actualizar existentes
+  for (const id of draft.nivelesOrden) {
+    if (id === NEW_LEVEL_ID) continue;
+    const hCm = Math.max(MIN_LEVEL_CM, Math.round(Number(alturas[id]) || 0));
+    const baseCm = Math.max(0, Math.round(Number(bases[id]) || 0));
+    const heightPx = cm2px(hCm);
+    const yPx = Math.max(0, roomHeightPx - (cm2px(baseCm) + heightPx));
+    const ok = updateFn(id, {
+      dimensiones: { alto: hCm },
+      alturaRespectoAlSuelo: baseCm,
+      y: yPx,
+      height: heightPx,
+    }, true, 'Ajuste de niveles (creación de otro nivel)');
+    if (!ok) return { ok: false, message: 'Falló la actualización de un nivel existente.' };
+  }
+
+  // 2) Crear el nuevo
+  const newId = typeof makeIdFn === 'function' ? makeIdFn() : ('lvl_' + Date.now());
+  const hNew = Math.max(MIN_LEVEL_CM, Math.round(Number(alturas[NEW_LEVEL_ID]) || 0));
+  const baseNew = Math.max(0, Math.round(Number(bases[NEW_LEVEL_ID]) || 0));
+  const heightPx = cm2px(hNew);
+  const yPx = Math.max(0, roomHeightPx - (cm2px(baseNew) + heightPx));
+
+  // Mezclar patch original del modal
+  const extra = JSON.parse(JSON.stringify(draft.targetPatch || {}));
+  extra.id = newId;
+  extra.padre = draft.roomId;
+  extra.dimensiones = { ...(extra.dimensiones || {}), alto: hNew };
+  extra.alturaRespectoAlSuelo = baseNew;
+
+  // width en px con base en ancho (o largo si prefieres)
+  const anchoCm = Number(extra?.dimensiones?.ancho);
+  const largoCm = Number(extra?.dimensiones?.largo);
+  const widthPx = Number.isFinite(anchoCm) ? cm2px(anchoCm)
+                 : Number.isFinite(largoCm) ? cm2px(largoCm)
+                 : undefined;
+
+  const newElement = {
+    tipo: 'pisos', // ajusta si tu tipo real difiere
+    ...extra,
+    x: Number.isFinite(extra.x) ? Math.round(extra.x) : 0,
+    y: yPx,
+    height: heightPx,
+    ...(widthPx != null ? { width: widthPx } : {}),
+  };
+
+  const okInsert = insertFn(newElement, draft.roomId, true, 'Creación de nivel sin validación');
+  if (!okInsert) return { ok: false, message: 'Falló la creación del nivel.' };
+
+  return { ok: true, newId };
 }
 
 // Proponer cambio de altura (y opcionalmente ancho/largo) para un nivel dentro del cuarto
 // elements: array del store
 // levelId: id del nivel objetivo
 // newDims: { ancho?, largo?, alto? } en cm (enteros o decimales redondeables)
-export function proposeLevelChange(elements, levelId, levelPatch) {
-  const { room, level, orderIds, byId, error } = getRoomAndLevels(elements, levelId);
+export function proposeLevelChange(elements, levelId, levelPatch, parentId) {
+  const { room, orderIds, byId, error } = getRoomAndLevels(elements, parentId);
   if (error) return { status: 'error', message: error };
+
+  let level = null;
+  if (levelId == 'Nuevo') {
+    level = levelPatch;
+    orderIds.push(levelId); // asegurar que el objetivo está en la lista
+  }
 
   const newDims = levelPatch?.dimensiones || {};
 
@@ -225,11 +413,16 @@ export function proposeLevelChange(elements, levelId, levelPatch) {
 }
 // Aplicar cambios finales (según la estrategia) usando el updater del store
 // updater: función (id, patch, saveHistory?, description?)
-export function applyLevelChange(elements, draft, strategy, updater) {
+export function applyLevelChange(elements, draft, strategy, updaters) {
+  // --- SECCIÓN 1: VALIDACIÓN Y PREPARACIÓN ---
+  if (!updaters || typeof updaters.add !== 'function' || typeof updaters.update !== 'function') {
+    return { ok: false, message: 'Se requieren las funciones de "add" y "update".' };
+  }
   if (!draft || !['ok', 'clamp', 'redistribute'].includes(strategy)) {
     return { ok: false, message: 'Estrategia inválida o draft vacío.' };
   }
 
+  // ... (Lógica de selección de alturas/bases y cálculo de roomHeightCm no cambia)
   let alturas, bases;
   if (strategy === 'ok') {
     alturas = draft.alturasOk; bases = draft.basesOk;
@@ -240,70 +433,90 @@ export function applyLevelChange(elements, draft, strategy, updater) {
   }
   if (!alturas || !bases) return { ok: false, message: 'No hay datos de alturas/bases para aplicar.' };
 
-  // 1) cm→px helpers
   const cm2px = (v) => Math.round((Number(v) || 0) * CM_TO_PX);
+  const byId = (id) => elements.find(e => e?.id === id);
 
-  // 2) Necesitamos el alto del cuarto para calcular Y desde el piso (sin huecos abajo)
   let roomHeightCm = Number(draft.roomHeightCm);
   if (!Number.isFinite(roomHeightCm) || roomHeightCm <= 0) {
-    // fallback por si no llegó en el draft: localizar cuarto
-    const byId = (id) => elements.find(e => e?.id === id);
-    const level = byId(draft.targetId);
-    const room = level ? byId(level.padre) : null;
+    const parentId = draft.parentId || byId(draft.targetId)?.padre;
+    const room = byId(parentId);
     roomHeightCm = Number(room?.dimensiones?.alto) || 0;
   }
+  if (roomHeightCm <= 0) {
+    return { ok: false, message: 'No se pudo determinar la altura del cuarto.' };
+  }
   const roomHeightPx = cm2px(roomHeightCm);
-
   const targetId = draft.targetId;
-  const targetPatch = draft.targetPatch || {};
-  // 3) Aplicar a cada nivel: alto (cm), baseZ (cm), y (px desde arriba), height (px)
+
+  // --- SECCIÓN 2: BUCLE CON LLAMADAS DIFERENCIADAS ---
+  console.log('draft', draft);
   for (const id of draft.nivelesOrden) {
+
     const hCm = Math.max(MIN_LEVEL_CM, Math.round(Number(alturas[id]) || 0));
     const baseCm = Math.max(0, Math.round(Number(bases[id]) || 0));
-
     const heightPx = cm2px(hCm);
-    // y desde el TOP del cuarto, apilado desde el piso: y = roomHeightPx - (base + height)
     const yPx = Math.max(0, roomHeightPx - (cm2px(baseCm) + heightPx));
 
-    // Patch base para todos los niveles
-    let patch = {
-      dimensiones: { alto: hCm },
-      alturaRespectoAlSuelo: baseCm,
-      // Propiedades visuales en px para la vista de cuarto
-      y: yPx,
-      height: heightPx,
-    };
+    let ok = false;
+    const description = 'Ajuste de niveles en cuarto';
 
-    // Si es el objetivo, fusionar patch del modal (nombre, capacidad, ancho/largo, etc.)
-    if (id === targetId) {
-      const extra = JSON.parse(JSON.stringify(targetPatch || {}));
-      extra.dimensiones = { ...(extra.dimensiones || {}), alto: hCm };
-      extra.alturaRespectoAlSuelo = baseCm;
+    // CASO A: CREACIÓN
+    if (id === 'Nuevo' && id === targetId) {
+      console.log("Es nuevo")
+      const parentContext = byId(draft.padre);
+      if (!parentContext) return { ok: false, message: 'Contexto del padre no encontrado para crear.' };
 
-      // Si hay cambios de ancho/largo en el patch del modal, actualizar width en px
-      const anchoCm = Number(extra.dimensiones?.ancho);
-      const largoCm = Number(extra.dimensiones?.largo);
-      // Por defecto usaremos ancho → width; si tu vista de cuarto usa largo como horizontal, cambia aquí.
+      const index = draft.nivelesOrden.indexOf(id);
+      const parentChilds = elements.filter(e => e?.padre === parentContext.id);
+      const newElementData = buildChildFromDraft(draft.targetPatch, parentContext, index, parentChilds);
+
+      // Asignar ID y geometría final
+      newElementData.id = uid(newElementData.tipo); // ¡Generamos el ID final aquí!
+      newElementData.dimensiones.alto = hCm;
+      newElementData.alturaRespectoAlSuelo = baseCm;
+      newElementData.y = yPx;
+      newElementData.height = heightPx;
+
+      const anchoCm = Number(newElementData.dimensiones?.ancho);
       if (Number.isFinite(anchoCm)) {
-        patch.width = cm2px(anchoCm);
-      } else if (Number.isFinite(largoCm)) {
-        patch.width = cm2px(largoCm);
+        newElementData.width = cm2px(anchoCm);
       }
 
-      // Asegurar Y/height finales calculados prevalecen
-      patch = {
-        ...extra,
-        dimensiones: { ...(extra.dimensiones || {}), alto: hCm },
-        alturaRespectoAlSuelo: baseCm,
-        y: yPx,
-        height: heightPx,
-        ...(patch.width != null ? { width: patch.width } : {}),
-      };
+      console.log('Calling ADD for new element', newElementData);
+      ok = updaters.add(id, newElementData, true, description);
+
+    // CASO B: ACTUALIZACIÓN (Tanto el objetivo como los de contexto)
+    } else {
+      console.log("Es update")
+      let patch = {};
+      // Si es el elemento que se está editando, el patch es más completo
+      if (id === targetId) {
+        patch = {
+          ...(draft.targetPatch || {}),
+          dimensiones: { ...((draft.targetPatch || {}).dimensiones || {}), alto: hCm },
+          alturaRespectoAlSuelo: baseCm,
+          y: yPx,
+          height: heightPx,
+        };
+        const anchoCm = Number(patch.dimensiones?.ancho);
+        if (Number.isFinite(anchoCm)) {
+          patch.width = cm2px(anchoCm);
+        }
+      // Si solo es un elemento que se reajusta, el patch es mínimo
+      } else {
+        patch = {
+          dimensiones: { alto: hCm },
+          alturaRespectoAlSuelo: baseCm,
+          y: yPx,
+          height: heightPx,
+        };
+      }
+
+      console.log(`Calling UPDATE for element ${id}`, patch);
+      ok = updaters.update(id, patch, true, description);
     }
 
-
-    const ok = updater(id, patch, true, 'Ajuste de niveles en cuarto');
-    if (!ok) return { ok: false, message: 'Falló la actualización de un nivel.' };
+    if (!ok) return { ok: false, message: `Falló la operación para el nivel con id: ${id}.` };
   }
 
   return { ok: true };

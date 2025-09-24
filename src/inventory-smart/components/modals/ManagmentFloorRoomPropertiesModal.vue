@@ -38,7 +38,8 @@
             type="text"
             placeholder="01"
             v-model="formValue.codigo"
-            class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
+            disabled
+            class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4 disabled:bg-gray-100">
         </div>
         <div class="col-span-2 flex flex-col gap-y-2">
           <label class="font-normal text-medium text-[#111928]" for="nombre_piso">Nombre del piso</label>

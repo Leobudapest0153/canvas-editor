@@ -348,7 +348,7 @@
               Pisos
               <button
                 :disabled="isSaving || isElementRestricted"
-                @click="canvasStore.abrirCuartoNivelesPropiedades()"
+                @click="canvasStore.abrirCuartoNivelesPropiedades(elementoSeleccionado.id)"
                 class="bg-primary-700 text-white p-1 rounded-full cursor-pointer
                 disabled:bg-gray-400 disabled:cursor-not-allowed">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
