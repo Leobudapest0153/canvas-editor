@@ -28,7 +28,7 @@ import {
   validateZStacking,
   errorsPlacement,
 } from '@/inventory-smart/validation/placementOrchestrator'
-import { proposeLevelChange, applyLevelChange, proposeCreateLevelInRoom, applyCreateLevelInRoom } from '@/inventory-smart/composables/useLevelStacking'
+import { proposeLevelChange, applyLevelChange } from '@/inventory-smart/composables/useLevelStacking'
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'

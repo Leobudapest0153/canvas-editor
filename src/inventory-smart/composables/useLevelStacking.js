@@ -163,97 +163,6 @@ function getRoomAndLevelsByRoomId(elements, roomId) {
   return { room, orderIds, byId };
 }
 
-export function proposeCreateLevelInRoom(elements, roomId, levelPatch) {
-  const { room, orderIds, byId, error } = getRoomAndLevelsByRoomId(elements, roomId);
-  if (error) return { status: 'error', message: error };
-
-  const newDims = levelPatch?.dimensiones || {};
-
-  // Validación footprint contra cuarto
-  const footprintCheck = validateFootprintWithinRoom(newDims, /*currentLevel*/ null, room);
-  if (!footprintCheck.ok) {
-    return { status: 'error', message: footprintCheck.message || 'Dimensiones exceden límites del cuarto.' };
-  }
-
-  // Alturas actuales
-  const heightsCurrent = {};
-  for (const id of orderIds) heightsCurrent[id] = Number(byId(id)?.dimensiones?.alto) || 0;
-  const hNew = Number(newDims?.alto);
-  if (!Number.isFinite(hNew) || hNew <= 0) {
-    return { status: 'error', message: 'Debes definir una altura válida (cm) para el nuevo nivel.' };
-  }
-
-  // Altura de cuarto
-  const Hc = Number(room?.dimensiones?.alto);
-  if (!Number.isFinite(Hc) || Hc <= 0) {
-    return { status: 'error', message: 'El cuarto no tiene altura válida definida.' };
-  }
-
-  const H_otros = sum(Object.values(heightsCurrent));
-  const H_total = H_otros + hNew;
-
-  // Nombres
-  const nombresPorId = Object.fromEntries(orderIds.map(id => [id, byId(id)?.nombre || id]));
-  nombresPorId[NEW_LEVEL_ID] = levelPatch?.nombre || 'Nuevo nivel';
-
-  const orderWithNew = [...orderIds, NEW_LEVEL_ID];
-
-  const draftBase = {
-    isCreation: true,
-    roomId: room.id,
-    roomHeightCm: Hc,
-    targetId: NEW_LEVEL_ID,
-    targetPatch: levelPatch,
-    nivelesOrden: orderWithNew,
-    alturasActuales: { ...heightsCurrent, [NEW_LEVEL_ID]: 0 },
-    basesActuales: computeStackBaseZ(orderIds, heightsCurrent), // sin el nuevo
-    nombresPorId,
-  };
-
-  // Si cabe sin overflow
-  if (H_total <= Hc + 1e-6) {
-    const alturasOkRaw = { ...heightsCurrent, [NEW_LEVEL_ID]: hNew };
-    const alturasOk = roundHeightsPreserveSum(alturasOkRaw, sum(Object.values(alturasOkRaw)));
-    const basesOk = computeStackBaseZ(orderWithNew, alturasOk);
-    return {
-      status: 'ok',
-      draft: { ...draftBase, alturasOk, basesOk },
-    };
-  }
-
-  // Overflow → propuestas
-  const D = H_total - Hc;
-
-  // Clamp: recortar SOLO el nuevo nivel
-  const clampRaw = { ...heightsCurrent, [NEW_LEVEL_ID]: Math.max(MIN_LEVEL_CM, hNew - D) };
-  const clampSum = sum(Object.values(clampRaw));
-  const alturasClamp = roundHeightsPreserveSum(clampRaw, clampSum);
-  const basesClamp = computeStackBaseZ(orderWithNew, alturasClamp);
-
-  // Redistribuir: reducir otros proporcionalmente
-  const others = orderIds.map(id => ({ id, h: heightsCurrent[id] }));
-  const { newHeightsById, leftover } = redistributeProportionally(others, D, MIN_LEVEL_CM);
-
-  const redistRaw = { ...heightsCurrent, [NEW_LEVEL_ID]: hNew };
-  for (const [oid, h] of Object.entries(newHeightsById)) redistRaw[oid] = h;
-
-  // Si no hubo margen suficiente en otros, fallback a clamp
-  const finalRedistRaw = leftover <= 1e-6 ? redistRaw : clampRaw;
-  const redistSum = sum(Object.values(finalRedistRaw));
-  const alturasRedistrib = roundHeightsPreserveSum(finalRedistRaw, redistSum);
-  const basesRedistrib = computeStackBaseZ(orderWithNew, alturasRedistrib);
-
-  return {
-    status: 'needs_confirmation',
-    draft: {
-      ...draftBase,
-      deficitCm: Math.round(D),
-      clamp: { alturas: alturasClamp, bases: basesClamp },
-      redistribute: { alturas: alturasRedistrib, bases: basesRedistrib },
-    },
-  };
-}
-
 // Aplicar creación: actualiza existentes y crea el nuevo
 // makeIdFn: () => string
 // insertFn: (newElement, roomId, saveHistory?, description?) => boolean
@@ -449,7 +358,6 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
   const targetId = draft.targetId;
 
   // --- SECCIÓN 2: BUCLE CON LLAMADAS DIFERENCIADAS ---
-  console.log('draft', draft);
   for (const id of draft.nivelesOrden) {
 
     const hCm = Math.max(MIN_LEVEL_CM, Math.round(Number(alturas[id]) || 0));
@@ -462,7 +370,6 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
 
     // CASO A: CREACIÓN
     if (id === 'Nuevo' && id === targetId) {
-      console.log("Es nuevo")
       const parentContext = byId(draft.padre);
       if (!parentContext) return { ok: false, message: 'Contexto del padre no encontrado para crear.' };
 
@@ -487,7 +394,6 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
 
     // CASO B: ACTUALIZACIÓN (Tanto el objetivo como los de contexto)
     } else {
-      console.log("Es update")
       let patch = {};
       // Si es el elemento que se está editando, el patch es más completo
       if (id === targetId) {
