@@ -27,6 +27,26 @@ export function useZoom(stageSize, layerConfig) {
       const planta = canvasStore.plantaActivaData
       const isInfinite = planta?.isInfinite === true
 
+      if (!isInfinite) {
+        const frame = canvasStore.canvasAdaptativo?.frame
+        const frameWidth = Number(frame?.width)
+        const frameHeight = Number(frame?.height)
+        if (
+          frame &&
+          Number.isFinite(frameWidth) &&
+          Number.isFinite(frameHeight) &&
+          frameWidth > 0 &&
+          frameHeight > 0
+        ) {
+          return {
+            x: Number(frame.x) || 0,
+            y: Number(frame.y) || 0,
+            width: Math.max(1, frameWidth),
+            height: Math.max(1, frameHeight),
+          }
+        }
+      }
+
       // 2.a) BBox del contenido visible (elementos de la planta activa)
       const elems = (canvasStore.elementosVisibles || []).filter((e) => e?.visible !== false && e?.plantaId === canvasStore.plantaActiva)
       if (elems.length > 0) {

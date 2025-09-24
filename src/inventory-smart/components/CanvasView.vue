@@ -47,10 +47,12 @@
         <!-- Dibujar grid solo si gridSize > 0 -->
         <template v-if="(canvasStore.gridSize || 0) > 0">
           <v-line
-            v-for="i in gridLines.vertical"
-            :key="`v-${i}`"
+            v-for="x in gridLines.vertical"
+            :key="`v-${Math.round(x * 1000)}`"
             :config="{
-              points: [i, 0, i, floorBoundary.height],
+              points: isInfinitePlant
+                ? [x, 0, x, floorBoundary.height]
+                : [x, floorBoundary.y, x, floorBoundary.y + floorBoundary.height],
               stroke: '#e5e7eb',
               strokeWidth: 1,
               opacity: 0.5,
@@ -58,10 +60,12 @@
             }"
           />
           <v-line
-            v-for="i in gridLines.horizontal"
-            :key="`h-${i}`"
+            v-for="y in gridLines.horizontal"
+            :key="`h-${Math.round(y * 1000)}`"
             :config="{
-              points: [0, i, floorBoundary.width, i],
+              points: isInfinitePlant
+                ? [0, y, floorBoundary.width, y]
+                : [floorBoundary.x, y, floorBoundary.x + floorBoundary.width, y],
               stroke: '#e5e7eb',
               strokeWidth: 1,
               opacity: 0.5,
@@ -451,28 +455,28 @@
         <v-text
           v-if="!canvasStore.estaEnPlanta || canvasStore.plantaActivaData?.isInfinite !== true"
           :config="{
-            x: 10,
-            y: -(39 / canvasStore.zoom),
-            text: !canvasStore.estaEnPlanta
-              ? `${canvasStore.estructuraContenedorActual?.nombre} - ${formatLengthsCm([layerConfig.width * viewport.cmPerPx, layerConfig.height * viewport.cmPerPx])}`
-              : `${canvasStore.plantaActivaData?.nombre} - ${formatLengthsCm([layerConfig.width * viewport.cmPerPx, layerConfig.height * viewport.cmPerPx])}`,
+            x: floorLabelPositions.main.x,
+            y: floorLabelPositions.main.y,
+            text: mainFloorInfoText,
             fontSize: 12 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#3b82f6',
             listening: false,
+            align: 'left',
             name: 'floor-info-label',
           }"
         />
         <v-text
           v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite !== true"
           :config="{
-            x: 10,
-            y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
-            text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
+            x: floorLabelPositions.secondary.x,
+            y: floorLabelPositions.secondary.y,
+            text: plantElementsText,
             fontSize: 11 / canvasStore.zoom,
             fontFamily: 'Arial',
             fill: '#6b7280',
             listening: false,
+            align: 'left',
             name: 'floor-info-label',
           }"
         />
@@ -722,6 +726,7 @@ const isSnappingEnabled = ref(true)
  * @returns {Object} - { width: number, height: number } en píxeles
  */
 const viewport = useViewportStore()
+
 const getElementPixelDimensions = (elemento) => {
   // Si ya tiene width/height en píxeles, usarlos solo si no tiene dimensiones en cm
   // Esto es para compatibilidad con elementos legacy que solo tienen width/height
@@ -851,17 +856,93 @@ const insetPoly = computed(() => polygonInset(plantPolygon.value, 1))
 
 const plantPolygonFlat = computed(() => plantPolygon.value.flatMap((p) => [p.x, p.y]))
 
-const floorBoundary = computed(() => {
-  const bounds = activeBounds.value.boundsPx || { width: 0, height: 0 }
-  if (!isInfinitePlant.value) {
-    return bounds
+const plantRect = computed(() => {
+  const adapt = canvasStore.canvasAdaptativo || {}
+  const frame = adapt?.frame
+  if (
+    frame &&
+    Number.isFinite(Number(frame.x)) &&
+    Number.isFinite(Number(frame.y))
+  ) {
+    return {
+      x: Number(frame.x) || 0,
+      y: Number(frame.y) || 0,
+      width: Number(frame.width) || 0,
+      height: Number(frame.height) || 0,
+    }
   }
+
+  const poly = plantPolygon.value
+  if (Array.isArray(poly) && poly.length >= 3) {
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const point of poly) {
+      const x = Number(point?.x)
+      const y = Number(point?.y)
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+      minX = Math.min(minX, x)
+      minY = Math.min(minY, y)
+      maxX = Math.max(maxX, x)
+      maxY = Math.max(maxY, y)
+    }
+    if (
+      Number.isFinite(minX) &&
+      Number.isFinite(minY) &&
+      Number.isFinite(maxX) &&
+      Number.isFinite(maxY) &&
+      maxX >= minX &&
+      maxY >= minY
+    ) {
+      return {
+        x: Math.floor(minX),
+        y: Math.floor(minY),
+        width: Math.max(0, Math.ceil(maxX) - Math.floor(minX)),
+        height: Math.max(0, Math.ceil(maxY) - Math.floor(minY)),
+      }
+    }
+  }
+
+  const bounds = activeBounds.value.boundsPx || { width: 0, height: 0 }
+  const width = Number(bounds.width) || Number(adapt.width) || 0
+  const height = Number(bounds.height) || Number(adapt.height) || 0
+  return { x: 0, y: 0, width, height }
+})
+
+const floorBoundary = computed(() => {
+  if (!isInfinitePlant.value) {
+    const rect = plantRect.value
+    const width = Number(rect.width) || 0
+    const height = Number(rect.height) || 0
+    const x = Number(rect.x) || 0
+    const y = Number(rect.y) || 0
+    return {
+      width,
+      height,
+      x,
+      y,
+      minX: x,
+      minY: y,
+      maxX: x + width,
+      maxY: y + height,
+    }
+  }
+  const bounds = activeBounds.value.boundsPx || { width: 0, height: 0 }
   const zoom = canvasStore.zoom || 1
   const viewWidth = stageSize.value.width / (zoom || 1)
   const viewHeight = stageSize.value.height / (zoom || 1)
+  const width = Math.max(bounds.width || 0, viewWidth || 0)
+  const height = Math.max(bounds.height || 0, viewHeight || 0)
   return {
-    width: Math.max(bounds.width || 0, viewWidth || 0),
-    height: Math.max(bounds.height || 0, viewHeight || 0),
+    width,
+    height,
+    x: 0,
+    y: 0,
+    minX: 0,
+    minY: 0,
+    maxX: width,
+    maxY: height,
   }
 })
 
@@ -878,6 +959,49 @@ const layerConfig = computed(() => {
   return {
     width: Math.max(baseWidth, viewWidth || 0),
     height: Math.max(baseHeight, viewHeight || 0),
+  }
+})
+
+const mainFloorInfoText = computed(() => {
+  const dimsText = formatLengthsCm([
+    (layerConfig.value.width || 0) * viewport.cmPerPx,
+    (layerConfig.value.height || 0) * viewport.cmPerPx,
+  ])
+  if (!canvasStore.estaEnPlanta) {
+    const name = canvasStore.estructuraContenedorActual?.nombre || ''
+    return `${name} - ${dimsText}`
+  }
+  return `${canvasStore.plantaActivaData?.nombre || ''} - ${dimsText}`
+})
+
+const plantElementsText = computed(() => `Elementos: ${elementosVisiblesEnCanvas.value.length}`)
+
+const floorLabelPositions = computed(() => {
+  const zoom = canvasStore.zoom || 1
+  const fallback = {
+    main: { x: 10, y: -(39 / zoom) },
+    secondary: { x: 10, y: -(19 / zoom) },
+  }
+
+  if (!canvasStore.estaEnPlanta || isInfinitePlant.value) {
+    return fallback
+  }
+
+  const rect = plantRect.value || { x: 0, y: 0, width: 0, height: 0 }
+  const paddingScreen = 10
+  const lineGapScreen = 18
+
+  const padWorld = paddingScreen / zoom
+  const lineGapWorld = lineGapScreen / zoom
+
+  const rectX = Number(rect.x)
+  const rectY = Number(rect.y)
+  const baseX = (Number.isFinite(rectX) ? rectX : 0) + padWorld
+  const baseY = (Number.isFinite(rectY) ? rectY : 0) + padWorld
+
+  return {
+    main: { x: baseX, y: baseY },
+    secondary: { x: baseX, y: baseY + lineGapWorld },
   }
 })
 
@@ -956,15 +1080,30 @@ const gridLines = computed(() => {
   }
 
   // Usar las dimensiones del layer (planta) para el grid
-  const layerWidth = floorBoundary.value.width
-  const layerHeight = floorBoundary.value.height
+  const boundary = floorBoundary.value
+  const layerWidth = Number(boundary.width) || 0
+  const layerHeight = Number(boundary.height) || 0
 
-  for (let i = 0; i <= layerWidth; i += gridSizePx) {
-    vertical.push(i)
-  }
+  if (!isInfinitePlant.value) {
+    const startX = Number(boundary.x) || 0
+    const endX = startX + layerWidth
+    for (let x = startX; x <= endX + 0.5; x += gridSizePx) {
+      vertical.push(x)
+    }
 
-  for (let i = 0; i <= layerHeight; i += gridSizePx) {
-    horizontal.push(i)
+    const startY = Number(boundary.y) || 0
+    const endY = startY + layerHeight
+    for (let y = startY; y <= endY + 0.5; y += gridSizePx) {
+      horizontal.push(y)
+    }
+  } else {
+    for (let x = 0; x <= layerWidth; x += gridSizePx) {
+      vertical.push(x)
+    }
+
+    for (let y = 0; y <= layerHeight; y += gridSizePx) {
+      horizontal.push(y)
+    }
   }
 
   return { vertical, horizontal }

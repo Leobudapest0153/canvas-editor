@@ -556,23 +556,72 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   const calcularCanvasAdaptativoPlanta = (planta) => {
-    // Calcular tamaño del canvas basado en las dimensiones de la planta
+    // Calcular tamaño y origen del canvas basado en la planta activa
     if (!planta) {
-      // Fallback por defecto
       canvasAdaptativo.value = {
         width: 800,
         height: 600,
         escala: 1,
+        frame: { x: 0, y: 0, width: 800, height: 600 },
       }
       return
     }
 
-    // Convertir dimensiones de cm a pixels usando la constante CM_TO_PX
-    // Para plantas, usamos la conversión directa 1:1 (sin factor de escala adicional)
+    const dims = planta.dimensiones || {}
+    const widthPxFromDims = (Number(dims.ancho) || 0) * CM_TO_PX
+    const heightPxFromDims = (Number(dims.largo) || 0) * CM_TO_PX
+
+    let originX = 0
+    let originY = 0
+    let frameWidth = widthPxFromDims
+    let frameHeight = heightPxFromDims
+
+    if (Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+
+      for (const point of planta.poligono) {
+        const x = Number(point?.x ?? point?.[0])
+        const y = Number(point?.y ?? point?.[1])
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+        minX = Math.min(minX, x)
+        minY = Math.min(minY, y)
+        maxX = Math.max(maxX, x)
+        maxY = Math.max(maxY, y)
+      }
+
+      if (
+        Number.isFinite(minX) &&
+        Number.isFinite(minY) &&
+        Number.isFinite(maxX) &&
+        Number.isFinite(maxY) &&
+        maxX > minX &&
+        maxY > minY
+      ) {
+        originX = Math.floor(minX)
+        originY = Math.floor(minY)
+        frameWidth = Math.max(1, Math.ceil(maxX) - originX)
+        frameHeight = Math.max(1, Math.ceil(maxY) - originY)
+      }
+    }
+
+    if (!Number.isFinite(frameWidth) || frameWidth <= 0) frameWidth = widthPxFromDims || 0
+    if (!Number.isFinite(frameHeight) || frameHeight <= 0) frameHeight = heightPxFromDims || 0
+
     canvasAdaptativo.value = {
-      width: planta.dimensiones.ancho * CM_TO_PX, // ancho = x
-      height: planta.dimensiones.largo * CM_TO_PX, // largo = y
-      escala: CM_TO_PX, // La escala es la conversión cm->px
+      width: frameWidth || widthPxFromDims,
+      height: frameHeight || heightPxFromDims,
+      escala: CM_TO_PX,
+      originX,
+      originY,
+      frame: {
+        x: originX,
+        y: originY,
+        width: frameWidth || widthPxFromDims,
+        height: frameHeight || heightPxFromDims,
+      },
     }
   }
 
