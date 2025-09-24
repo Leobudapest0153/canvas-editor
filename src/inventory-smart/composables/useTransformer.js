@@ -3,6 +3,7 @@ import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { CM_TO_PX, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { circleInPolygon, isRectCompletelyInPolygon } from '@/inventory-smart/utils/polygonBounds'
+import { boundaryToAreaBounds } from '@/inventory-smart/utils/bounds'
 import { correctTransformValues } from '@/inventory-smart/utils/precision'
 import { toTransformerPrecision } from '../utils/fixedDimensions'
 
@@ -401,6 +402,27 @@ export function useTransformer({
         }
       }
 
+      const polygonForBounds = Array.isArray(boundary?.inset) && boundary.inset.length
+        ? boundary.inset
+        : (Array.isArray(boundary?.points) && boundary.points.length ? boundary.points : undefined)
+
+      const layerWidth = layerConfig?.value?.width ?? 0
+      const layerHeight = layerConfig?.value?.height ?? 0
+
+      const normalizedBoundary =
+        boundary && boundary.type === 'polygon' && polygonForBounds
+          ? { ...boundary, points: polygonForBounds }
+          : boundary
+
+      const areaBounds = boundaryToAreaBounds(normalizedBoundary, {
+        minX: 0,
+        minY: 0,
+        maxX: layerWidth,
+        maxY: layerHeight,
+        mode: boundary?.mode || 'fixed',
+        polygon: polygonForBounds ?? null,
+      })
+
       // Extraer valores de Konva (mantener valores originales para Konva y store)
       const width = node.width() * node.scaleX()
       const height = node.height() * node.scaleY()
@@ -619,7 +641,7 @@ export function useTransformer({
       try {
         if (boundary && boundary.type === 'polygon' && boundary.mode !== 'elastic') {
           let isInsidePolygon = false
-          const polygon = boundary.inset?.length ? boundary.inset : boundary.points
+          const polygon = polygonForBounds || []
 
           if (elemento?.forma === 'circular') {
             // Para círculos, verificar que el círculo completo esté dentro
@@ -645,37 +667,6 @@ export function useTransformer({
       // VALIDACIÓN 3: Placement validation (colisiones, área) - usar valores corregidos
       // Usar neighbors del snapshot para evitar cambios durante la validación
       const neighbors = Array.from(elementosSnapshot.values()).filter((e) => e.id !== elementId)
-
-      const polygonForBounds = Array.isArray(boundary?.inset) && boundary.inset.length
-        ? boundary.inset
-        : (Array.isArray(boundary?.points) && boundary.points.length ? boundary.points : undefined)
-
-      const layerWidth = layerConfig?.value?.width ?? 0
-      const layerHeight = layerConfig?.value?.height ?? 0
-
-      const areaBounds = boundary
-        ? boundary.mode === 'elastic'
-          ? {
-              minX: 0,
-              minY: 0,
-              mode: 'elastic',
-              ...(polygonForBounds ? { polygon: polygonForBounds } : {}),
-            }
-          : {
-              minX: 0,
-              minY: 0,
-              mode: boundary.mode || 'fixed',
-              maxX: layerWidth,
-              maxY: layerHeight,
-              ...(polygonForBounds ? { polygon: polygonForBounds } : {}),
-            }
-        : {
-            minX: 0,
-            minY: 0,
-            mode: 'fixed',
-            maxX: layerWidth,
-            maxY: layerHeight,
-          }
       const elementoParaValidacion =
         elementoSnapshot?.forma === 'circular'
           ? {
@@ -753,12 +744,6 @@ export function useTransformer({
       const newDimensiones = tempDimensiones
 
       // Solo verificamos para detectar inconsistencias en las validaciones
-      const bounds = {
-        minX: 0,
-        minY: 0,
-        maxX: layerConfig.value.width,
-        maxY: layerConfig.value.height,
-      }
 
       // IMPORTANTE: Usar valores originales de Konva (sin corrección de precisión)
       // Solo aplicar dimensiones y rotación originales - NO modificar coordenadas x, y
@@ -806,7 +791,7 @@ export function useTransformer({
         `Elemento redimensionado: ${elementoSnapshot?.nombre || elementoSnapshot?.tipo || elementId}`,
       )
 
-  lastValidPositions.value.set(elementId, { x: finalNodeX, y: finalNodeY })
+      lastValidPositions.value.set(elementId, { x: finalNodeX, y: finalNodeY })
 
       nextTick(() => setupTransformer())
     } catch (err) {

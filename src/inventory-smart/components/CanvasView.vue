@@ -1145,12 +1145,47 @@ const computeBoundary = () => {
   const points = plantPolygon.value
 
   if (Array.isArray(points) && points.length >= 3) {
-    const inset = Array.isArray(insetPoly.value) && insetPoly.value.length ? insetPoly.value : points
-    return {
-      type: 'polygon',
-      mode,
-      points,
-      inset,
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const point of points) {
+      const px = Number(point?.x)
+      const py = Number(point?.y)
+      if (!Number.isFinite(px) || !Number.isFinite(py)) {
+        continue
+      }
+      minX = Math.min(minX, px)
+      minY = Math.min(minY, py)
+      maxX = Math.max(maxX, px)
+      maxY = Math.max(maxY, py)
+    }
+
+    if (
+      Number.isFinite(minX) &&
+      Number.isFinite(minY) &&
+      Number.isFinite(maxX) &&
+      Number.isFinite(maxY)
+    ) {
+      const width = Math.max(0, maxX - minX)
+      const height = Math.max(0, maxY - minY)
+      const inset = Array.isArray(insetPoly.value) && insetPoly.value.length ? insetPoly.value : points
+      return {
+        type: 'polygon',
+        mode,
+        points,
+        inset,
+        x: minX,
+        y: minY,
+        width,
+        height,
+        W: width,
+        H: height,
+        minX,
+        minY,
+        maxX,
+        maxY,
+      }
     }
   }
 
@@ -1159,6 +1194,10 @@ const computeBoundary = () => {
   const height = Number(boundary.height) || 0
   const x = Number(boundary.x) || 0
   const y = Number(boundary.y) || 0
+  const minX = Number.isFinite(boundary.minX) ? Number(boundary.minX) : x
+  const minY = Number.isFinite(boundary.minY) ? Number(boundary.minY) : y
+  const maxX = Number.isFinite(boundary.maxX) ? Number(boundary.maxX) : x + width
+  const maxY = Number.isFinite(boundary.maxY) ? Number(boundary.maxY) : y + height
 
   return {
     type: 'rect',
@@ -1169,10 +1208,10 @@ const computeBoundary = () => {
     height,
     W: width,
     H: height,
-    minX: boundary.minX ?? x,
-    minY: boundary.minY ?? y,
-    maxX: boundary.maxX ?? x + width,
-    maxY: boundary.maxY ?? y + height,
+    minX,
+    minY,
+    maxX,
+    maxY,
     points: [],
     inset: [],
   }
