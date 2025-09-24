@@ -2368,9 +2368,11 @@ const fitToPlanta = () => {
     } catch { /* ignore */ }
 
     if (isInfinitePlant.value) {
-      const hasVisibleElements = elementosVisiblesEnCanvas.value.length > 0
+      const hasRenderableElements = Array.isArray(canvasStore.elementosVisibles)
+        ? canvasStore.elementosVisibles.some((el) => el?.visible !== false)
+        : false
 
-      if (!hasVisibleElements) {
+      if (!hasRenderableElements) {
         const fallbackZoom = Math.min(
           MAX_ZOOM,
           Math.max(dynamicMinZoom, DEFAULT_INFINITE_INITIAL_ZOOM),
