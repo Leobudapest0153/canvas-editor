@@ -38,7 +38,72 @@ export const useCatalogStore = defineStore('catalog', () => {
           root.alturaRespectoAlSuelo = it.alturaRespectoAlSuelo
         }
 
-        const structure = { root, payload: { rootId: root.id, elements: [root] }, meta: { kind, childrenCount: 0 } }
+        // Crear hijos internos desde constants.pisosNiveles si existen; si no, crear uno por defecto
+        const children = []
+        if (Array.isArray(it.pisosNiveles) && it.pisosNiveles.length > 0) {
+          const esCuarto = it.tipo === 'cuartos'
+          it.pisosNiveles.forEach((niv, idx) => {
+            const childId = `${it.id}__${esCuarto ? 'piso' : 'nivel'}_${idx + 1}`
+            const child = {
+              id: childId,
+              nombre: niv?.nombre || (esCuarto ? `Piso ${idx + 1}` : `Nivel ${idx + 1}`),
+              tipo: esCuarto ? 'pisos' : 'contenedores',
+              categoria: esCuarto ? 'piso' : 'nivel',
+              padre: root.id,
+              color: root.color,
+              colorBase: root.colorBase,
+              x: 0,
+              y: idx * 50,
+              // Si el nivel/piso no define dimensiones, heredar las del root
+              dimensiones: {
+                ancho: typeof niv?.ancho === 'number' ? niv.ancho : (root.dimensiones?.ancho ?? undefined),
+                largo: typeof niv?.largo === 'number' ? niv.largo : (root.dimensiones?.largo ?? undefined),
+                alto: typeof niv?.alto === 'number' ? niv.alto : (root.dimensiones?.alto ?? undefined),
+              },
+              capacidadCarga: Number.isFinite(Number(niv?.capacidadCarga))
+                ? Number(niv.capacidadCarga)
+                : (Number(root.capacidadCarga) || 0),
+              tiposProductos: Array.isArray(niv?.tiposProductos) ? niv.tiposProductos.slice() : [],
+              tipoZona: niv?.tipoZona || 'almacenaje',
+              permiteFragiles: !!niv?.permiteFragiles,
+              props: { catalogVisible: false },
+              meta: esCuarto
+                ? { esPisoInterno: true, indicePiso: idx + 1 }
+                : { esNivelInterno: true, indiceNivel: idx + 1 },
+            }
+            root.hijos.push(childId)
+            children.push(child)
+          })
+          root.meta.tienePisosGenerados = true
+        } else if (it.tipo === 'cuartos' || it.tipo === 'elementos') {
+          const esCuarto = it.tipo === 'cuartos'
+          const childId = `${it.id}__${esCuarto ? 'piso' : 'nivel'}_1`
+          const child = {
+            id: childId,
+            nombre: esCuarto ? 'Piso 1' : 'Nivel 1',
+            tipo: esCuarto ? 'pisos' : 'contenedores',
+            categoria: esCuarto ? 'piso' : 'nivel',
+            padre: root.id,
+            color: root.color,
+            colorBase: root.colorBase,
+            x: 0,
+            y: 0,
+            dimensiones: { ...(root.dimensiones || {}) },
+            capacidadCarga: Number(root.capacidadCarga) || 0,
+            tiposProductos: [],
+            tipoZona: 'almacenaje',
+            permiteFragiles: false,
+            props: { catalogVisible: false },
+            meta: esCuarto
+              ? { esPisoInterno: true, indicePiso: 1 }
+              : { esNivelInterno: true, indiceNivel: 1 },
+          }
+          root.hijos.push(childId)
+          children.push(child)
+          root.meta.tienePisosGenerados = true
+        }
+
+        const structure = { root, payload: { rootId: root.id, elements: [root, ...children] }, meta: { kind, childrenCount: children.length } }
         const mapped = toCatalogItemFromStructure({
           name: it.nombre,
           description: it.descripcion,
