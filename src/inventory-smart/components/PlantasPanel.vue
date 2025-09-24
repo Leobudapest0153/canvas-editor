@@ -78,29 +78,25 @@
               class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
             ></div> -->
           </div>
-        </div>
 
-        <!-- Botón de agregar planta - siempre visible -->
-        <UiTooltip
-          label="Agregar nueva planta de almacén"
-          :delay="200"
-          position="right"
-        >
-          <button
+          <!-- Card para crear nueva planta -->
+          <div
+            class="relative m-2 flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 flex-shrink-0"
             @click="canvasStore.abrirEditor()"
-            class="flex-shrink-0 inline-flex items-center justify-center w-12 h-12 bg-primary hover:bg-primary-900 text-white rounded-lg shadow-md hover:shadow-lg cursor-pointer transition-colors"
-            type="button"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-          </button>
-        </UiTooltip>
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-primary">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+                <div class="flex flex-col align-middle">
+                <h3 class="text-sm font-semibold text-gray-800 leading-snug">Crear nuevo</h3>
+                <h3 class="text-sm font-semibold text-gray-800 leading-snug">piso de almacén</h3>
+                </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Espacio flexible para empujar las acciones hacia la derecha -->
