@@ -997,7 +997,7 @@ const floorLabelPositions = computed(() => {
   const rectX = Number(rect.x)
   const rectY = Number(rect.y)
   const baseX = (Number.isFinite(rectX) ? rectX : 0) + padWorld
-  const baseY = (Number.isFinite(rectY) ? rectY : 0) + padWorld
+  const baseY = (Number.isFinite(rectY) ? rectY : 0) - (lineGapWorld + padWorld)
 
   return {
     main: { x: baseX, y: baseY },
