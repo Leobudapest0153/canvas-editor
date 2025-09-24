@@ -290,7 +290,7 @@ export const TIPOS_ESPACIO = [
 ]
 
 export const TIPOS_CUARTO = [
-  { id: 'almacenamiento', nombre: 'Almacenamiento' },
+  { id: 'almacenamiento', nombre: 'Zona de almacenaje' },
   { id: 'zona_de_descarga', nombre: 'Zona de Descarga' },
   { id: 'almacenaje', nombre: 'Almacenaje' }
 ]
@@ -334,8 +334,6 @@ export const getCategoriasPorTipo = (tipo) => {
       return CATEGORIAS_CUARTOS
     case 'pisos':
       return CATEGORIAS_PISOS
-    case 'pasillos':
-      return CATEGORIAS_PASILLOS
     default:
       return []
   }
@@ -348,17 +346,11 @@ export const puedeContener = (tipoPadre, tipoHijo) => {
   return JERARQUIA_PERMITIDA[tipoPadre]?.includes(tipoHijo) || false
 }
 
-/**
- * Obtiene el color por defecto para un tipo
- */
 export const getColorPorTipo = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.color || '#6b7280'
 }
 
-/**
- * Obtiene el icono por defecto para un tipo
- */
 export const getIconoPorTipo = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.icono || '📦'
@@ -399,6 +391,9 @@ export const GRID_SIZE = 0
 export const PRECISION_CM = 0.01
 // Número de decimales para redondeo
 export const DECIMAL_PLACES = 2
+
+// MARGEN POR DEFECTO PARA CAPACIDAD DE CARGA AL AUTOCOMPLETAR (5% = 0.05)
+export const LOAD_MARGIN = 0.05
 
 // Parámetros por defecto para guard de redimensionado
 export const MARGIN_CM = 5 // margen perimetral interno en cm para packing
