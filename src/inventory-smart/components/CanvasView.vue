@@ -1268,6 +1268,7 @@ const handleWheel = (e) => {
 }
 
 const MAX_ZOOM = 5
+const DEFAULT_INFINITE_INITIAL_ZOOM = 0.6
 const ZOOM_STEP = 1.1
 const canZoomIn = computed(() => (canvasStore.zoom || 1) < MAX_ZOOM)
 const canZoomOut = computed(() => (canvasStore.zoom || 1) > getDynamicMinZoom())
@@ -2367,7 +2368,26 @@ const fitToPlanta = () => {
     } catch { /* ignore */ }
 
     if (isInfinitePlant.value) {
-      canvasStore.configurarZoom(canvasStore.zoom, dynamicMinZoom)
+      const hasVisibleElements = elementosVisiblesEnCanvas.value.length > 0
+
+      if (!hasVisibleElements) {
+        const fallbackZoom = Math.min(
+          MAX_ZOOM,
+          Math.max(dynamicMinZoom, DEFAULT_INFINITE_INITIAL_ZOOM),
+        )
+        const centerX = stageSize.value.width / 2
+        const centerY = stageSize.value.height / 2
+
+        stage.scale({ x: fallbackZoom, y: fallbackZoom })
+        stage.position({ x: centerX, y: centerY })
+
+        canvasStore.configurarZoom(fallbackZoom, dynamicMinZoom)
+        canvasStore.configurarPan(centerX, centerY)
+
+        stage.batchDraw?.()
+      } else {
+        canvasStore.configurarZoom(canvasStore.zoom, dynamicMinZoom)
+      }
     } else {
       canvasStore.configurarZoom(z, z)
     }
