@@ -292,8 +292,8 @@ import {
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
 } from '@/inventory-smart/utils/constants'
-import { CATALOGO } from '@/inventory-smart/utils/constants'
-import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
+// import { CATALOGO, SCALE_WITH_PARENT_KEYS } from '@/inventory-smart/utils/constants'
+// import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
 
 import ElementEditor from './modals/ElementEditor.vue'
 import AgregarCuartoModal from './AgregarCuartoModal.vue'
@@ -551,24 +551,30 @@ const isKebabRestricted = (item) => {
   return t === 'pasillos' || t === 'contenedores' || t === 'pisos'
 }
 
-// Dims preview para elementos de sistema por defecto
-const isSystemDefaultItem = (item) =>
-  !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
+// const isSystemDefaultItem = (item) =>
+//   !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
 
-const getCardDims = (item) => {
-  try {
-    if (!item?.dimensiones) return { ancho: 0, largo: 0, alto: 0 }
-    if (!isSystemDefaultItem(item)) return item.dimensiones
-    const planta = canvasStore.plantaActivaData
-    const dimsPlanta = planta?.dimensiones
-    if (!dimsPlanta) return item.dimensiones
-    const parentDims = { w: dimsPlanta.ancho, h: dimsPlanta.largo, d: dimsPlanta.alto }
-    const dims = computeDimsByAxisScale(item.id, parentDims, { snap: true })
-    return dims || item.dimensiones
-  } catch {
-    return item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
-  }
-}
+// const getCardDims = (item) => {
+//   try {
+//     if (!item?.dimensiones) return { ancho: 0, largo: 0, alto: 0 }
+//     // Solo escalar para tipos explícitos (pasillo/cuarto/piso). Para elementos regulares
+//     // como estantes o anaqueles, mostrar dimensiones base del catálogo.
+//     if (!(isSystemDefaultItem(item) && SCALE_WITH_PARENT_KEYS.includes(item.id))) {
+//       return item.dimensiones
+//     }
+//     const planta = canvasStore.plantaActivaData
+//     const dimsPlanta = planta?.dimensiones
+//     if (!dimsPlanta) return item.dimensiones
+//     const parentDims = { w: dimsPlanta.ancho, h: dimsPlanta.largo, d: dimsPlanta.alto }
+//     const dims = computeDimsByAxisScale(item.id, parentDims, { snap: true })
+//     return dims || item.dimensiones
+//   } catch {
+//     return item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
+//   }
+// }
+
+// Comportamiento actual: sin escalado, siempre dimensiones base del catálogo
+const getCardDims = (item) => item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
 
 // Drag and Drop
 const iniciarArrastre = (elemento, event) => {
