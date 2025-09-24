@@ -103,62 +103,88 @@
                   </p>
                 </div>
 
-                <!-- Orientación y Ubicación en la misma fila -->
-                <div v-if="modo === 'espacio'" class="grid grid-cols-2 gap-4">
-                  <!-- Orientación -->
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Orientación*</label>
-                    <select
-                      v-model="datosGenerales.orientacion"
-                      class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      :class="
-                        touchedGeneral.orientacion && !validOrientacion
-                          ? 'border-red-400'
-                          : 'border-gray-300'
-                      "
-                      @change="touchedGeneral.orientacion = true"
-                      @blur="touchedGeneral.orientacion = true"
-                    >
-                      <option value="">Seleccionar orientación</option>
-                      <option v-for="opt in ORIENTACIONES" :key="opt.id" :value="opt.id">
-                        {{ opt.nombre }}
-                      </option>
-                    </select>
-                    <p
-                      v-if="touchedGeneral.orientacion && !validOrientacion"
-                      class="mt-1 text-xs text-red-600"
-                    >
-                      Selecciona una orientación.
-                    </p>
+                <!-- Bloque específico para espacios: orientación, ubicación y altura en pared -->
+                <template v-if="modo === 'espacio'">
+                  <!-- Orientación y Ubicación en la misma fila -->
+                  <div class="grid grid-cols-2 gap-4">
+                    <!-- Orientación -->
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Orientación*</label>
+                      <select
+                        v-model="datosGenerales.orientacion"
+                        class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="
+                          touchedGeneral.orientacion && !validOrientacion
+                            ? 'border-red-400'
+                            : 'border-gray-300'
+                        "
+                        @change="touchedGeneral.orientacion = true"
+                        @blur="touchedGeneral.orientacion = true"
+                      >
+                        <option value="">Seleccionar orientación</option>
+                        <option v-for="opt in ORIENTACIONES" :key="opt.id" :value="opt.id">
+                          {{ opt.nombre }}
+                        </option>
+                      </select>
+                      <p
+                        v-if="touchedGeneral.orientacion && !validOrientacion"
+                        class="mt-1 text-xs text-red-600"
+                      >
+                        Selecciona una orientación.
+                      </p>
+                    </div>
+
+                    <!-- Ubicación -->
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Ubicación*</label>
+                      <select
+                        v-model="datosGenerales.ubicacion"
+                        class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="
+                          touchedGeneral.ubicacion && !validUbicacion
+                            ? 'border-red-400'
+                            : 'border-gray-300'
+                        "
+                        @change="touchedGeneral.ubicacion = true"
+                        @blur="touchedGeneral.ubicacion = true"
+                      >
+                        <option value="">Seleccionar ubicación</option>
+                        <option v-for="ubicacion in UBICACIONES_DISPONIBLES" :key="ubicacion.id" :value="ubicacion.id">
+                          {{ ubicacion.nombre }}
+                        </option>
+                      </select>
+                      <p
+                        v-if="touchedGeneral.ubicacion && !validUbicacion"
+                        class="mt-1 text-xs text-red-600"
+                      >
+                        Selecciona una ubicación.
+                      </p>
+                    </div>
                   </div>
 
-                  <!-- Ubicación -->
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Ubicación*</label>
-                    <select
-                      v-model="datosGenerales.ubicacion"
-                      class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      :class="
-                        touchedGeneral.ubicacion && !validUbicacion
-                          ? 'border-red-400'
-                          : 'border-gray-300'
-                      "
-                      @change="touchedGeneral.ubicacion = true"
-                      @blur="touchedGeneral.ubicacion = true"
-                    >
-                      <option value="">Seleccionar ubicación</option>
-                      <option v-for="ubicacion in UBICACIONES_DISPONIBLES" :key="ubicacion.id" :value="ubicacion.id">
-                        {{ ubicacion.nombre }}
-                      </option>
-                    </select>
-                    <p
-                      v-if="touchedGeneral.ubicacion && !validUbicacion"
-                      class="mt-1 text-xs text-red-600"
-                    >
-                      Selecciona una ubicación.
-                    </p>
+                  <!-- Altura respecto al suelo (solo espacios en pared) -->
+                  <div v-if="datosGenerales.ubicacion === 'pared'" class="grid grid-cols-2 gap-4 mt-2">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Altura respecto al suelo (m)*</label>
+                      <input
+                        v-model.number="datosGenerales.alturaRespectoAlSuelo"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="
+                          touchedGeneral.alturaRespectoAlSuelo && !validAlturaRespectoAlSuelo
+                            ? 'border-red-400'
+                            : 'border-gray-300'
+                        "
+                        @blur="touchedGeneral.alturaRespectoAlSuelo = true"
+                      />
+                      <p v-if="touchedGeneral.alturaRespectoAlSuelo && !validAlturaRespectoAlSuelo" class="mt-1 text-xs text-red-600">
+                        Ingresa una altura válida mayor a 0.
+                      </p>
+                    </div>
                   </div>
-                </div>
+                </template>
 
                 <!-- Orientación solo (para cuartos) -->
                 <div v-else>
@@ -786,6 +812,7 @@ const datosGenerales = ref({
   descripcion: '',
   orientacion: '',
   ubicacion: '',
+  alturaRespectoAlSuelo: null,
 })
 
 const dimensiones = ref({
@@ -803,6 +830,7 @@ const touchedGeneral = ref({
   tipoSeleccionado: false,
   orientacion: false,
   ubicacion: false,
+  alturaRespectoAlSuelo: false,
   forma: false,
   largo: false,
   alto: false,
@@ -813,6 +841,13 @@ const validNombre = computed(() => datosGenerales.value.nombre.trim() !== '')
 const validTipo = computed(() => datosGenerales.value.tipoSeleccionado !== '')
 const validOrientacion = computed(() => datosGenerales.value.orientacion !== '')
 const validUbicacion = computed(() => datosGenerales.value.ubicacion !== '')
+const validAlturaRespectoAlSuelo = computed(() => {
+  // Obligatorio solo cuando es espacio y ubicación = 'pared'
+  if (props.modo !== 'espacio') return true
+  if (datosGenerales.value.ubicacion !== 'pared') return true
+  const v = Number(datosGenerales.value.alturaRespectoAlSuelo)
+  return Number.isFinite(v) && v > 0
+})
 const validForma = computed(() => dimensiones.value.forma !== '')
 const validLargo = computed(() => Number(dimensiones.value.largo) > 0)
 const validAlto = computed(() => Number(dimensiones.value.alto) > 0)
@@ -861,9 +896,9 @@ const esFormularioValido = computed(() => {
   
   let hasGeneral = dg.nombre.trim() !== '' && dg.tipoSeleccionado !== '' && dg.color && dg.orientacion !== ''
   
-  // Para espacios, también validar ubicación
+  // Para espacios, también validar ubicación y, si es pared, alturaRespectoAlSuelo
   if (props.modo === 'espacio') {
-    hasGeneral = hasGeneral && dg.ubicacion !== ''
+    hasGeneral = hasGeneral && dg.ubicacion !== '' && validAlturaRespectoAlSuelo.value
   }
   
   const hasDims =
@@ -971,6 +1006,10 @@ const inicializarFormulario = () => {
       descripcion: dg.descripcion || '',
       orientacion: dg.orientacion || '',
       ubicacion: props.modo === 'espacio' ? (dg.ubicacion || '') : '',
+      alturaRespectoAlSuelo:
+        props.modo === 'espacio' && dg.ubicacion === 'pared'
+          ? (typeof dg.alturaRespectoAlSuelo === 'number' ? dg.alturaRespectoAlSuelo : null)
+          : null,
     }
 
     const dim = f.dimensiones || {}
@@ -1022,6 +1061,7 @@ const inicializarFormulario = () => {
     descripcion: '',
     orientacion: '',
     ubicacion: '',
+    alturaRespectoAlSuelo: null,
   }
 
   dimensiones.value = {
@@ -1083,6 +1123,7 @@ const resetTouched = () => {
     tipoSeleccionado: false,
     orientacion: false,
     ubicacion: false,
+    alturaRespectoAlSuelo: false,
     forma: false,
     largo: false,
     alto: false,

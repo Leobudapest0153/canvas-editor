@@ -47,6 +47,10 @@ export function buildStructureFromForm(form) {
     descripcion: datosGenerales.descripcion || '',
     icono: modo === 'cuarto' ? 'home' : 'box',
     hijos: [],
+    // Altura respecto al suelo (solo aplica a espacios en pared). Convertir m→cm
+    ...(modo === 'espacio' && datosGenerales.ubicacion === 'pared' && Number.isFinite(Number(datosGenerales.alturaRespectoAlSuelo))
+      ? { alturaRespectoAlSuelo: Math.round(Number(datosGenerales.alturaRespectoAlSuelo) * 100) }
+      : {}),
     // Metadata que indica que al instanciar debe regenerar pisos
     meta: { tienePisosGenerados: true },
     // Calcular width/height directamente para evitar problemas de serialización
@@ -172,6 +176,10 @@ export function toFormFromCatalogItem(item) {
       descripcion: root.descripcion || item.descripcion || '',
       orientacion: root.orientacion || '',
       ubicacion: modo === 'espacio' ? (root.ubicacion || item.ubicacion || '') : '',
+      // Si es espacio en pared, exponer alturaRespectoAlSuelo en metros
+      ...(modo === 'espacio' && (root.ubicacion || item.ubicacion) === 'pared'
+        ? { alturaRespectoAlSuelo: fromCm(root.alturaRespectoAlSuelo ?? item.alturaRespectoAlSuelo) }
+        : {}),
     }
 
     const d = root.dimensiones || {}
@@ -224,6 +232,9 @@ export function toFormFromCatalogItem(item) {
       descripcion: item.descripcion || '',
       orientacion: item.orientacion || '',
       ubicacion: modo === 'espacio' ? (item.ubicacion || '') : '',
+      ...(modo === 'espacio' && item.ubicacion === 'pared'
+        ? { alturaRespectoAlSuelo: fromCm(item.alturaRespectoAlSuelo) }
+        : {}),
     }
     const dimensiones = {
       forma: item.forma || '',
