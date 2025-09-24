@@ -105,7 +105,8 @@
             <!-- Dimensiones -->
             <div class="mb-6">
               <h3 class="text-lg font-medium text-gray-800 mb-3">Dimensiones (cm)</h3>
-              <div class="grid grid-cols-3 gap-4">
+              <!-- Forma NO circular -->
+              <div v-if="!esFormaCircular" class="grid grid-cols-3 gap-4">
                 <div class="mb-2">
                   <label class="block text-sm font-medium text-gray-700">Ancho</label>
                   <input
@@ -124,7 +125,29 @@
                     min="1"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
                     required
-                    :disabled="esFormaCircular"
+                  />
+                </div>
+                <div class="mb-2">
+                  <label class="block text-sm font-medium text-gray-700">Alto</label>
+                  <input
+                    v-model.number="localElemento.dimensiones.alto"
+                    type="number"
+                    min="1"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
+                    required
+                  />
+                </div>
+              </div>
+              <!-- Forma circular: usar solo diámetro + alto -->
+              <div v-else class="grid grid-cols-2 gap-4">
+                <div class="mb-2">
+                  <label class="block text-sm font-medium text-gray-700">Diámetro</label>
+                  <input
+                    v-model.number="diametro"
+                    type="number"
+                    min="1"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg mt-1 text-base"
+                    required
                   />
                 </div>
                 <div class="mb-2">
@@ -258,6 +281,9 @@ const canvasStore = useCanvasStore()
 
 const esFormaCircular = computed(() => localElemento.value.forma === 'circular')
 
+// Diámetro usado solo cuando la forma es circular; refleja ancho/largo
+const diametro = ref(0)
+
 // Información sobre el peso para elementos que estamos editando
 const elementoEditandoInfo = computed(() => {
   // Si no estamos editando un elemento existente o no tiene ID, no mostrar información
@@ -316,6 +342,17 @@ watch(
   (val) => {
     if (val) {
       localElemento.value = JSON.parse(JSON.stringify(val))
+      // Si se edita y es circular y ancho==largo, establecer diametro para el input
+      if (localElemento.value.forma === 'circular') {
+        const { ancho, largo } = localElemento.value.dimensiones || {}
+        if (ancho && largo && Math.abs(ancho - largo) < 0.0001) {
+          diametro.value = ancho
+        } else {
+          // Si por alguna razón son distintos, forzar igualdad tomando el ancho
+          diametro.value = ancho || largo || 0
+          localElemento.value.dimensiones.largo = diametro.value
+        }
+      }
     }
   },
   { immediate: true, deep: true },
@@ -328,6 +365,10 @@ watch(
     if (nuevaForma === 'circular') {
       // Si es circular, hacer que largo sea igual a ancho
       localElemento.value.dimensiones.largo = localElemento.value.dimensiones.ancho
+      diametro.value = localElemento.value.dimensiones.ancho
+    }
+    else {
+      // Al cambiar a una forma no circular mantener ancho/largo ya sincronizados, nada especial
     }
   },
 )
@@ -338,8 +379,20 @@ watch(
   (nuevoAncho) => {
     if (esFormaCircular.value) {
       localElemento.value.dimensiones.largo = nuevoAncho
+      diametro.value = nuevoAncho
     }
   },
+)
+
+// Vigilar el diámetro directamente (cuando el usuario escribe en el campo de diámetro)
+watch(
+  () => diametro.value,
+  (nuevoDiametro) => {
+    if (esFormaCircular.value && nuevoDiametro > 0) {
+      localElemento.value.dimensiones.ancho = nuevoDiametro
+      localElemento.value.dimensiones.largo = nuevoDiametro
+    }
+  }
 )
 
 // Restablecer el formulario cuando el modal se abre
@@ -368,6 +421,7 @@ const restablecerFormulario = () => {
     icono: 'box',
     contenedores: [],
   }
+  diametro.value = 100
 }
 
 const onCancel = () => {
