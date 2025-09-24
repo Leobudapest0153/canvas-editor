@@ -274,11 +274,166 @@ const errors = reactive({ name: false, dimensions: false, maxWeight: false })
 const isManuallyEdited = ref(false)
 const isLoadingData = ref(false)
 let dimensionChangeDebounce = null
+let skipDimensionWatcher = false
 
 // Hint cuando se cambia de elástico -> limitado
 const showLimitedHint = ref(false)
 
 const INFINITE_PREVIEW_PADDING = 14
+const FINITE_PREVIEW_PADDING = 14
+const MIN_DIMENSION_CM = 100
+const DEFAULT_HEIGHT_CM = 300
+
+function getElementDimensionsPx(el) {
+  const width = Number(el?.width)
+  const height = Number(el?.height)
+  if (
+    Number.isFinite(width) &&
+    Number.isFinite(height) &&
+    width > 0 &&
+    height > 0
+  ) {
+    return { width, height }
+  }
+  const widthCm = Number(el?.dimensiones?.ancho)
+  const heightCm = Number(el?.dimensiones?.largo)
+  if (
+    Number.isFinite(widthCm) &&
+    Number.isFinite(heightCm) &&
+    widthCm > 0 &&
+    heightCm > 0
+  ) {
+    return { width: widthCm * PIXELS_PER_CM, height: heightCm * PIXELS_PER_CM }
+  }
+  return null
+}
+
+function getElementPositionPx(el) {
+  const x = Number(el?.x)
+  const y = Number(el?.y)
+  if (Number.isFinite(x) && Number.isFinite(y)) {
+    return { x, y }
+  }
+  const posX = Number(el?.posicion?.x)
+  const posY = Number(el?.posicion?.y)
+  if (Number.isFinite(posX) && Number.isFinite(posY)) {
+    return { x: posX, y: posY }
+  }
+  return null
+}
+
+function computeElementBBox(el) {
+  const dims = getElementDimensionsPx(el)
+  const pos = getElementPositionPx(el)
+  if (!dims || !pos) return null
+
+  const rotationRaw = Number(el?.rotation ?? el?.posicion?.rotation ?? 0) || 0
+  const rotation = Number.isFinite(rotationRaw) ? rotationRaw : 0
+  const rad = (rotation * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const offsetX = Number(el?.offsetX ?? el?.offset?.x ?? 0) || 0
+  const offsetY = Number(el?.offsetY ?? el?.offset?.y ?? 0) || 0
+
+  const corners = [
+    { x: 0, y: 0 },
+    { x: dims.width, y: 0 },
+    { x: dims.width, y: dims.height },
+    { x: 0, y: dims.height },
+  ]
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+
+  for (const corner of corners) {
+    const localX = corner.x - offsetX
+    const localY = corner.y - offsetY
+    const rotatedX = localX * cos - localY * sin
+    const rotatedY = localX * sin + localY * cos
+    const worldX = pos.x + rotatedX
+    const worldY = pos.y + rotatedY
+    minX = Math.min(minX, worldX)
+    minY = Math.min(minY, worldY)
+    maxX = Math.max(maxX, worldX)
+    maxY = Math.max(maxY, worldY)
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return null
+  }
+
+  return { minX, minY, maxX, maxY }
+}
+
+function computeElementsBBox(elements) {
+  const list = Array.isArray(elements) ? elements : []
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let hasAny = false
+
+  for (const el of list) {
+    if (!el || el.visible === false) continue
+    const bbox = computeElementBBox(el)
+    if (!bbox) continue
+    hasAny = true
+    minX = Math.min(minX, bbox.minX)
+    minY = Math.min(minY, bbox.minY)
+    maxX = Math.max(maxX, bbox.maxX)
+    maxY = Math.max(maxY, bbox.maxY)
+  }
+
+  if (!hasAny) return null
+  return { minX, minY, maxX, maxY }
+}
+
+function padBBox(bbox, padding) {
+  if (!bbox) return null
+  const p = Number(padding) || 0
+  return {
+    minX: bbox.minX - p,
+    minY: bbox.minY - p,
+    maxX: bbox.maxX + p,
+    maxY: bbox.maxY + p,
+  }
+}
+
+function getPolygonBBox(poly) {
+  if (!Array.isArray(poly) || poly.length === 0) return null
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let has = false
+  for (const point of poly) {
+    const x = Number(point?.x)
+    const y = Number(point?.y)
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+    has = true
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    maxX = Math.max(maxX, x)
+    maxY = Math.max(maxY, y)
+  }
+  if (!has) return null
+  return { minX, minY, maxX, maxY }
+}
+
+function buildRectPolygon(widthPx, lengthPx, originX, originY) {
+  const w = Number(widthPx) || 0
+  const l = Number(lengthPx) || 0
+  const ox = Number(originX) || 0
+  const oy = Number(originY) || 0
+  return [
+    { x: ox, y: oy },
+    { x: ox + w, y: oy },
+    { x: ox + w, y: oy + l },
+    { x: ox, y: oy + l },
+  ]
+}
 
 const previewFrameBBox = computed(() => {
   // Plantas infinitas → preview se encuadra al BBox de elementos con padding.
@@ -324,6 +479,127 @@ function defaultRect(w_cm, l_cm) {
     { x: w, y: l },
     { x: 0, y: l },
   ]
+}
+
+function computeHeightFromElementsCm(elements) {
+  const list = Array.isArray(elements) ? elements : []
+  let maxHeight = 0
+  for (const el of list) {
+    if (!el || el.visible === false) continue
+    const elementoAlto = Number(el?.dimensiones?.alto) || 0
+    const base = Number(el?.alturaRespectoAlSuelo) || 0
+    const total = elementoAlto + base
+    if (total > maxHeight) maxHeight = total
+  }
+  return maxHeight > 0 ? Math.ceil(maxHeight) : 0
+}
+
+function normalizeMeters(valueCm) {
+  if (!Number.isFinite(valueCm)) return 0
+  return Number((valueCm / 100).toFixed(2))
+}
+
+function suggestFiniteDimensionsFromContent() {
+  const rawBBox = computeElementsBBox(local.elements)
+  const paddedBBox = padBBox(rawBBox, FINITE_PREVIEW_PADDING)
+  let originX = 0
+  let originY = 0
+
+  let widthCm = MIN_DIMENSION_CM
+  let lengthCm = MIN_DIMENSION_CM
+
+  if (paddedBBox) {
+    const minX = Math.floor(paddedBBox.minX)
+    const minY = Math.floor(paddedBBox.minY)
+    const maxX = Math.ceil(paddedBBox.maxX)
+    const maxY = Math.ceil(paddedBBox.maxY)
+    if (
+      Number.isFinite(minX) &&
+      Number.isFinite(minY) &&
+      Number.isFinite(maxX) &&
+      Number.isFinite(maxY) &&
+      maxX > minX &&
+      maxY > minY
+    ) {
+      originX = minX
+      originY = minY
+      const widthPx = Math.max(1, maxX - minX)
+      const lengthPx = Math.max(1, maxY - minY)
+      widthCm = Math.max(MIN_DIMENSION_CM, Math.ceil(widthPx / PIXELS_PER_CM))
+      lengthCm = Math.max(MIN_DIMENSION_CM, Math.ceil(lengthPx / PIXELS_PER_CM))
+    }
+  } else {
+    const fallbackWidthCm = Number(rectW.value) || 0
+    const fallbackLengthCm = Number(rectL.value) || 0
+    if (Number.isFinite(fallbackWidthCm) && fallbackWidthCm > 0) {
+      widthCm = Math.max(MIN_DIMENSION_CM, Math.ceil(fallbackWidthCm))
+    }
+    if (Number.isFinite(fallbackLengthCm) && fallbackLengthCm > 0) {
+      lengthCm = Math.max(MIN_DIMENSION_CM, Math.ceil(fallbackLengthCm))
+    }
+    const polyBBox = getPolygonBBox(local.polygon)
+    if (polyBBox) {
+      originX = Math.floor(polyBBox.minX)
+      originY = Math.floor(polyBBox.minY)
+    }
+  }
+
+  if (!Number.isFinite(originX)) originX = 0
+  if (!Number.isFinite(originY)) originY = 0
+
+  const prevHeightMeters = Number(localRectYMeters.value)
+  const prevHeightCm = Number.isFinite(prevHeightMeters) && prevHeightMeters > 0 ? prevHeightMeters * 100 : 0
+  const heightFromElementsCm = computeHeightFromElementsCm(local.elements)
+  const heightCm = prevHeightCm > 0
+    ? Math.ceil(prevHeightCm)
+    : (heightFromElementsCm > 0 ? heightFromElementsCm : DEFAULT_HEIGHT_CM)
+
+  const widthMeters = normalizeMeters(widthCm)
+  const lengthMeters = normalizeMeters(lengthCm)
+  const heightMeters = normalizeMeters(heightCm)
+
+  skipDimensionWatcher = true
+  rectW.value = widthCm
+  rectL.value = lengthCm
+  rectY.value = heightCm
+  localRectWMeters.value = widthMeters
+  localRectLMeters.value = lengthMeters
+  localRectYMeters.value = heightMeters
+
+  const worldWidthPx = rectW.value * PIXELS_PER_CM
+  const worldLengthPx = rectL.value * PIXELS_PER_CM
+
+  let nextPolygon
+  if (local.shape === 'circle') {
+    const circlePoints = applyCircle(rectW.value, rectL.value)
+    nextPolygon = circlePoints.map((pt) => ({ x: pt.x + originX, y: pt.y + originY }))
+  } else if (local.shape === 'rectangle') {
+    nextPolygon = buildRectPolygon(worldWidthPx, worldLengthPx, originX, originY)
+  } else {
+    const current = Array.isArray(local.polygon) ? local.polygon : []
+    const sourceBBox = getPolygonBBox(current)
+    if (current.length >= 3 && sourceBBox) {
+      const sourceWidth = Math.max(1, sourceBBox.maxX - sourceBBox.minX)
+      const sourceHeight = Math.max(1, sourceBBox.maxY - sourceBBox.minY)
+      nextPolygon = current.map((pt) => ({
+        x: Math.round(originX + ((pt.x - sourceBBox.minX) / sourceWidth) * worldWidthPx),
+        y: Math.round(originY + ((pt.y - sourceBBox.minY) / sourceHeight) * worldLengthPx),
+      }))
+    } else {
+      nextPolygon = buildRectPolygon(worldWidthPx, worldLengthPx, originX, originY)
+    }
+  }
+
+  local.polygon = nextPolygon
+  errors.dimensions = false
+  notice.value = ''
+
+  // Al pasar de infinita→finita: usamos el BBox del contenido para proponer dimensiones (W×L) con padding,
+  // rellenamos el formulario y reencuadramos el preview con el nuevo rectángulo.
+  nextTick(() => {
+    skipDimensionWatcher = false
+    canvasEditorRef.value?.fitStageToPolygon()
+  })
 }
 
 const closeModal = () => {
@@ -517,6 +793,7 @@ watch(
     // Si pasa a limitado desde elástico, mostrar hint hasta que se guarde con dimensiones válidas
     if (!isOn && wasOn) {
       showLimitedHint.value = true
+      suggestFiniteDimensionsFromContent()
     }
   },
 )
@@ -581,19 +858,34 @@ function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, f
   const oldL_cm = rectL.value
   if (!oldW_cm || !oldL_cm) return { ok: false, message: '' }
 
-  const oldWorldWidth = oldW_cm * PIXELS_PER_CM
-  const oldWorldLength = oldL_cm * PIXELS_PER_CM
   const newWorldWidth = newW_cm * PIXELS_PER_CM
   const newWorldLength = newL_cm * PIXELS_PER_CM
 
-  const scaleX = newWorldWidth / oldWorldWidth
-  const scaleY = newWorldLength / oldWorldLength
-  const scaledPolygon = local.polygon.map((p) => ({
-    x: Math.round(p.x * scaleX),
-    y: Math.round(p.y * scaleY),
-  }))
+  const polyBBox = getPolygonBBox(local.polygon)
+  const baseX = polyBBox?.minX ?? 0
+  const baseY = polyBBox?.minY ?? 0
+  const polyWidthPx = Math.max(1, (polyBBox?.maxX ?? baseX) - baseX)
+  const polyLengthPx = Math.max(1, (polyBBox?.maxY ?? baseY) - baseY)
 
-  const polyCheck = validatePolygonAndContainment(scaledPolygon, newWorldWidth, newWorldLength)
+  let nextPolygon
+  if (local.shape === 'circle') {
+    const circlePoints = applyCircle(newW_cm, newL_cm)
+    nextPolygon = circlePoints.map((pt) => ({ x: pt.x + baseX, y: pt.y + baseY }))
+  } else if (local.shape === 'rectangle') {
+    nextPolygon = buildRectPolygon(newWorldWidth, newWorldLength, baseX, baseY)
+  } else {
+    const current = Array.isArray(local.polygon) ? local.polygon : []
+    if (current.length >= 3 && polyBBox) {
+      nextPolygon = current.map((pt) => ({
+        x: Math.round(baseX + (polyWidthPx ? ((pt.x - polyBBox.minX) / polyWidthPx) * newWorldWidth : 0)),
+        y: Math.round(baseY + (polyLengthPx ? ((pt.y - polyBBox.minY) / polyLengthPx) * newWorldLength : 0)),
+      }))
+    } else {
+      nextPolygon = buildRectPolygon(newWorldWidth, newWorldLength, baseX, baseY)
+    }
+  }
+
+  const polyCheck = validatePolygonAndContainment(nextPolygon, newWorldWidth, newWorldLength)
   if (!polyCheck.ok) return polyCheck
 
   const heightCheck = validateElementsHeight(newY_cm)
@@ -603,7 +895,7 @@ function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, f
     rectW.value = newW_cm
     rectL.value = newL_cm
     rectY.value = newY_cm
-    local.polygon = scaledPolygon
+    local.polygon = nextPolygon
     notice.value = ''
 
     if (opts.fit) {
@@ -617,7 +909,7 @@ function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, f
 
 // --- WATCH CORREGIDO ---
 watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY]) => {
-  if (isLoadingData.value) return
+  if (isLoadingData.value || skipDimensionWatcher) return
 
   clearTimeout(dimensionChangeDebounce)
 

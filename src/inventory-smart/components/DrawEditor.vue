@@ -196,6 +196,15 @@ const backgroundRect = computed(() => {
       height: Math.max(1, maxY - minY),
     }
   }
+  if (polygonBBox.value) {
+    const { minX, minY, maxX, maxY } = polygonBBox.value
+    return {
+      x: minX,
+      y: minY,
+      width: Math.max(1, maxX - minX),
+      height: Math.max(1, maxY - minY),
+    }
+  }
   return {
     x: 0,
     y: 0,
