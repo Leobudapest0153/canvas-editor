@@ -1550,8 +1550,9 @@ const getOrientationBarRect = (elemento) => {
     if (forma === 'circular' || tipo === 'pasillos') return null
     // Si la vista es XZ, no mostrar barra de orientación
     if (canvasStore.vistaActiva === 'XZ') return null
-    const w = Number(elemento.width) || 0
-    const h = Number(elemento.height) || 0
+    // Usar las dimensiones de dibujo reales para evitar desalineaciones con el grupo
+    const w = getDrawWidth(elemento)
+    const h = getDrawHeight(elemento)
     if (w <= 0 || h <= 0) return null
     const allowed = [0, 90, 180, 270]
     let o = Number(elemento.orientacion)

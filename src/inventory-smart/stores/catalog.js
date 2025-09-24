@@ -33,6 +33,11 @@ export const useCatalogStore = defineStore('catalog', () => {
           y: 0,
           // Opcionalmente podemos calcular width/height si fuera necesario en la UI
         }
+
+        if(it.alturaRespectoAlSuelo) {
+          root.alturaRespectoAlSuelo = it.alturaRespectoAlSuelo
+        }
+
         const structure = { root, payload: { rootId: root.id, elements: [root] }, meta: { kind, childrenCount: 0 } }
         const mapped = toCatalogItemFromStructure({
           name: it.nombre,
