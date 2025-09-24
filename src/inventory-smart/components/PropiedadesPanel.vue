@@ -425,7 +425,7 @@
                   v-model="edited.codigoEsl"
                   type="text"
                   min="0"
-                  :disabled="isSaving || isElementRestricted"
+                  :disabled="isSaving"
                   placeholder="B123456789ABCD"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
                   focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
@@ -433,7 +433,7 @@
                 />
                 <button
                   @click="abrirModalIdentificarEsl"
-                  :disabled="isSaving || isElementRestricted"
+                  :disabled="isSaving"
                   class="text-[#364153] text-sm bg-gray-200 px-3 py-2 cursor-pointer rounded-[6px] ml-1
                   disabled:opacity-50 hover:bg-gray-300 disabled:cursor-not-allowed">
                   Configurar
