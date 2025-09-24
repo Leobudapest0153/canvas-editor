@@ -43,6 +43,7 @@
                         touchedGeneral.nombre && !validNombre ? 'border-red-400' : 'border-gray-300'
                       "
                       :placeholder="`Nombre del ${modo}`"
+                      @input="touchedGeneral.nombre = true"
                       @blur="touchedGeneral.nombre = true"
                     />
                     <p
@@ -84,6 +85,7 @@
                         : 'border-gray-300'
                     "
                     @change="touchedGeneral.tipoSeleccionado = true"
+                    @input="touchedGeneral.tipoSeleccionado = true"
                     @blur="touchedGeneral.tipoSeleccionado = true"
                   >
                     <option value="">Seleccionar tipo</option>
@@ -119,6 +121,7 @@
                             : 'border-gray-300'
                         "
                         @change="touchedGeneral.orientacion = true"
+                        @input="touchedGeneral.orientacion = true"
                         @blur="touchedGeneral.orientacion = true"
                       >
                         <option value="">Seleccionar orientación</option>
@@ -146,6 +149,7 @@
                             : 'border-gray-300'
                         "
                         @change="touchedGeneral.ubicacion = true"
+                        @input="touchedGeneral.ubicacion = true"
                         @blur="touchedGeneral.ubicacion = true"
                       >
                         <option value="">Seleccionar ubicación</option>
@@ -177,6 +181,7 @@
                             ? 'border-red-400'
                             : 'border-gray-300'
                         "
+                        @input="touchedGeneral.alturaRespectoAlSuelo = true"
                         @blur="touchedGeneral.alturaRespectoAlSuelo = true"
                       />
                       <p v-if="touchedGeneral.alturaRespectoAlSuelo && !validAlturaRespectoAlSuelo" class="mt-1 text-xs text-red-600">
@@ -198,6 +203,7 @@
                         : 'border-gray-300'
                     "
                     @change="touchedGeneral.orientacion = true"
+                    @input="touchedGeneral.orientacion = true"
                     @blur="touchedGeneral.orientacion = true"
                   >
                     <option value="">Seleccionar orientación</option>
@@ -242,6 +248,7 @@
                       touchedGeneral.forma && !validForma ? 'border-red-400' : 'border-gray-300'
                     "
                     @change="touchedGeneral.forma = true"
+                    @input="touchedGeneral.forma = true"
                     @blur="touchedGeneral.forma = true"
                   >
                     <option value="">Seleccionar forma</option>
@@ -267,6 +274,7 @@
                       :class="
                         touchedGeneral.largo && !validLargo ? 'border-red-400' : 'border-gray-300'
                       "
+                      @input="touchedGeneral.largo = true"
                       @blur="touchedGeneral.largo = true"
                     />
                     <p v-if="touchedGeneral.largo && !validLargo" class="mt-1 text-xs text-red-600">
@@ -284,6 +292,7 @@
                       :class="
                         touchedGeneral.alto && !validAlto ? 'border-red-400' : 'border-gray-300'
                       "
+                      @input="touchedGeneral.alto = true"
                       @blur="touchedGeneral.alto = true"
                     />
                     <p v-if="touchedGeneral.alto && !validAlto" class="mt-1 text-xs text-red-600">
@@ -305,6 +314,7 @@
                       :class="
                         touchedGeneral.ancho && !validAncho ? 'border-red-400' : 'border-gray-300'
                       "
+                      @input="touchedGeneral.ancho = true"
                       @blur="touchedGeneral.ancho = true"
                     />
                     <p v-if="touchedGeneral.ancho && !validAncho" class="mt-1 text-xs text-red-600">
@@ -326,6 +336,7 @@
                           ? 'border-red-400'
                           : 'border-gray-300'
                       "
+                      @input="touchedGeneral.capacidadCarga = true"
                       @blur="touchedGeneral.capacidadCarga = true"
                     />
                     <p
@@ -349,6 +360,15 @@
             </div>
 
             <div class="space-y-6 overflow-y-auto flex-1">
+              <!-- Errores agregados de sumas globales -->
+              <div v-if="excesoAltoNiveles || excesoCapacidadNiveles" class="mb-2 space-y-1">
+                <p v-if="excesoAltoNiveles" class="text-xs text-red-600">
+                  La suma de los altos de los {{ modo === 'cuarto' ? 'pisos' : 'niveles' }} excede el alto total ({{ dimensiones.alto }} m)
+                </p>
+                <p v-if="excesoCapacidadNiveles" class="text-xs text-red-600">
+                  La suma de las capacidades de carga excede la capacidad total ({{ dimensiones.capacidadCarga }} kg)
+                </p>
+              </div>
               <div
                 v-for="(pisoNivel, index) in pisosNiveles"
                 :key="pisoNivel.id"
@@ -408,7 +428,7 @@
 
                 <div class="space-y-4">
                   <!-- Nombre -->
-                  <div>
+                    <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                       Nombre del {{ modo === 'cuarto' ? 'piso' : 'nivel' }}
                     </label>
@@ -443,8 +463,12 @@
                         type="number"
                         min="0.10"
                         step="any"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="excedeLargo(pisoNivel) ? 'border-red-400' : 'border-gray-300'"
                       />
+                      <p v-if="excedeLargo(pisoNivel)" class="mt-1 text-xs text-red-600">
+                        El largo excede el largo total ({{ dimensiones.largo || 0 }} m)
+                      </p>
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-2">Alto (m)</label>
@@ -467,8 +491,12 @@
                         type="number"
                         min="0.10"
                         step="any"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="excedeAncho(pisoNivel) ? 'border-red-400' : 'border-gray-300'"
                       />
+                      <p v-if="excedeAncho(pisoNivel)" class="mt-1 text-xs text-red-600">
+                        El ancho excede el ancho total ({{ dimensiones.ancho || 0 }} m)
+                      </p>
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-2"
@@ -679,8 +707,7 @@
         </button>
         <button
           @click="guardar"
-          :disabled="!esFormularioValido"
-          class="bg-primary cursor-pointer px-4 py-2 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          class="bg-primary cursor-pointer px-4 py-2 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
           Aceptar
         </button>
@@ -960,36 +987,29 @@ const autoCompletarDimensionesNiveles = () => {
   })
 }
 
-const validarNivelesContraGlobal = () => {
-  const errs = []
-  const eps = 1e-6
-  const largoG = Number(dimensiones.value.largo)
-  const anchoG = Number(dimensiones.value.ancho)
+// Validaciones en tiempo real para niveles
+const eps = 1e-6
+const excesoAltoNiveles = computed(() => {
   const altoG = Number(dimensiones.value.alto)
+  if (!(altoG > 0)) return false
+  const sumaAlto = pisosNiveles.value.reduce((acc, p) => acc + Number(p.alto || 0), 0)
+  return sumaAlto > altoG + eps
+})
+const excesoCapacidadNiveles = computed(() => {
   const capG = Number(dimensiones.value.capacidadCarga)
-
-  let sumaAlto = 0
-  let sumaCap = 0
-  pisosNiveles.value.forEach((p, idx) => {
-    if (p.largo > largoG + eps)
-      errs.push(
-        `El largo del ${props.modo === 'cuarto' ? 'piso' : 'nivel'} ${idx + 1} excede el largo total`,
-      )
-    if (p.ancho > anchoG + eps)
-      errs.push(
-        `El ancho del ${props.modo === 'cuarto' ? 'piso' : 'nivel'} ${idx + 1} excede el ancho total`,
-      )
-    sumaAlto += Number(p.alto || 0)
-    sumaCap += Number(p.capacidadCarga || 0)
-  })
-  // Permitir que las sumas sean menores o iguales al total; solo marcar error si EXCEDEN
-  if (sumaAlto > altoG + eps)
-    errs.push('La suma de los altos de los niveles/pisos excede el alto total')
-  if (sumaCap > capG + eps)
-    errs.push(
-      'La suma de las capacidades de carga de los niveles/pisos excede la capacidad total',
-    )
-  return errs
+  if (!(capG > 0)) return false
+  const sumaCap = pisosNiveles.value.reduce((acc, p) => acc + Number(p.capacidadCarga || 0), 0)
+  return sumaCap > capG + eps
+})
+const excedeLargo = (p) => {
+  const largoG = Number(dimensiones.value.largo)
+  if (!(largoG > 0)) return false
+  return Number(p.largo) > largoG + eps
+}
+const excedeAncho = (p) => {
+  const anchoG = Number(dimensiones.value.ancho)
+  if (!(anchoG > 0)) return false
+  return Number(p.ancho) > anchoG + eps
 }
 
 // Métodos
@@ -1140,16 +1160,29 @@ const cerrarModal = () => {
   emit('close')
 }
 
+const marcarTodoInvalido = () => {
+  Object.keys(touchedGeneral.value).forEach(k => touchedGeneral.value[k] = true)
+  pisosNiveles.value.forEach(p => {
+    ensureTouchedForLevel(p)
+    p._touched.nombre = true
+    p._touched.tiposProductos = true
+    p._touched.tipoZona = true
+  })
+}
+
 const guardar = () => {
-  if (!esFormularioValido.value) return
+  // Si algo es inválido, marcar y salir
+  if (!esFormularioValido.value) {
+    marcarTodoInvalido()
+    return
+  }
 
   // Completar automáticamente dimensiones faltantes de niveles
   autoCompletarDimensionesNiveles()
 
-  // Validar consistencia respecto a dimensiones globales
-  const errores = validarNivelesContraGlobal()
-  if (errores.length > 0) {
-    showError(errores.join('\n'))
+  // Validar excedentes después de autocompletar
+  if (excesoAltoNiveles.value || excesoCapacidadNiveles.value || pisosNiveles.value.some(p => excedeLargo(p) || excedeAncho(p))) {
+    marcarTodoInvalido()
     return
   }
 
@@ -1159,7 +1192,6 @@ const guardar = () => {
     pisosNiveles: pisosNiveles.value,
     modo: props.modo,
   }
-
   emit('save', datos)
   cerrarModal()
 }
