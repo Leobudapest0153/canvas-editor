@@ -169,7 +169,17 @@
           <!-- Capacidad máxima -->
           <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm" v-show="!local.isInfinite">
             <h4 class="text-sm font-semibold text-gray-800 mb-2">Capacidad máxima (kg)</h4>
+            <UiTooltip :label="capacityTooltip" position="right" :delay="200" v-if="capacityWasAutoAdjusted">
+              <input
+                type="number"
+                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+                :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.maxWeight }"
+                v-model.number="local.maxWeight"
+                placeholder="Ej. 1000"
+              />
+            </UiTooltip>
             <input
+              v-else
               type="number"
               class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
               :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.maxWeight }"
@@ -226,7 +236,7 @@ import { computed, reactive, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, LOAD_MARGIN } from '@/inventory-smart/utils/constants'
 import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import DrawEditor from './DrawEditor.vue'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
@@ -278,6 +288,14 @@ let skipDimensionWatcher = false
 
 // Hint cuando se cambia de elástico -> limitado
 const showLimitedHint = ref(false)
+
+// Estado para indicar que la capacidad fue autocompletada al pasar de planta elástica -> finita
+const capacityWasAutoAdjusted = ref(false)
+const autoSuggestedMaxWeight = ref(null)
+const capacityTooltip = computed(() => {
+  if (!capacityWasAutoAdjusted.value || !autoSuggestedMaxWeight.value) return ''
+  return `Ajustado a carga requerida de ${autoSuggestedMaxWeight.value} kg`
+})
 
 const INFINITE_PREVIEW_PADDING = 14
 const FINITE_PREVIEW_PADDING = 14
@@ -794,8 +812,59 @@ watch(
     if (!isOn && wasOn) {
       showLimitedHint.value = true
       suggestFiniteDimensionsFromContent()
+      // Calcular la carga requerida por los elementos y autocompletar la capacidad si es necesario
+      try {
+        // Si tenemos una planta existente, preferimos usar el cálculo centralizado (toma en cuenta jerarquía)
+        let requiredLoad = 0
+        if (local.id) {
+          requiredLoad = Number(weightValidation.calcularPesoTotal(local.id, 'plantas') || 0)
+        } else {
+          // Fallback: sumar desde local.elements (peso por elemento * cantidad/unidades si existen)
+          requiredLoad = (Array.isArray(local.elements) ? local.elements : []).reduce((acc, el) => {
+            const basePeso = Number(el?.pesoMaximo || 0)
+            const qty = Number(el?.cantidad || el?.unidades || el?.qty || 1) || 1
+            return acc + basePeso * qty
+          }, 0)
+        }
+
+        const margin = typeof LOAD_MARGIN === 'number' ? LOAD_MARGIN : 0
+        const suggested = Math.ceil(requiredLoad * (1 + margin))
+
+        // Reglas: si requiredLoad == 0 -> conservar capacidad previa si > 0, si nula -> poner 0
+        if (requiredLoad <= 0) {
+          // No forzamos a cero si el usuario ya tenía un valor mayor (preservar)
+          if (!Number.isFinite(Number(local.maxWeight)) || Number(local.maxWeight) < 0) {
+            local.maxWeight = 0
+            capacityWasAutoAdjusted.value = true
+            autoSuggestedMaxWeight.value = 0
+          }
+        } else {
+          // Si el valor actual es no-finito o menor al sugerido, ajustarlo
+          const current = Number(local.maxWeight || 0)
+          if (!Number.isFinite(current) || current < suggested) {
+            local.maxWeight = suggested
+            capacityWasAutoAdjusted.value = true
+            autoSuggestedMaxWeight.value = suggested
+          }
+        }
+      } catch (err) {
+        // No interrumpir el flujo por errores en la suma; dejar que el usuario edite manualmente
+        console.error('Error calculando carga requerida al cambiar a planta finita', err)
+      }
     }
   },
+)
+
+// Si el usuario edita manualmente la capacidad y difiere del valor sugerido, quitar la marca de autocompletado
+watch(
+  () => local.maxWeight,
+  (val) => {
+    if (autoSuggestedMaxWeight.value == null) return
+    if (Number(val) !== Number(autoSuggestedMaxWeight.value)) {
+      capacityWasAutoAdjusted.value = false
+      autoSuggestedMaxWeight.value = null
+    }
+  }
 )
 
 // Helpers de validación reutilizables
