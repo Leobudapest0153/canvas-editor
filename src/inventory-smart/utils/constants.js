@@ -89,6 +89,15 @@ export const ELEMENTOS_PREDEFINIDOS = [
     descripcion: 'Cuarto especial',
     icono: 'home',
     props: { system: true, catalogVisible: true },
+    // Un piso por defecto con tipos de productos
+    pisosNiveles: [
+      {
+        nombre: 'Piso 1',
+        tiposProductos: ['refrigerados', 'congelados'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
 
   // Piso base (navegable)
@@ -117,7 +126,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
   // Anaqueles
   {
     id: 'anaquel_metalico_grande',
-    nombre: 'Anaquel 2 x 2',
+    nombre: 'Anaquel',
     tipo: 'elementos', // NUEVO CAMPO
     categoria: 'anaquel_metal',
     forma: 'rectangular',
@@ -133,6 +142,15 @@ export const ELEMENTOS_PREDEFINIDOS = [
     descripcion: 'Anaquel metálico de alta capacidad para almacenamiento pesado',
     icono: 'rack',
     props: { system: true },
+    // Un nivel por defecto con tipos de productos
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos', 'voluminosos'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
 
   // Estante de pared
@@ -155,6 +173,14 @@ export const ELEMENTOS_PREDEFINIDOS = [
     descripcion: 'Estante montado en pared para almacenamiento ligero',
     icono: 'shelf',
     props: { system: true },
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos', 'fragiles'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: true,
+      },
+    ],
   },
 
   // Armario de pared
@@ -177,6 +203,14 @@ export const ELEMENTOS_PREDEFINIDOS = [
     descripcion: 'Armario montado en pared para almacenamiento vertical',
     icono: 'cabinet',
     props: { system: true },
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
 
   // Barril
@@ -198,6 +232,14 @@ export const ELEMENTOS_PREDEFINIDOS = [
     descripcion: 'Barril estándar de madera',
     icono: 'barrel',
     props: { system: true },
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
 
   // === CONTENEDORES (solo pueden ir en elementos) ===
