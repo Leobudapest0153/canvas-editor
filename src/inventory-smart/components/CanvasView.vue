@@ -2395,6 +2395,12 @@ watch(
     await nextTick()
     await nextTick()
 
+    if (ctx.tipo === 'plantas' && isInfinitePlant.value) {
+      await nextTick()
+      fitToPlanta()
+      return
+    }
+
     const dynamicMinZoom = getDynamicMinZoom()
     canvasStore.configurarZoom(dynamicMinZoom, dynamicMinZoom)
 
