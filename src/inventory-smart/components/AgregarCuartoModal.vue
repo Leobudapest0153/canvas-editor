@@ -85,8 +85,6 @@
                         : 'border-gray-300'
                     "
                     @change="touchedGeneral.tipoSeleccionado = true"
-                    @input="touchedGeneral.tipoSeleccionado = true"
-                    @blur="touchedGeneral.tipoSeleccionado = true"
                   >
                     <option value="">Seleccionar tipo</option>
                     <option
@@ -121,8 +119,6 @@
                             : 'border-gray-300'
                         "
                         @change="touchedGeneral.orientacion = true"
-                        @input="touchedGeneral.orientacion = true"
-                        @blur="touchedGeneral.orientacion = true"
                       >
                         <option value="">Seleccionar orientación</option>
                         <option v-for="opt in ORIENTACIONES" :key="opt.id" :value="opt.id">
@@ -149,8 +145,6 @@
                             : 'border-gray-300'
                         "
                         @change="touchedGeneral.ubicacion = true"
-                        @input="touchedGeneral.ubicacion = true"
-                        @blur="touchedGeneral.ubicacion = true"
                       >
                         <option value="">Seleccionar ubicación</option>
                         <option v-for="ubicacion in UBICACIONES_DISPONIBLES" :key="ubicacion.id" :value="ubicacion.id">
@@ -203,8 +197,6 @@
                         : 'border-gray-300'
                     "
                     @change="touchedGeneral.orientacion = true"
-                    @input="touchedGeneral.orientacion = true"
-                    @blur="touchedGeneral.orientacion = true"
                   >
                     <option value="">Seleccionar orientación</option>
                     <option v-for="opt in ORIENTACIONES" :key="opt.id" :value="opt.id">
@@ -248,8 +240,6 @@
                       touchedGeneral.forma && !validForma ? 'border-red-400' : 'border-gray-300'
                     "
                     @change="touchedGeneral.forma = true"
-                    @input="touchedGeneral.forma = true"
-                    @blur="touchedGeneral.forma = true"
                   >
                     <option value="">Seleccionar forma</option>
                     <option v-for="forma in formasDisponibles" :key="forma.id" :value="forma.id">
@@ -261,92 +251,125 @@
                   </p>
                 </div>
 
-                <!-- Largo y Alto -->
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Largo (m)*</label>
-                    <input
-                      v-model.number="dimensiones.largo"
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      :class="
-                        touchedGeneral.largo && !validLargo ? 'border-red-400' : 'border-gray-300'
-                      "
-                      @input="touchedGeneral.largo = true"
-                      @blur="touchedGeneral.largo = true"
-                    />
-                    <p v-if="touchedGeneral.largo && !validLargo" class="mt-1 text-xs text-red-600">
-                      Ingresa un valor mayor a 0.
-                    </p>
+                <!-- Dimensiones dinámicas según forma -->
+                <template v-if="dimensiones.forma === 'circular'">
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Diámetro (m)*</label>
+                      <input
+                        v-model.number="diametro"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.ancho && !validAncho ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.ancho = true; touchedGeneral.largo = true"
+                        @blur="touchedGeneral.ancho = true; touchedGeneral.largo = true"
+                      />
+                      <p v-if="(touchedGeneral.ancho || touchedGeneral.largo) && !validAncho" class="mt-1 text-xs text-red-600">
+                        Ingresa un valor mayor a 0.
+                      </p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Alto (m)*</label>
+                      <input
+                        v-model.number="dimensiones.alto"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.alto && !validAlto ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.alto = true"
+                        @blur="touchedGeneral.alto = true"
+                      />
+                      <p v-if="touchedGeneral.alto && !validAlto" class="mt-1 text-xs text-red-600">
+                        Ingresa un valor mayor a 0.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Alto (m)*</label>
-                    <input
-                      v-model.number="dimensiones.alto"
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      :class="
-                        touchedGeneral.alto && !validAlto ? 'border-red-400' : 'border-gray-300'
-                      "
-                      @input="touchedGeneral.alto = true"
-                      @blur="touchedGeneral.alto = true"
-                    />
-                    <p v-if="touchedGeneral.alto && !validAlto" class="mt-1 text-xs text-red-600">
-                      Ingresa un valor mayor a 0.
-                    </p>
+                  <div class="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Capacidad de carga (kg)*</label>
+                      <input
+                        v-model.number="dimensiones.capacidadCarga"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.capacidadCarga && !validCapacidad ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.capacidadCarga = true"
+                        @blur="touchedGeneral.capacidadCarga = true"
+                      />
+                      <p v-if="touchedGeneral.capacidadCarga && !validCapacidad" class="mt-1 text-xs text-red-600">
+                        Ingresa un valor mayor a 0.
+                      </p>
+                    </div>
                   </div>
-                </div>
-
-                <!-- Ancho y Capacidad -->
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Ancho (m)*</label>
-                    <input
-                      v-model.number="dimensiones.ancho"
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      :class="
-                        touchedGeneral.ancho && !validAncho ? 'border-red-400' : 'border-gray-300'
-                      "
-                      @input="touchedGeneral.ancho = true"
-                      @blur="touchedGeneral.ancho = true"
-                    />
-                    <p v-if="touchedGeneral.ancho && !validAncho" class="mt-1 text-xs text-red-600">
-                      Ingresa un valor mayor a 0.
-                    </p>
+                </template>
+                <template v-else>
+                  <!-- Largo y Alto -->
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Largo (m)*</label>
+                      <input
+                        v-model.number="dimensiones.largo"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.largo && !validLargo ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.largo = true"
+                        @blur="touchedGeneral.largo = true"
+                      />
+                      <p v-if="touchedGeneral.largo && !validLargo" class="mt-1 text-xs text-red-600">Ingresa un valor mayor a 0.</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Alto (m)*</label>
+                      <input
+                        v-model.number="dimensiones.alto"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.alto && !validAlto ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.alto = true"
+                        @blur="touchedGeneral.alto = true"
+                      />
+                      <p v-if="touchedGeneral.alto && !validAlto" class="mt-1 text-xs text-red-600">Ingresa un valor mayor a 0.</p>
+                    </div>
                   </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2"
-                      >Capacidad de carga (kg)*</label
-                    >
-                    <input
-                      v-model.number="dimensiones.capacidadCarga"
-                      type="number"
-                      min="0"
-                      step="1"
-                      class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      :class="
-                        touchedGeneral.capacidadCarga && !validCapacidad
-                          ? 'border-red-400'
-                          : 'border-gray-300'
-                      "
-                      @input="touchedGeneral.capacidadCarga = true"
-                      @blur="touchedGeneral.capacidadCarga = true"
-                    />
-                    <p
-                      v-if="touchedGeneral.capacidadCarga && !validCapacidad"
-                      class="mt-1 text-xs text-red-600"
-                    >
-                      Ingresa un valor mayor a 0.
-                    </p>
+                  <!-- Ancho y Capacidad -->
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Ancho (m)*</label>
+                      <input
+                        v-model.number="dimensiones.ancho"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.ancho && !validAncho ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.ancho = true"
+                        @blur="touchedGeneral.ancho = true"
+                      />
+                      <p v-if="touchedGeneral.ancho && !validAncho" class="mt-1 text-xs text-red-600">Ingresa un valor mayor a 0.</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Capacidad de carga (kg)*</label>
+                      <input
+                        v-model.number="dimensiones.capacidadCarga"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.capacidadCarga && !validCapacidad ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.capacidadCarga = true"
+                        @blur="touchedGeneral.capacidadCarga = true"
+                      />
+                      <p v-if="touchedGeneral.capacidadCarga && !validCapacidad" class="mt-1 text-xs text-red-600">Ingresa un valor mayor a 0.</p>
+                    </div>
                   </div>
-                </div>
+                </template>
               </div>
             </div>
           </div>
@@ -850,6 +873,9 @@ const dimensiones = ref({
   capacidadCarga: null,
 })
 
+// Diámetro (solo aplica si forma === 'circular')
+const diametro = ref(null)
+
 const pisosNiveles = ref([])
 
 const touchedGeneral = ref({
@@ -880,6 +906,45 @@ const validLargo = computed(() => Number(dimensiones.value.largo) > 0)
 const validAlto = computed(() => Number(dimensiones.value.alto) > 0)
 const validAncho = computed(() => Number(dimensiones.value.ancho) > 0)
 const validCapacidad = computed(() => Number(dimensiones.value.capacidadCarga) > 0)
+
+// Mantener ancho y largo iguales cuando sea circular
+watch(
+  () => dimensiones.value.forma,
+  (nueva) => {
+    if (nueva === 'circular') {
+      // Inicializar diametro tomando el ancho o largo existente
+      const base = Number(dimensiones.value.ancho) || Number(dimensiones.value.largo) || null
+      if (base) {
+        diametro.value = base
+        dimensiones.value.ancho = base
+        dimensiones.value.largo = base
+      } else {
+        diametro.value = null
+      }
+    }
+  }
+)
+
+watch(
+  () => diametro.value,
+  (nuevo) => {
+    if (dimensiones.value.forma === 'circular' && Number(nuevo) > 0) {
+      dimensiones.value.ancho = Number(nuevo)
+      dimensiones.value.largo = Number(nuevo)
+    }
+  }
+)
+
+// Si el usuario cambia manualmente ancho estando circular (por autofill u otros), reflejar
+watch(
+  () => dimensiones.value.ancho,
+  (nuevoAncho) => {
+    if (dimensiones.value.forma === 'circular' && Number(nuevoAncho) > 0) {
+      dimensiones.value.largo = Number(nuevoAncho)
+      diametro.value = Number(nuevoAncho)
+    }
+  }
+)
 
 const ensureTouchedForLevel = (nivel) => {
   if (!nivel._touched) nivel._touched = { tiposProductos: false, tipoZona: false, nombre: false }
