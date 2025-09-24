@@ -32,6 +32,7 @@ import { proposeLevelChange, applyLevelChange } from '@/inventory-smart/composab
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'
+import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
 import { exportCatalogItemsToDTO, importCatalogItemsFromDTO } from '@/inventory-smart/modules/catalog/catalogItems.serializer.js'
 
 export const useCanvasStore = defineStore('canvas', () => {
@@ -40,6 +41,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Instancia del catálogo
   const catalogStore = useCatalogStore()
+  const changeHistoryStore = useChangeHistoryStore?.() // opcional durante init
 
   // === INTEGRACIÓN CON HISTORIAL ===
   // Instancia del historial - se establece desde useCanvasWithHistory
@@ -1209,6 +1211,14 @@ export const useCanvasStore = defineStore('canvas', () => {
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
       catalogos: catalogos.value,
     }
+    // Incluir historial de cambios si existe
+    try {
+      const ch = changeHistoryStore?.serialize?.()
+      if (ch) state.changeHistory = ch
+    } catch (e) {
+      // ignore change history serialization errors
+    }
+
     const jsonStr = _serialize(state, { validateBeforeSerialize: true, includeMetrics: true, saveTimestamp })
     try {
       const parsed = JSON.parse(jsonStr)
@@ -1282,7 +1292,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }
 
-    const ok = _deserialize(jsonString, storeActions)
+  const ok = _deserialize(jsonString, storeActions)
 
     // Post-procesar: garantizar que todas las plantas y elementos tengan 'codigo'
     try {
@@ -1310,6 +1320,16 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Importar plantillas si existen (retrocompatible)
     try {
       const parsed = JSON.parse(jsonString)
+      // Importar historial de cambios si viene
+      try {
+        if (parsed.changeHistory) {
+          const ch = useChangeHistoryStore?.()
+          ch?.deserialize?.(parsed.changeHistory)
+          ch?.setBaseline?.({ plantas: plantas.value, elementos: elementos.value })
+        }
+      } catch (e) {
+        // ignore change history import errors
+      }
       if (Array.isArray(parsed.plantillas) && parsed.plantillas.length > 0) {
         importTemplatesFromDTO(parsed.plantillas)
       }

@@ -22,6 +22,17 @@ export const SERVICE_TYPES = {
       pagination: 'Object',
     },
   },
+  CHANGE_HISTORY: {
+    type: 'change_history',
+    description: 'Obtener historial de cambios (paginado, filtrable por planta)',
+    expectedResponse: {
+      items: 'Array<Object>',
+      total: 'number',
+      page: 'number',
+      pageSize: 'number',
+      totalPages: 'number',
+    },
+  },
 }
 
 function validateServiceFunction(serviceFunction) {
@@ -36,9 +47,9 @@ function validateServiceFunction(serviceFunction) {
     return false
   }
 
-  if (type !== 'container_products') {
+  if (!['container_products', 'change_history'].includes(type)) {
     console.error(
-      `Service function type "${type}" is not supported. Only 'container_products' is allowed.`,
+      `Service function type "${type}" is not supported. Allowed: 'container_products', 'change_history'.`,
     )
     return false
   }
@@ -51,8 +62,20 @@ function validateServiceFunction(serviceFunction) {
   return true
 }
 
-function validateServiceResponse(response) {
-  return response && Array.isArray(response.products) && typeof response.totalCount === 'number'
+function validateServiceResponse(type, response) {
+  if (!response) return false
+  if (type === 'container_products') {
+    return Array.isArray(response.products) && typeof response.totalCount === 'number'
+  }
+  if (type === 'change_history') {
+    const ok = Array.isArray(response.items) &&
+      typeof response.total === 'number' &&
+      typeof response.page === 'number' &&
+      typeof response.pageSize === 'number' &&
+      typeof response.totalPages === 'number'
+    return ok
+  }
+  return true
 }
 
 function getCacheKey(serviceName, params = null) {
@@ -159,7 +182,7 @@ export const useServicesStore = defineStore('services', () => {
       const servicePromise = service.handler(params)
       const response = await Promise.race([servicePromise, timeoutPromise])
 
-      const isValidResponse = validateServiceResponse(response)
+  const isValidResponse = validateServiceResponse(service.type, response)
       if (!isValidResponse) {
         throw new Error(`Invalid response from service "${serviceName}"`)
       }

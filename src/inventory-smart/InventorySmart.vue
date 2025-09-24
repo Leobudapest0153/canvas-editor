@@ -1,7 +1,7 @@
 <template>
   <div id="inventory-smart">
     <!-- Panel de plantas -->
-    <PlantasPanel @configChanged="handleConfigChanged" />
+  <PlantasPanel :author="author" @configChanged="handleConfigChanged" />
 
     <!-- Navegación jerárquica -->
     <NavegacionJerarquica />
@@ -78,6 +78,14 @@ const props = defineProps({
   configCanvas: {
     type: [String, null],
     default: () => '',
+  },
+  author: {
+    type: Object,
+    default: () => null,
+    validator: (a) => {
+      if (a == null) return true
+      return typeof a.id === 'string' && typeof a.name === 'string'
+    }
   },
   externalServices: {
     type: Array,

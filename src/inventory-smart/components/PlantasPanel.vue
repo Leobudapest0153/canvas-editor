@@ -176,6 +176,17 @@
         </UiTooltip>
 
         <!-- Botón Guardar Cambios -->
+          <!-- Botón Historial de cambios -->
+          <button
+            type="button"
+            class="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 cursor-pointer"
+            @click="openChangeHistoryModal"
+          >
+            <span class="text-base">🕘</span>
+            <span>Historial</span>
+          </button>
+
+          <!-- Botón Guardar Cambios -->
         <UiTooltip label="Guardar cambios actuales" position="bottom" :delay="200">
           <button
             type="button"
@@ -274,9 +285,7 @@
                 />
               </div>
               <div>
-                <label for="largo" class="block mb-1 text-xs font-medium text-gray-600"
-                  >Largo</label
-                >
+                <label for="largo" class="block mb-1 text-xs font-medium text-gray-600">Largo</label>
                 <input
                   id="largo"
                   v-model.number="formularioPlanta.dimensiones.largo"
@@ -457,8 +466,11 @@
     </div>
   </teleport>
 
-  <!-- Modal de historial -->
+  <!-- Modal de historial (historial de acciones interno) -->
   <HistorialModal :is-open="showHistorialModal" @close="closeHistorialModal" />
+
+  <!-- Modal de historial de cambios (diff) -->
+  <ChangeHistoryModal :is-open="showChangeHistoryModal" @close="closeChangeHistoryModal" />
 
   <!-- Modal de importar/exportar -->
   <ImportExportModal :mostrar="showImportExportModal" @cerrar="closeImportExportModal" />
@@ -478,6 +490,7 @@ import { useToast } from '@/inventory-smart/composables/useToast'
 import HistorialModal from './HistorialModal.vue'
 import ImportExportModal from './ImportExportModal.vue'
 import BackupModal from './BackupModal.vue'
+import ChangeHistoryModal from './ChangeHistoryModal.vue'
 import {
   usePlantResizeGuard,
   pack as packShelf,
@@ -485,6 +498,15 @@ import {
 import { CM_TO_PX, MARGIN_CM, FACTOR_UTILIZACION } from '@/inventory-smart/utils/constants'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import { formatLengthCm, formatLengthsCm } from '../utils/units'
+import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
+
+// Props
+const props = defineProps({
+  author: {
+    type: Object,
+    default: null,
+  }
+})
 
 // Store
 const canvasStore = useCanvasStore()
@@ -497,6 +519,7 @@ canvasStore.setAutoSaveInstance?.(autoSave)
 
 // Estado local para modales
 const showHistorialModal = ref(false)
+const showChangeHistoryModal = ref(false)
 const showImportExportModal = ref(false)
 const showBackupModal = ref(false)
 const mostrarModalAgregar = ref(false)
@@ -581,6 +604,14 @@ const closeHistorialModal = () => {
   showHistorialModal.value = false
 }
 
+const openChangeHistoryModal = () => {
+  showChangeHistoryModal.value = true
+}
+
+const closeChangeHistoryModal = () => {
+  showChangeHistoryModal.value = false
+}
+
 const openImportExportModal = () => {
   showImportExportModal.value = true
 }
@@ -601,6 +632,17 @@ const guardarCambios = async () => {
   try {
     const wasEnabled = autoSave?.isEnabled?.value === true
     autoSave?.stopAutoSave?.()
+    // Capturar snapshot para historial de cambios ANTES de serializar
+    try {
+      const changeHistoryStore = useChangeHistoryStore()
+      changeHistoryStore.recordSave({
+        plantas: canvasStore.plantas,
+        elementos: canvasStore.elementos,
+      }, props.author)
+    } catch (e) {
+      console.warn('No se pudo registrar historial de cambios', e)
+    }
+
     const configSerializada = canvasStore.serialize(true)
     if (wasEnabled) autoSave?.startAutoSave?.()
     emit('configChanged', configSerializada)

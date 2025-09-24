@@ -8,10 +8,12 @@
 import { onMounted, nextTick } from 'vue'
 import { useCanvasStore } from './useCanvasStore'
 import { useCanvasHistory } from './useCanvasHistory'
+import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
 
 export const useCanvasWithHistory = () => {
   const canvasStore = useCanvasStore()
   const history = useCanvasHistory()
+  const changeHistory = useChangeHistoryStore?.()
 
   // Variable para controlar si ya se inicializó
   let isInitialized = false
@@ -26,6 +28,13 @@ export const useCanvasWithHistory = () => {
 
       // Integrar el historial con el store de manera directa
       canvasStore.setHistoryInstance(history)
+
+      // Inicializar baseline del historial de cambios (diff)
+      try {
+        changeHistory?.setBaseline?.({ plantas: canvasStore.plantas, elementos: canvasStore.elementos })
+      } catch (e) {
+        // noop
+      }
 
       // Guardar estado inicial en el historial
       history.initializeHistory('Estado inicial del canvas')
