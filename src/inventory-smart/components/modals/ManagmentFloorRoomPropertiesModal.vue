@@ -42,7 +42,7 @@
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4 disabled:bg-gray-100">
         </div>
         <div class="col-span-2 flex flex-col gap-y-2">
-          <label class="font-normal text-medium text-[#111928]" for="nombre_piso">Nombre del piso</label>
+          <label class="font-normal text-medium text-[#111928]" for="nombre_piso">Nombre del piso *</label>
           <input
             type="text"
             placeholder="piso bajo"
@@ -216,6 +216,8 @@
       </button>
       <button
         @click="onSave"
+        :disabled="disableSaveButton"
+        :class="disableSaveButton ? '!bg-gray-300 !cursor-not-allowed' : 'bg-primary-700 cursor-pointer'"
         class="bg-primary-700 w-[117px] h-[50px] font-normal text-white rounded-[6px]
         cursor-pointer">
         Guardar
@@ -256,6 +258,10 @@ const filteredOptions = computed(() =>
     opt.toLowerCase().includes(search.value.toLowerCase())
   )
 );
+
+const disableSaveButton = computed(() => {
+  return !formValue.value.nombre || formValue.value.tiposProductos.length === 0;
+});
 
 const formValue = ref({
   codigo: canvasStore.nivelAEditar?.codigo ?? '',
