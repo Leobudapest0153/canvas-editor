@@ -448,85 +448,107 @@
       </v-layer>
       <v-layer ref="uiLayerRef" :config="{ listening: false }">
         <!-- Debug: mostrar información según el contexto -->
-        <v-text
-          v-if="!canvasStore.estaEnPlanta || canvasStore.plantaActivaData?.isInfinite !== true"
-          :config="{
-            x: 10,
-            y: -(39 / canvasStore.zoom),
-            text: !canvasStore.estaEnPlanta
-              ? `${canvasStore.estructuraContenedorActual?.nombre} - ${formatLengthsCm([layerConfig.width * viewport.cmPerPx, layerConfig.height * viewport.cmPerPx])}`
-              : `${canvasStore.plantaActivaData?.nombre} - ${formatLengthsCm([layerConfig.width * viewport.cmPerPx, layerConfig.height * viewport.cmPerPx])}`,
-            fontSize: 12 / canvasStore.zoom,
-            fontFamily: 'Arial',
-            fill: '#3b82f6',
-            listening: false,
-            name: 'floor-info-label',
-          }"
-        />
-        <v-text
-          v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite !== true"
-          :config="{
-            x: 10,
-            y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
-            text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
-            fontSize: 11 / canvasStore.zoom,
-            fontFamily: 'Arial',
-            fill: '#6b7280',
-            listening: false,
-            name: 'floor-info-label',
-          }"
-        />
+        <v-group v-if="plantLabelLayout" :config="{ listening: false }">
+          <v-text
+            :config="{
+              x: plantLabelLayout.x,
+              y: plantLabelLayout.primaryY,
+              width: plantLabelLayout.width,
+              align: 'right',
+              text: `${canvasStore.plantaActivaData?.nombre} - ${formatLengthsCm([
+                layerConfig.width * viewport.cmPerPx,
+                layerConfig.height * viewport.cmPerPx,
+              ])}`,
+              fontSize: 12 / canvasStore.zoom,
+              fontFamily: 'Arial',
+              fill: '#3b82f6',
+              listening: false,
+              name: 'floor-info-label',
+            }"
+          />
+          <v-text
+            :config="{
+              x: plantLabelLayout.x,
+              y: plantLabelLayout.secondaryY,
+              width: plantLabelLayout.width,
+              align: 'right',
+              text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
+              fontSize: 11 / canvasStore.zoom,
+              fontFamily: 'Arial',
+              fill: '#6b7280',
+              listening: false,
+              name: 'floor-info-label',
+            }"
+          />
+        </v-group>
 
-        <v-text
-          v-else-if="canvasStore.estaEnCuarto"
-          :config="{
-            x: 10,
-            y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
-            text: `Pisos: ${elementosVisiblesEnCanvas.length}`,
-            fontSize: 11 / canvasStore.zoom,
-            fontFamily: 'Arial',
-            fill: '#6b7280',
-            listening: false,
-          }"
-        />
+        <template v-if="!canvasStore.estaEnPlanta">
+          <v-text
+            :config="{
+              x: 10,
+              y: -(39 / canvasStore.zoom),
+              text: `${canvasStore.estructuraContenedorActual?.nombre} - ${formatLengthsCm([
+                layerConfig.width * viewport.cmPerPx,
+                layerConfig.height * viewport.cmPerPx,
+              ])}`,
+              fontSize: 12 / canvasStore.zoom,
+              fontFamily: 'Arial',
+              fill: '#3b82f6',
+              listening: false,
+              name: 'floor-info-label',
+            }"
+          />
+          <v-text
+            v-if="canvasStore.estaEnCuarto"
+            :config="{
+              x: 10,
+              y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
+              text: `Pisos: ${elementosVisiblesEnCanvas.length}`,
+              fontSize: 11 / canvasStore.zoom,
+              fontFamily: 'Arial',
+              fill: '#6b7280',
+              listening: false,
+            }"
+          />
 
-        <v-text
-          v-else-if="canvasStore.estaEnPiso"
-          :config="{
-            x: 10,
-            y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
-            text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
-            fontSize: 11 / canvasStore.zoom,
-            fontFamily: 'Arial',
-            fill: '#6b7280',
-            listening: false,
-          }"
-        />
+          <v-text
+            v-else-if="canvasStore.estaEnPiso"
+            :config="{
+              x: 10,
+              y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
+              text: `Elementos: ${elementosVisiblesEnCanvas.length}`,
+              fontSize: 11 / canvasStore.zoom,
+              fontFamily: 'Arial',
+              fill: '#6b7280',
+              listening: false,
+            }"
+          />
 
-        <v-text
-          v-if="canvasStore.estaEnElemento"
-          :config="{
-            x: 10,
-            y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
-            text: `Contenedores: ${elementosVisiblesEnCanvas.length}`,
-            fontSize: 11 / canvasStore.zoom,
-            fontFamily: 'Arial',
-            fill: '#dc2626',
-            listening: false,
-          }"
-        />
-        <v-text
-          v-if="canvasStore.estaEnContenedor"
-          :config="{
-            x: 10,
-            y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
-            text: `Items: ${elementosVisiblesEnCanvas.length} (elementos + contenedores)`,
-            fontSize: 11 / canvasStore.zoom,
-            fontFamily: 'Arial',
-            fill: '#dc2626',
-            listening: false,
-          }"
-        />
+          <v-text
+            v-else-if="canvasStore.estaEnElemento"
+            :config="{
+              x: 10,
+              y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
+              text: `Contenedores: ${elementosVisiblesEnCanvas.length}`,
+              fontSize: 11 / canvasStore.zoom,
+              fontFamily: 'Arial',
+              fill: '#dc2626',
+              listening: false,
+            }"
+          />
+          <v-text
+            v-else-if="canvasStore.estaEnContenedor"
+            :config="{
+              x: 10,
+              y: -(11 / canvasStore.zoom) - 8 / canvasStore.zoom,
+              text: `Items: ${elementosVisiblesEnCanvas.length} (elementos + contenedores)`,
+              fontSize: 11 / canvasStore.zoom,
+              fontFamily: 'Arial',
+              fill: '#dc2626',
+              listening: false,
+            }"
+          />
+        </template>
       </v-layer>
       <v-layer ref="overlaysLayerRef">
         <!-- Líneas guía de object snapping -->
@@ -862,6 +884,81 @@ const floorBoundary = computed(() => {
   return {
     width: Math.max(bounds.width || 0, viewWidth || 0),
     height: Math.max(bounds.height || 0, viewHeight || 0),
+  }
+})
+
+const LABEL_PRIMARY_OFFSET_PX = 39
+const LABEL_SECONDARY_OFFSET_PX = 19
+const LABEL_MARGIN_RIGHT_PX = 14
+const LABEL_BLOCK_WIDTH_PX = 360
+
+const plantRect = computed(() => {
+  const poly = plantPolygon.value
+  if (!Array.isArray(poly) || poly.length === 0) {
+    return {
+      x: 0,
+      y: 0,
+      width: floorBoundary.value.width || 0,
+      height: floorBoundary.value.height || 0,
+    }
+  }
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+
+  for (const point of poly) {
+    const x = Number(point?.x)
+    const y = Number(point?.y)
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+    if (x < minX) minX = x
+    if (y < minY) minY = y
+    if (x > maxX) maxX = x
+    if (y > maxY) maxY = y
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return {
+      x: 0,
+      y: 0,
+      width: floorBoundary.value.width || 0,
+      height: floorBoundary.value.height || 0,
+    }
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(0, maxX - minX),
+    height: Math.max(0, maxY - minY),
+  }
+})
+
+const plantLabelLayout = computed(() => {
+  if (!canvasStore.estaEnPlanta || isInfinitePlant.value) {
+    return null
+  }
+
+  const zoom = Number(canvasStore.zoom) || 1
+  if (!Number.isFinite(zoom) || zoom <= 0) {
+    return null
+  }
+
+  const rect = plantRect.value || {}
+  const rectX = Number(rect.x) || 0
+  const rectY = Number(rect.y) || 0
+  const rectWidth = Number(rect.width) || 0
+
+  const labelWidth = Math.max(1, LABEL_BLOCK_WIDTH_PX / zoom)
+  const marginRight = LABEL_MARGIN_RIGHT_PX / zoom
+  const labelRightEdge = rectX + rectWidth - marginRight
+
+  return {
+    x: labelRightEdge - labelWidth,
+    width: labelWidth,
+    primaryY: rectY - (LABEL_PRIMARY_OFFSET_PX / zoom),
+    secondaryY: rectY - (LABEL_SECONDARY_OFFSET_PX / zoom),
   }
 })
 

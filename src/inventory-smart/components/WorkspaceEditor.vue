@@ -408,17 +408,6 @@ function computeElementsBBox(elements) {
   return { minX, minY, maxX, maxY }
 }
 
-function padBBox(bbox, padding) {
-  if (!bbox) return null
-  const p = Number(padding) || 0
-  return {
-    minX: bbox.minX - p,
-    minY: bbox.minY - p,
-    maxX: bbox.maxX + p,
-    maxY: bbox.maxY + p,
-  }
-}
-
 function getPolygonBBox(poly) {
   if (!Array.isArray(poly) || poly.length === 0) return null
   let minX = Infinity
@@ -519,18 +508,18 @@ function normalizeMeters(valueCm) {
 
 function suggestFiniteDimensionsFromContent() {
   const rawBBox = computeElementsBBox(local.elements)
-  const paddedBBox = padBBox(rawBBox, FINITE_PREVIEW_PADDING)
   let originX = 0
   let originY = 0
 
   let widthCm = MIN_DIMENSION_CM
   let lengthCm = MIN_DIMENSION_CM
 
-  if (paddedBBox) {
-    const minX = Math.floor(paddedBBox.minX)
-    const minY = Math.floor(paddedBBox.minY)
-    const maxX = Math.ceil(paddedBBox.maxX)
-    const maxY = Math.ceil(paddedBBox.maxY)
+  if (rawBBox) {
+    const paddingPx = FINITE_PREVIEW_PADDING
+    const minX = Math.floor(rawBBox.minX - paddingPx)
+    const minY = Math.floor(rawBBox.minY - paddingPx)
+    const maxX = Math.ceil(rawBBox.maxX + paddingPx)
+    const maxY = Math.ceil(rawBBox.maxY + paddingPx)
     if (
       Number.isFinite(minX) &&
       Number.isFinite(minY) &&
