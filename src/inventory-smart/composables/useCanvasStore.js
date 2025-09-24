@@ -1446,6 +1446,15 @@ export const useCanvasStore = defineStore('canvas', () => {
       showToast('La altura del nivel no puede exceder la altura del cuarto', 'error');
       return;
     }
+    if (!nivelActualizado?.dimensiones.alto || nivelActualizado?.dimensiones?.alto <= 0) {
+      nivelActualizado.dimensiones.alto = Math.floor((parent?.dimensiones?.alto || 300) / (parent?.hijos?.length + 1 ?? 3) );
+    }
+    if (!nivelActualizado?.dimensiones.ancho || nivelActualizado?.dimensiones?.ancho <= 0) {
+      nivelActualizado.dimensiones.ancho = parent?.dimensiones?.ancho || 100;
+    }
+    if (!nivelActualizado?.dimensiones.largo || nivelActualizado?.dimensiones?.largo <= 0) {
+      nivelActualizado.dimensiones.largo = parent?.dimensiones?.largo || 100;
+    }
     // Si no hay id, es un nuevo nivel
     if (!id) {
       const res = proposeLevelChange(elementos.value, 'Nuevo', nivelActualizado || {}, nivelAEditar.value.padre);

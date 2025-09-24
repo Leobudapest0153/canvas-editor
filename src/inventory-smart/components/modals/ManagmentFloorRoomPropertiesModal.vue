@@ -271,7 +271,7 @@ const formValue = ref({
       ? (canvasStore.nivelAEditar.dimensiones.alto / 100).toFixed(2)
       : ''
   },
-  capacidadCarga: canvasStore.nivelAEditar?.capacidadCarga ?? '',
+  capacidadCarga: canvasStore.nivelAEditar?.pesoMaximo ?? '',
   tipoZona: canvasStore.nivelAEditar?.tipoZona ?? '',
   tiposProductos: canvasStore.nivelAEditar?.tiposProductos ?? [],
   permiteFragiles: canvasStore.nivelAEditar?.permiteFragiles ?? false
