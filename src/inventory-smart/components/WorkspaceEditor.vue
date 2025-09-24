@@ -646,6 +646,7 @@ function resetLocalState() {
 
   errors.name = false
   errors.dimensions = false
+  errors.maxWeight = false
   notice.value = ''
 }
 
@@ -723,16 +724,14 @@ watch(
   () => local.name,
   (val) => {
     errors.name = !String(val || '').trim()
-  },
-  { immediate: true },
+  }
 )
 watch(
   () => local.maxWeight,
   (val) => {
     const n = Number(val)
     errors.maxWeight = !Number.isFinite(n) || n < 0
-  },
-  { immediate: true },
+  }
 )
 
 function applyRect(w_cm, l_cm) {
