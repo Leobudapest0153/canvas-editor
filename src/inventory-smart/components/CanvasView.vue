@@ -724,29 +724,6 @@ const isSnappingEnabled = ref(true)
  * @returns {Object} - { width: number, height: number } en píxeles
  */
 const viewport = useViewportStore()
-
-let textMeasureCtx = null
-const ensureMeasureContext = () => {
-  if (typeof document === 'undefined') return null
-  if (textMeasureCtx) return textMeasureCtx
-  try {
-    const canvas = document.createElement('canvas')
-    textMeasureCtx = canvas.getContext('2d') || null
-  } catch {
-    textMeasureCtx = null
-  }
-  return textMeasureCtx
-}
-
-const measureTextWidth = (text, fontPx) => {
-  const ctx = ensureMeasureContext()
-  if (!ctx) {
-    const length = String(text || '').length
-    return length * fontPx * 0.6
-  }
-  ctx.font = `${fontPx}px Arial`
-  return ctx.measureText(String(text || '')).width
-}
 const getElementPixelDimensions = (elemento) => {
   // Si ya tiene width/height en píxeles, usarlos solo si no tiene dimensiones en cm
   // Esto es para compatibilidad con elementos legacy que solo tienen width/height
@@ -1008,20 +985,16 @@ const floorLabelPositions = computed(() => {
   }
 
   const rect = plantRect.value || { x: 0, y: 0, width: 0, height: 0 }
-  const paddingPx = 14
-  const rightEdge = (Number(rect.x) || 0) + (Number(rect.width) || 0) - paddingPx / zoom
+  const rectX = Number(rect.x) || 0
+  const rectY = Number(rect.y) || 0
+  const paddingPx = 10
+  const paddingWorld = paddingPx / zoom
+  const lineSpacingPx = 18
 
-  const mainText = mainFloorInfoText.value || ''
-  const mainWidthWorld = measureTextWidth(mainText, 12) / zoom
-  const safeMainWidth = Number.isFinite(mainWidthWorld) ? mainWidthWorld : 0
-  const mainX = Number.isFinite(rightEdge) ? rightEdge - safeMainWidth : 0
-  const mainY = (Number(rect.y) || 0) - (39 / zoom)
-
-  const secondaryText = plantElementsText.value || ''
-  const secondaryWidthWorld = measureTextWidth(secondaryText, 11) / zoom
-  const safeSecondaryWidth = Number.isFinite(secondaryWidthWorld) ? secondaryWidthWorld : 0
-  const secondaryX = Number.isFinite(rightEdge) ? rightEdge - safeSecondaryWidth : 0
-  const secondaryY = (Number(rect.y) || 0) - (19 / zoom)
+  const mainX = rectX + paddingWorld
+  const mainY = rectY + paddingWorld
+  const secondaryX = mainX
+  const secondaryY = mainY + lineSpacingPx / zoom
 
   return {
     main: { x: mainX, y: mainY },
