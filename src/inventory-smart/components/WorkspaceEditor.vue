@@ -279,6 +279,11 @@ let dimensionChangeDebounce = null
 const showLimitedHint = ref(false)
 
 const INFINITE_PREVIEW_PADDING = 14
+const FINITE_MODE_PADDING = 14
+const MIN_RECT_DIM_CM = 100
+const DEFAULT_HEIGHT_METERS = 3
+
+const isAutoApplyingDimensions = ref(false)
 
 const previewFrameBBox = computed(() => {
   // Plantas infinitas → preview se encuadra al BBox de elementos con padding.
@@ -314,6 +319,154 @@ const previewFrameBBox = computed(() => {
 })
 
 const showInfiniteEmptyState = computed(() => local.isInfinite && !previewFrameBBox.value)
+
+function toFiniteNumber(value) {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+function resolveElementDimensionsPx(element) {
+  if (!element) return null
+  let width = toFiniteNumber(element?.width)
+  let height = toFiniteNumber(element?.height)
+
+  if (!(width > 0)) {
+    const anchoCm = toFiniteNumber(element?.dimensiones?.ancho)
+    if (anchoCm && anchoCm > 0) width = anchoCm * PIXELS_PER_CM
+  }
+
+  if (!(height > 0)) {
+    const largoCm = toFiniteNumber(element?.dimensiones?.largo)
+    if (largoCm && largoCm > 0) height = largoCm * PIXELS_PER_CM
+    else {
+      const altoCm = toFiniteNumber(element?.dimensiones?.alto)
+      if (altoCm && altoCm > 0) height = altoCm * PIXELS_PER_CM
+    }
+  }
+
+  if (!(width > 0) || !(height > 0)) return null
+  return { width, height }
+}
+
+function resolveElementPositionPx(element) {
+  const x = toFiniteNumber(element?.x)
+  const y = toFiniteNumber(element?.y)
+  let px = x ?? toFiniteNumber(element?.posicion?.x)
+  let py = y ?? toFiniteNumber(element?.posicion?.y)
+
+  const offsetX = toFiniteNumber(element?.offsets?.dx ?? element?.offset?.x ?? element?.offsetX)
+  const offsetY = toFiniteNumber(element?.offsets?.dy ?? element?.offset?.y ?? element?.offsetY)
+
+  if (Number.isFinite(offsetX)) px = (px ?? 0) + offsetX
+  if (Number.isFinite(offsetY)) py = (py ?? 0) + offsetY
+
+  if (!Number.isFinite(px) || !Number.isFinite(py)) return null
+  return { x: px, y: py }
+}
+
+function elementBBoxWithRotation(element) {
+  if (!element || element.visible === false) return null
+  const size = resolveElementDimensionsPx(element)
+  const pos = resolveElementPositionPx(element)
+  if (!size || !pos) return null
+
+  const rotationDeg = toFiniteNumber(element?.posicion?.rotation ?? element?.rotation) ?? 0
+  const normalizedRotation = ((rotationDeg % 360) + 360) % 360
+  if (Math.abs(normalizedRotation) < 1e-6) {
+    return {
+      minX: pos.x,
+      minY: pos.y,
+      maxX: pos.x + size.width,
+      maxY: pos.y + size.height,
+    }
+  }
+
+  const rad = (normalizedRotation * Math.PI) / 180
+  const cx = pos.x + size.width / 2
+  const cy = pos.y + size.height / 2
+  const corners = [
+    { x: pos.x, y: pos.y },
+    { x: pos.x + size.width, y: pos.y },
+    { x: pos.x + size.width, y: pos.y + size.height },
+    { x: pos.x, y: pos.y + size.height },
+  ]
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+
+  for (const corner of corners) {
+    const dx = corner.x - cx
+    const dy = corner.y - cy
+    const rx = cx + dx * Math.cos(rad) - dy * Math.sin(rad)
+    const ry = cy + dx * Math.sin(rad) + dy * Math.cos(rad)
+    minX = Math.min(minX, rx)
+    minY = Math.min(minY, ry)
+    maxX = Math.max(maxX, rx)
+    maxY = Math.max(maxY, ry)
+  }
+
+  return { minX, minY, maxX, maxY }
+}
+
+function computeUnifiedBBox(elements, paddingPx = 0) {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let hasAny = false
+
+  for (const el of elements) {
+    const bbox = elementBBoxWithRotation(el)
+    if (!bbox) continue
+    hasAny = true
+    minX = Math.min(minX, bbox.minX)
+    minY = Math.min(minY, bbox.minY)
+    maxX = Math.max(maxX, bbox.maxX)
+    maxY = Math.max(maxY, bbox.maxY)
+  }
+
+  if (!hasAny) return null
+  const pad = Math.max(0, paddingPx)
+  return {
+    minX: minX - pad,
+    minY: minY - pad,
+    maxX: maxX + pad,
+    maxY: maxY + pad,
+  }
+}
+
+function inferAutoHeightMeters(elements) {
+  const current = Number(localRectYMeters.value)
+  if (elements.length === 0) {
+    if (Number.isFinite(current) && current > 0) {
+      if (local.id || Math.abs(current - 5) > 1e-6) return current
+    }
+    return DEFAULT_HEIGHT_METERS
+  }
+  if (Number.isFinite(current) && current > 0) return current
+
+  let maxHeightCm = 0
+  for (const el of elements) {
+    if (!el || el.visible === false) continue
+    let totalCm = 0
+    const heightCm = toFiniteNumber(el?.dimensiones?.alto)
+    if (Number.isFinite(heightCm) && heightCm > 0) totalCm += heightCm
+    const baseOffsetCm = toFiniteNumber(el?.alturaRespectoAlSuelo ?? el?.zBase ?? el?.posicion?.z)
+    if (Number.isFinite(baseOffsetCm) && baseOffsetCm > 0) totalCm += baseOffsetCm
+    if (totalCm <= 0) {
+      const heightPx = toFiniteNumber(el?.height)
+      if (Number.isFinite(heightPx) && heightPx > 0) {
+        totalCm = heightPx / PIXELS_PER_CM
+      }
+    }
+    maxHeightCm = Math.max(maxHeightCm, totalCm)
+  }
+
+  if (maxHeightCm > 0) return maxHeightCm / 100
+  return DEFAULT_HEIGHT_METERS
+}
 
 function defaultRect(w_cm, l_cm) {
   const w = w_cm * PIXELS_PER_CM
@@ -516,6 +669,7 @@ watch(
     }
     // Si pasa a limitado desde elástico, mostrar hint hasta que se guarde con dimensiones válidas
     if (!isOn && wasOn) {
+      applyAutoDimensionsFromElements()
       showLimitedHint.value = true
     }
   },
@@ -615,11 +769,94 @@ function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, f
   return { ok: true }
 }
 
+// Al pasar de infinita→finita: usamos el BBox del contenido para proponer dimensiones (W×L) con padding,
+// rellenamos el formulario y reencuadramos el preview con el nuevo rectángulo.
+function applyAutoDimensionsFromElements() {
+  const items = Array.isArray(local.elements) ? local.elements : []
+  const visibles = items.filter((el) => el && el.visible !== false)
+  const paddedBBox = computeUnifiedBBox(visibles, FINITE_MODE_PADDING)
+
+  let widthCm = MIN_RECT_DIM_CM
+  let lengthCm = MIN_RECT_DIM_CM
+
+  if (paddedBBox) {
+    const widthPx = Math.max(0, paddedBBox.maxX - paddedBBox.minX)
+    const lengthPx = Math.max(0, paddedBBox.maxY - paddedBBox.minY)
+    const computedWidthCm = Math.ceil(widthPx / PIXELS_PER_CM)
+    const computedLengthCm = Math.ceil(lengthPx / PIXELS_PER_CM)
+    if (Number.isFinite(computedWidthCm) && computedWidthCm > 0) {
+      widthCm = Math.max(MIN_RECT_DIM_CM, computedWidthCm)
+    }
+    if (Number.isFinite(computedLengthCm) && computedLengthCm > 0) {
+      lengthCm = Math.max(MIN_RECT_DIM_CM, computedLengthCm)
+    }
+  } else {
+    const fallbackW = Number(rectW.value)
+    const fallbackL = Number(rectL.value)
+    if (Number.isFinite(fallbackW) && fallbackW > 0 && (visibles.length > 0 || fallbackW !== 500)) {
+      widthCm = Math.max(MIN_RECT_DIM_CM, Math.round(fallbackW))
+    }
+    if (Number.isFinite(fallbackL) && fallbackL > 0 && (visibles.length > 0 || fallbackL !== 500)) {
+      lengthCm = Math.max(MIN_RECT_DIM_CM, Math.round(fallbackL))
+    }
+  }
+
+  const heightMeters = inferAutoHeightMeters(visibles)
+  const heightCm = Math.max(1, Math.ceil(heightMeters * 100))
+
+  if (dimensionChangeDebounce) {
+    clearTimeout(dimensionChangeDebounce)
+    dimensionChangeDebounce = null
+  }
+
+  const result = tryApplyDimensionsCM(widthCm, lengthCm, heightCm, { apply: true, fit: true })
+
+  if (!result.ok) {
+    rectW.value = widthCm
+    rectL.value = lengthCm
+    rectY.value = heightCm
+    if (local.shape === 'rectangle') {
+      local.polygon = applyRect(widthCm, lengthCm)
+    } else if (local.shape === 'circle') {
+      local.polygon = applyCircle(widthCm, lengthCm)
+    } else if (!local.polygon || local.polygon.length < 3) {
+      local.polygon = applyRect(widthCm, lengthCm)
+    }
+    notice.value = result.message || ''
+  } else {
+    notice.value = ''
+    errors.dimensions = false
+    if (local.shape === 'rectangle') {
+      local.polygon = applyRect(widthCm, lengthCm)
+    } else if (local.shape === 'circle') {
+      local.polygon = applyCircle(widthCm, lengthCm)
+    }
+  }
+
+  isAutoApplyingDimensions.value = true
+  localRectWMeters.value = widthCm / 100
+  localRectLMeters.value = lengthCm / 100
+  localRectYMeters.value = heightCm / 100
+  errors.dimensions = !result.ok
+  nextTick(() => {
+    canvasEditorRef.value?.fitStageToPolygon()
+    isAutoApplyingDimensions.value = false
+  })
+}
+
 // --- WATCH CORREGIDO ---
 watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY]) => {
   if (isLoadingData.value) return
 
-  clearTimeout(dimensionChangeDebounce)
+  if (dimensionChangeDebounce) {
+    clearTimeout(dimensionChangeDebounce)
+    dimensionChangeDebounce = null
+  }
+
+  if (isAutoApplyingDimensions.value) {
+    errors.dimensions = false
+    return
+  }
 
   // Si el modo es elástico, ignorar cambios de dimensiones
   if (local.isInfinite) return

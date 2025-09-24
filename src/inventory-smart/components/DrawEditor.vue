@@ -186,6 +186,14 @@ watch(
   { deep: true },
 )
 
+watch(
+  () => [worldWidth.value, worldHeight.value],
+  () => {
+    if (frameBBox.value) return
+    nextTick(() => fitStageToPolygon())
+  },
+)
+
 const backgroundRect = computed(() => {
   if (providedFrameBBox.value) {
     const { minX, minY, maxX, maxY } = providedFrameBBox.value
