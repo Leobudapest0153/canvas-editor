@@ -1141,11 +1141,40 @@ watch(
 
 // Contorno activo siempre expresado como polígono
 const computeBoundary = () => {
+  const mode = activeBounds.value.mode || 'fixed'
+  const points = plantPolygon.value
+
+  if (Array.isArray(points) && points.length >= 3) {
+    const inset = Array.isArray(insetPoly.value) && insetPoly.value.length ? insetPoly.value : points
+    return {
+      type: 'polygon',
+      mode,
+      points,
+      inset,
+    }
+  }
+
+  const boundary = floorBoundary.value || {}
+  const width = Number(boundary.width) || 0
+  const height = Number(boundary.height) || 0
+  const x = Number(boundary.x) || 0
+  const y = Number(boundary.y) || 0
+
   return {
-    type: 'polygon',
-    mode: activeBounds.value.mode || 'fixed',
-    points: plantPolygon.value,
-    inset: insetPoly.value,
+    type: 'rect',
+    mode,
+    x,
+    y,
+    width,
+    height,
+    W: width,
+    H: height,
+    minX: boundary.minX ?? x,
+    minY: boundary.minY ?? y,
+    maxX: boundary.maxX ?? x + width,
+    maxY: boundary.maxY ?? y + height,
+    points: [],
+    inset: [],
   }
 }
 
