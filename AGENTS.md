@@ -23,3 +23,24 @@ Use Node.js 20.19+ (see `package.json` engines) and ensure pnpm/yarn lockfiles a
 - Constantes: reutilizar o ampliar las existentes; si se requiere una nueva y ya hay un módulo afín, definirla ahí para evitar archivos sueltos.
 - Redacción: no modificar ortografía, signos o símbolos de textos existentes a menos que se pida de forma explícita.
 - Codificación: mantener siempre intactos acentos, emojis, caracteres especiales y comentarios. No reescribir ni reinterpretar texto en otro encoding (UTF-8 se asume por defecto). Cualquier tarea pedida debe limitarse a la lógica/estructura indicada sin introducir cambios accidentales de codificación.
+
+## 📏 Regla de Mantenimiento: Componentes de Gran Tamaño
+
+Con el fin de mantener la escalabilidad y facilitar el mantenimiento del proyecto, se establece la siguiente norma:
+
+### 1. Principio General
+- No agregar más líneas de código directamente en componentes que ya son demasiado grandes (CanvasView.vue, InventorySmart.vue, u otros identificados como críticos).
+- Toda lógica que aumente significativamente la complejidad debe moverse a un archivo independiente y luego importarse.
+
+### 2. Criterios de Extracción
+- Si una función supera las 40 líneas de código o concentra múltiples condicionales/casos especiales, debe extraerse.
+- Si se trata de lógica reactiva o dependiente de setup → mover a /composables.
+- Si se trata de funciones puras o helpers reutilizables → mover a /utils.
+- Si se trata de UI/renderizado → crear un subcomponente en /components.
+
+### 3. Notas
+Pequeñas correcciones (1–3 líneas) pueden aplicarse directamente en el componente.
+
+Siempre documentar en el PR qué funciones fueron extraídas y a qué carpeta fueron movidas.
+
+Este lineamiento aplica también a InventorySmart.vue y cualquier otro componente de tamaño similar.
