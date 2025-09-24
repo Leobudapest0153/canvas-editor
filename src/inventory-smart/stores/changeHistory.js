@@ -84,16 +84,16 @@ export const useChangeHistoryStore = defineStore('changeHistory', () => {
     // Elementos creados/actualizados/eliminados
     for (const [id, e] of currElems.entries()) {
       if (!prevElems.has(id)) {
-        changes.push({ entityType: 'elemento', op: 'create', id, name: e.nombre, plantaId: e.plantaId, fields: diffFields(null, e, FIELDS_ELEMENTO) })
+        changes.push({ entityType: 'elemento', op: 'create', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields: diffFields(null, e, FIELDS_ELEMENTO) })
       } else {
         const before = prevElems.get(id)
         const fields = diffFields(before, e, FIELDS_ELEMENTO)
-        if (fields.length) changes.push({ entityType: 'elemento', op: 'update', id, name: e.nombre, plantaId: e.plantaId, fields })
+        if (fields.length) changes.push({ entityType: 'elemento', op: 'update', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields })
       }
     }
     for (const [id, e] of prevElems.entries()) {
       if (!currElems.has(id)) {
-        changes.push({ entityType: 'elemento', op: 'delete', id, name: e.nombre, plantaId: e.plantaId, fields: [] })
+        changes.push({ entityType: 'elemento', op: 'delete', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields: [] })
       }
     }
 

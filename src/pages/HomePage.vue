@@ -3,6 +3,7 @@
     <InventorySmart
       :configCanvas="initialConfig"
       :externalServices="externalServices"
+      :author="{ name: 'David Deras', id: '123' }"
       @configUpdated="handleConfigUpdated"
     />
   </div>
