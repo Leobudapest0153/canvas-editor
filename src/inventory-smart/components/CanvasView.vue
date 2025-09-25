@@ -662,7 +662,14 @@ import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
-import { GRID_SIZE, CM_TO_PX, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
+import {
+  GRID_SIZE,
+  CM_TO_PX,
+  CATALOGO,
+  OFFSETS,
+  FIT_VIEWPORT_PADDING,
+  INFINITE_DETAIL_FIT_PADDING,
+} from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { cmToPx, pxToCm, fmtCm, formatLengthsCm } from '@/inventory-smart/utils/units'
 import { useViewportStore } from '@/inventory-smart/stores/viewport'
@@ -2328,6 +2335,21 @@ watch(
   { deep: true },
 )
 
+const DETAIL_CONTEXTS = ['elementos', 'contenedores']
+
+const resolveFitPaddingOptions = () => {
+  const basePadding = FIT_VIEWPORT_PADDING
+  if (canvasStore.plantaActivaData?.isInfinite === true) {
+    const ctxTipo = canvasStore.contextoActual?.tipo
+    if (DETAIL_CONTEXTS.includes(ctxTipo)) {
+      const padding = INFINITE_DETAIL_FIT_PADDING
+      return { viewportPadding: padding, infinitePadding: padding }
+    }
+    return { viewportPadding: basePadding, infinitePadding: basePadding }
+  }
+  return { viewportPadding: basePadding, infinitePadding: basePadding }
+}
+
 // Ajustar la vista para encuadrar la planta activa
 const fitToPlanta = () => {
   try {
@@ -2339,8 +2361,15 @@ const fitToPlanta = () => {
       return
     }
 
+    const fitOptions = resolveFitPaddingOptions()
+
     // Ajustar directamente al contenido (BBox + margen)
-    fitToContent(stage)
+    fitToContent(stage, fitOptions)
+
+    const contextoTipo = canvasStore.contextoActual?.tipo
+    if (contextoTipo && contextoTipo !== 'plantas') {
+      return
+    }
 
     // Sincronizar llamada explícita para compatibilidad con pruebas:
     // intentar usar el bbox del polígono crudo (sin interpretar unidades)
@@ -2357,7 +2386,7 @@ const fitToPlanta = () => {
         const maxY = Math.max(...ys)
         const bw = Math.max(1, maxX - minX)
         const bh = Math.max(1, maxY - minY)
-        const margin = 40
+        const margin = Number(fitOptions?.viewportPadding) || FIT_VIEWPORT_PADDING
         const vw = Math.max(16, stageSize.value.width - margin * 2)
         const vh = Math.max(16, stageSize.value.height - margin * 2)
         const sx = vw / bw
@@ -2417,7 +2446,26 @@ watch(
     await nextTick()
     await nextTick()
 
-    if (ctx.tipo === 'plantas' && isInfinitePlant.value) {
+    if (ctx.tipo === 'plantas') {
+      if (isInfinitePlant.value) {
+        await nextTick()
+        fitToPlanta()
+        return
+      }
+
+      const dynamicMinZoom = getDynamicMinZoom()
+      canvasStore.configurarZoom(dynamicMinZoom, dynamicMinZoom)
+
+      const stage = stageRef.value?.getNode?.()
+      if (stage) {
+        const centerX = stageSize.value.width / 2
+        const centerY = stageSize.value.height / 2
+        canvasStore.configurarPan(centerX, centerY)
+      }
+      return
+    }
+
+    if (isInfinitePlant.value && DETAIL_CONTEXTS.includes(ctx.tipo)) {
       await nextTick()
       fitToPlanta()
       return

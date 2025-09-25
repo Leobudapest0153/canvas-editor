@@ -266,6 +266,12 @@ export const ELEMENTOS_PREDEFINIDOS = [
   },
 ]
 
+// === CONFIGURACIÓN DE VISTA ===
+// Padding predeterminado (en px) usado al encuadrar contenido en la vista.
+export const FIT_VIEWPORT_PADDING = 40
+// Padding extra aplicado al encuadrar elementos dentro de plantas infinitas.
+export const INFINITE_DETAIL_FIT_PADDING = 40
+
 // === CATEGORÍAS POR TIPO ===
 export const CATEGORIAS_ELEMENTOS = [
   { id: 'anaqueles', nombre: 'Anaqueles', color: '#3b82f6', tipo: 'elementos' },

@@ -4,17 +4,29 @@
  */
 
 import { useCanvasStore } from './useCanvasStore'
-import { CM_TO_PX } from '../utils/constants'
+import { CM_TO_PX, FIT_VIEWPORT_PADDING, INFINITE_DETAIL_FIT_PADDING } from '../utils/constants'
 
-const CONTENT_MARGIN = 40
+const DEFAULT_VIEWPORT_PADDING = FIT_VIEWPORT_PADDING
+const DEFAULT_INFINITE_PADDING = INFINITE_DETAIL_FIT_PADDING
 
 export function useZoom(stageSize, layerConfig) {
   const canvasStore = useCanvasStore()
 
+  const resolvePadding = (options = {}) => {
+    const viewportPadding = Number.isFinite(options.viewportPadding)
+      ? Math.max(0, Number(options.viewportPadding))
+      : DEFAULT_VIEWPORT_PADDING
+    const infinitePadding = Number.isFinite(options.infinitePadding)
+      ? Math.max(0, Number(options.infinitePadding))
+      : DEFAULT_INFINITE_PADDING
+    return { viewportPadding, infinitePadding }
+  }
+
   /**
    * Calcula el bounding box para diferentes contextos
    */
-  const calculateBoundingBox = () => {
+  const calculateBoundingBox = (options = {}) => {
+    const { infinitePadding } = resolvePadding(options)
     // Contexto 1: si no estamos en planta (navegando dentro de un elemento)
     if ((!canvasStore.estaEnPlanta) && canvasStore.estructuraContenedorActual) {
       const localW = layerConfig.value.width || Math.max(1, canvasStore.estructuraContenedorActual.width || 1)
@@ -65,7 +77,7 @@ export function useZoom(stageSize, layerConfig) {
           const width = Math.max(1, maxX - minX)
           const height = Math.max(1, maxY - minY)
           if (isInfinite) {
-            const margin = CONTENT_MARGIN
+            const margin = infinitePadding
             return {
               x: minX - margin,
               y: minY - margin,
@@ -147,7 +159,8 @@ export function useZoom(stageSize, layerConfig) {
       return 0.001
     }
 
-    const margin = 40
+    const { viewportPadding } = resolvePadding()
+    const margin = viewportPadding
     const vw = Math.max(16, stageSize.value.width - margin * 2)
     const vh = Math.max(16, stageSize.value.height - margin * 2)
 
@@ -208,15 +221,16 @@ export function useZoom(stageSize, layerConfig) {
    * Ajusta la vista para encuadrar perfectamente el contenido activo
    * Versión avanzada que maneja múltiples contextos y centra inteligentemente
    */
-  const fitToContent = (stage) => {
+  const fitToContent = (stage, options = {}) => {
     if (!stage) return
 
     try {
-      const margin = 40
+      const { viewportPadding, infinitePadding } = resolvePadding(options)
+      const margin = viewportPadding
       const vw = Math.max(16, stageSize.value.width - margin * 2)
       const vh = Math.max(16, stageSize.value.height - margin * 2)
 
-      const bbox = calculateBoundingBox()
+      const bbox = calculateBoundingBox({ infinitePadding })
       const chosen = chooseBestBoundingBox(bbox, { width: vw, height: vh })
 
       if (!chosen) {
