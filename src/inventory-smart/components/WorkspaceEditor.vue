@@ -130,9 +130,7 @@
                 @change="touched.shape = true"
                 @blur="touched.shape = true"
               >
-                <option value="none" disabled>Sin definir</option>
-                <option value="rectangle">Rectángulo</option>
-                <option value="circle">Círculo</option>
+                <option v-for="p in PLANTILLAS_PLANTA" :key="p.id" :value="p.id">{{ p.nombre }}</option>
               </select>
               <p v-if="touched.shape && !validShape" class="mt-1 text-xs text-rose-600">Selecciona una plantilla.</p>
             </template>
@@ -274,7 +272,7 @@ import { computed, reactive, ref, watch, nextTick, onBeforeUnmount, onMounted } 
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import { CM_TO_PX, LOAD_MARGIN } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, LOAD_MARGIN, PLANTILLAS_PLANTA } from '@/inventory-smart/utils/constants'
 import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import DrawEditor from './DrawEditor.vue'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'

@@ -8,9 +8,16 @@
     @click.self="handleClose"
   >
     <form class="modal" @submit.prevent="saveTemplate">
-      <header class="modal-header">
-        <h3 id="templateModalTitle" class="title">Guardar como plantilla</h3>
-        <button type="button" class="close" @click="handleClose" aria-label="Cerrar">×</button>
+      <header class="modal-header relative flex items-center justify-center px-4 py-3">
+        <h3 id="templateModalTitle" class="title text-primary text-center w-full pointer-events-none select-none">Guardar como plantilla</h3>
+        <button
+          type="button"
+          class="close absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-xl leading-none rounded-md hover:bg-slate-100 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          @click="handleClose"
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
       </header>
       <section class="modal-body">
         <div class="template-modal__row">
@@ -26,8 +33,9 @@
           />
           <p v-if="templateError" class="template-modal__error">{{ templateError }}</p>
         </div>
-        <div class="template-modal__row">
-          <div class="template-modal__summary" id="templateSummary" v-if="templateSummary">
+        <div class="template-modal__row" v-if="templateSummary">
+          <h4 class="text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Propiedades</h4>
+          <div class="template-modal__summary" id="templateSummary">
             <div>Tipo: {{ templateSummary.elementType }}</div>
             <div>Dimensiones: {{ templateSummary.width }}×{{ templateSummary.depth }}×{{ templateSummary.height }}</div>
             <div>Hijos: {{ templateSummary.childrenCount }}</div>
@@ -43,9 +51,9 @@
           ></textarea>
         </div>
       </section>
-      <footer class="modal-footer">
-        <button type="button" class="btn" @click="handleClose">Cancelar</button>
-        <button type="submit" class="btn btn-primary" :disabled="!templateName.trim() || isSaving">
+      <footer class="flex justify-center gap-3 p-4 bg-top">
+        <button type="button" class="px-4 py-2 cursor-pointer rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary" @click="handleClose">Cancelar</button>
+        <button type="submit" class="px-4 py-2 rounded-lg font-medium shadow-sm focus:outline-none focus:ring-2 bg-primary text-white hover:bg-primary-800 focus:ring-primary-900 cursor-pointer" :disabled="!templateName.trim() || isSaving">
           Guardar
         </button>
       </footer>

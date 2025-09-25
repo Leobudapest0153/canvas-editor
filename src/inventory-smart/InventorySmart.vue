@@ -660,9 +660,8 @@ watch(
   border-bottom: 1px solid #e5e7eb;
 }
 .modal-header .title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  color: #111827;
 }
 .modal-header .close {
   background: transparent;
