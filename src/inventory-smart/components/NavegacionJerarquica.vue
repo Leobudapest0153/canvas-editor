@@ -93,12 +93,12 @@
             {{ canvasStore.elementosVisibles.length }} elementos
           </span>
           <span v-else-if="canvasStore.estaEnElemento">
-            {{ canvasStore.elementosVisibles.length }} contenedores
+            {{ canvasStore.elementosVisibles.length }} niveles
             <br />
             <small>Interior de {{ elementoActual?.nombre }}</small>
           </span>
           <span v-else-if="canvasStore.estaEnContenedor">
-            {{ canvasStore.elementosVisibles.length }} items (elementos + contenedores)
+            {{ canvasStore.elementosVisibles.length }} items (elementos + niveles)
             <br />
             <small>Interior de {{ elementoActual?.nombre }}</small>
           </span>

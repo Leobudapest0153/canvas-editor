@@ -67,8 +67,8 @@ export function buildStructureFromForm(form) {
     // Determinar tipo y categoría según si es cuarto o espacio
     const esEspacio = modo === 'espacio'
     const childType = esEspacio ? 'contenedores' : 'pisos'
-    const childCategory = esEspacio ? 'contenedor' : 'piso'
-    const childId = uid(esEspacio ? 'contenedor' : 'piso')
+    const childCategory = esEspacio ? 'nivel' : 'piso'
+    const childId = uid(esEspacio ? 'nivel' : 'piso')
 
     children.push({
       id: childId,

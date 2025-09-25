@@ -1143,7 +1143,7 @@ const getTipoNombrePadre = () => {
   if (tipo === 'cuartos') return 'del cuarto'
   if (tipo === 'pisos') return 'del piso'
   if (tipo === 'elementos') return 'del elemento'
-  if (tipo === 'contenedores') return 'del contenedor'
+  if (tipo === 'contenedores') return 'del nivel'
   if (tipo === 'pasillos') return 'del pasillo'
 
   return `del ${getTipoNombre(tipo)}`
@@ -1157,7 +1157,7 @@ const getTipoNombreActual = () => {
   if (tipo === 'cuartos') return 'del cuarto'
   if (tipo === 'pisos') return 'del piso'
   if (tipo === 'elementos') return 'del elemento'
-  if (tipo === 'contenedores') return 'del contenedor'
+  if (tipo === 'contenedores') return 'del nivel'
   if (tipo === 'pasillos') return 'del pasillo'
   if (tipo === 'plantas') return 'de la planta'
 
