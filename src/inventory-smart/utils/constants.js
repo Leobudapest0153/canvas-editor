@@ -19,7 +19,7 @@ export const TIPOS_ENTIDAD = [
     id: 'plantas',
     nombre: 'Plantas',
     nombreSingular: 'Planta',
-    color: '#10b981',
+    color: '#1C1E4D',
     icono: '🏢',
     restrictions: [],
   },
@@ -27,7 +27,7 @@ export const TIPOS_ENTIDAD = [
     id: 'cuartos',
     nombre: 'Cuartos',
     nombreSingular: 'Cuarto',
-    color: '#0ea5e9',
+    color: '#1C1E4D',
     icono: '🏠',
     restrictions: [],
   },
@@ -35,7 +35,7 @@ export const TIPOS_ENTIDAD = [
     id: 'pisos',
     nombre: 'Pisos',
     nombreSingular: 'Piso',
-    color: '#22c55e',
+    color: '#1C1E4D',
     icono: '🧱',
     restrictions: ['read-only-properties', 'right-click', 'drag'],
   },
@@ -43,7 +43,7 @@ export const TIPOS_ENTIDAD = [
     id: 'pasillos',
     nombre: 'Pasillos',
     nombreSingular: 'Pasillo',
-    color: '#111827',
+    color: '#1C1E4D',
     icono: '🛣️',
     restrictions: [],
   },
@@ -59,7 +59,7 @@ export const TIPOS_ENTIDAD = [
     id: 'contenedores',
     nombre: 'Niveles',
     nombreSingular: 'Nivel',
-    color: '#dc2626',
+    color: '#1C1E4D',
     icono: '🗃️',
     restrictions: ['read-only-properties', 'right-click', 'drag'],
   },
@@ -324,21 +324,6 @@ export const DEFAULT_TIPOS_CUARTO = [
   { id: 'zona_de_descarga', nombre: 'Zona de Descarga' },
   { id: 'almacenaje', nombre: 'Almacenaje' },
 ]
-// == Catálogos default
-
-export const DEFAULT_TIPOS_CONTENEDOR = [{ id: 'nivel', nombre: 'Nivel' }]
-
-export const DEFAULT_TIPOS_PISO = [{ id: 'piso', nombre: 'Piso' }]
-
-export const TODAS_LAS_CATEGORIAS = [...DEFAULT_TIPOS_CUARTO, ...DEFAULT_TIPOS_ESPACIO]
-
-export const ORIENTACIONES = [
-  { id: '0', nombre: '0°' },
-  { id: '90', nombre: '90°' },
-  { id: '180', nombre: '180°' },
-  { id: '270', nombre: '270°' },
-]
-
 export const DEFAULT_TIPOS_PRODUCTO_ADMITIDOS = [
   { id: 'secos', nombre: 'Productos secos' },
   { id: 'refrigerados', nombre: 'Refrigerados' },
@@ -346,6 +331,20 @@ export const DEFAULT_TIPOS_PRODUCTO_ADMITIDOS = [
   { id: 'fragiles', nombre: 'Frágiles' },
   { id: 'peligrosos', nombre: 'Peligrosos' },
   { id: 'voluminosos', nombre: 'Voluminosos' },
+]
+// == Catálogos default
+
+export const DEFAULT_TIPOS_CONTENEDOR = [{ id: 'nivel', nombre: 'Nivel' }]
+
+export const DEFAULT_TIPOS_PISO = [{ id: 'piso', nombre: 'Piso' }]
+
+export const TODAS_LAS_CATEGORIAS = [...DEFAULT_TIPOS_CUARTO, ...DEFAULT_TIPOS_ESPACIO, ...DEFAULT_TIPOS_CONTENEDOR, ...DEFAULT_TIPOS_PISO]
+
+export const ORIENTACIONES = [
+  { id: '0', nombre: '0°' },
+  { id: '90', nombre: '90°' },
+  { id: '180', nombre: '180°' },
+  { id: '270', nombre: '270°' },
 ]
 
 export const puedeContener = (tipoPadre, tipoHijo) => {
@@ -357,14 +356,22 @@ export const getColorPorTipo = (tipo) => {
   return tipoInfo?.color || '#6b7280'
 }
 
+export const getColorPorCategoria = (categoriaId) => {
+  const cat = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
+  return cat?.color || '#3b82f6'
+}
+
 export const getIconoPorTipo = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.icono || '📦'
 }
 
 export const getColorCategoria = (categoriaId) => {
+  // Buscar categoria, su tipo y devolver color
   const cat = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
-  return cat?.color || '#3b82f6'
+  if (!cat) return '#6b7280'
+  const tipoInfo = TIPOS_ENTIDAD.find((t) => puedeContener(t.id, cat.id))
+  return tipoInfo?.color || '#6b7280'
 }
 
 // Tolerancia para colisiones y ajustes

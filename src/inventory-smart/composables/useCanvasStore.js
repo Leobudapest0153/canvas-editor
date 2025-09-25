@@ -18,10 +18,10 @@ import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import { useStatePersistence, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS } from '@/inventory-smart/composables/useStatePersistence'
+import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
 import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,

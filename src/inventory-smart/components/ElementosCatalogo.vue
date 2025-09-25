@@ -201,11 +201,11 @@
                   color: getContrastTextColor(getColorPorTipo(elemento.tipo))
                 }"
               >
-                {{ getTipoNombre(elemento.tipo) }}
-              </span>
-              <span class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
                 {{ getCategoriaName(elemento.categoria) }}
               </span>
+              <!-- <span class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
+                {{ getCategoriaName(elemento.categoria) }}
+              </span> -->
             </div>
           </div>
         </div>

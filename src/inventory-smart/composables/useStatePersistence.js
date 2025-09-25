@@ -12,32 +12,7 @@
  * - Gestión de catálogos dinámicos
  */
 
-import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG } from "../utils/constants"
-
-// === CATÁLOGOS POR DEFECTO ===
-// Estos catálogos se pueden sobrescribir dinámicamente en el estado persistente
-
-export const DEFAULT_TIPOS_ESPACIO = [
-  { id: 'anaquel_metal', nombre: 'Anaquel metal' },
-  { id: 'estante_madera', nombre: 'Estante madera' },
-  { id: 'repisa_aluminio', nombre: 'Repisa aluminio' },
-  { id: 'otro', nombre: 'Otro' }
-]
-
-export const DEFAULT_TIPOS_CUARTO = [
-  { id: 'almacenamiento', nombre: 'Almacenamiento' },
-  { id: 'zona_de_descarga', nombre: 'Zona de Descarga' },
-  { id: 'almacenaje', nombre: 'Almacenaje' }
-]
-
-export const DEFAULT_TIPOS_PRODUCTO_ADMITIDOS = [
-  { id: 'secos', nombre: 'Productos secos' },
-  { id: 'refrigerados', nombre: 'Refrigerados' },
-  { id: 'congelados', nombre: 'Congelados' },
-  { id: 'fragiles', nombre: 'Frágiles' },
-  { id: 'peligrosos', nombre: 'Peligrosos' },
-  { id: 'voluminosos', nombre: 'Voluminosos' },
-]
+import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS } from "../utils/constants"
 
 export const useStatePersistence = () => {
   /**
