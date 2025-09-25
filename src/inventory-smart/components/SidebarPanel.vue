@@ -13,14 +13,20 @@
   <div class="h-full flex flex-col bg-white">
     <!-- Header con tabs -->
     <div class="flex border-b border-slate-200 bg-slate-50">
-      <UiTooltip v-for="tab in tabs" :key="tab.id" :label="tab.tooltip" position="right" :delay="500">
+      <UiTooltip
+        v-for="tab in tabs"
+        :key="tab.id"
+        :label="tab.tooltip"
+        position="right"
+        :delay="500"
+      >
         <button
           @click="activeTab = tab.id"
           :class="[
-            'flex-1 flex items-center justify-center gap-2 px-2 py-3 border-none bg-transparent cursor-pointer transition-all duration-200 text-slate-500 text-sm font-medium border-b-2 border-transparent',
+            'flex-1 flex items-center justify-center border-b-2 border-b-transparent gap-2 px-2 py-3 bg-transparent cursor-pointer transition-all duration-200 text-slate-500 text-sm font-medium',
             'hover:bg-slate-100 hover:text-slate-600',
             {
-              'text-blue-500 bg-white border-b-blue-500': activeTab === tab.id,
+              '!border-b-primary': activeTab === tab.id,
             },
           ]"
         >
@@ -29,7 +35,7 @@
             v-if="tab.id === 'elementos'"
             class="w-[18px] h-[18px] shrink-0"
             fill="none"
-            stroke="currentColor"
+            :stroke="activeTab === tab.id ? '#1c1e4d' : 'currentColor'"
             viewBox="0 0 24 24"
           >
             <path
@@ -45,7 +51,7 @@
             v-else-if="tab.id === 'capas'"
             class="w-[18px] h-[18px] shrink-0"
             fill="none"
-            stroke="currentColor"
+            :stroke="activeTab === tab.id ? '#1c1e4d' : 'currentColor'"
             viewBox="0 0 24 24"
           >
             <path
@@ -57,11 +63,11 @@
           </svg>
 
           <!-- Icono Clipboard para Buffer -->
-          <svg
+          <!-- <svg
             v-else-if="tab.id === 'buffer'"
             class="w-[18px] h-[18px] shrink-0"
             fill="none"
-            stroke="currentColor"
+            :stroke="activeTab === tab.id ? '#1c1e4d' : 'currentColor'"
             viewBox="0 0 24 24"
           >
             <path
@@ -70,13 +76,17 @@
               stroke-width="2"
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
             />
-          </svg>
+          </svg> -->
 
           <span
             v-if="tab.id === 'capas' && activeFilters"
             class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"
           ></span>
-          <span class="font-medium max-[360px]:hidden">{{ tab.label }}</span>
+          <span
+            class="font-medium max-[360px]:hidden"
+            :class="{ 'font-bold text-primary': activeTab === tab.id }"
+            >{{ tab.label }}</span
+          >
         </button>
       </UiTooltip>
     </div>
