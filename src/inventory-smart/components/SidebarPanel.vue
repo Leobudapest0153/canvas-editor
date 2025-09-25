@@ -94,9 +94,9 @@
       </div>
 
       <!-- Tab Buffer -->
-      <div v-show="activeTab === 'buffer'" class="h-full overflow-y-auto">
+      <!-- <div v-show="activeTab === 'buffer'" class="h-full overflow-y-auto">
         <BufferTab />
-      </div>
+      </div> -->
     </div>
   </div>
 </template>
@@ -126,11 +126,11 @@ const tabs = [
     label: 'Capas',
     tooltip: 'Gestión de capas y jerarquías',
   },
-  {
-    id: 'buffer',
-    label: 'Portapapeles',
-    tooltip: 'Almacén temporal de elementos',
-  },
+  // {
+  //   id: 'buffer',
+  //   label: 'Portapapeles',
+  //   tooltip: 'Almacén temporal de elementos',
+  // },
 ]
 
 const activeFilters = computed(() => {
