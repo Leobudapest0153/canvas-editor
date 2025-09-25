@@ -729,7 +729,8 @@ watch(
       local.id = planta.id
       local.name = planta.nombre
       local.polygon = planta.poligono
-      local.shape = planta.forma ?? 'none'
+  // Si la planta era infinita, podría venir sin forma definida. Usar 'rectangle' como default válido.
+  local.shape = planta.forma ?? (planta.isInfinite ? 'rectangle' : 'none')
       local.isInfinite = !!planta.isInfinite
       local.codigo = planta.codigo || ''
 
@@ -855,11 +856,10 @@ watch(
       rectL.value * PIXELS_PER_CM,
     )
     if (!res.ok) {
+      // Mantener la selección del usuario aunque el polígono propuesto no sea válido.
+      // Mostramos aviso y no aplicamos el nuevo polígono.
       notice.value = res.message
-      // Revertir el cambio de shape
-      nextTick(() => {
-        local.shape = oldShape
-      })
+      isManuallyEdited.value = true
       return
     }
 
@@ -886,6 +886,10 @@ watch(
     }
     // Si pasa a limitado desde elástico, mostrar hint hasta que se guarde con dimensiones válidas
     if (!isOn && wasOn) {
+      // Asegurar una plantilla válida por defecto para habilitar el selector
+      if (local.shape === 'none') {
+        local.shape = 'rectangle'
+      }
       showLimitedHint.value = true
       suggestFiniteDimensionsFromContent()
       // Calcular la carga requerida por los elementos y autocompletar la capacidad si es necesario
