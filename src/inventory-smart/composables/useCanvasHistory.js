@@ -122,7 +122,7 @@ export const useCanvasHistory = () => {
         }
       }
     } catch (error) {
-      console.error('❌ Error aplicando cambios incrementales:', error)
+      console.error('Error aplicando cambios incrementales:', error)
       historyEvents.errors.push({
         operation: 'applyIncrementalChanges',
         error: error.message,
@@ -155,7 +155,7 @@ export const useCanvasHistory = () => {
       canvasStore.panX = snapshot.panX
       canvasStore.panY = snapshot.panY
     } catch (error) {
-      console.error('❌ Error al restaurar snapshot:', error)
+      console.error('Error al restaurar snapshot:', error)
       historyEvents.errors.push({
         operation: 'restoreSnapshot',
         error: error.message,
@@ -213,7 +213,7 @@ export const useCanvasHistory = () => {
       }
       historyEvents.operationsCount++
     } catch (error) {
-      console.error('❌ Error al guardar estado en historial:', error)
+      console.error('Error al guardar estado en historial:', error)
       historyEvents.errors.push({
         operation: 'pushState',
         error: error.message,
@@ -228,7 +228,7 @@ export const useCanvasHistory = () => {
    */
   const undo = async () => {
     if (!canUndo.value) {
-      console.warn('⚠️ No hay acciones para deshacer')
+      console.warn('No hay acciones para deshacer')
       return false
     }
 
@@ -258,7 +258,7 @@ export const useCanvasHistory = () => {
 
       return true
     } catch (error) {
-      console.error('❌ Error durante undo:', error)
+      console.error('Error durante undo:', error)
       historyEvents.errors.push({
         operation: 'undo',
         error: error.message,
@@ -277,7 +277,7 @@ export const useCanvasHistory = () => {
    */
   const redo = async () => {
     if (!canRedo.value) {
-      console.warn('⚠️ No hay acciones para rehacer')
+      console.warn('No hay acciones para rehacer')
       return false
     }
 
@@ -302,7 +302,7 @@ export const useCanvasHistory = () => {
 
       return true
     } catch (error) {
-      console.error('❌ Error durante redo:', error)
+      console.error('Error durante redo:', error)
       historyEvents.errors.push({
         operation: 'redo',
         error: error.message,
@@ -336,11 +336,9 @@ export const useCanvasHistory = () => {
       const initialState = historyStack.value[0]
       historyStack.value = [initialState]
       currentIndex.value = 0
-      console.log('🗑️ Historial limpiado, estado inicial preservado')
     } else {
       historyStack.value = []
       currentIndex.value = -1
-      console.log('🗑️ Historial limpiado completamente')
     }
 
     // Resetear contadores de eventos
@@ -371,7 +369,7 @@ export const useCanvasHistory = () => {
       }
 
     } catch (error) {
-      console.error('❌ Error al inicializar historial:', error)
+      console.error('Error al inicializar historial:', error)
       historyEvents.errors.push({
         operation: 'initializeHistory',
         error: error.message,
@@ -449,18 +447,12 @@ export const useCanvasHistory = () => {
    */
   const jumpToState = (index) => {
     if (index < 0 || index >= historyStack.value.length) {
-      console.warn('⚠️ Índice de historial inválido:', index)
+      console.warn('Índice de historial inválido:', index)
       return false
     }
 
     currentIndex.value = index
     const snapshot = historyStack.value[index]
-
-    console.log('🎯 Saltando a estado:', {
-      description: snapshot.description,
-      timestamp: new Date(snapshot.timestamp).toLocaleTimeString(),
-      position: index + 1,
-    })
 
     restoreSnapshot(snapshot)
     return true

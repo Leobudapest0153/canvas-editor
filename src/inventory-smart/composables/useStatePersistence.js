@@ -10,62 +10,39 @@
  * - Validación de estructura de datos
  * - Manejo de errores en operaciones de persistencia
  * - Gestión de catálogos dinámicos
+ * - Serialización/deserialización opcional del historial de cambios
  */
 
-import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG } from "../utils/constants"
-
-// === CATÁLOGOS POR DEFECTO ===
-// Estos catálogos se pueden sobrescribir dinámicamente en el estado persistente
-
-export const DEFAULT_TIPOS_ESPACIO = [
-  { id: 'anaquel_metal', nombre: 'Anaquel metal' },
-  { id: 'estante_madera', nombre: 'Estante madera' },
-  { id: 'repisa_aluminio', nombre: 'Repisa aluminio' },
-  { id: 'otro', nombre: 'Otro' }
-]
-
-export const DEFAULT_TIPOS_CUARTO = [
-  { id: 'almacenamiento', nombre: 'Almacenamiento' },
-  { id: 'zona_de_descarga', nombre: 'Zona de Descarga' },
-  { id: 'almacenaje', nombre: 'Almacenaje' }
-]
-
-export const DEFAULT_TIPOS_PRODUCTO_ADMITIDOS = [
-  { id: 'secos', nombre: 'Productos secos' },
-  { id: 'refrigerados', nombre: 'Refrigerados' },
-  { id: 'congelados', nombre: 'Congelados' },
-  { id: 'fragiles', nombre: 'Frágiles' },
-  { id: 'peligrosos', nombre: 'Peligrosos' },
-  { id: 'voluminosos', nombre: 'Voluminosos' },
-]
+import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS } from "../utils/constants"
 
 export const useStatePersistence = () => {
   /**
    * Serializa el estado completo del canvas a JSON
    * @param {Object} state - Estado del store (plantas, elementos, etc.)
    * @param {Object} options - Opciones de serialización
+   * @param {boolean} options.includeChangeHistory - Si incluir el historial de cambios (opcional)
    * @returns {string} JSON string con todo el estado
    */
   const serialize = (state, options = {}) => {
-    const { validateBeforeSerialize = true, includeMetrics = true } = options
+    const { validateBeforeSerialize = true, includeMetrics = true, saveTimestamp = false, includeChangeHistory = true } = options
 
     if (validateBeforeSerialize) {
       const preValidation = validateStateBeforeSerialization(state)
       if (!preValidation.valid) {
-        console.warn('⚠️ Problemas detectados antes de serializar:', preValidation.issues)
         if (preValidation.critical) {
           throw new Error(`Serialización abortada: ${preValidation.issues.join(', ')}`)
         }
-      } else if (includeMetrics) {
-        console.log('✅ Estado validado para serialización:', preValidation.metrics)
       }
     }
+
+    // Timestamp actual en ISO 8601
+    const timestamp = new Date().toISOString()
 
     const serializedState = {
       // Información básica del canvas
       meta: {
         version: EXPORT_FORMAT_VERSION,
-        timestamp: new Date().toISOString(),
+        timestamp: timestamp,
         app: 'inventory-smart',
         ...(includeMetrics && {
           metrics: calculateStateMetrics(state)
@@ -83,7 +60,7 @@ export const useStatePersistence = () => {
       plantas: state.plantas.map((planta) => {
         // Validar datos críticos de la planta antes de serializar
         if (!planta.id || !planta.dimensiones) {
-          console.warn('⚠️ Planta con datos incompletos será serializada:', planta.id || 'sin ID')
+          console.warn('Planta con datos incompletos será serializada:', planta.id || 'sin ID')
         }
 
         return {
@@ -109,7 +86,7 @@ export const useStatePersistence = () => {
       elementos: state.elementos.map((elemento) => {
         // Validar datos críticos del elemento antes de serializar
         if (!elemento.id || !elemento.tipo || !elemento.dimensiones) {
-          console.warn('⚠️ Elemento con datos incompletos será serializado:', elemento.id || 'sin ID')
+          console.warn('Elemento con datos incompletos será serializado:', elemento.id || 'sin ID')
         }
 
         return {
@@ -195,12 +172,56 @@ export const useStatePersistence = () => {
       }),
     }
 
+    if (includeChangeHistory && state.changeHistory) {
+      try {
+        const changeHistoryData = typeof state.changeHistory.serialize === 'function'
+          ? state.changeHistory.serialize()
+          : state.changeHistory
+
+        if (changeHistoryData && changeHistoryData.entries) {
+          serializedState.changeHistory = {
+            entries: changeHistoryData.entries,
+            meta: {
+              totalEntries: changeHistoryData.entries.length,
+              exportedAt: timestamp
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Error al serializar historial de cambios:', error)
+      }
+    }
+
     // Añadir métrica de plantillas (retrocompatible)
     if (serializedState.meta?.metrics) {
       serializedState.meta.metrics.totalPlantillas = state.templates?.length || 0
+      if (serializedState.changeHistory?.entries) {
+        serializedState.meta.metrics.totalChangeHistory = serializedState.changeHistory.entries.length
+      }
+    }
+
+    // Guardar timestamp en localStorage si se solicita
+    if (saveTimestamp) {
+      saveLastSerializationTimestamp(timestamp)
     }
 
     return JSON.stringify(serializedState, null, 2)
+  }
+
+  /**
+   * Guardar timestamp de última serialización en localStorage
+   * @param {string} timestamp - Timestamp ISO 8601
+   */
+  const saveLastSerializationTimestamp = (timestamp) => {
+    localStorage.setItem('canvas_last_serialization', timestamp)
+  }
+
+  /**
+   * Obtener timestamp de última serialización desde localStorage
+   * @returns {string|null} - Timestamp ISO 8601 o null si no existe
+   */
+  const getLastSerializationTimestamp = () => {
+    return localStorage.getItem('canvas_last_serialization')
   }
 
   /**
@@ -348,7 +369,7 @@ export const useStatePersistence = () => {
       const validation = validateStructure(jsonString, true)
 
       if (!validation.valid) {
-        console.error('❌ Validación fallida:', validation.error)
+        console.error('Validación fallida:', validation.error)
         console.error('Errores encontrados:', validation.errors)
         if (validation.warnings?.length > 0) {
           console.warn('Advertencias:', validation.warnings)
@@ -356,17 +377,8 @@ export const useStatePersistence = () => {
         return false
       }
 
-      // Mostrar información de validación
-      console.log('✅ Validación exitosa:', {
-        plantas: validation.info.plantas,
-        elementos: validation.info.elementos,
-        version: validation.info.version,
-        elementosPorTipo: validation.info.elementosPorTipo,
-        warnings: validation.warnings?.length || 0
-      })
-
       if (validation.warnings?.length > 0) {
-        console.warn('⚠️ Advertencias durante la validación:', validation.warnings)
+        console.warn('Advertencias durante la validación:', validation.warnings)
       }
 
       const state = validation.data || JSON.parse(jsonString)
@@ -377,14 +389,14 @@ export const useStatePersistence = () => {
       // === RESTAURAR CATÁLOGOS ===
       if (state.catalogos) {
         const catalogosRestaurados = {
-          tiposEspacio: Array.isArray(state.catalogos.tiposEspacio) 
-            ? state.catalogos.tiposEspacio 
+          tiposEspacio: Array.isArray(state.catalogos.tiposEspacio)
+            ? state.catalogos.tiposEspacio
             : DEFAULT_TIPOS_ESPACIO,
-          tiposCuarto: Array.isArray(state.catalogos.tiposCuarto) 
-            ? state.catalogos.tiposCuarto 
+          tiposCuarto: Array.isArray(state.catalogos.tiposCuarto)
+            ? state.catalogos.tiposCuarto
             : DEFAULT_TIPOS_CUARTO,
-          tiposProductoAdmitidos: Array.isArray(state.catalogos.tiposProductoAdmitidos) 
-            ? state.catalogos.tiposProductoAdmitidos 
+          tiposProductoAdmitidos: Array.isArray(state.catalogos.tiposProductoAdmitidos)
+            ? state.catalogos.tiposProductoAdmitidos
             : DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
         }
         storeActions.setCatalogos(catalogosRestaurados)
@@ -403,7 +415,7 @@ export const useStatePersistence = () => {
         try {
           // Validar datos mínimos antes de crear la planta
           if (!plantaData.id || !plantaData.nombre || !plantaData.dimensiones) {
-            console.warn(`⚠️ Planta ${index + 1} omitida: datos incompletos`)
+            console.warn(`Planta ${index + 1} omitida: datos incompletos`)
             return
           }
 
@@ -429,12 +441,12 @@ export const useStatePersistence = () => {
           storeActions.addPlanta(plantaSegura)
           plantasRestauradas++
         } catch (error) {
-          console.error(`❌ Error restaurando planta ${index + 1}:`, error)
+          console.error(`Error restaurando planta ${index + 1}:`, error)
         }
       })
 
       if (plantasRestauradas === 0) {
-        console.error('❌ No se pudo restaurar ninguna planta válida')
+        console.error('No se pudo restaurar ninguna planta válida')
         return false
       }
 
@@ -447,25 +459,25 @@ export const useStatePersistence = () => {
         try {
           // Validaciones críticas que impiden la restauración
           if (!elementoData.id) {
-            console.warn(`⚠️ Elemento ${index + 1} omitido: falta ID`)
+            console.warn(`Elemento ${index + 1} omitido: falta ID`)
             elementosOmitidos++
             return
           }
 
           if (!elementoData.tipo) {
-            console.warn(`⚠️ Elemento ${index + 1} omitido: falta tipo`)
+            console.warn(`Elemento ${index + 1} omitido: falta tipo`)
             elementosOmitidos++
             return
           }
 
           if (!elementoData.plantaId || !plantaIds.has(elementoData.plantaId)) {
-            console.warn(`⚠️ Elemento ${index + 1} omitido: plantaId inválido`)
+            console.warn(`Elemento ${index + 1} omitido: plantaId inválido`)
             elementosOmitidos++
             return
           }
 
           if (!elementoData.dimensiones || !elementoData.posicion) {
-            console.warn(`⚠️ Elemento ${index + 1} omitido: faltan dimensiones o posición`)
+            console.warn(`Elemento ${index + 1} omitido: faltan dimensiones o posición`)
             elementosOmitidos++
             return
           }
@@ -552,30 +564,46 @@ export const useStatePersistence = () => {
           storeActions.addElemento(elementoSeguro)
           elementosRestaurados++
         } catch (error) {
-          console.error(`❌ Error restaurando elemento ${index + 1}:`, error)
+          console.error(`Error restaurando elemento ${index + 1}:`, error)
           elementosOmitidos++
         }
       })
+
+      let changeHistoryRestored = false
+      if (state.changeHistory && storeActions.setChangeHistory) {
+        try {
+          if (state.changeHistory.entries && Array.isArray(state.changeHistory.entries)) {
+            storeActions.setChangeHistory(state.changeHistory.entries)
+            changeHistoryRestored = true
+          }
+        } catch (error) {
+          console.warn('Error al restaurar historial de cambios:', error)
+        }
+      }
 
       // === ESTABLECER NAVEGACIÓN INICIAL ===
       const primeraPlanta = state.plantas[0]
       storeActions.setInitialNavigation(primeraPlanta.id, primeraPlanta.nombre)
 
       // === RESUMEN DE DESERIALIZACIÓN ===
-      const summary = {
-        plantas: plantasRestauradas,
-        elementos: elementosRestaurados,
-        elementosOmitidos,
-        plantaActiva: primeraPlanta.id,
-        warnings: validation.warnings?.length || 0,
-        catalogos: {
-          tiposEspacio: state.catalogos?.tiposEspacio?.length || DEFAULT_TIPOS_ESPACIO.length,
-          tiposCuarto: state.catalogos?.tiposCuarto?.length || DEFAULT_TIPOS_CUARTO.length,
-          tiposProductoAdmitidos: state.catalogos?.tiposProductoAdmitidos?.length || DEFAULT_TIPOS_PRODUCTO_ADMITIDOS.length,
-        }
-      }
+      // const summary = {
+      //   plantas: plantasRestauradas,
+      //   elementos: elementosRestaurados,
+      //   elementosOmitidos,
+      //   plantaActiva: primeraPlanta.id,
+      //   warnings: validation.warnings?.length || 0,
+      //   changeHistory: {
+      //     restored: changeHistoryRestored,
+      //     entries: changeHistoryRestored ? state.changeHistory.entries.length : 0
+      //   },
+      //   catalogos: {
+      //     tiposEspacio: state.catalogos?.tiposEspacio?.length || DEFAULT_TIPOS_ESPACIO.length,
+      //     tiposCuarto: state.catalogos?.tiposCuarto?.length || DEFAULT_TIPOS_CUARTO.length,
+      //     tiposProductoAdmitidos: state.catalogos?.tiposProductoAdmitidos?.length || DEFAULT_TIPOS_PRODUCTO_ADMITIDOS.length,
+      //   }
+      // }
 
-      console.log('✅ Estado deserializado exitosamente:', summary)
+      // console.log('✅ Estado deserializado exitosamente:', summary)
 
       if (elementosOmitidos > 0) {
         console.warn(`⚠️ ${elementosOmitidos} elementos fueron omitidos debido a datos inválidos`)
@@ -583,7 +611,7 @@ export const useStatePersistence = () => {
 
       return true
     } catch (error) {
-      console.error('❌ Error al deserializar JSON:', error)
+      console.error('Error al deserializar JSON:', error)
       return false
     }
   }
@@ -865,7 +893,33 @@ export const useStatePersistence = () => {
         })
       }
 
-      // === INFORMACIÓN ADICIONAL ===
+      if (data.changeHistory) {
+        if (typeof data.changeHistory !== 'object') {
+          validationResult.warnings.push('changeHistory debe ser un objeto')
+        } else {
+          if (!Array.isArray(data.changeHistory.entries)) {
+            validationResult.warnings.push('changeHistory.entries debe ser un array')
+          } else {
+            // Validar estructura básica de entradas del historial
+            data.changeHistory.entries.forEach((entry, index) => {
+              if (!entry || typeof entry !== 'object') {
+                validationResult.warnings.push(`Entrada de historial ${index + 1}: estructura inválida`)
+              } else {
+                if (!entry.id) {
+                  validationResult.warnings.push(`Entrada de historial ${index + 1}: falta ID`)
+                }
+                if (!entry.timestamp) {
+                  validationResult.warnings.push(`Entrada de historial ${index + 1}: falta timestamp`)
+                }
+                if (!entry.changes || !Array.isArray(entry.changes)) {
+                  validationResult.warnings.push(`Entrada de historial ${index + 1}: changes debe ser un array`)
+                }
+              }
+            })
+          }
+        }
+      }
+
       validationResult.info = {
         plantas: data.plantas?.length || 0,
         elementos: data.elementos?.length || 0,
@@ -874,7 +928,15 @@ export const useStatePersistence = () => {
         app: data.meta?.app || 'desconocida',
         elementosPorTipo: {},
         elementosConHijos: 0,
-        elementosHuerfanos: 0
+        elementosHuerfanos: 0,
+        changeHistory: data.changeHistory ? {
+          hasChangeHistory: true,
+          entries: data.changeHistory.entries?.length || 0,
+          exportedAt: data.changeHistory.meta?.exportedAt || null
+        } : {
+          hasChangeHistory: false,
+          entries: 0
+        }
       }
 
       // Estadísticas de elementos
@@ -1075,19 +1137,19 @@ export const useStatePersistence = () => {
    */
   const validateCatalogo = (catalogo, nombre) => {
     if (!Array.isArray(catalogo)) {
-      console.warn(`⚠️ Catálogo ${nombre}: debe ser un array`)
+      console.warn(`Catálogo ${nombre}: debe ser un array`)
       return false
     }
 
-    const hasValidItems = catalogo.every(item => 
-      item && 
-      typeof item === 'object' && 
-      typeof item.id === 'string' && 
+    const hasValidItems = catalogo.every(item =>
+      item &&
+      typeof item === 'object' &&
+      typeof item.id === 'string' &&
       typeof item.nombre === 'string'
     )
 
     if (!hasValidItems) {
-      console.warn(`⚠️ Catálogo ${nombre}: algunos elementos no tienen la estructura correcta (id, nombre)`)
+      console.warn(`Catálogo ${nombre}: algunos elementos no tienen la estructura correcta (id, nombre)`)
       return false
     }
 
@@ -1101,6 +1163,9 @@ export const useStatePersistence = () => {
     persist,
     load,
     clear,
+
+    // Timestamp
+    getLastSerializationTimestamp,
 
     // Utilidades de validación
     validateStructure,

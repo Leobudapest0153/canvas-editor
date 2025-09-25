@@ -36,7 +36,7 @@ export const toTransformerPrecision = (valueCm) => {
   if (typeof valueCm !== 'number' || !isFinite(valueCm)) {
     return valueCm
   }
-  // Use 4 decimal places to preserve smooth transformer behavior
-  // but avoid floating point errors
-  return Math.round(valueCm * 10000) / 10000
+  // Use configured decimal places to maintain consistency with system precision
+  const factor = Math.pow(10, DECIMAL_PLACES)
+  return Math.round(valueCm * factor) / factor
 }

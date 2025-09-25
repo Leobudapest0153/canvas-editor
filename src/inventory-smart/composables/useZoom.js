@@ -4,9 +4,10 @@
  */
 
 import { useCanvasStore } from './useCanvasStore'
-import { CM_TO_PX } from '../utils/constants'
+import { CM_TO_PX, INFINITE_VIEW_PADDING_PX } from '../utils/constants'
 
-const CONTENT_MARGIN = 40
+const FALLBACK_INFINITE_PADDING = 40
+const infinitePadding = Number.isFinite(INFINITE_VIEW_PADDING_PX) ? INFINITE_VIEW_PADDING_PX : FALLBACK_INFINITE_PADDING
 
 export function useZoom(stageSize, layerConfig) {
   const canvasStore = useCanvasStore()
@@ -17,9 +18,19 @@ export function useZoom(stageSize, layerConfig) {
   const calculateBoundingBox = () => {
     // Contexto 1: si no estamos en planta (navegando dentro de un elemento)
     if ((!canvasStore.estaEnPlanta) && canvasStore.estructuraContenedorActual) {
-      const localW = layerConfig.value.width || Math.max(1, canvasStore.estructuraContenedorActual.width || 1)
-      const localH = layerConfig.value.height || Math.max(1, canvasStore.estructuraContenedorActual.height || 1)
-      return { x: 0, y: 0, width: Math.max(1, localW), height: Math.max(1, localH) }
+      const structure = canvasStore.estructuraContenedorActual
+      const baseWidth = layerConfig.value.width || Math.max(1, Number(structure.width) || 1)
+      const baseHeight = layerConfig.value.height || Math.max(1, Number(structure.height) || 1)
+      const applyPadding = canvasStore.plantaActivaData?.isInfinite === true
+      const padding = applyPadding ? infinitePadding : 0
+      const width = Math.max(1, baseWidth)
+      const height = Math.max(1, baseHeight)
+      return {
+        x: padding ? -padding : 0,
+        y: padding ? -padding : 0,
+        width: width + padding * 2,
+        height: height + padding * 2,
+      }
     }
 
     // Contexto 2: planta activa -> priorizar contenido si existe
@@ -65,7 +76,7 @@ export function useZoom(stageSize, layerConfig) {
           const width = Math.max(1, maxX - minX)
           const height = Math.max(1, maxY - minY)
           if (isInfinite) {
-            const margin = CONTENT_MARGIN
+            const margin = infinitePadding
             return {
               x: minX - margin,
               y: minY - margin,

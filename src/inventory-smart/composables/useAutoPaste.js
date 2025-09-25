@@ -405,7 +405,7 @@ export function useAutoPaste() {
         }
       }
     } catch (error) {
-      console.warn('⚠️ Error en validación de peso (ignorado):', error.message)
+      console.warn('Error en validación de peso (ignorado):', error.message)
     }
 
     // 4. Usar los guards de placement para validación crítica
@@ -420,7 +420,7 @@ export function useAutoPaste() {
         }
       }
     } catch (error) {
-      console.warn('⚠️ Error en placement guards:', error.message)
+      console.warn('Error en placement guards:', error.message)
       return {
         valid: false,
         reason: `Error en validación de placement: ${error.message}`
@@ -761,8 +761,6 @@ export function useAutoPaste() {
         )
         return false
       }
-
-      console.log('✅ Espacio encontrado:', spaceResult.position)
 
       // Validar la colocación en la posición encontrada
       const validation = validatePlacement(elemento, spaceResult.position, areaBounds)
