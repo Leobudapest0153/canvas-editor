@@ -585,3 +585,61 @@ export function buildStructureFromCanvasElement(canvasStore, elementoId, { offse
   const root = cloneRec(elemento, null, 0)
   return { root, payload: { rootId: root.id, elements: Array.from(all.values()) }, meta: { kind: 'template', childrenCount: (Array.isArray(root.hijos) ? root.hijos.length : 0) } }
 }
+
+export function buildChildFromDraft(draft, parentContext, index = 0, parentChilds) {
+  if (!draft || !parentContext) {
+    console.warn('buildChildFromDraft requiere un draft y un parentContext.');
+    return draft; // Devuelve el draft original si faltan datos
+  }
+
+  // 1. Determinar el tipo y categoría del hijo basándose en el padre
+  const esPadreEspacio = parentContext.tipo === 'elementos';
+  const childType = esPadreEspacio ? 'contenedores' : 'pisos';
+  const childCategory = esPadreEspacio ? 'nivel' : 'piso';
+  const defaultName = `${esPadreEspacio ? 'Nivel' : 'Piso'} ${index + 1}`;
+
+  console.log('draft en buildChildFromDraft:', draft);
+  // 2. Construir el objeto base con datos heredados y por defecto
+  const baseChild = {
+    id: draft.id || uid(esPadreEspacio ? 'nivel' : 'piso'),
+    tipo: childType,
+    categoria: childCategory,
+    padre: parentContext.id,
+
+    // Datos heredados del padre
+    color: parentContext.color,
+    colorBase: parentContext.colorBase,
+
+    // Datos por defecto que el draft puede sobreescribir
+    nombre: draft.nombre ?? defaultName,
+    dimensiones: {},
+    capacidadCarga: 0,
+    plantaId: parentContext.plantaId || null,
+    tiposProductos: [],
+    permiteFragiles: false,
+    props: { catalogVisible: false },
+    meta: esPadreEspacio
+      ? { esNivelInterno: true, indiceNivel: index + 1 }
+      : { esPisoInterno: true, indicePiso: index + 1 },
+  };
+
+  // 3. Fusionar el borrador con la base. El draft tiene prioridad.
+  const completedChild = {
+    ...baseChild,
+    ...draft,
+    dimensiones: {
+      ...baseChild.dimensiones,
+      ...(draft.dimensiones || {}),
+    },
+    meta: {
+      ...baseChild.meta,
+      ...(draft.meta || {}),
+    }
+  };
+
+  const typeKey = esPadreEspacio ? 'contenedores' : 'pisos';
+
+  completedChild.codigo = generateCodigo(typeKey, { existing: parentChilds, baseName: completedChild?.nombre });
+
+  return completedChild;
+}
