@@ -390,7 +390,18 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     // Actualizar contexto de navegación
-    const nuevoPath = [...contextoNavegacion.value.path]
+    let nuevoPath = [...contextoNavegacion.value.path]
+    if (nuevoPath.length === 0) {
+      // Buscar la planta raíz activa
+      const planta = plantaPorId.value(plantaActiva.value)
+      if (planta) {
+        nuevoPath.push({
+          tipo: 'plantas',
+          id: planta.id,
+          nombre: planta.nombre,
+        })
+      }
+    }
     nuevoPath.push({
       tipo: elemento.tipo,
       id: elementoId,
