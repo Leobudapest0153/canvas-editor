@@ -84,13 +84,13 @@
         </div>
         <div class="context-details">
           <span v-if="canvasStore.estaEnPlanta">
-            {{ canvasStore.elementosVisibles.length }} items (cuartos, elementos, pasillos)
+            {{ canvasStore.elementosVisibles.length }} items (cuartos, espacios, pasillos)
           </span>
           <span v-else-if="canvasStore.estaEnCuarto">
             {{ canvasStore.elementosVisibles.length }} pisos
           </span>
           <span v-else-if="canvasStore.estaEnPiso">
-            {{ canvasStore.elementosVisibles.length }} elementos
+            {{ canvasStore.elementosVisibles.length }} espacios
           </span>
           <span v-else-if="canvasStore.estaEnElemento">
             {{ canvasStore.elementosVisibles.length }} niveles
@@ -98,7 +98,7 @@
             <small>Interior de {{ elementoActual?.nombre }}</small>
           </span>
           <span v-else-if="canvasStore.estaEnContenedor">
-            {{ canvasStore.elementosVisibles.length }} items (elementos + niveles)
+            {{ canvasStore.elementosVisibles.length }} items (espacios + niveles)
             <br />
             <small>Interior de {{ elementoActual?.nombre }}</small>
           </span>

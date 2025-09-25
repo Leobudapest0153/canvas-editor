@@ -2103,7 +2103,6 @@ const createElementFromTemplate = (data, dropEvent) => {
   }
   // Unificar instanciación de estructuras (plantillas/cuarto/espacio)
   instantiateStructureOnCanvas(canvasStore, payload, res.position)
-  showToast('No se pudo insertar la plantilla', 'error')
 }
 
 // Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
