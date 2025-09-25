@@ -33,6 +33,7 @@
                   planta.id !== canvasStore.plantaActiva,
               },
             ]"
+            @contextmenu.stop.prevent="toggleMenuPlanta(planta.id, $event)"
           >
             <div class="flex items-center space-x-3" @click="seleccionarPlanta(planta.id)">
               <div
@@ -701,9 +702,17 @@ const toggleMenuPlanta = (plantaId, event) => {
       const viewportTop = window.scrollY + 8
       const viewportBottom = window.scrollY + window.innerHeight - 8
 
-      // Alinear por defecto bajo el botón y con borde derecho alineado al botón
-      let left = rect.right + window.scrollX - w
-      let top = rect.bottom + window.scrollY + gap
+      // Posición inicial: si es clic derecho, usar el puntero; si no, alinear al botón
+      let left
+      let top
+      if (event?.type === 'contextmenu' && Number.isFinite(event?.pageX) && Number.isFinite(event?.pageY)) {
+        left = event.pageX
+        top = event.pageY
+      } else {
+        // Alinear por defecto bajo el botón y con borde derecho alineado al botón
+        left = rect.right + window.scrollX - w
+        top = rect.bottom + window.scrollY + gap
+      }
 
       // Si no cabe a la derecha/izquierda, ajustar
       if (left < viewportLeft) {
