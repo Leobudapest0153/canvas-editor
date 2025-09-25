@@ -951,9 +951,9 @@ const ensureTouchedForLevel = (nivel) => {
   return nivel._touched
 }
 
-// Computed
 const tiposDisponibles = computed(() => {
-  return props.modo === 'cuarto' ? catalogos.value.tiposCuarto : catalogos.value.tiposEspacio
+  const tipos = props.modo === 'cuarto' ? catalogos.value.tiposCuarto : catalogos.value.tiposEspacio
+  return tipos.filter((t) => t.id !== 'pasillo')
 })
 
 const formasDisponibles = computed(() => {
@@ -985,14 +985,14 @@ const tiposZonaUI = computed(() => {
 const esFormularioValido = computed(() => {
   const dg = datosGenerales.value
   const dim = dimensiones.value
-  
+
   let hasGeneral = dg.nombre.trim() !== '' && dg.tipoSeleccionado !== '' && dg.color && dg.orientacion !== ''
-  
+
   // Para espacios, también validar ubicación y, si es pared, alturaRespectoAlSuelo
   if (props.modo === 'espacio') {
     hasGeneral = hasGeneral && dg.ubicacion !== '' && validAlturaRespectoAlSuelo.value
   }
-  
+
   const hasDims =
     dim.forma !== '' && dim.largo > 0 && dim.alto > 0 && dim.ancho > 0 && dim.capacidadCarga > 0
   // En niveles/pisos, solo los campos de "Características" son obligatorios (tipoZona). Los demás se auto-calculan.

@@ -94,7 +94,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
     categoria: 'pasillo',
     forma: 'rectangular',
     orientacion: 0,
-    colorBase: '#ffffff',
+    colorBase: '#EDEDED',
     dimensiones: {
       ancho: 150,
       largo: 600,
