@@ -319,7 +319,7 @@ export const DEFAULT_TIPOS_ESPACIO = [
   { id: 'pasillo', nombre: 'Pasillo' },
 ]
 export const DEFAULT_TIPOS_CUARTO = [
-  { id: 'almacenamiento', nombre: 'Almacenamiento' },
+  { id: 'almacenamiento', nombre: 'Zona de almacenaje' },
   { id: 'zona_de_descarga', nombre: 'Zona de Descarga' },
   { id: 'almacenaje', nombre: 'Almacenaje' },
 ]
@@ -337,6 +337,7 @@ export const DEFAULT_TIPOS_CONTENEDOR = [{ id: 'nivel', nombre: 'Nivel' }]
 
 export const DEFAULT_TIPOS_PISO = [{ id: 'piso', nombre: 'Piso' }]
 
+<<<<<<< HEAD
 export const TODAS_LAS_CATEGORIAS = [...DEFAULT_TIPOS_CUARTO, ...DEFAULT_TIPOS_ESPACIO, ...DEFAULT_TIPOS_CONTENEDOR, ...DEFAULT_TIPOS_PISO]
 
 export const ORIENTACIONES = [
@@ -345,6 +346,25 @@ export const ORIENTACIONES = [
   { id: '180', nombre: '180°' },
   { id: '270', nombre: '270°' },
 ]
+=======
+/**
+ * Obtiene las categorías permitidas según el tipo de entidad
+ */
+export const getCategoriasPorTipo = (tipo) => {
+  switch (tipo) {
+    case 'elementos':
+      return CATEGORIAS_ELEMENTOS
+    case 'contenedores':
+      return CATEGORIAS_CONTENEDORES
+    case 'cuartos':
+      return CATEGORIAS_CUARTOS
+    case 'pisos':
+      return CATEGORIAS_PISOS
+    default:
+      return []
+  }
+}
+>>>>>>> origin/dev
 
 export const puedeContener = (tipoPadre, tipoHijo) => {
   return JERARQUIA_PERMITIDA[tipoPadre]?.includes(tipoHijo) || false
@@ -355,11 +375,14 @@ export const getColorPorTipo = (tipo) => {
   return tipoInfo?.color || '#6b7280'
 }
 
+<<<<<<< HEAD
 export const getColorPorCategoria = (categoriaId) => {
   const cat = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
   return cat?.color || '#3b82f6'
 }
 
+=======
+>>>>>>> origin/dev
 export const getIconoPorTipo = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.icono || '📦'
@@ -385,6 +408,13 @@ export const GRID_SIZE = 0
 export const PRECISION_CM = 0.01
 // Número de decimales para redondeo
 export const DECIMAL_PLACES = 2
+<<<<<<< HEAD
+=======
+
+// MARGEN POR DEFECTO PARA CAPACIDAD DE CARGA AL AUTOCOMPLETAR (5% = 0.05)
+export const LOAD_MARGIN = 0.05
+
+>>>>>>> origin/dev
 // Parámetros por defecto para guard de redimensionado
 export const MARGIN_CM = 5 // margen perimetral interno en cm para packing
 export const FACTOR_UTILIZACION = 0.9 // porcentaje máximo de ocupación de área

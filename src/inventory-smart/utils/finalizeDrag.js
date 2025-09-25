@@ -26,22 +26,28 @@ function getModelBBoxFromShape(shape) {
 
 function shrinkBoundsByStroke(areaBounds, strokeHalf) {
   if (!strokeHalf || strokeHalf <= 0) return { ...areaBounds }
-  const { minX, minY, maxX, maxY } = areaBounds
+  const { minX, minY, maxX, maxY, polygon } = areaBounds
+  // Preservar referencia a polígono (incl. flag _isInfinite) para chequeos posteriores
   return {
     minX: minX + strokeHalf,
     minY: minY + strokeHalf,
     maxX: maxX - strokeHalf,
     maxY: maxY - strokeHalf,
+    ...(polygon ? { polygon } : {}),
   }
 }
 
 function clampRectToBounds(x, y, w, h, b) {
+  // Bypass si área infinita
+  if (b && b.polygon && b.polygon._isInfinite === true) return { x, y }
   const nx = Math.max(b.minX, Math.min(x, b.maxX - w))
   const ny = Math.max(b.minY, Math.min(y, b.maxY - h))
   return { x: nx, y: ny }
 }
 
 function rectOutsideBounds(x, y, w, h, b, eps = 1e-6) {
+  // Bypass si área infinita
+  if (b && b.polygon && b.polygon._isInfinite === true) return false
   return x < b.minX - eps || y < b.minY - eps || x + w > b.maxX + eps || y + h > b.maxY + eps
 }
 
@@ -58,6 +64,8 @@ function dominantAxisFromVelocity(vx, vy) {
 
 function corridorFeasible({ movingEl, neighbors = [], areaBounds, axis = 'x', CM_TO_PX, strokeHalf = 0, marginPx = 0 }) {
   void CM_TO_PX
+  // Bypass de corredor si el área es infinita
+  if (areaBounds && areaBounds.polygon && areaBounds.polygon._isInfinite === true) return true
   const EPS = 1e-6
   const w = movingEl.width || 0
   const h = movingEl.height || 0
@@ -72,12 +80,10 @@ function corridorFeasible({ movingEl, neighbors = [], areaBounds, axis = 'x', CM
     for (const n of neighbors) {
       const nx0 = n.x
       const nx1 = n.x + (n.width || 0)
-      // Vecino pegado a borde izquierdo
       if (nx0 <= minX + EPS) {
         const gap = Math.max(0, nx0 - minX)
         if (gap + EPS < needed) return false
       }
-      // Vecino pegado a borde derecho
       if (nx1 >= maxX - EPS) {
         const gap = Math.max(0, maxX - nx1)
         if (gap + EPS < needed) return false
@@ -88,12 +94,10 @@ function corridorFeasible({ movingEl, neighbors = [], areaBounds, axis = 'x', CM
     for (const n of neighbors) {
       const ny0 = n.y
       const ny1 = n.y + (n.height || 0)
-      // Vecino pegado a borde superior
       if (ny0 <= minY + EPS) {
         const gap = Math.max(0, ny0 - minY)
         if (gap + EPS < needed) return false
       }
-      // Vecino pegado a borde inferior
       if (ny1 >= maxY - EPS) {
         const gap = Math.max(0, maxY - ny1)
         if (gap + EPS < needed) return false
@@ -110,7 +114,7 @@ function resolveBlockingCollisions(x0, y0, el, elements, areaBounds) {
   let y = y0
   const MAX_ITERS = 3
 
-  // clamp stroke-safe bounds primero
+  // clamp stroke-safe bounds primero (no-op en área infinita)
   const c0 = clampRectToBounds(x, y, w, h, areaBounds)
   x = c0.x; y = c0.y
 
@@ -139,54 +143,61 @@ function resolveBlockingCollisions(x0, y0, el, elements, areaBounds) {
 
 export async function runFinalClamp({ shape, el, areaBounds, grid = GRID_SIZE, elements = [], lastValidPos = null, CM_TO_PX }) {
   if (!shape || !el || !areaBounds) return { x: el?.x ?? 0, y: el?.y ?? 0, appliedFallback: true }
-  // marcar CM_TO_PX como usado para evitar lint si no se requiere
   void CM_TO_PX
 
   const strokeEnabled = typeof shape.strokeEnabled === 'function' ? shape.strokeEnabled() : !!shape.strokeEnabled
   const strokeWidth = typeof shape.strokeWidth === 'function' ? shape.strokeWidth() : (shape.strokeWidth || 0)
   const strokeHalf = strokeEnabled ? (strokeWidth / 2) : 0
   const bStroke = shrinkBoundsByStroke(areaBounds, strokeHalf)
+  const isInf = !!(bStroke && bStroke.polygon && bStroke.polygon._isInfinite === true)
 
   // Leer bbox de modelo actual del shape (sin sombras)
   const bbox = getModelBBoxFromShape(shape)
   let candidate = { x: bbox.x, y: bbox.y }
 
-  // (a) clamp puro con histéresis (edge constraint)
+  // (a) clamp con histéresis: en infinito, applyEdgeConstraint devolverá pos original si preservamos polygon
   const { pos: posA } = applyEdgeConstraint(candidate, el, bStroke)
 
-  // (b) resolver bloqueantes simple
+  // (b) resolver bloqueantes (independiente de límites)
   const { x: xB, y: yB } = resolveBlockingCollisions(posA.x, posA.y, el, elements, bStroke)
 
-  // (c) clamp → snap → re-clamp (rects) o snap de centro para círculos
+  // (c) snap/clamp final respetando infinito
   let xf = xB
   let yf = yB
   if (bbox.className === 'Circle' || el.forma === 'circular') {
     const r = Math.min(el.width, el.height) / 2
     const cx = xf + r
     const cy = yf + r
-    // Snap solo si grid > 0
     if (typeof grid === 'number' && grid > 0) {
       const sx = Math.round(cx / grid) * grid
       const sy = Math.round(cy / grid) * grid
-      const cxClamped = Math.max(bStroke.minX + r, Math.min(sx, bStroke.maxX - r))
-      const cyClamped = Math.max(bStroke.minY + r, Math.min(sy, bStroke.maxY - r))
-      xf = cxClamped - r
-      yf = cyClamped - r
-    } else {
-      // No snap: solo clamp
+      if (isInf) {
+        xf = sx - r
+        yf = sy - r
+      } else {
+        const cxClamped = Math.max(bStroke.minX + r, Math.min(sx, bStroke.maxX - r))
+        const cyClamped = Math.max(bStroke.minY + r, Math.min(sy, bStroke.maxY - r))
+        xf = cxClamped - r
+        yf = cyClamped - r
+      }
+    } else if (!isInf) {
       const cxClamped = Math.max(bStroke.minX + r, Math.min(cx, bStroke.maxX - r))
       const cyClamped = Math.max(bStroke.minY + r, Math.min(cy, bStroke.maxY - r))
       xf = cxClamped - r
       yf = cyClamped - r
     }
   } else {
-    // finalizeRectClampSnapReclamp internamente hacía snap; si grid <= 0 evitamos el snap
     if (typeof grid === 'number' && grid > 0) {
-      const fr = finalizeRectClampSnapReclamp(xf, yf, el.width, el.height, bStroke, grid)
-      xf = fr.x
-      yf = fr.y
-    } else {
-      // Solo clamp
+      if (isInf) {
+        const snapped = snapToGrid(xf, yf, grid)
+        xf = snapped.x
+        yf = snapped.y
+      } else {
+        const fr = finalizeRectClampSnapReclamp(xf, yf, el.width, el.height, bStroke, grid)
+        xf = fr.x
+        yf = fr.y
+      }
+    } else if (!isInf) {
       const cHard = clampRectToBounds(xf, yf, el.width, el.height, bStroke)
       xf = cHard.x
       yf = cHard.y
@@ -203,10 +214,9 @@ export async function runFinalClamp({ shape, el, areaBounds, grid = GRID_SIZE, e
     shape.y(yf)
   }
 
-  // Validación final stroke-safe
+  // Validación final stroke-safe (no aplica en infinito)
   const out = rectOutsideBounds(xf, yf, el.width, el.height, bStroke)
   if (out) {
-    // Fallback a última válida si existe
     const fallback = lastValidPos || null
     if (fallback) {
       if (bbox.className === 'Circle' || el.forma === 'circular') {
@@ -220,7 +230,6 @@ export async function runFinalClamp({ shape, el, areaBounds, grid = GRID_SIZE, e
         return { x: fallback.x, y: fallback.y, appliedFallback: true }
       }
     }
-    // Último recurso: clamp duro
     const cHard = clampRectToBounds(xf, yf, el.width, el.height, bStroke)
     if (bbox.className === 'Circle' || el.forma === 'circular') {
       const r = Math.min(el.width, el.height) / 2
@@ -251,6 +260,7 @@ export function solveFinalPlacement({
   const EPS = 1e-6
   const w = movingEl.width || 0
   const h = movingEl.height || 0
+  const isInf = !!(areaBounds && areaBounds.polygon && areaBounds.polygon._isInfinite === true)
 
   // (A) determinar eje por lastVelocity (default 'x')
   const axis = lastVelocity ? dominantAxisFromVelocity(lastVelocity.x || 0, lastVelocity.y || 0) : 'x'
@@ -258,14 +268,17 @@ export function solveFinalPlacement({
   // stroke para shrink final y para inflar vecino en chequeo
   const strokeHalf = (movingEl.__strokePx || 0) / 2
 
-  // (B) chequear factibilidad del corredor contra vecinos pegados al borde
-  const feasible = corridorFeasible({ movingEl, neighbors, areaBounds, axis, CM_TO_PX, strokeHalf, marginPx })
-  if (!feasible) {
-    return lastValidPos ? { ...lastValidPos } : { x: movingEl.x || 0, y: movingEl.y || 0 }
+  // (B) chequear factibilidad del corredor contra vecinos pegados al borde (si no es infinita)
+  if (!isInf) {
+    const feasible = corridorFeasible({ movingEl, neighbors, areaBounds, axis, CM_TO_PX, strokeHalf, marginPx })
+    if (!feasible) {
+      return lastValidPos ? { ...lastValidPos } : { x: movingEl.x || 0, y: movingEl.y || 0 }
+    }
   }
 
-  // (C) clamp inicial a área (sin stroke)
-  let pos = clampRectToBounds(candidate.x, candidate.y, w, h, areaBounds)
+  // (C) clamp inicial stroke-safe (no-op si es infinita)
+  const bStroke = shrinkBoundsByStroke(areaBounds, strokeHalf)
+  let pos = clampRectToBounds(candidate.x, candidate.y, w, h, bStroke)
 
   // Helper GS en eje único
   const tryPassAxis = (maxIters) => {
@@ -285,13 +298,13 @@ export function solveFinalPlacement({
         else dx = 0
         const nx = pos.x + dx
         const ny = pos.y + dy
-        if (rectOutsideBounds(nx, ny, w, h, areaBounds, EPS)) {
+        if (!isInf && rectOutsideBounds(nx, ny, w, h, bStroke, EPS)) {
           // Rompería el área -> falla inmediata
           return { ok: false }
         }
         pos.x = nx
         pos.y = ny
-        const c = clampRectToBounds(pos.x, pos.y, w, h, areaBounds)
+        const c = clampRectToBounds(pos.x, pos.y, w, h, bStroke)
         pos.x = c.x
         pos.y = c.y
       }
@@ -319,17 +332,10 @@ export function solveFinalPlacement({
   const r2 = tryPassAxis(3)
   if (!r2.ok) return lastValidPos ? { ...lastValidPos } : { x: movingEl.x || 0, y: movingEl.y || 0 }
 
-  // (F) clamp final stroke-safe
-  if (strokeHalf > 0) {
-    const bStroke = shrinkBoundsByStroke(areaBounds, strokeHalf)
-    const c = clampRectToBounds(pos.x, pos.y, w, h, bStroke)
-    pos.x = c.x
-    pos.y = c.y
-  } else {
-    const c = clampRectToBounds(pos.x, pos.y, w, h, areaBounds)
-    pos.x = c.x
-    pos.y = c.y
-  }
+  // (F) clamp final stroke-safe (no-op si infinito)
+  const c = clampRectToBounds(pos.x, pos.y, w, h, bStroke)
+  pos.x = c.x
+  pos.y = c.y
 
   return { x: pos.x, y: pos.y }
 }
@@ -358,6 +364,8 @@ export function finalizePlacement({
 
   // Función auxiliar para calcular gap disponible
   function gapDisponible(axis, neighbors, areaBounds) {
+    // Bypass total si es infinita
+    if (areaBounds && areaBounds.polygon && areaBounds.polygon._isInfinite === true) return Infinity
     const EPS = 1e-6
     const strokeHalf = strokePx / 2
 
@@ -371,14 +379,10 @@ export function finalizePlacement({
       for (const n of neighbors) {
         const nx0 = n.x
         const nx1 = n.x + (n.width || 0)
-
-        // Vecino pegado a borde izquierdo - gap disponible entre vecino y borde izquierdo
         if (nx0 <= minX + EPS) {
           const gap = Math.max(0, nx0 - minX)
           minGap = Math.min(minGap, gap)
         }
-
-        // Vecino pegado a borde derecho - gap disponible entre borde derecho y vecino
         if (nx1 >= maxX - EPS) {
           const gap = Math.max(0, maxX - nx1)
           minGap = Math.min(minGap, gap)
@@ -390,14 +394,10 @@ export function finalizePlacement({
       for (const n of neighbors) {
         const ny0 = n.y
         const ny1 = n.y + (n.height || 0)
-
-        // Vecino pegado a borde superior - gap disponible entre vecino y borde superior
         if (ny0 <= minY + EPS) {
           const gap = Math.max(0, ny0 - minY)
           minGap = Math.min(minGap, gap)
         }
-
-        // Vecino pegado a borde inferior - gap disponible entre borde inferior y vecino
         if (ny1 >= maxY - EPS) {
           const gap = Math.max(0, maxY - ny1)
           minGap = Math.min(minGap, gap)
@@ -426,9 +426,11 @@ export function finalizePlacement({
     return clampAreaStrokeSafe(pos, areaBounds, strokePx)
   }
 
+  const isInf = !!(areaBounds && areaBounds.polygon && areaBounds.polygon._isInfinite === true)
+
   // (2) Verificar si el corredor es factible
   const corredorFactible = gapDisponible(axis, neighbors, areaBounds) >= size(movingEl, axis)
-  if (!corredorFactible) {
+  if (!isInf && !corredorFactible) {
     return lastValidPos || { x: movingEl.x || 0, y: movingEl.y || 0 }
   }
 

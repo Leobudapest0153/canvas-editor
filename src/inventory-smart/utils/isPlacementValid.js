@@ -24,6 +24,12 @@ export function insideAreaModel(pos, movingEl, areaBounds, epsPx = 0.5) {
   // Para elementos circulares, usar geometría circular
   const isCirc = movingEl?.forma === 'circular'
 
+  const mode = areaBounds?.mode ?? 'fixed'
+  if (mode === 'elastic') {
+    return true
+  }
+
+
   const { minX, minY, maxX, maxY } = areaBounds || { minX: 0, minY: 0, maxX: 0, maxY: 0 }
    // Si se proporcionó un polígono, usar validación estricta de rect dentro del polígono
    if (areaBounds && Array.isArray(areaBounds.polygon)) {
