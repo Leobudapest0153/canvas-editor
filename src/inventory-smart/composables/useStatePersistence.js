@@ -29,12 +29,9 @@ export const useStatePersistence = () => {
     if (validateBeforeSerialize) {
       const preValidation = validateStateBeforeSerialization(state)
       if (!preValidation.valid) {
-        console.warn('Problemas detectados antes de serializar:', preValidation.issues)
         if (preValidation.critical) {
           throw new Error(`Serialización abortada: ${preValidation.issues.join(', ')}`)
         }
-      } else if (includeMetrics) {
-        console.log('Estado validado para serialización:', preValidation.metrics)
       }
     }
 
