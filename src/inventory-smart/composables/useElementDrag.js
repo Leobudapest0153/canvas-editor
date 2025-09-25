@@ -14,7 +14,7 @@ import { finalizePlacement } from '@/inventory-smart/utils/finalizeDrag'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
 import { GRID_SIZE, CM_TO_PX } from '@/inventory-smart/utils/constants'
-import { getActiveBounds } from '@/inventory-smart/utils/activeBounds'
+import { boundaryToAreaBounds } from '@/inventory-smart/utils/bounds'
 import {
   detectConflictsFor,
   computeMTD,
@@ -88,16 +88,29 @@ export function useElementDrag({
 
     // Iterar para resolver múltiples colisiones respetando contorno
     const MAX_ITERS = 3
-    const boundary = computeBoundary()
-    const W = boundary.type === 'rect' ? boundary.W : Infinity
-    const H = boundary.type === 'rect' ? boundary.H : Infinity
+    const boundary = computeBoundary() || {}
+    const areaBounds = boundaryToAreaBounds(boundary, {
+      minX: 0,
+      minY: 0,
+      maxX: layerConfig.value.width,
+      maxY: layerConfig.value.height,
+      mode: boundary?.mode || 'fixed',
+      polygon: boundary?.type === 'polygon' ? boundary.points : null,
+    })
+    const boundaryMode = areaBounds.mode ?? 'fixed'
+    const clampToBoundary = boundaryMode !== 'elastic'
+    const boundaryType = boundary.type
+    const rectMinX = areaBounds.minX ?? 0
+    const rectMinY = areaBounds.minY ?? 0
+    const rectWidth = boundaryType === 'rect' ? Math.max(0, (areaBounds.maxX ?? rectMinX) - rectMinX) : Infinity
+    const rectHeight = boundaryType === 'rect' ? Math.max(0, (areaBounds.maxY ?? rectMinY) - rectMinY) : Infinity
 
     // Paso (1): clamp al área primero
-    if (boundary.type === 'rect') {
-      const c = clampRectToRect(x, y, w, h, W, H)
-      x = c.x
-      y = c.y
-    } else if (boundary.type === 'polygon') {
+    if (clampToBoundary && boundaryType === 'rect') {
+      const c = clampRectToRect(x - rectMinX, y - rectMinY, w, h, rectWidth, rectHeight)
+      x = c.x + rectMinX
+      y = c.y + rectMinY
+    } else if (clampToBoundary && boundaryType === 'polygon') {
       // Para elementos circulares, usar clamp circular con posición previa para movimiento suave
       if (elemento.forma === 'circular') {
         const radius = Math.min(w, h) / 2
@@ -149,8 +162,17 @@ export function useElementDrag({
       }
 
       // Proyección del MTD contra el contorno rectangular
-      if (boundary.type === 'rect') {
-        const proj = projectMTDAgainstBoundary(x, y, accDx, accDy, w, h, W, H)
+      if (clampToBoundary && boundaryType === 'rect') {
+        const proj = projectMTDAgainstBoundary(
+          x - rectMinX,
+          y - rectMinY,
+          accDx,
+          accDy,
+          w,
+          h,
+          rectWidth,
+          rectHeight,
+        )
         accDx = proj.dx
         accDy = proj.dy
       }
@@ -159,11 +181,11 @@ export function useElementDrag({
       x += accDx
       y += accDy
 
-      if (boundary.type === 'rect') {
-        const c2 = clampRectToRect(x, y, w, h, W, H)
-        x = c2.x
-        y = c2.y
-      } else if (boundary.type === 'polygon') {
+      if (clampToBoundary && boundaryType === 'rect') {
+        const c2 = clampRectToRect(x - rectMinX, y - rectMinY, w, h, rectWidth, rectHeight)
+        x = c2.x + rectMinX
+        y = c2.y + rectMinY
+      } else if (clampToBoundary && boundaryType === 'polygon') {
         if (elemento.forma === 'circular') {
           const radius = Math.min(w, h) / 2
           const centerX = x + radius
@@ -195,9 +217,13 @@ export function useElementDrag({
     const movingEnd = { ...elemento, x, y }
     const endConf = detectConflictsFor(movingEnd, all).filter((c) => c.bloqueante)
     const outsideArea =
-      boundary.type === 'rect'
-        ? x < -1e-6 || y < -1e-6 || x + w > W + 1e-6 || y + h > H + 1e-6
-        : !pointInPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.points)
+      clampToBoundary &&
+      (boundaryType === 'rect'
+        ? x < rectMinX - 1e-6 ||
+          y < rectMinY - 1e-6 ||
+          x + w > rectMinX + rectWidth + 1e-6 ||
+          y + h > rectMinY + rectHeight + 1e-6
+        : !pointInPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.points))
     if (outsideArea) {
       const cp = clampPointToPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.inset)
       x = cp.x - w / 2
@@ -289,8 +315,15 @@ export function useElementDrag({
 
         const onValidateLight = throttle2((bbox) => {
           // Overlay rojo/ok basado en el MISMO predicado de validez (modelo puro)
-          const active = getActiveBounds(canvasStore)
-          const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: active.polygonPx }
+          const boundary = typeof computeBoundary === 'function' ? computeBoundary() : null
+          const areaBounds = boundaryToAreaBounds(boundary, {
+            minX: 0,
+            minY: 0,
+            maxX: layerConfig.value.width,
+            maxY: layerConfig.value.height,
+            polygon: boundary?.type === 'polygon' ? boundary.points : null,
+            mode: boundary?.mode || 'fixed',
+          })
           const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
           if (!elemento) return
           const moving = {
@@ -337,8 +370,15 @@ export function useElementDrag({
           if (!elemento) return
           const W = layerConfig.value.width
           const H = layerConfig.value.height
-          const activeForFrame = getActiveBounds(canvasStore)
-          const areaBounds = { minX: 0, minY: 0, maxX: W, maxY: H, polygon: activeForFrame.polygonPx }
+          const boundary = typeof computeBoundary === 'function' ? computeBoundary() : null
+          const areaBounds = boundaryToAreaBounds(boundary, {
+            minX: 0,
+            minY: 0,
+            maxX: W,
+            maxY: H,
+            polygon: boundary?.type === 'polygon' ? boundary.points : null,
+            mode: boundary?.mode || 'fixed',
+          })
 
           // Para círculos, desiredPos ya es top-left (convertido en updateElementPosition)
           const asRect =
@@ -374,8 +414,15 @@ export function useElementDrag({
           const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
           if (!elemento) return false
           const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
-          const activeForValidate = getActiveBounds(canvasStore)
-          const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: activeForValidate.polygonPx }
+          const boundary = typeof computeBoundary === 'function' ? computeBoundary() : null
+          const areaBounds = boundaryToAreaBounds(boundary, {
+            minX: 0,
+            minY: 0,
+            maxX: layerConfig.value.width,
+            maxY: layerConfig.value.height,
+            polygon: boundary?.type === 'polygon' ? boundary.points : null,
+            mode: boundary?.mode || 'fixed',
+          })
           return isPlacementValid({ pos, movingEl: elemento, neighbors, areaBounds, CM_TO_PX, epsPx: 0.5 })
         }
 
@@ -480,8 +527,15 @@ export function useElementDrag({
       const layer = layerRef.value.getNode()
       const shape = stage.findOne(`#${elementId}`)
       if (shape && layer) {
-          const activeFinalize = getActiveBounds(canvasStore)
-          const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: activeFinalize.polygonPx }
+        const boundary = typeof computeBoundary === 'function' ? computeBoundary() : null
+        const areaBounds = boundaryToAreaBounds(boundary, {
+          minX: 0,
+          minY: 0,
+          maxX: layerConfig.value.width,
+          maxY: layerConfig.value.height,
+          polygon: boundary?.type === 'polygon' ? boundary.points : null,
+          mode: boundary?.mode || 'fixed',
+        })
         const elementoActual = canvasStore.elementosVisibles.find((e) => e.id === elementId)
         if (elementoActual) {
           // Candidato desde el shape (bbox de modelo)
@@ -678,8 +732,15 @@ export function useElementDrag({
 
       if (storeEl && posDiff) {
         // Validar que la posición final está dentro del área y es válida según el validador común
-  const active2 = getActiveBounds(canvasStore)
-  const areaBounds = { minX: 0, minY: 0, maxX: layerConfig.value.width, maxY: layerConfig.value.height, polygon: active2.polygonPx }
+        const boundary = typeof computeBoundary === 'function' ? computeBoundary() : null
+        const areaBounds = boundaryToAreaBounds(boundary, {
+          minX: 0,
+          minY: 0,
+          maxX: layerConfig.value.width,
+          maxY: layerConfig.value.height,
+          polygon: boundary?.type === 'polygon' ? boundary.points : null,
+          mode: boundary?.mode || 'fixed',
+        })
         const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
         const isValidNow = isPlacementValid({
           pos: { x: finalX, y: finalY },

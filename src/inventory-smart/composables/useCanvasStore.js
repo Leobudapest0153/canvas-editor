@@ -18,10 +18,10 @@ import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import { useStatePersistence, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS } from '@/inventory-smart/composables/useStatePersistence'
+import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
 import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
@@ -32,6 +32,7 @@ import { proposeLevelChange, applyLevelChange } from '@/inventory-smart/composab
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'
+import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
 import { exportCatalogItemsToDTO, importCatalogItemsFromDTO } from '@/inventory-smart/modules/catalog/catalogItems.serializer.js'
 
 export const useCanvasStore = defineStore('canvas', () => {
@@ -40,6 +41,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Instancia del catálogo
   const catalogStore = useCatalogStore()
+  const changeHistoryStore = useChangeHistoryStore?.() // opcional durante init
 
   // === INTEGRACIÓN CON HISTORIAL ===
   // Instancia del historial - se establece desde useCanvasWithHistory
@@ -59,6 +61,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         largo: 1500, // cm
       },
       capacidadCargaSoportado: 5000, // kg
+      // Nuevo flag para plantas elásticas (por defecto false)
+      isInfinite: false,
       poligono: [
         {
           x: 0,
@@ -370,14 +374,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     const elemento = elementoPorId.value(elementoId)
     if (!elemento) {
       showToast('Elemento no encontrado')
-      console.error('Elemento no encontrado:', elementoId)
       return
     }
 
     // Verificar que el elemento sea navegable: cuartos, pisos, elementos
     if (!['cuartos', 'pisos', 'elementos'].includes(elemento.tipo)) {
       showToast('Este elemento no permite navegación')
-      console.error('No navegable:', elemento.tipo)
       return
     }
 
@@ -493,7 +495,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     const planta = plantaPorId.value(plantaId)
     if (!planta) {
       showToast('Planta no encontrada')
-      console.error('Planta no encontrada:', plantaId)
       return
     }
 
@@ -572,7 +573,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const defaultHeight = elemento.tipo === 'contenedores' ? 40 : 60
       elementWidthPx = defaultWidth * CM_TO_PX
       elementHeightPx = defaultHeight * CM_TO_PX
-      console.log('Usando dimensiones por defecto')
+      console.warn('Usando dimensiones por defecto')
     }
 
     // El canvas muestra el espacio real del elemento
@@ -584,23 +585,72 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   const calcularCanvasAdaptativoPlanta = (planta) => {
-    // Calcular tamaño del canvas basado en las dimensiones de la planta
+    // Calcular tamaño y origen del canvas basado en la planta activa
     if (!planta) {
-      // Fallback por defecto
       canvasAdaptativo.value = {
         width: 800,
         height: 600,
         escala: 1,
+        frame: { x: 0, y: 0, width: 800, height: 600 },
       }
       return
     }
 
-    // Convertir dimensiones de cm a pixels usando la constante CM_TO_PX
-    // Para plantas, usamos la conversión directa 1:1 (sin factor de escala adicional)
+    const dims = planta.dimensiones || {}
+    const widthPxFromDims = (Number(dims.ancho) || 0) * CM_TO_PX
+    const heightPxFromDims = (Number(dims.largo) || 0) * CM_TO_PX
+
+    let originX = 0
+    let originY = 0
+    let frameWidth = widthPxFromDims
+    let frameHeight = heightPxFromDims
+
+    if (Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+
+      for (const point of planta.poligono) {
+        const x = Number(point?.x ?? point?.[0])
+        const y = Number(point?.y ?? point?.[1])
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+        minX = Math.min(minX, x)
+        minY = Math.min(minY, y)
+        maxX = Math.max(maxX, x)
+        maxY = Math.max(maxY, y)
+      }
+
+      if (
+        Number.isFinite(minX) &&
+        Number.isFinite(minY) &&
+        Number.isFinite(maxX) &&
+        Number.isFinite(maxY) &&
+        maxX > minX &&
+        maxY > minY
+      ) {
+        originX = Math.floor(minX)
+        originY = Math.floor(minY)
+        frameWidth = Math.max(1, Math.ceil(maxX) - originX)
+        frameHeight = Math.max(1, Math.ceil(maxY) - originY)
+      }
+    }
+
+    if (!Number.isFinite(frameWidth) || frameWidth <= 0) frameWidth = widthPxFromDims || 0
+    if (!Number.isFinite(frameHeight) || frameHeight <= 0) frameHeight = heightPxFromDims || 0
+
     canvasAdaptativo.value = {
-      width: planta.dimensiones.ancho * CM_TO_PX, // ancho = x
-      height: planta.dimensiones.largo * CM_TO_PX, // largo = y
-      escala: CM_TO_PX, // La escala es la conversión cm->px
+      width: frameWidth || widthPxFromDims,
+      height: frameHeight || heightPxFromDims,
+      escala: CM_TO_PX,
+      originX,
+      originY,
+      frame: {
+        x: originX,
+        y: originY,
+        width: frameWidth || widthPxFromDims,
+        height: frameHeight || heightPxFromDims,
+      },
     }
   }
 
@@ -632,7 +682,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     try {
       const idx = elementos.value.findIndex(e => e && e.id === id);
       if (idx === -1) {
-        console.warn('[actualizarElementoSinValidacion] Elemento no encontrado:', id);
+        console.warn('Elemento no encontrado:', id);
         return false;
       }
 
@@ -681,7 +731,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       return true;
     } catch (err) {
-      console.error('[actualizarElementoSinValidacion] Error:', err);
+      console.error('Error:', err);
       return false;
     }
   };
@@ -863,6 +913,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         largo: nuevaPlanta.dimensiones?.largo || 0,
       },
       capacidadCargaSoportado: nuevaPlanta.capacidadCargaSoportado || 3000,
+      // Flag de planta elástica: por defecto false
+      isInfinite: false,
       ...nuevaPlanta,
     })
     return id
@@ -963,8 +1015,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Actions para elementos
   const agregarElemento = (nuevoElemento, opts = {}) => {
-    console.log('Agregando elemento al store:', nuevoElemento)
-
     const ubic = (
       nuevoElemento.ubicacion ||
       nuevoElemento.ubic ||
@@ -1006,11 +1056,11 @@ export const useCanvasStore = defineStore('canvas', () => {
       return null
     }
     if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
-      showToast('En elementos solo se pueden agregar contenedores')
+      showToast('En elementos solo se pueden agregar niveles')
       return null
     }
     if (contextoActual === 'contenedores') {
-      showToast('Los contenedores no pueden contener nada')
+      showToast('Los niveles no pueden contener más elementos')
       return null
     }
 
@@ -1064,9 +1114,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const shouldAuto = true
       if (shouldAuto && ['cuartos','pisos','elementos','pasillos'].includes(nuevoElemento.tipo)) {
         const typeKey = nuevoElemento.systemTypeKey || nuevoElemento.id
-        const isSystemDefault = !!(
-          typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey)
-        )
+        const isSystemDefault = !!(typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey))
         const isLocked = nuevoElemento.dimensionLock === true
         if (isSystemDefault && !isLocked) {
           const planta = plantas.value.find((p) => p.id === nuevoElemento.plantaId)
@@ -1253,7 +1301,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const setHistoryInstance = (historyComposableInstance) => {
     historyInstance.value = historyComposableInstance
-    console.log('🔗 Instancia de historial establecida en el store')
   }
 
   /**
@@ -1271,7 +1318,7 @@ export const useCanvasStore = defineStore('canvas', () => {
    * Serializa el estado completo del canvas a JSON
    * @returns {string} JSON string con todo el estado
    */
-  const serialize = () => {
+  const serialize = (saveTimestamp = false) => {
     const state = {
       plantas: plantas.value.map(p => p?._custom?.value || p),
       elementos: elementos.value.map(e => e?._custom?.value || e),
@@ -1279,7 +1326,15 @@ export const useCanvasStore = defineStore('canvas', () => {
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
       catalogos: catalogos.value,
     }
-    const jsonStr = _serialize(state)
+    // Incluir historial de cambios si existe
+    try {
+      const ch = changeHistoryStore?.serialize?.()
+      if (ch) state.changeHistory = ch
+    } catch (e) {
+      // ignore change history serialization errors
+    }
+
+    const jsonStr = _serialize(state, { validateBeforeSerialize: true, includeMetrics: true, saveTimestamp })
     try {
       const parsed = JSON.parse(jsonStr)
       if (state.templates.length > 0) {
@@ -1352,7 +1407,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }
 
-    const ok = _deserialize(jsonString, storeActions)
+  const ok = _deserialize(jsonString, storeActions)
 
     // Post-procesar: garantizar que todas las plantas y elementos tengan 'codigo'
     try {
@@ -1380,6 +1435,16 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Importar plantillas si existen (retrocompatible)
     try {
       const parsed = JSON.parse(jsonString)
+      // Importar historial de cambios si viene
+      try {
+        if (parsed.changeHistory) {
+          const ch = useChangeHistoryStore?.()
+          ch?.deserialize?.(parsed.changeHistory)
+          ch?.setBaseline?.({ plantas: plantas.value, elementos: elementos.value })
+        }
+      } catch (e) {
+        // ignore change history import errors
+      }
       if (Array.isArray(parsed.plantillas) && parsed.plantillas.length > 0) {
         importTemplatesFromDTO(parsed.plantillas)
       }
@@ -1717,7 +1782,6 @@ export const useCanvasStore = defineStore('canvas', () => {
    */
   const setAutoSaveInstance = (autoSaveComposableInstance) => {
     autoSaveInstance.value = autoSaveComposableInstance
-    console.log('💾 Instancia de autosave establecida en el store')
   }
 
 

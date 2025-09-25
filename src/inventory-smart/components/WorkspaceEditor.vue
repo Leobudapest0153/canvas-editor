@@ -39,12 +39,20 @@
         <div class="md:col-span-3 flex flex-col bg-slate-50/60">
           <div class="flex-grow min-h-0 p-3">
             <div class="h-full w-full overflow-auto rounded-lg bg-white">
+              <div
+                v-if="showInfiniteEmptyState"
+                class="flex h-full min-h-[280px] w-full items-center justify-center border-2 border-dashed border-slate-300 bg-slate-50 text-sm font-medium text-slate-500"
+              >
+                Planta sin elementos
+              </div>
               <DrawEditor
+                v-else
                 ref="canvasEditorRef"
                 :polygon="local.polygon"
                 :elements="local.elements"
                 :worldWidth="worldWidth"
                 :worldHeight="worldHeight"
+                :frameBBox="previewFrameBBox"
                 :adding="adding"
                 :deleting="deleting"
                 @update:polygon="onPolygonUpdate"
@@ -73,7 +81,7 @@
               </button>
               <button
                 class="px-3 py-2 cursor-pointer rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
-                @click="() => canvasEditorRef.fitStageToPolygon()"
+                @click="onFitPreview"
               >
                 Ajustar Vista
               </button>
@@ -100,21 +108,32 @@
             />
           </div>
 
-          <!-- Plantilla -->
+          <!-- Modo: Planta elástica -->
           <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
-            <h4 class="text-sm font-semibold text-gray-800 mb-3">Plantilla</h4>
-            <select
-              class="w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
-              v-model="local.shape"
-            >
-              <option value="none" disabled>Sin definir</option>
-              <option value="rectangle">Rectángulo</option>
-              <option value="circle">Círculo</option>
-            </select>
+            <h4 class="text-sm font-semibold text-gray-800 mb-3">Modo</h4>
+            <label class="flex items-center gap-3 select-none">
+              <input type="checkbox" v-model="local.isInfinite" />
+              <span class="font-semibold">Planta elástica</span>
+              <UiTooltip
+                label="En modo elástico no hay límites de planta. Usa la grilla y el minimapa para orientarte."
+                position="right"
+                :delay="300"
+              >
+                <svg class="w-4 h-4 text-slate-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M18 10A8 8 0 11.001 9.999 8 8 0 0118 10zM9 9V5h2v6H9zm0 4h2v2H9z" />
+                </svg>
+              </UiTooltip>
+            </label>
+            <p v-if="local.isInfinite" class="mt-2 text-xs text-slate-600">
+              En este modo se ignoran los límites de planta. Las dimensiones y la capacidad quedan deshabilitadas.
+            </p>
+            <p v-else-if="showLimitedHint" class="mt-2 text-xs text-amber-700">
+              Define dimensiones válidas antes de guardar para salir del modo elástico.
+            </p>
           </div>
 
           <!-- Dimensiones -->
-          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
+          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm" v-show="!local.isInfinite">
             <h4 class="text-sm font-semibold text-gray-800 mb-3">Dimensiones</h4>
             <div class="grid grid-cols-2 gap-x-3 gap-y-3">
               <div>
@@ -144,17 +163,29 @@
                   v-model.number="localRectYMeters"
                 />
               </div>
-              <div class="col-span-2">
-                <label class="mb-1 block text-xs text-slate-600">Capacidad máxima (kg)</label>
-                <input
-                  type="number"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
-                  :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.maxWeight }"
-                  v-model.number="local.maxWeight"
-                  placeholder="Ej. 1000"
-                />
-              </div>
             </div>
+          </div>
+
+          <!-- Capacidad máxima -->
+          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm" v-show="!local.isInfinite">
+            <h4 class="text-sm font-semibold text-gray-800 mb-2">Capacidad máxima (kg)</h4>
+            <UiTooltip :label="capacityTooltip" position="right" :delay="200" v-if="capacityWasAutoAdjusted">
+              <input
+                type="number"
+                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+                :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.maxWeight }"
+                v-model.number="local.maxWeight"
+                placeholder="Ej. 1000"
+              />
+            </UiTooltip>
+            <input
+              v-else
+              type="number"
+              class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
+              :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.maxWeight }"
+              v-model.number="local.maxWeight"
+              placeholder="Ej. 1000"
+            />
           </div>
 
           <!-- Extras -->
@@ -205,9 +236,10 @@ import { computed, reactive, ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, LOAD_MARGIN } from '@/inventory-smart/utils/constants'
 import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import DrawEditor from './DrawEditor.vue'
+import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 
 const canvasStore = useCanvasStore()
 const { showToast } = useToast()
@@ -243,6 +275,8 @@ const local = reactive({
   pixelsPerUnit: PIXELS_PER_CM,
   height: 500,
   maxWeight: 1000,
+  // NUEVO: modo elástico
+  isInfinite: false,
 })
 
 const notice = ref('')
@@ -250,6 +284,209 @@ const errors = reactive({ name: false, dimensions: false, maxWeight: false })
 const isManuallyEdited = ref(false)
 const isLoadingData = ref(false)
 let dimensionChangeDebounce = null
+let skipDimensionWatcher = false
+
+// Hint cuando se cambia de elástico -> limitado
+const showLimitedHint = ref(false)
+
+// Estado para indicar que la capacidad fue autocompletada al pasar de planta elástica -> finita
+const capacityWasAutoAdjusted = ref(false)
+const autoSuggestedMaxWeight = ref(null)
+const capacityTooltip = computed(() => {
+  if (!capacityWasAutoAdjusted.value || !autoSuggestedMaxWeight.value) return ''
+  return `Ajustado a carga requerida de ${autoSuggestedMaxWeight.value} kg`
+})
+
+const INFINITE_PREVIEW_PADDING = 14
+const FINITE_PREVIEW_PADDING = 14
+const MIN_DIMENSION_CM = 100
+const DEFAULT_HEIGHT_CM = 300
+
+function getElementDimensionsPx(el) {
+  const width = Number(el?.width)
+  const height = Number(el?.height)
+  if (
+    Number.isFinite(width) &&
+    Number.isFinite(height) &&
+    width > 0 &&
+    height > 0
+  ) {
+    return { width, height }
+  }
+  const widthCm = Number(el?.dimensiones?.ancho)
+  const heightCm = Number(el?.dimensiones?.largo)
+  if (
+    Number.isFinite(widthCm) &&
+    Number.isFinite(heightCm) &&
+    widthCm > 0 &&
+    heightCm > 0
+  ) {
+    return { width: widthCm * PIXELS_PER_CM, height: heightCm * PIXELS_PER_CM }
+  }
+  return null
+}
+
+function getElementPositionPx(el) {
+  const x = Number(el?.x)
+  const y = Number(el?.y)
+  if (Number.isFinite(x) && Number.isFinite(y)) {
+    return { x, y }
+  }
+  const posX = Number(el?.posicion?.x)
+  const posY = Number(el?.posicion?.y)
+  if (Number.isFinite(posX) && Number.isFinite(posY)) {
+    return { x: posX, y: posY }
+  }
+  return null
+}
+
+function computeElementBBox(el) {
+  const dims = getElementDimensionsPx(el)
+  const pos = getElementPositionPx(el)
+  if (!dims || !pos) return null
+
+  const rotationRaw = Number(el?.rotation ?? el?.posicion?.rotation ?? 0) || 0
+  const rotation = Number.isFinite(rotationRaw) ? rotationRaw : 0
+  const rad = (rotation * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const offsetX = Number(el?.offsetX ?? el?.offset?.x ?? 0) || 0
+  const offsetY = Number(el?.offsetY ?? el?.offset?.y ?? 0) || 0
+
+  const corners = [
+    { x: 0, y: 0 },
+    { x: dims.width, y: 0 },
+    { x: dims.width, y: dims.height },
+    { x: 0, y: dims.height },
+  ]
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+
+  for (const corner of corners) {
+    const localX = corner.x - offsetX
+    const localY = corner.y - offsetY
+    const rotatedX = localX * cos - localY * sin
+    const rotatedY = localX * sin + localY * cos
+    const worldX = pos.x + rotatedX
+    const worldY = pos.y + rotatedY
+    minX = Math.min(minX, worldX)
+    minY = Math.min(minY, worldY)
+    maxX = Math.max(maxX, worldX)
+    maxY = Math.max(maxY, worldY)
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return null
+  }
+
+  return { minX, minY, maxX, maxY }
+}
+
+function computeElementsBBox(elements) {
+  const list = Array.isArray(elements) ? elements : []
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let hasAny = false
+
+  for (const el of list) {
+    if (!el || el.visible === false) continue
+    const bbox = computeElementBBox(el)
+    if (!bbox) continue
+    hasAny = true
+    minX = Math.min(minX, bbox.minX)
+    minY = Math.min(minY, bbox.minY)
+    maxX = Math.max(maxX, bbox.maxX)
+    maxY = Math.max(maxY, bbox.maxY)
+  }
+
+  if (!hasAny) return null
+  return { minX, minY, maxX, maxY }
+}
+
+function padBBox(bbox, padding) {
+  if (!bbox) return null
+  const p = Number(padding) || 0
+  return {
+    minX: bbox.minX - p,
+    minY: bbox.minY - p,
+    maxX: bbox.maxX + p,
+    maxY: bbox.maxY + p,
+  }
+}
+
+function getPolygonBBox(poly) {
+  if (!Array.isArray(poly) || poly.length === 0) return null
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let has = false
+  for (const point of poly) {
+    const x = Number(point?.x)
+    const y = Number(point?.y)
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+    has = true
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    maxX = Math.max(maxX, x)
+    maxY = Math.max(maxY, y)
+  }
+  if (!has) return null
+  return { minX, minY, maxX, maxY }
+}
+
+function buildRectPolygon(widthPx, lengthPx, originX, originY) {
+  const w = Number(widthPx) || 0
+  const l = Number(lengthPx) || 0
+  const ox = Number(originX) || 0
+  const oy = Number(originY) || 0
+  return [
+    { x: ox, y: oy },
+    { x: ox + w, y: oy },
+    { x: ox + w, y: oy + l },
+    { x: ox, y: oy + l },
+  ]
+}
+
+const previewFrameBBox = computed(() => {
+  // Plantas infinitas → preview se encuadra al BBox de elementos con padding.
+  if (!local.isInfinite) return null
+  const items = Array.isArray(local.elements) ? local.elements : []
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  let hasValid = false
+  for (const el of items) {
+    const x = Number(el?.x)
+    const y = Number(el?.y)
+    const width = Number(el?.width)
+    const height = Number(el?.height)
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+      continue
+    }
+    hasValid = true
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    maxX = Math.max(maxX, x + width)
+    maxY = Math.max(maxY, y + height)
+  }
+  if (!hasValid) return null
+  const padding = INFINITE_PREVIEW_PADDING
+  return {
+    minX: minX - padding,
+    minY: minY - padding,
+    maxX: maxX + padding,
+    maxY: maxY + padding,
+  }
+})
+
+const showInfiniteEmptyState = computed(() => local.isInfinite && !previewFrameBBox.value)
 
 function defaultRect(w_cm, l_cm) {
   const w = w_cm * PIXELS_PER_CM
@@ -260,6 +497,127 @@ function defaultRect(w_cm, l_cm) {
     { x: w, y: l },
     { x: 0, y: l },
   ]
+}
+
+function computeHeightFromElementsCm(elements) {
+  const list = Array.isArray(elements) ? elements : []
+  let maxHeight = 0
+  for (const el of list) {
+    if (!el || el.visible === false) continue
+    const elementoAlto = Number(el?.dimensiones?.alto) || 0
+    const base = Number(el?.alturaRespectoAlSuelo) || 0
+    const total = elementoAlto + base
+    if (total > maxHeight) maxHeight = total
+  }
+  return maxHeight > 0 ? Math.ceil(maxHeight) : 0
+}
+
+function normalizeMeters(valueCm) {
+  if (!Number.isFinite(valueCm)) return 0
+  return Number((valueCm / 100).toFixed(2))
+}
+
+function suggestFiniteDimensionsFromContent() {
+  const rawBBox = computeElementsBBox(local.elements)
+  const paddedBBox = padBBox(rawBBox, FINITE_PREVIEW_PADDING)
+  let originX = 0
+  let originY = 0
+
+  let widthCm = MIN_DIMENSION_CM
+  let lengthCm = MIN_DIMENSION_CM
+
+  if (paddedBBox) {
+    const minX = Math.floor(paddedBBox.minX)
+    const minY = Math.floor(paddedBBox.minY)
+    const maxX = Math.ceil(paddedBBox.maxX)
+    const maxY = Math.ceil(paddedBBox.maxY)
+    if (
+      Number.isFinite(minX) &&
+      Number.isFinite(minY) &&
+      Number.isFinite(maxX) &&
+      Number.isFinite(maxY) &&
+      maxX > minX &&
+      maxY > minY
+    ) {
+      originX = minX
+      originY = minY
+      const widthPx = Math.max(1, maxX - minX)
+      const lengthPx = Math.max(1, maxY - minY)
+      widthCm = Math.max(MIN_DIMENSION_CM, Math.ceil(widthPx / PIXELS_PER_CM))
+      lengthCm = Math.max(MIN_DIMENSION_CM, Math.ceil(lengthPx / PIXELS_PER_CM))
+    }
+  } else {
+    const fallbackWidthCm = Number(rectW.value) || 0
+    const fallbackLengthCm = Number(rectL.value) || 0
+    if (Number.isFinite(fallbackWidthCm) && fallbackWidthCm > 0) {
+      widthCm = Math.max(MIN_DIMENSION_CM, Math.ceil(fallbackWidthCm))
+    }
+    if (Number.isFinite(fallbackLengthCm) && fallbackLengthCm > 0) {
+      lengthCm = Math.max(MIN_DIMENSION_CM, Math.ceil(fallbackLengthCm))
+    }
+    const polyBBox = getPolygonBBox(local.polygon)
+    if (polyBBox) {
+      originX = Math.floor(polyBBox.minX)
+      originY = Math.floor(polyBBox.minY)
+    }
+  }
+
+  if (!Number.isFinite(originX)) originX = 0
+  if (!Number.isFinite(originY)) originY = 0
+
+  const prevHeightMeters = Number(localRectYMeters.value)
+  const prevHeightCm = Number.isFinite(prevHeightMeters) && prevHeightMeters > 0 ? prevHeightMeters * 100 : 0
+  const heightFromElementsCm = computeHeightFromElementsCm(local.elements)
+  const heightCm = prevHeightCm > 0
+    ? Math.ceil(prevHeightCm)
+    : (heightFromElementsCm > 0 ? heightFromElementsCm : DEFAULT_HEIGHT_CM)
+
+  const widthMeters = normalizeMeters(widthCm)
+  const lengthMeters = normalizeMeters(lengthCm)
+  const heightMeters = normalizeMeters(heightCm)
+
+  skipDimensionWatcher = true
+  rectW.value = widthCm
+  rectL.value = lengthCm
+  rectY.value = heightCm
+  localRectWMeters.value = widthMeters
+  localRectLMeters.value = lengthMeters
+  localRectYMeters.value = heightMeters
+
+  const worldWidthPx = rectW.value * PIXELS_PER_CM
+  const worldLengthPx = rectL.value * PIXELS_PER_CM
+
+  let nextPolygon
+  if (local.shape === 'circle') {
+    const circlePoints = applyCircle(rectW.value, rectL.value)
+    nextPolygon = circlePoints.map((pt) => ({ x: pt.x + originX, y: pt.y + originY }))
+  } else if (local.shape === 'rectangle') {
+    nextPolygon = buildRectPolygon(worldWidthPx, worldLengthPx, originX, originY)
+  } else {
+    const current = Array.isArray(local.polygon) ? local.polygon : []
+    const sourceBBox = getPolygonBBox(current)
+    if (current.length >= 3 && sourceBBox) {
+      const sourceWidth = Math.max(1, sourceBBox.maxX - sourceBBox.minX)
+      const sourceHeight = Math.max(1, sourceBBox.maxY - sourceBBox.minY)
+      nextPolygon = current.map((pt) => ({
+        x: Math.round(originX + ((pt.x - sourceBBox.minX) / sourceWidth) * worldWidthPx),
+        y: Math.round(originY + ((pt.y - sourceBBox.minY) / sourceHeight) * worldLengthPx),
+      }))
+    } else {
+      nextPolygon = buildRectPolygon(worldWidthPx, worldLengthPx, originX, originY)
+    }
+  }
+
+  local.polygon = nextPolygon
+  errors.dimensions = false
+  notice.value = ''
+
+  // Al pasar de infinita→finita: usamos el BBox del contenido para proponer dimensiones (W×L) con padding,
+  // rellenamos el formulario y reencuadramos el preview con el nuevo rectángulo.
+  nextTick(() => {
+    skipDimensionWatcher = false
+    canvasEditorRef.value?.fitStageToPolygon()
+  })
 }
 
 const closeModal = () => {
@@ -278,7 +636,9 @@ function resetLocalState() {
   local.elements = []
   local.height = 500
   local.maxWeight = 1000
+  local.isInfinite = false
   isManuallyEdited.value = false
+  showLimitedHint.value = false
 
   localRectWMeters.value = rectW.value / 100
   localRectLMeters.value = rectL.value / 100
@@ -286,6 +646,7 @@ function resetLocalState() {
 
   errors.name = false
   errors.dimensions = false
+  errors.maxWeight = false
   notice.value = ''
 }
 
@@ -299,6 +660,7 @@ watch(
       local.name = planta.nombre
       local.polygon = planta.poligono
       local.shape = planta.forma ?? 'none'
+      local.isInfinite = !!planta.isInfinite
 
       const todosLosElementos = canvasStore.elementos || []
       local.elements = todosLosElementos.filter((el) => el.plantaId === planta.id && !el.padre)
@@ -332,6 +694,10 @@ const resetMode = () => {
   deleting.value = false
 }
 
+const onFitPreview = () => {
+  canvasEditorRef.value?.fitStageToPolygon()
+}
+
 function toggleAddMode() {
   adding.value = !adding.value
   if (adding.value) {
@@ -358,16 +724,14 @@ watch(
   () => local.name,
   (val) => {
     errors.name = !String(val || '').trim()
-  },
-  { immediate: true },
+  }
 )
 watch(
   () => local.maxWeight,
   (val) => {
     const n = Number(val)
     errors.maxWeight = !Number.isFinite(n) || n < 0
-  },
-  { immediate: true },
+  }
 )
 
 function applyRect(w_cm, l_cm) {
@@ -432,6 +796,76 @@ watch(
   },
 )
 
+// NUEVO: Watch del modo elástico
+watch(
+  () => local.isInfinite,
+  async (isOn, wasOn) => {
+    if (isLoadingData.value) return
+    // Si pasa a elástico, aplicar inmediatamente en la planta activa (si existe)
+    if (isOn && local.id) {
+      try { canvasStore.editarPlanta(local.id, { isInfinite: true }) } catch (e) { /* ignore */ }
+      showLimitedHint.value = false
+      notice.value = ''
+    }
+    // Si pasa a limitado desde elástico, mostrar hint hasta que se guarde con dimensiones válidas
+    if (!isOn && wasOn) {
+      showLimitedHint.value = true
+      suggestFiniteDimensionsFromContent()
+      // Calcular la carga requerida por los elementos y autocompletar la capacidad si es necesario
+      try {
+        // Si tenemos una planta existente, preferimos usar el cálculo centralizado (toma en cuenta jerarquía)
+        let requiredLoad = 0
+        if (local.id) {
+          requiredLoad = Number(weightValidation.calcularPesoTotal(local.id, 'plantas') || 0)
+        } else {
+          // Fallback: sumar desde local.elements (peso por elemento * cantidad/unidades si existen)
+          requiredLoad = (Array.isArray(local.elements) ? local.elements : []).reduce((acc, el) => {
+            const basePeso = Number(el?.pesoMaximo || 0)
+            const qty = Number(el?.cantidad || el?.unidades || el?.qty || 1) || 1
+            return acc + basePeso * qty
+          }, 0)
+        }
+
+        const margin = typeof LOAD_MARGIN === 'number' ? LOAD_MARGIN : 0
+        const suggested = Math.ceil(requiredLoad * (1 + margin))
+
+        // Reglas: si requiredLoad == 0 -> conservar capacidad previa si > 0, si nula -> poner 0
+        if (requiredLoad <= 0) {
+          // No forzamos a cero si el usuario ya tenía un valor mayor (preservar)
+          if (!Number.isFinite(Number(local.maxWeight)) || Number(local.maxWeight) < 0) {
+            local.maxWeight = 0
+            capacityWasAutoAdjusted.value = true
+            autoSuggestedMaxWeight.value = 0
+          }
+        } else {
+          // Si el valor actual es no-finito o menor al sugerido, ajustarlo
+          const current = Number(local.maxWeight || 0)
+          if (!Number.isFinite(current) || current < suggested) {
+            local.maxWeight = suggested
+            capacityWasAutoAdjusted.value = true
+            autoSuggestedMaxWeight.value = suggested
+          }
+        }
+      } catch (err) {
+        // No interrumpir el flujo por errores en la suma; dejar que el usuario edite manualmente
+        console.error('Error calculando carga requerida al cambiar a planta finita', err)
+      }
+    }
+  },
+)
+
+// Si el usuario edita manualmente la capacidad y difiere del valor sugerido, quitar la marca de autocompletado
+watch(
+  () => local.maxWeight,
+  (val) => {
+    if (autoSuggestedMaxWeight.value == null) return
+    if (Number(val) !== Number(autoSuggestedMaxWeight.value)) {
+      capacityWasAutoAdjusted.value = false
+      autoSuggestedMaxWeight.value = null
+    }
+  }
+)
+
 // Helpers de validación reutilizables
 function validatePolygonAndContainment(newPolygon, newWorldWidth, newWorldLength) {
   const validation = canvasEditorRef.value?.isPolygonValid(newPolygon, local.elements)
@@ -492,19 +926,34 @@ function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, f
   const oldL_cm = rectL.value
   if (!oldW_cm || !oldL_cm) return { ok: false, message: '' }
 
-  const oldWorldWidth = oldW_cm * PIXELS_PER_CM
-  const oldWorldLength = oldL_cm * PIXELS_PER_CM
   const newWorldWidth = newW_cm * PIXELS_PER_CM
   const newWorldLength = newL_cm * PIXELS_PER_CM
 
-  const scaleX = newWorldWidth / oldWorldWidth
-  const scaleY = newWorldLength / oldWorldLength
-  const scaledPolygon = local.polygon.map((p) => ({
-    x: Math.round(p.x * scaleX),
-    y: Math.round(p.y * scaleY),
-  }))
+  const polyBBox = getPolygonBBox(local.polygon)
+  const baseX = polyBBox?.minX ?? 0
+  const baseY = polyBBox?.minY ?? 0
+  const polyWidthPx = Math.max(1, (polyBBox?.maxX ?? baseX) - baseX)
+  const polyLengthPx = Math.max(1, (polyBBox?.maxY ?? baseY) - baseY)
 
-  const polyCheck = validatePolygonAndContainment(scaledPolygon, newWorldWidth, newWorldLength)
+  let nextPolygon
+  if (local.shape === 'circle') {
+    const circlePoints = applyCircle(newW_cm, newL_cm)
+    nextPolygon = circlePoints.map((pt) => ({ x: pt.x + baseX, y: pt.y + baseY }))
+  } else if (local.shape === 'rectangle') {
+    nextPolygon = buildRectPolygon(newWorldWidth, newWorldLength, baseX, baseY)
+  } else {
+    const current = Array.isArray(local.polygon) ? local.polygon : []
+    if (current.length >= 3 && polyBBox) {
+      nextPolygon = current.map((pt) => ({
+        x: Math.round(baseX + (polyWidthPx ? ((pt.x - polyBBox.minX) / polyWidthPx) * newWorldWidth : 0)),
+        y: Math.round(baseY + (polyLengthPx ? ((pt.y - polyBBox.minY) / polyLengthPx) * newWorldLength : 0)),
+      }))
+    } else {
+      nextPolygon = buildRectPolygon(newWorldWidth, newWorldLength, baseX, baseY)
+    }
+  }
+
+  const polyCheck = validatePolygonAndContainment(nextPolygon, newWorldWidth, newWorldLength)
   if (!polyCheck.ok) return polyCheck
 
   const heightCheck = validateElementsHeight(newY_cm)
@@ -514,7 +963,7 @@ function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, f
     rectW.value = newW_cm
     rectL.value = newL_cm
     rectY.value = newY_cm
-    local.polygon = scaledPolygon
+    local.polygon = nextPolygon
     notice.value = ''
 
     if (opts.fit) {
@@ -528,9 +977,12 @@ function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, f
 
 // --- WATCH CORREGIDO ---
 watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY]) => {
-  if (isLoadingData.value) return
+  if (isLoadingData.value || skipDimensionWatcher) return
 
   clearTimeout(dimensionChangeDebounce)
+
+  // Si el modo es elástico, ignorar cambios de dimensiones
+  if (local.isInfinite) return
 
   // Si el valor del input es vacío, v-model.number lo convierte en '' (string) o null.
   // Esta guarda previene la ejecución si los valores no son números válidos y positivos.
@@ -557,8 +1009,8 @@ watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY
 // onShapeChange eliminado en favor del watch sobre local.shape
 
 function onSave() {
-  // Si hay un debounce pendiente, aplicamos dimensiones inmediatamente antes de guardar
-  if (dimensionChangeDebounce) {
+  // Si hay un debounce pendiente, aplicamos dimensiones inmediatamente antes de guardar (solo en modo limitado)
+  if (!local.isInfinite && dimensionChangeDebounce) {
     clearTimeout(dimensionChangeDebounce)
     const newW_cm = (Number(localRectWMeters.value) || 0) * 100
     const newL_cm = (Number(localRectLMeters.value) || 0) * 100
@@ -575,20 +1027,47 @@ function onSave() {
   errors.dimensions = false
   errors.maxWeight = false
 
-  if (notice.value) {
-    showToast('Por favor corrige los errores antes de guardar.', 'error')
-    return
-  }
-
-  const finalValidation = canvasEditorRef.value?.isPolygonValid(local.polygon, local.elements)
-  if (finalValidation && !finalValidation.valid) {
-    notice.value = finalValidation.message
-    return
-  }
-
-  if (!local.name.trim()) {
+  if (!String(local.name || '').trim()) {
     errors.name = true
     notice.value = 'El campo "Nombre" es obligatorio.'
+    return
+  }
+
+  // Rama Modo Elástico: omitir validaciones de contención y dimensiones
+  if (local.isInfinite) {
+    const plantaData = {
+      id: local.id,
+      nombre: local.name.trim(),
+      isInfinite: true,
+      // Preservamos referencias existentes (polígono/dimensiones) para compat
+      dimensiones: {
+        alto: (Number(localRectYMeters.value) || 0) * 100 || (canvasStore.plantaEnEdicion?.dimensiones?.alto || 0),
+        ancho: rectW.value,
+        largo: rectL.value,
+      },
+      forma: local.shape,
+      poligono: local.polygon,
+      pesoMaximoSoportado: Number(local.maxWeight) || 0,
+    }
+
+    if (plantaData.id) {
+      canvasStore.editarPlanta(plantaData.id, plantaData)
+      canvasStore.calcularCanvasAdaptativoPlanta(plantaData)
+      showToast('Modo elástico aplicado a la planta.', 'success')
+    } else {
+      delete plantaData.id
+      canvasStore.agregarPlanta(plantaData)
+    }
+
+    resetLocalState()
+    resetMode()
+    canvasStore.cerrarEditor()
+    return
+  }
+
+  // Rama Modo Limitado (validaciones completas)
+  if (notice.value) {
+    showToast('Por favor corrige los errores antes de guardar.', 'error')
     return
   }
 
@@ -601,7 +1080,7 @@ function onSave() {
     }
   }
 
-  // Validación extra: peso máximo no negativo
+  // Validación extra: capacidad no negativa (solo si visible)
   if (!Number.isFinite(Number(local.maxWeight)) || Number(local.maxWeight) < 0) {
     errors.maxWeight = true
     notice.value = 'La capacidad máxima (kg) no puede ser negativa.'
@@ -671,6 +1150,7 @@ function onSave() {
     id: local.id,
     nombre: local.name.trim(),
     capacidadCargaSoportado: local.maxWeight,
+    isInfinite: false,
     dimensiones: {
       // Alto desde input en metros -> cm
       alto: (Number(localRectYMeters.value) || 0) * 100,
@@ -700,11 +1180,15 @@ const canSave = computed(() => {
   const hasNotice = Boolean(notice.value)
   const hasErrors = errors.name || errors.dimensions || errors.maxWeight
   const hasValidName = Boolean(String(local.name || '').trim())
-  const dimsOk =
-    (Number(localRectWMeters.value) || 0) > 0 &&
-    (Number(localRectLMeters.value) || 0) > 0 &&
-    (Number(localRectYMeters.value) || 0) > 0
-  const weightOk = Number.isFinite(Number(local.maxWeight)) && Number(local.maxWeight) >= 0
+  // En modo elástico, no exigimos dimensiones/capacidad
+  const dimsOk = local.isInfinite
+    ? true
+    : (Number(localRectWMeters.value) || 0) > 0 &&
+      (Number(localRectLMeters.value) || 0) > 0 &&
+      (Number(localRectYMeters.value) || 0) > 0
+  const weightOk = local.isInfinite
+    ? true
+    : (Number.isFinite(Number(local.maxWeight)) && Number(local.maxWeight) >= 0)
   return !hasNotice && !hasErrors && hasValidName && dimsOk && weightOk
 })
 
