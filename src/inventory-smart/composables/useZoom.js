@@ -4,12 +4,15 @@
  */
 
 import { useCanvasStore } from './useCanvasStore'
-import { CM_TO_PX } from '../utils/constants'
-
-const CONTENT_MARGIN = 40
+import { CM_TO_PX, DEFAULT_FIT_VIEW_PADDING } from '../utils/constants'
 
 export function useZoom(stageSize, layerConfig) {
   const canvasStore = useCanvasStore()
+
+  const getFitPadding = () => {
+    const raw = Number(canvasStore.fitViewPadding ?? DEFAULT_FIT_VIEW_PADDING)
+    return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_FIT_VIEW_PADDING
+  }
 
   /**
    * Calcula el bounding box para diferentes contextos
@@ -65,7 +68,7 @@ export function useZoom(stageSize, layerConfig) {
           const width = Math.max(1, maxX - minX)
           const height = Math.max(1, maxY - minY)
           if (isInfinite) {
-            const margin = CONTENT_MARGIN
+            const margin = getFitPadding()
             return {
               x: minX - margin,
               y: minY - margin,
@@ -147,7 +150,7 @@ export function useZoom(stageSize, layerConfig) {
       return 0.001
     }
 
-    const margin = 40
+    const margin = getFitPadding()
     const vw = Math.max(16, stageSize.value.width - margin * 2)
     const vh = Math.max(16, stageSize.value.height - margin * 2)
 
@@ -212,7 +215,7 @@ export function useZoom(stageSize, layerConfig) {
     if (!stage) return
 
     try {
-      const margin = 40
+      const margin = getFitPadding()
       const vw = Math.max(16, stageSize.value.width - margin * 2)
       const vh = Math.max(16, stageSize.value.height - margin * 2)
 

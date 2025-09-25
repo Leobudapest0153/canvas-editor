@@ -444,6 +444,9 @@ export const SNAP_EPS = 4
 // Tamaño de grilla para snap y búsqueda en espiral
 export const GRID_SIZE = 0
 
+// Padding por defecto para ajustar la vista al contenido (en px)
+export const DEFAULT_FIT_VIEW_PADDING = 40
+
 // === CONFIGURACIÓN DE PRECISIÓN ===
 // Precisión decimal para dimensiones en centímetros (0.01 = 2 decimales)
 export const PRECISION_CM = 0.01

@@ -662,7 +662,7 @@ import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
-import { GRID_SIZE, CM_TO_PX, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
+import { GRID_SIZE, CM_TO_PX, CATALOGO, OFFSETS, DEFAULT_FIT_VIEW_PADDING } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { cmToPx, pxToCm, fmtCm, formatLengthsCm } from '@/inventory-smart/utils/units'
 import { useViewportStore } from '@/inventory-smart/stores/viewport'
@@ -710,6 +710,11 @@ const indicatorsLayerRef = ref(null)
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
+
+const getFitViewPadding = () => {
+  const raw = Number(canvasStore.fitViewPadding ?? DEFAULT_FIT_VIEW_PADDING)
+  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_FIT_VIEW_PADDING
+}
 const { onDragStartGuard, onDragMoveGuard, onDragEndGuard, onTransformEndGuard } =
   usePlacementGuards()
 const buffer = useCanvasBuffer()
@@ -2339,6 +2344,12 @@ const fitToPlanta = () => {
       return
     }
 
+    const contextType = canvasStore.contextoActual?.tipo
+    if (contextType && contextType !== 'plantas') {
+      fitToContent(stage)
+      return
+    }
+
     // Ajustar directamente al contenido (BBox + margen)
     fitToContent(stage)
 
@@ -2357,7 +2368,7 @@ const fitToPlanta = () => {
         const maxY = Math.max(...ys)
         const bw = Math.max(1, maxX - minX)
         const bh = Math.max(1, maxY - minY)
-        const margin = 40
+        const margin = getFitViewPadding()
         const vw = Math.max(16, stageSize.value.width - margin * 2)
         const vh = Math.max(16, stageSize.value.height - margin * 2)
         const sx = vw / bw
@@ -2417,7 +2428,7 @@ watch(
     await nextTick()
     await nextTick()
 
-    if (ctx.tipo === 'plantas' && isInfinitePlant.value) {
+    if (isInfinitePlant.value) {
       await nextTick()
       fitToPlanta()
       return

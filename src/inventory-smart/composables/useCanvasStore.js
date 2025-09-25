@@ -18,7 +18,14 @@ import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
+import {
+  CM_TO_PX,
+  DIMENSIONS,
+  CATALOGO,
+  OFFSETS,
+  TIPOS_ENTIDAD,
+  DEFAULT_FIT_VIEW_PADDING,
+} from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useStatePersistence, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS } from '@/inventory-smart/composables/useStatePersistence'
@@ -151,6 +158,14 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Por defecto desactivamos la cuadrícula (0 = sin cuadricula visual ni snap a grilla)
   const gridSize = ref(0) // px entre líneas de grilla (0 desactiva)
   const snapGridEps = ref(10) // px de proximidad para aplicar snap al soltar
+
+  const fitViewPadding = ref(DEFAULT_FIT_VIEW_PADDING)
+
+  const setFitViewPadding = (paddingPx) => {
+    const parsed = Number(paddingPx)
+    if (!Number.isFinite(parsed)) return
+    fitViewPadding.value = Math.max(0, parsed)
+  }
 
   const setGridSize = (sizePx) => {
     const s = Number(sizePx)
@@ -1685,6 +1700,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     panY,
     gridSize,
     snapGridEps,
+    fitViewPadding,
     crearPlanta,
     plantaEnEdicion,
     etiquetas,
@@ -1733,6 +1749,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     configurarPan,
     setGridSize,
     setSnapGridEps,
+    setFitViewPadding,
 
     // Actions - Plantas
     seleccionarPlanta,
