@@ -28,9 +28,9 @@
 
       <!-- Header -->
       <h3
-        class="text-lg font-semibold tracking-tight text-gray-900 px-5 py-4 border-b border-b-slate-200 flex-shrink-0"
+        class="text-lg font-semibold tracking-tight text-primary px-5 py-4 border-b border-b-slate-200 flex-shrink-0"
       >
-        Área de Trabajo
+        Nuevo piso
       </h3>
 
       <!-- Body -->
@@ -64,7 +64,7 @@
 
           <!-- Toolbar debajo del canvas -->
           <div class="px-3 pb-2">
-            <div class="flex items-center gap-2 flex-shrink-0">
+            <div class="flex items-center gap-2 flex-shrink-0" v-if="!local.isInfinite">
               <button
                 class="px-3 py-2 cursor-pointer rounded-lg border border-gray-300 bg-white text-slate-800 shadow-sm hover:bg-gray-50"
                 :class="{ 'ring-2 ring-sky-500': adding }"
@@ -97,15 +97,45 @@
 
         <!-- Panel de inputs -->
         <div class="md:col-span-2 space-y-3 p-4 overflow-y-auto">
-          <!-- Nombre -->
+          <!-- Datos básicos: Nombre + Código (+ Plantilla si no es elástico) -->
           <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm">
-            <h4 class="text-sm font-semibold text-gray-800 mb-3">Nombre</h4>
+            <h4 class="text-sm font-semibold text-gray-800 mb-2">Nombre*</h4>
             <input
-              class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-400 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
-              :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.name }"
+              class="w-full rounded-lg bg-white px-3 py-2 text-gray-900 placeholder:text-gray-400 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 border"
+              :class="{ 'border-rose-500 ring-2 ring-rose-500/60': touched.name && !validNombre }"
               v-model="local.name"
               placeholder="Ej. Bodega A"
+              @input="touched.name = true"
+              @blur="touched.name = true"
             />
+            <p v-if="touched.name && !validNombre" class="mt-1 text-xs text-rose-600">El nombre es requerido.</p>
+
+            <h4 class="text-sm font-semibold text-gray-800 mt-4 mb-2">Código*</h4>
+            <input
+              class="w-full rounded-lg bg-white px-3 py-2 text-gray-900 placeholder:text-gray-400 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 border"
+              :class="{ 'border-rose-500 ring-2 ring-rose-500/60': touched.codigo && !validCodigo }"
+              v-model="local.codigo"
+              placeholder="Ej. PLT-001"
+              @input="touched.codigo = true"
+              @blur="touched.codigo = true"
+            />
+            <p v-if="touched.codigo && !validCodigo" class="mt-1 text-xs text-rose-600">El código es requerido.</p>
+
+            <template v-if="!local.isInfinite">
+              <h4 class="text-sm font-semibold text-gray-800 mt-4 mb-2">Plantilla*</h4>
+              <select
+                class="w-full cursor-pointer rounded-lg bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 border"
+                :class="{ 'border-rose-500 ring-2 ring-rose-500/60': touched.shape && !validShape }"
+                v-model="local.shape"
+                @change="touched.shape = true"
+                @blur="touched.shape = true"
+              >
+                <option value="none" disabled>Sin definir</option>
+                <option value="rectangle">Rectángulo</option>
+                <option value="circle">Círculo</option>
+              </select>
+              <p v-if="touched.shape && !validShape" class="mt-1 text-xs text-rose-600">Selecciona una plantilla.</p>
+            </template>
           </div>
 
           <!-- Modo: Planta elástica -->
@@ -113,79 +143,95 @@
             <h4 class="text-sm font-semibold text-gray-800 mb-3">Modo</h4>
             <label class="flex items-center gap-3 select-none">
               <input type="checkbox" v-model="local.isInfinite" />
-              <span class="font-semibold">Planta elástica</span>
+              <span class="font-semibold">Planta infinita</span>
               <UiTooltip
-                label="En modo elástico no hay límites de planta. Usa la grilla y el minimapa para orientarte."
+                label="Al activar este modo no hay límite de dimensiones en el piso."
                 position="right"
                 :delay="300"
               >
-                <svg class="w-4 h-4 text-slate-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M18 10A8 8 0 11.001 9.999 8 8 0 0118 10zM9 9V5h2v6H9zm0 4h2v2H9z" />
-                </svg>
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[11px] font-semibold cursor-help shadow-sm"
+                  aria-label="Información modo planta infinita"
+                >
+                  i
+                </button>
               </UiTooltip>
             </label>
-            <p v-if="local.isInfinite" class="mt-2 text-xs text-slate-600">
+            <!-- <p v-if="local.isInfinite" class="mt-2 text-xs text-slate-600">
               En este modo se ignoran los límites de planta. Las dimensiones y la capacidad quedan deshabilitadas.
             </p>
             <p v-else-if="showLimitedHint" class="mt-2 text-xs text-amber-700">
               Define dimensiones válidas antes de guardar para salir del modo elástico.
-            </p>
+            </p> -->
           </div>
 
           <!-- Dimensiones -->
-          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm" v-show="!local.isInfinite">
+          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm" v-if="!local.isInfinite">
             <h4 class="text-sm font-semibold text-gray-800 mb-3">Dimensiones</h4>
-            <div class="grid grid-cols-2 gap-x-3 gap-y-3">
+            <div class="space-y-3">
               <div>
-                <label class="mb-1 block text-xs text-slate-600">Ancho (m)</label>
+                <label class="mb-1 block text-xs text-slate-600">Alto (m)*</label>
                 <input
                   type="number"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
-                  :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.dimensions }"
-                  v-model.number="localRectWMeters"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-xs text-slate-600">Largo (m)</label>
-                <input
-                  type="number"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
-                  :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.dimensions }"
-                  v-model.number="localRectLMeters"
-                />
-              </div>
-              <div class="col-span-2">
-                <label class="mb-1 block text-xs text-slate-600">Alto (m)</label>
-                <input
-                  type="number"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
-                  :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.dimensions }"
+                  class="w-full rounded-lg bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 border"
+                  :class="{ 'border-rose-500 ring-2 ring-rose-500/60': (touched.dimensions && !validDims) }"
                   v-model.number="localRectYMeters"
+                  @input="touched.dimensions = true"
+                  @blur="touched.dimensions = true"
+                />
+              </div>
+              <div>
+                <label class="mb-1 block text-xs text-slate-600">Largo (m)*</label>
+                <input
+                  type="number"
+                  class="w-full rounded-lg bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 border"
+                  :class="{ 'border-rose-500 ring-2 ring-rose-500/60': (touched.dimensions && !validDims) }"
+                  v-model.number="localRectLMeters"
+                  @input="touched.dimensions = true"
+                  @blur="touched.dimensions = true"
+                />
+              </div>
+              <div>
+                <label class="mb-1 block text-xs text-slate-600">Ancho (m)*</label>
+                <input
+                  type="number"
+                  class="w-full rounded-lg bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 border"
+                  :class="{ 'border-rose-500 ring-2 ring-rose-500/60': (touched.dimensions && !validDims) }"
+                  v-model.number="localRectWMeters"
+                  @input="touched.dimensions = true"
+                  @blur="touched.dimensions = true"
                 />
               </div>
             </div>
+            <p v-if="touched.dimensions && !validDims" class="mt-2 text-xs text-rose-600">Todas las dimensiones deben ser mayores a 0.</p>
           </div>
 
           <!-- Capacidad máxima -->
-          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm" v-show="!local.isInfinite">
-            <h4 class="text-sm font-semibold text-gray-800 mb-2">Capacidad máxima (kg)</h4>
+          <div class="border border-gray-200 rounded-xl px-4 pt-3 pb-4 bg-white shadow-sm" v-if="!local.isInfinite">
+            <h4 class="text-sm font-semibold text-gray-800 mb-2">Capacidad de carga (kg)*</h4>
             <UiTooltip :label="capacityTooltip" position="right" :delay="200" v-if="capacityWasAutoAdjusted">
               <input
                 type="number"
-                class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
-                :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.maxWeight }"
+                class="w-full rounded-lg bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 border"
+                :class="{ 'border-rose-500 ring-2 ring-rose-500/60': touched.maxWeight && !validMaxWeight }"
                 v-model.number="local.maxWeight"
                 placeholder="Ej. 1000"
+                @input="touched.maxWeight = true"
+                @blur="touched.maxWeight = true"
               />
             </UiTooltip>
             <input
               v-else
               type="number"
-              class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30"
-              :class="{ 'border-rose-500 ring-2 ring-rose-500/60': errors.maxWeight }"
+              class="w-full rounded-lg bg-white px-3 py-2 text-gray-900 shadow-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 border"
+              :class="{ 'border-rose-500 ring-2 ring-rose-500/60': touched.maxWeight && !validMaxWeight }"
               v-model.number="local.maxWeight"
               placeholder="Ej. 1000"
+              @input="touched.maxWeight = true"
+              @blur="touched.maxWeight = true"
             />
+            <p v-if="touched.maxWeight && !validMaxWeight" class="mt-2 text-xs text-rose-600">La capacidad de carga es requerida.</p>
           </div>
 
           <!-- Extras -->
@@ -215,24 +261,16 @@
           Cerrar
         </button>
         <button
-          class="px-4 py-2 rounded-lg font-medium shadow-sm focus:outline-none focus:ring-2"
-          :class="[
-            canSave
-              ? 'cursor-pointer bg-primary text-white hover:bg-primary-800 focus:ring-primary-900'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          ]"
-          :disabled="!canSave"
+          class="px-4 py-2 rounded-lg font-medium shadow-sm focus:outline-none focus:ring-2 bg-primary text-white hover:bg-primary-800 focus:ring-primary-900 cursor-pointer"
           @click="onSave"
-        >
-          Guardar Cambios
-        </button>
+        >Guardar</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { computed, reactive, ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useToast } from '@/inventory-smart/composables/useToast'
@@ -268,6 +306,7 @@ const worldHeight = computed(() => rectL.value * PIXELS_PER_CM)
 const local = reactive({
   id: null,
   name: '',
+  codigo: '',
   shape: 'rectangle',
   polygon: [],
   elements: [],
@@ -280,11 +319,44 @@ const local = reactive({
 })
 
 const notice = ref('')
-const errors = reactive({ name: false, dimensions: false, maxWeight: false })
+// Sistema de validación inline
+const errors = reactive({ name: false, codigo: false, shape: false, dimensions: false, maxWeight: false })
+const touched = reactive({ name: false, codigo: false, shape: false, dimensions: false, maxWeight: false })
+
+function resetValidationState() {
+  errors.name = false
+  errors.codigo = false
+  errors.shape = false
+  errors.dimensions = false
+  errors.maxWeight = false
+  touched.name = false
+  touched.codigo = false
+  touched.shape = false
+  touched.dimensions = false
+  touched.maxWeight = false
+}
+
+const validNombre = computed(() => String(local.name || '').trim().length > 0)
+const validCodigo = computed(() => String(local.codigo || '').trim().length > 0)
+const validShape = computed(() => local.isInfinite || (local.shape === 'rectangle' || local.shape === 'circle'))
+const validDims = computed(() => {
+  if (local.isInfinite) return true
+  return (Number(localRectWMeters.value) || 0) > 0 && (Number(localRectLMeters.value) || 0) > 0 && (Number(localRectYMeters.value) || 0) > 0
+})
+// Capacidad: debe considerarse inválida si el usuario interactuó y el campo quedó vacío (null/'')
+const validMaxWeight = computed(() => {
+  if (local.isInfinite) return true
+  const raw = local.maxWeight
+  if (raw === '' || raw === null || raw === undefined) return false
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return false
+  return n >= 0
+})
 const isManuallyEdited = ref(false)
 const isLoadingData = ref(false)
 let dimensionChangeDebounce = null
 let skipDimensionWatcher = false
+let prevBodyOverflow = null
 
 // Hint cuando se cambia de elástico -> limitado
 const showLimitedHint = ref(false)
@@ -624,14 +696,18 @@ const closeModal = () => {
   resetLocalState()
   canvasStore.cerrarEditor()
   resetMode()
+  // Restaurar scroll del body
+  document.body.style.overflow = prevBodyOverflow || ''
 }
 
 function resetLocalState() {
   local.id = null
   local.name = ''
+  local.codigo = ''
   local.shape = 'rectangle'
   rectW.value = 500
   rectL.value = 500
+  rectY.value = 500
   local.polygon = defaultRect(500, 500)
   local.elements = []
   local.height = 500
@@ -644,9 +720,7 @@ function resetLocalState() {
   localRectLMeters.value = rectL.value / 100
   localRectYMeters.value = rectY.value / 100
 
-  errors.name = false
-  errors.dimensions = false
-  errors.maxWeight = false
+  resetValidationState()
   notice.value = ''
 }
 
@@ -661,6 +735,7 @@ watch(
       local.polygon = planta.poligono
       local.shape = planta.forma ?? 'none'
       local.isInfinite = !!planta.isInfinite
+      local.codigo = planta.codigo || ''
 
       const todosLosElementos = canvasStore.elementos || []
       local.elements = todosLosElementos.filter((el) => el.plantaId === planta.id && !el.padre)
@@ -674,6 +749,7 @@ watch(
       // local.height = planta.dimensiones.alto;
       // local.maxWeight = planta.capacidadCargaSoportado;
       isManuallyEdited.value = true
+      resetValidationState()
     } else {
       resetLocalState()
     }
@@ -1008,7 +1084,21 @@ watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY
 
 // onShapeChange eliminado en favor del watch sobre local.shape
 
+function markAllTouched() {
+  touched.name = true
+  touched.codigo = true
+  touched.shape = true
+  touched.dimensions = true
+  touched.maxWeight = true
+}
+
 function onSave() {
+  markAllTouched()
+  // Validaciones básicas previas
+  if (!validNombre.value || !validCodigo.value) return
+  if (!validShape.value) return
+  if (!validDims.value) return
+  if (!validMaxWeight.value) return
   // Si hay un debounce pendiente, aplicamos dimensiones inmediatamente antes de guardar (solo en modo limitado)
   if (!local.isInfinite && dimensionChangeDebounce) {
     clearTimeout(dimensionChangeDebounce)
@@ -1027,9 +1117,13 @@ function onSave() {
   errors.dimensions = false
   errors.maxWeight = false
 
-  if (!String(local.name || '').trim()) {
-    errors.name = true
-    notice.value = 'El campo "Nombre" es obligatorio.'
+  errors.name = !validNombre.value
+  errors.codigo = !validCodigo.value
+  errors.shape = !validShape.value
+  errors.dimensions = !validDims.value
+  errors.maxWeight = !validMaxWeight.value
+  if (errors.name || errors.codigo || errors.shape || errors.dimensions || errors.maxWeight) {
+    if (!notice.value) notice.value = 'Corrige los campos marcados.'
     return
   }
 
@@ -1038,6 +1132,7 @@ function onSave() {
     const plantaData = {
       id: local.id,
       nombre: local.name.trim(),
+      codigo: local.codigo.trim(),
       isInfinite: true,
       // Preservamos referencias existentes (polígono/dimensiones) para compat
       dimensiones: {
@@ -1149,6 +1244,7 @@ function onSave() {
   const plantaData = {
     id: local.id,
     nombre: local.name.trim(),
+    codigo: local.codigo.trim(),
     capacidadCargaSoportado: local.maxWeight,
     isInfinite: false,
     dimensiones: {
@@ -1176,21 +1272,7 @@ function onSave() {
 }
 
 // Estado derivado para habilitar el guardado
-const canSave = computed(() => {
-  const hasNotice = Boolean(notice.value)
-  const hasErrors = errors.name || errors.dimensions || errors.maxWeight
-  const hasValidName = Boolean(String(local.name || '').trim())
-  // En modo elástico, no exigimos dimensiones/capacidad
-  const dimsOk = local.isInfinite
-    ? true
-    : (Number(localRectWMeters.value) || 0) > 0 &&
-      (Number(localRectLMeters.value) || 0) > 0 &&
-      (Number(localRectYMeters.value) || 0) > 0
-  const weightOk = local.isInfinite
-    ? true
-    : (Number.isFinite(Number(local.maxWeight)) && Number(local.maxWeight) >= 0)
-  return !hasNotice && !hasErrors && hasValidName && dimsOk && weightOk
-})
+// Botón siempre habilitado: se mantiene canSave obsoleto (eliminado) para no usar disabled
 
 onBeforeUnmount(() => {
   if (dimensionChangeDebounce) {
@@ -1198,5 +1280,16 @@ onBeforeUnmount(() => {
     dimensionChangeDebounce = null
   }
   document.body.style.cursor = 'default'
+  document.body.style.overflow = prevBodyOverflow || ''
+})
+
+// Bloquear scroll mientras el modal esté abierto
+watch(() => canvasStore.crearPlanta, (v) => {
+  if (v) {
+    prevBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  } else {
+    document.body.style.overflow = prevBodyOverflow || ''
+  }
 })
 </script>
