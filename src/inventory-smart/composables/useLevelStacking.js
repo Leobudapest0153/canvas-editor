@@ -163,79 +163,6 @@ function getRoomAndLevelsByRoomId(elements, roomId) {
   return { room, orderIds, byId };
 }
 
-// Aplicar creación: actualiza existentes y crea el nuevo
-// makeIdFn: () => string
-// insertFn: (newElement, roomId, saveHistory?, description?) => boolean
-// updateFn: (id, patch, saveHistory?, description?) => boolean
-export function applyCreateLevelInRoom(elements, draft, strategy, makeIdFn, insertFn, updateFn) {
-  if (!draft?.isCreation || !['ok', 'clamp', 'redistribute'].includes(strategy)) {
-    return { ok: false, message: 'Draft de creación inválido o estrategia no soportada.' };
-  }
-
-  let alturas, bases;
-  if (strategy === 'ok') {
-    alturas = draft.alturasOk; bases = draft.basesOk;
-  } else if (strategy === 'clamp') {
-    alturas = draft.clamp?.alturas; bases = draft.clamp?.bases;
-  } else {
-    alturas = draft.redistribute?.alturas; bases = draft.redistribute?.bases;
-  }
-  if (!alturas || !bases) return { ok: false, message: 'No hay alturas/bases para aplicar.' };
-
-  const cm2px = (v) => Math.round((Number(v) || 0) * CM_TO_PX);
-  const roomHeightPx = cm2px(draft.roomHeightCm);
-
-  // 1) Actualizar existentes
-  for (const id of draft.nivelesOrden) {
-    if (id === NEW_LEVEL_ID) continue;
-    const hCm = Math.max(MIN_LEVEL_CM, Math.round(Number(alturas[id]) || 0));
-    const baseCm = Math.max(0, Math.round(Number(bases[id]) || 0));
-    const heightPx = cm2px(hCm);
-    const yPx = Math.max(0, roomHeightPx - (cm2px(baseCm) + heightPx));
-    const ok = updateFn(id, {
-      dimensiones: { alto: hCm },
-      alturaRespectoAlSuelo: baseCm,
-      y: yPx,
-      height: heightPx,
-    }, true, 'Ajuste de niveles (creación de otro nivel)');
-    if (!ok) return { ok: false, message: 'Falló la actualización de un nivel existente.' };
-  }
-
-  // 2) Crear el nuevo
-  const newId = typeof makeIdFn === 'function' ? makeIdFn() : ('lvl_' + Date.now());
-  const hNew = Math.max(MIN_LEVEL_CM, Math.round(Number(alturas[NEW_LEVEL_ID]) || 0));
-  const baseNew = Math.max(0, Math.round(Number(bases[NEW_LEVEL_ID]) || 0));
-  const heightPx = cm2px(hNew);
-  const yPx = Math.max(0, roomHeightPx - (cm2px(baseNew) + heightPx));
-
-  // Mezclar patch original del modal
-  const extra = JSON.parse(JSON.stringify(draft.targetPatch || {}));
-  extra.id = newId;
-  extra.padre = draft.roomId;
-  extra.dimensiones = { ...(extra.dimensiones || {}), alto: hNew };
-  extra.alturaRespectoAlSuelo = baseNew;
-
-  // width en px con base en ancho (o largo si prefieres)
-  const anchoCm = Number(extra?.dimensiones?.ancho);
-  const largoCm = Number(extra?.dimensiones?.largo);
-  const widthPx = Number.isFinite(anchoCm) ? cm2px(anchoCm)
-                 : Number.isFinite(largoCm) ? cm2px(largoCm)
-                 : undefined;
-
-  const newElement = {
-    tipo: 'pisos', // ajusta si tu tipo real difiere
-    ...extra,
-    x: Number.isFinite(extra.x) ? Math.round(extra.x) : 0,
-    y: yPx,
-    height: heightPx,
-    ...(widthPx != null ? { width: widthPx } : {}),
-  };
-
-  const okInsert = insertFn(newElement, draft.roomId, true, 'Creación de nivel sin validación');
-  if (!okInsert) return { ok: false, message: 'Falló la creación del nivel.' };
-
-  return { ok: true, newId };
-}
 
 // Proponer cambio de altura (y opcionalmente ancho/largo) para un nivel dentro del cuarto
 // elements: array del store
@@ -246,26 +173,49 @@ export function proposeLevelChange(elements, levelId, levelPatch, parentId) {
   if (error) return { status: 'error', message: error };
 
   let level = null;
-  if (levelId == 'Nuevo') {
+  const isCreation = (levelId === 'Nuevo');
+  if (isCreation) {
     level = levelPatch;
     orderIds.push(levelId); // asegurar que el objetivo está en la lista
   }
 
   const newDims = levelPatch?.dimensiones || {};
 
-  // 1) Validar footprint contra cuarto
+  // 1) Validar footprint (ancho/largo)
   const footprintCheck = validateFootprintWithinRoom(newDims, level, room);
   if (!footprintCheck.ok) {
     return { status: 'error', message: footprintCheck.message || 'Dimensiones exceden límites del cuarto.' };
   }
 
-  // 2) Alturas actuales
+  // 2) Peso
+  const MIN_WEIGHT_KG = 0;
+  const getWeight = (node) => Number(node?.capacidadCarga) || 0;
+
+  const weightsCurrent = {};
+  for (const id of orderIds) weightsCurrent[id] = getWeight(byId(id));
+
+  // peso objetivo del patch (si el usuario lo modificó)
+  const wPatch = levelPatch?.capacidadCarga;
+  const wTarget = wPatch != null ? Number(wPatch) : weightsCurrent[levelId];
+
+  const WcRaw = room?.capacidadCarga;
+  const Wc = Number(WcRaw);
+  const hasWeightLimit = Number.isFinite(Wc) && Wc > 0;
+
+  const W_otros = sum(orderIds.filter(id => id !== levelId).map(id => weightsCurrent[id]));
+  const W_total = (Number(wTarget) || 0) + W_otros;
+
+  const weightExceeded = hasWeightLimit && (W_total > Wc + 1e-6);
+  const D_w = weightExceeded ? (W_total - Wc) : 0; // déficit de peso a recortar
+  const weightExcessKg = weightExceeded ? Math.ceil(D_w) : 0;
+
+  // 3) Alturas
   const heightsCurrent = {};
   for (const id of orderIds) heightsCurrent[id] = Number(byId(id)?.dimensiones?.alto) || 0;
 
   const hTarget = newDims?.alto != null ? Number(newDims.alto) : heightsCurrent[levelId];
 
-  // 3) Altura del cuarto (siempre finita según tu regla)
+  // 4) Altura del cuarto
   const Hc = Number(room?.dimensiones?.alto);
   if (!Number.isFinite(Hc) || Hc <= 0) {
     return { status: 'error', message: 'El cuarto no tiene altura válida definida.' };
@@ -274,54 +224,98 @@ export function proposeLevelChange(elements, levelId, levelPatch, parentId) {
   const others = orderIds.filter(id => id !== levelId).map(id => ({ id, h: heightsCurrent[id] }));
   const H_otros = sum(others.map(o => o.h));
   const H_total = (Number(hTarget) || 0) + H_otros;
+  const heightExceeded = H_total > Hc + 1e-6;
+  const D = heightExceeded ? (H_total - Hc) : 0;
+
+  // Propuestas de PESO (solo si excede)
+  let weightClamp = null;
+  let weightRedistribute = null;
+  if (weightExceeded) {
+    // Clamp de peso: reduce el del target lo mínimo para caber
+    const wClampRaw = { ...weightsCurrent, [levelId]: Math.max(MIN_WEIGHT_KG, (Number(wTarget) || 0) - D_w) };
+
+    // Redistribución de peso: mantener target y reducir los otros proporcionalmente con mínimo 0
+    const othersW = orderIds.filter(id => id !== levelId).map(id => ({ id, h: weightsCurrent[id] }));
+    const { newHeightsById: newWeightsById, leftover } = redistributeProportionally(othersW, D_w, MIN_WEIGHT_KG);
+
+    const wRedistRaw = { ...weightsCurrent, [levelId]: Number(wTarget) || 0 };
+    for (const [oid, val] of Object.entries(newWeightsById)) wRedistRaw[oid] = val;
+
+    const finalWRedist = leftover <= 1e-6 ? wRedistRaw : wClampRaw; // si no alcanza, cae a clamp
+
+    weightClamp = wClampRaw;
+    weightRedistribute = finalWRedist;
+  }
+
+  // Pesos propuestos por id para comparativa (por defecto: iguales a actuales salvo el target si patch)
+  const pesosPropuestos = { ...weightsCurrent };
+  if (wTarget != null) pesosPropuestos[levelId] = Number(wTarget) || 0;
 
   const draftBase = {
+    isCreation,
     roomId: room.id,
     roomHeightCm: Hc,
     targetId: levelId,
-    targetPatch: levelPatch, // patch completo del modal
+    targetPatch: levelPatch,
     nivelesOrden: orderIds,
     alturasActuales: { ...heightsCurrent },
     basesActuales: computeStackBaseZ(orderIds, heightsCurrent),
     nombresPorId: Object.fromEntries(orderIds.map(id => [id, byId(id)?.nombre || id])),
+
+    // Info de peso para UI
+    roomWeightMax: hasWeightLimit ? Wc : null,
+    pesosActuales: { ...weightsCurrent },
+    pesosPropuestos,
+    pesoTotal: W_total,
+
+    // Propuestas de peso
+    weightClamp,
+    weightRedistribute,
   };
 
-  if (H_total <= Hc + 1e-6) {
+  // Caso feliz: ni altura ni peso exceden
+  if (!heightExceeded && !weightExceeded) {
     const alturasOkRaw = { ...heightsCurrent, [levelId]: hTarget };
     const alturasOk = roundHeightsPreserveSum(alturasOkRaw, sum(Object.values(alturasOkRaw)));
     const basesOk = computeStackBaseZ(orderIds, alturasOk);
     return { status: 'ok', draft: { ...draftBase, alturasOk, basesOk } };
   }
 
-  const D = H_total - Hc;
+  // Propuestas de ALTURA (solo si excede altura)
+  let clamp = null;
+  let redistribute = null;
+  if (heightExceeded) {
+    const clampHRaw = { ...heightsCurrent, [levelId]: Math.max(MIN_LEVEL_CM, (Number(hTarget) || 0) - D) };
+    const clampSum = sum(Object.values(clampHRaw));
+    const alturasClamp = roundHeightsPreserveSum(clampHRaw, clampSum);
+    const basesClamp = computeStackBaseZ(orderIds, alturasClamp);
+    clamp = { alturas: alturasClamp, bases: basesClamp };
 
-  // Clamp
-  const clampHRaw = { ...heightsCurrent, [levelId]: Math.max(MIN_LEVEL_CM, (Number(hTarget) || 0) - D) };
-  const clampSum = sum(Object.values(clampHRaw));
-  const alturasClamp = roundHeightsPreserveSum(clampHRaw, clampSum);
-  const basesClamp = computeStackBaseZ(orderIds, alturasClamp);
-
-  // Redistribución
-  const { newHeightsById, leftover } = redistributeProportionally(others, D, MIN_LEVEL_CM);
-  const redistRaw = { ...heightsCurrent, [levelId]: Number(hTarget) || 0 };
-  for (const [oid, h] of Object.entries(newHeightsById)) redistRaw[oid] = h;
-  const finalRedistribRaw = leftover <= 1e-6 ? redistRaw : clampHRaw;
-  const redistSum = sum(Object.values(finalRedistribRaw));
-  const alturasRedistrib = roundHeightsPreserveSum(finalRedistribRaw, redistSum);
-  const basesRedistrib = computeStackBaseZ(orderIds, alturasRedistrib);
+    const { newHeightsById, leftover } = redistributeProportionally(others, D, MIN_LEVEL_CM);
+    const redistRaw = { ...heightsCurrent, [levelId]: Number(hTarget) || 0 };
+    for (const [oid, h] of Object.entries(newHeightsById)) redistRaw[oid] = h;
+    const finalRedistribRaw = leftover <= 1e-6 ? redistRaw : clampHRaw;
+    const redistSum = sum(Object.values(finalRedistribRaw));
+    const alturasRedistrib = roundHeightsPreserveSum(finalRedistribRaw, redistSum);
+    const basesRedistrib = computeStackBaseZ(orderIds, alturasRedistrib);
+    redistribute = { alturas: alturasRedistrib, bases: basesRedistrib };
+  }
+  console.log("Draft base", draftBase)
 
   return {
     status: 'needs_confirmation',
     draft: {
       ...draftBase,
-      deficitCm: Math.round(D),
-      clamp: { alturas: alturasClamp, bases: basesClamp },
-      redistribute: { alturas: alturasRedistrib, bases: basesRedistrib },
+      heightExceeded,
+      weightExceeded,
+      deficitCm: heightExceeded ? Math.round(D) : 0,
+      weightExcess: weightExcessKg,
+      clamp,               // altura
+      redistribute,        // altura
+      // peso: weightClamp / weightRedistribute ya vienen arriba en base
     },
   };
 }
-// Aplicar cambios finales (según la estrategia) usando el updater del store
-// updater: función (id, patch, saveHistory?, description?)
 export function applyLevelChange(elements, draft, strategy, updaters) {
   // --- SECCIÓN 1: VALIDACIÓN Y PREPARACIÓN ---
   if (!updaters || typeof updaters.add !== 'function' || typeof updaters.update !== 'function') {
@@ -331,7 +325,14 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
     return { ok: false, message: 'Estrategia inválida o draft vacío.' };
   }
 
-  // ... (Lógica de selección de alturas/bases y cálculo de roomHeightCm no cambia)
+  // Si hay exceso de peso y el usuario eligió 'ok', bloquear
+  if (draft?.weightExceeded && strategy === 'ok') {
+    const total = Math.round(Number(draft?.pesoTotal || 0));
+    const max = Math.round(Number(draft?.roomWeightMax || 0));
+    return { ok: false, message: `No se puede aplicar: el peso total (${total} kg) excede el máximo permitido (${max} kg).` };
+  }
+
+  // Selección de alturas/bases
   let alturas, bases;
   if (strategy === 'ok') {
     alturas = draft.alturasOk; bases = draft.basesOk;
@@ -341,6 +342,21 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
     alturas = draft.redistribute?.alturas; bases = draft.redistribute?.bases;
   }
   if (!alturas || !bases) return { ok: false, message: 'No hay datos de alturas/bases para aplicar.' };
+
+  // Selección de pesos según estrategia (si existen propuestas)
+  let pesos = null;
+  if (strategy === 'clamp') {
+    pesos = draft.weightClamp || null;
+  } else if (strategy === 'redistribute') {
+    pesos = draft.weightRedistribute || null;
+  } else {
+    pesos = null; // 'ok' no toca pesos
+  }
+
+  // Si todavía hay exceso de peso pero no tenemos propuestas de peso, bloquear
+  if (draft?.weightExceeded && !pesos) {
+    return { ok: false, message: 'No hay propuesta de peso para resolver el exceso. Elige "Limitar" o "Forzar".' };
+  }
 
   const cm2px = (v) => Math.round((Number(v) || 0) * CM_TO_PX);
   const byId = (id) => elements.find(e => e?.id === id);
@@ -357,18 +373,17 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
   const roomHeightPx = cm2px(roomHeightCm);
   const targetId = draft.targetId;
 
-  // --- SECCIÓN 2: BUCLE CON LLAMADAS DIFERENCIADAS ---
   for (const id of draft.nivelesOrden) {
-
-    const hCm = Math.max(MIN_LEVEL_CM, Math.round(Number(alturas[id]) || 0));
+    const hCm = Math.max(1, Math.round(Number(alturas[id]) || 0));
     const baseCm = Math.max(0, Math.round(Number(bases[id]) || 0));
     const heightPx = cm2px(hCm);
     const yPx = Math.max(0, roomHeightPx - (cm2px(baseCm) + heightPx));
 
+    const wNew = (pesos && pesos[id] != null) ? Math.max(0, Math.round(Number(pesos[id]) || 0)) : null;
+
     let ok = false;
     const description = 'Ajuste de niveles en cuarto';
 
-    // CASO A: CREACIÓN
     if (id === 'Nuevo' && id === targetId) {
       const parentContext = byId(draft.padre);
       if (!parentContext) return { ok: false, message: 'Contexto del padre no encontrado para crear.' };
@@ -377,25 +392,20 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
       const parentChilds = elements.filter(e => e?.padre === parentContext.id);
       const newElementData = buildChildFromDraft(draft.targetPatch, parentContext, index, parentChilds);
 
-      // Asignar ID y geometría final
-      newElementData.id = uid(newElementData.tipo); // ¡Generamos el ID final aquí!
+      newElementData.id = uid(newElementData.tipo);
       newElementData.dimensiones.alto = hCm;
       newElementData.alturaRespectoAlSuelo = baseCm;
       newElementData.y = yPx;
       newElementData.height = heightPx;
+      if (wNew != null) newElementData.capacidadCarga = wNew;
 
       const anchoCm = Number(newElementData.dimensiones?.ancho);
-      if (Number.isFinite(anchoCm)) {
-        newElementData.width = cm2px(anchoCm);
-      }
+      if (Number.isFinite(anchoCm)) newElementData.width = cm2px(anchoCm);
 
-      console.log('Calling ADD for new element', newElementData);
       ok = updaters.add(id, newElementData, true, description);
 
-    // CASO B: ACTUALIZACIÓN (Tanto el objetivo como los de contexto)
     } else {
       let patch = {};
-      // Si es el elemento que se está editando, el patch es más completo
       if (id === targetId) {
         patch = {
           ...(draft.targetPatch || {}),
@@ -404,11 +414,11 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
           y: yPx,
           height: heightPx,
         };
+        if (wNew != null) patch.capacidadCarga = wNew;
+
         const anchoCm = Number(patch.dimensiones?.ancho);
-        if (Number.isFinite(anchoCm)) {
-          patch.width = cm2px(anchoCm);
-        }
-      // Si solo es un elemento que se reajusta, el patch es mínimo
+        if (Number.isFinite(anchoCm)) patch.width = cm2px(anchoCm);
+
       } else {
         patch = {
           dimensiones: { alto: hCm },
@@ -416,9 +426,9 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
           y: yPx,
           height: heightPx,
         };
+        if (wNew != null) patch.capacidadCarga = wNew;
       }
 
-      console.log(`Calling UPDATE for element ${id}`, patch);
       ok = updaters.update(id, patch, true, description);
     }
 
