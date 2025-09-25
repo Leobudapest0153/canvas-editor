@@ -310,7 +310,6 @@ export const FORMAS_DISPONIBLES = [
 export const UBICACIONES_DISPONIBLES = [
   { id: 'suelo', nombre: 'Suelo', aplicaA: ['elementos', 'cuartos', 'pisos', 'pasillos'] },
   { id: 'pared', nombre: 'Pared', aplicaA: ['elementos'] },
-  { id: 'interior', nombre: 'Interior', aplicaA: ['contenedores'] },
 ]
 
 // === CATÁLOGOS PARA CUARTOS Y ESPACIOS ===
