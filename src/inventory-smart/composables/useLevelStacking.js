@@ -300,8 +300,6 @@ export function proposeLevelChange(elements, levelId, levelPatch, parentId) {
     const basesRedistrib = computeStackBaseZ(orderIds, alturasRedistrib);
     redistribute = { alturas: alturasRedistrib, bases: basesRedistrib };
   }
-  console.log("Draft base", draftBase)
-
   return {
     status: 'needs_confirmation',
     draft: {
