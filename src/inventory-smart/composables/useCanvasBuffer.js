@@ -38,7 +38,6 @@ export const useCanvasBuffer = () => {
 
     // Limpiar datos de uso antes de guardar en el buffer
     const elementoLimpio = limpiarDatosUso(elemento, canvasStore.elementoPorId)
-    console.log('📋 Preparando elemento para buffer:', elementoLimpio)
 
     return {
       id: `buffer_${currentTimestamp}_${Math.random().toString(36).substr(2, 9)}`,
@@ -76,7 +75,7 @@ export const useCanvasBuffer = () => {
    */
   const addToBuffer = (elemento, sourceInfo = {}) => {
     if (!elemento) {
-      console.warn('⚠️ No se puede agregar elemento vacío al buffer')
+      console.warn('No se puede agregar elemento vacío al buffer')
       return false
     }
 
@@ -87,12 +86,10 @@ export const useCanvasBuffer = () => {
       // Actualizar elemento existente en buffer
       const updatedItem = createBufferItem(elemento, sourceInfo)
       bufferItems.value[existingIndex] = updatedItem
-      console.log('📋 Elemento actualizado en buffer:', updatedItem.elemento.nombre)
     } else {
       // Agregar nuevo elemento al buffer
       const bufferItem = createBufferItem(elemento, sourceInfo)
       bufferItems.value.push(bufferItem)
-      console.log('📋 Elemento agregado al buffer:', bufferItem.elemento.nombre)
     }
 
     return true
@@ -104,14 +101,14 @@ export const useCanvasBuffer = () => {
   const copyToBuffer = (elementoId, description = 'Estructura copiada al buffer') => {
     const elemento = canvasStore.elementoPorId(elementoId)
     if (!elemento) {
-      console.warn('⚠️ Elemento no encontrado para copiar al buffer:', elementoId)
+      console.warn('Elemento no encontrado para copiar al buffer:', elementoId)
       return false
     }
 
     // Clonar la estructura completa
     const clonedStructure = serializeElementForTemplate(elementoId)
     if (!clonedStructure) {
-      console.error('⚠️ Error al clonar la estructura del elemento')
+      console.error('Error al clonar la estructura del elemento')
       return false
     }
 
@@ -150,7 +147,7 @@ export const useCanvasBuffer = () => {
         : `Elemento "${nombreElemento}" copiado al portapapeles`
       showToast(mensaje, 'info')
     } else {
-      console.error('⚠️ Error al copiar la estructura al buffer')
+      console.error('Error al copiar la estructura al buffer')
     }
 
     return success
@@ -175,22 +172,12 @@ export const useCanvasBuffer = () => {
   }
 
   /**
-   * Pegar estructura de forma recursiva respetando la jerarquía
-   * NUEVO: Incluye lógica especial para elementos con pisos generados automáticamente
-   */
-  // Reemplazar pegado recursivo por la función centralizada
-  const pasteStructureRecursive = (elementoToPaste, position, allElementsMap, parentId = null) => {
-    const payload = { rootId: elementoToPaste.id, elements: Array.from(allElementsMap.values()) }
-    return instantiateStructureOnCanvas(canvasStore, payload, position)
-  }
-
-  /**
    * Pegar estructura completa desde buffer al canvas actual
    */
   const pasteFromBuffer = (bufferItemId, position = { x: 100, y: 100 }) => {
     const bufferItem = bufferItems.value.find((item) => item.id === bufferItemId)
     if (!bufferItem) {
-      console.warn('⚠️ Item no encontrado en buffer:', bufferItemId)
+      console.warn('Item no encontrado en buffer:', bufferItemId)
       return false
     }
 
@@ -216,7 +203,6 @@ export const useCanvasBuffer = () => {
     )
 
     if (!resultadoValidacionPeso.valido) {
-      console.warn('⚠️ No se puede pegar: excedería el peso máximo soportado', resultadoValidacionPeso)
       showToast(
         `No se puede pegar: excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso} kg`,
         'error', { timeout: 3000 }
@@ -226,7 +212,6 @@ export const useCanvasBuffer = () => {
 
     // Verificar si es una estructura con elementos hijos
     if (sourceInfo.isStructure && sourceInfo.allElements) {
-      console.log('📋 Pegando estructura completa con', sourceInfo.allElements.size, 'elementos')
       const payload = {
         rootId: elemento.id,
         // Asegurar que no se cuelen datos de uso en pegados antiguos guardados sin limpiar
@@ -282,11 +267,6 @@ export const useCanvasBuffer = () => {
       const finalElementId = canvasStore.agregarElemento(newElement, { preserveExistingCode: false, resetName: true, regenerateCode: true })
 
       if (finalElementId) {
-        console.log('📋 Elemento simple pegado desde buffer con nuevo ID único:', {
-          original: elemento.id,
-          nuevo: finalElementId,
-          nombre: elemento.nombre || elemento.tipo
-        })
         const nombreElemento = elemento.nombre || elemento.tipo
         showToast(`Elemento "${nombreElemento}" pegado correctamente`, 'info')
         return finalElementId
@@ -301,7 +281,7 @@ export const useCanvasBuffer = () => {
    */
   const pasteFromSerialized = (payload, position = { x: 100, y: 100 }) => {
     if (!payload || !payload.rootId || !Array.isArray(payload.elements)) {
-      console.warn('⚠️ Payload de plantilla inválido')
+      console.warn('Payload de plantilla inválido')
       return false
     }
     // Limpiar datos de uso si vienen presentes en la plantilla
@@ -323,7 +303,6 @@ export const useCanvasBuffer = () => {
     const index = bufferItems.value.findIndex((item) => item.id === bufferItemId)
     if (index !== -1) {
       const removedItem = bufferItems.value.splice(index, 1)[0]
-      console.log('🗑️ Elemento removido del buffer:', removedItem.elemento.nombre)
       return true
     }
     return false
@@ -335,7 +314,6 @@ export const useCanvasBuffer = () => {
   const clearBuffer = () => {
     const count = bufferItems.value.length
     bufferItems.value = []
-    console.log(`🗑️ Buffer limpiado - ${count} elementos removidos`)
   }
 
   /**

@@ -29,12 +29,12 @@ export const useStatePersistence = () => {
     if (validateBeforeSerialize) {
       const preValidation = validateStateBeforeSerialization(state)
       if (!preValidation.valid) {
-        console.warn('⚠️ Problemas detectados antes de serializar:', preValidation.issues)
+        console.warn('Problemas detectados antes de serializar:', preValidation.issues)
         if (preValidation.critical) {
           throw new Error(`Serialización abortada: ${preValidation.issues.join(', ')}`)
         }
       } else if (includeMetrics) {
-        console.log('✅ Estado validado para serialización:', preValidation.metrics)
+        console.log('Estado validado para serialización:', preValidation.metrics)
       }
     }
 
@@ -63,7 +63,7 @@ export const useStatePersistence = () => {
       plantas: state.plantas.map((planta) => {
         // Validar datos críticos de la planta antes de serializar
         if (!planta.id || !planta.dimensiones) {
-          console.warn('⚠️ Planta con datos incompletos será serializada:', planta.id || 'sin ID')
+          console.warn('Planta con datos incompletos será serializada:', planta.id || 'sin ID')
         }
 
         return {
@@ -89,7 +89,7 @@ export const useStatePersistence = () => {
       elementos: state.elementos.map((elemento) => {
         // Validar datos críticos del elemento antes de serializar
         if (!elemento.id || !elemento.tipo || !elemento.dimensiones) {
-          console.warn('⚠️ Elemento con datos incompletos será serializado:', elemento.id || 'sin ID')
+          console.warn('Elemento con datos incompletos será serializado:', elemento.id || 'sin ID')
         }
 
         return {
@@ -373,7 +373,7 @@ export const useStatePersistence = () => {
       const validation = validateStructure(jsonString, true)
 
       if (!validation.valid) {
-        console.error('❌ Validación fallida:', validation.error)
+        console.error('Validación fallida:', validation.error)
         console.error('Errores encontrados:', validation.errors)
         if (validation.warnings?.length > 0) {
           console.warn('Advertencias:', validation.warnings)
@@ -381,17 +381,8 @@ export const useStatePersistence = () => {
         return false
       }
 
-      // Mostrar información de validación
-      console.log('✅ Validación exitosa:', {
-        plantas: validation.info.plantas,
-        elementos: validation.info.elementos,
-        version: validation.info.version,
-        elementosPorTipo: validation.info.elementosPorTipo,
-        warnings: validation.warnings?.length || 0
-      })
-
       if (validation.warnings?.length > 0) {
-        console.warn('⚠️ Advertencias durante la validación:', validation.warnings)
+        console.warn('Advertencias durante la validación:', validation.warnings)
       }
 
       const state = validation.data || JSON.parse(jsonString)
@@ -428,7 +419,7 @@ export const useStatePersistence = () => {
         try {
           // Validar datos mínimos antes de crear la planta
           if (!plantaData.id || !plantaData.nombre || !plantaData.dimensiones) {
-            console.warn(`⚠️ Planta ${index + 1} omitida: datos incompletos`)
+            console.warn(`Planta ${index + 1} omitida: datos incompletos`)
             return
           }
 
@@ -454,12 +445,12 @@ export const useStatePersistence = () => {
           storeActions.addPlanta(plantaSegura)
           plantasRestauradas++
         } catch (error) {
-          console.error(`❌ Error restaurando planta ${index + 1}:`, error)
+          console.error(`Error restaurando planta ${index + 1}:`, error)
         }
       })
 
       if (plantasRestauradas === 0) {
-        console.error('❌ No se pudo restaurar ninguna planta válida')
+        console.error('No se pudo restaurar ninguna planta válida')
         return false
       }
 
@@ -472,25 +463,25 @@ export const useStatePersistence = () => {
         try {
           // Validaciones críticas que impiden la restauración
           if (!elementoData.id) {
-            console.warn(`⚠️ Elemento ${index + 1} omitido: falta ID`)
+            console.warn(`Elemento ${index + 1} omitido: falta ID`)
             elementosOmitidos++
             return
           }
 
           if (!elementoData.tipo) {
-            console.warn(`⚠️ Elemento ${index + 1} omitido: falta tipo`)
+            console.warn(`Elemento ${index + 1} omitido: falta tipo`)
             elementosOmitidos++
             return
           }
 
           if (!elementoData.plantaId || !plantaIds.has(elementoData.plantaId)) {
-            console.warn(`⚠️ Elemento ${index + 1} omitido: plantaId inválido`)
+            console.warn(`Elemento ${index + 1} omitido: plantaId inválido`)
             elementosOmitidos++
             return
           }
 
           if (!elementoData.dimensiones || !elementoData.posicion) {
-            console.warn(`⚠️ Elemento ${index + 1} omitido: faltan dimensiones o posición`)
+            console.warn(`Elemento ${index + 1} omitido: faltan dimensiones o posición`)
             elementosOmitidos++
             return
           }
@@ -577,7 +568,7 @@ export const useStatePersistence = () => {
           storeActions.addElemento(elementoSeguro)
           elementosRestaurados++
         } catch (error) {
-          console.error(`❌ Error restaurando elemento ${index + 1}:`, error)
+          console.error(`Error restaurando elemento ${index + 1}:`, error)
           elementosOmitidos++
         }
       })
@@ -588,7 +579,6 @@ export const useStatePersistence = () => {
           if (state.changeHistory.entries && Array.isArray(state.changeHistory.entries)) {
             storeActions.setChangeHistory(state.changeHistory.entries)
             changeHistoryRestored = true
-            console.log(`Historial de cambios restaurado: ${state.changeHistory.entries.length} entradas`)
           }
         } catch (error) {
           console.warn('Error al restaurar historial de cambios:', error)
@@ -600,24 +590,24 @@ export const useStatePersistence = () => {
       storeActions.setInitialNavigation(primeraPlanta.id, primeraPlanta.nombre)
 
       // === RESUMEN DE DESERIALIZACIÓN ===
-      const summary = {
-        plantas: plantasRestauradas,
-        elementos: elementosRestaurados,
-        elementosOmitidos,
-        plantaActiva: primeraPlanta.id,
-        warnings: validation.warnings?.length || 0,
-        changeHistory: {
-          restored: changeHistoryRestored,
-          entries: changeHistoryRestored ? state.changeHistory.entries.length : 0
-        },
-        catalogos: {
-          tiposEspacio: state.catalogos?.tiposEspacio?.length || DEFAULT_TIPOS_ESPACIO.length,
-          tiposCuarto: state.catalogos?.tiposCuarto?.length || DEFAULT_TIPOS_CUARTO.length,
-          tiposProductoAdmitidos: state.catalogos?.tiposProductoAdmitidos?.length || DEFAULT_TIPOS_PRODUCTO_ADMITIDOS.length,
-        }
-      }
+      // const summary = {
+      //   plantas: plantasRestauradas,
+      //   elementos: elementosRestaurados,
+      //   elementosOmitidos,
+      //   plantaActiva: primeraPlanta.id,
+      //   warnings: validation.warnings?.length || 0,
+      //   changeHistory: {
+      //     restored: changeHistoryRestored,
+      //     entries: changeHistoryRestored ? state.changeHistory.entries.length : 0
+      //   },
+      //   catalogos: {
+      //     tiposEspacio: state.catalogos?.tiposEspacio?.length || DEFAULT_TIPOS_ESPACIO.length,
+      //     tiposCuarto: state.catalogos?.tiposCuarto?.length || DEFAULT_TIPOS_CUARTO.length,
+      //     tiposProductoAdmitidos: state.catalogos?.tiposProductoAdmitidos?.length || DEFAULT_TIPOS_PRODUCTO_ADMITIDOS.length,
+      //   }
+      // }
 
-      console.log('✅ Estado deserializado exitosamente:', summary)
+      // console.log('✅ Estado deserializado exitosamente:', summary)
 
       if (elementosOmitidos > 0) {
         console.warn(`⚠️ ${elementosOmitidos} elementos fueron omitidos debido a datos inválidos`)
@@ -625,7 +615,7 @@ export const useStatePersistence = () => {
 
       return true
     } catch (error) {
-      console.error('❌ Error al deserializar JSON:', error)
+      console.error('Error al deserializar JSON:', error)
       return false
     }
   }
@@ -1151,7 +1141,7 @@ export const useStatePersistence = () => {
    */
   const validateCatalogo = (catalogo, nombre) => {
     if (!Array.isArray(catalogo)) {
-      console.warn(`⚠️ Catálogo ${nombre}: debe ser un array`)
+      console.warn(`Catálogo ${nombre}: debe ser un array`)
       return false
     }
 
@@ -1163,7 +1153,7 @@ export const useStatePersistence = () => {
     )
 
     if (!hasValidItems) {
-      console.warn(`⚠️ Catálogo ${nombre}: algunos elementos no tienen la estructura correcta (id, nombre)`)
+      console.warn(`Catálogo ${nombre}: algunos elementos no tienen la estructura correcta (id, nombre)`)
       return false
     }
 

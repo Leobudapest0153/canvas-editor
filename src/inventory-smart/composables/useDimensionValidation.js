@@ -72,7 +72,6 @@ export function useDimensionValidation() {
     // Validar contención de elementos hijos
     const validacionHijos = validarContencionHijos(elementoTemporal)
     if (!validacionHijos.valida) {
-      console.log('❌ VALIDACIÓN DE HIJOS FALLIDA:', validacionHijos.razon)
       if (!silencioso) {
         toast.showError(validacionHijos.razon)
       }
@@ -82,7 +81,6 @@ export function useDimensionValidation() {
     // Validar contención en contenedor padre
     const validacionPadre = validarContencionEnPadre(elementoTemporal)
     if (!validacionPadre.valida) {
-      console.log('❌ VALIDACIÓN DE CONTENCIÓN EN PADRE FALLIDA:', validacionPadre.razon)
       if (!silencioso) {
         toast.showError(validacionPadre.razon)
       }
@@ -98,8 +96,6 @@ export function useDimensionValidation() {
     //   }
     //   return validacionVolumen
     // }
-
-    console.log('✅ TODAS LAS VALIDACIONES DE DIMENSIONES FÍSICAS EXITOSAS')
 
     // Mostrar toast de éxito si no se ha mostrado otro toast
     if (!silencioso) {
@@ -232,8 +228,6 @@ export function useDimensionValidation() {
         const nombreDimension = esVistaFrontal ? 'alto' : 'largo';
         sugerencias.push(`Aumentar ${nombreDimension} ${excesoSegundo.toFixed(1)}cm más`);
       }
-
-      console.log('❌ PROBLEMAS DE CONTENCIÓN DETECTADOS:', mensajesProblemas);
 
       return {
         valida: false,

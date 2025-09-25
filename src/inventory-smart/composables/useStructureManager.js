@@ -403,14 +403,6 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
       effectivePos = pos
     }
 
-    console.log(`🎯 Paste element: ${elem.id || elem.nombre} (${elem.tipo})`, {
-      isRoot,
-      hasXYSelf,
-      elemXY: { x: elem.x, y: elem.y },
-      effectivePos,
-      context: isRoot ? 'planta-canvas' : 'padre-canvas'
-    })
-
     // Asegurar color y colorBase en todos los nodos
     const colorMerged = elem.color ?? elem.colorBase ?? (isRoot ? (root.color ?? root.colorBase) : undefined)
     const colorBaseMerged = elem.colorBase ?? elem.color ?? colorMerged
@@ -457,21 +449,12 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
       return hasBasicPosition
     })
 
-    console.log('🔍 Regenerate decision:', {
-      isRootWithFloors,
-      hasFloorChildren,
-      shouldRegenerate
-    })
-
     if (shouldRegenerate) {
-      console.log(`🔧 Using regenerateFloors for: ${elem.id || elem.nombre}`)
       regenerateFloors(canvasStore, elem, newMap, newId, base.dimensiones)
     } else if (hasChildren) {
-      console.log(`🎯 Using pasteRecursive for children of: ${elem.id || elem.nombre}`)
       for (const hid of elem.hijos) {
         const child = newMap.get(hid)
         if (!child) continue
-        console.log(`  → Child: ${child.id || child.nombre} at (${child.x}, ${child.y})`)
         // Pasar la posición del root pegado para que los hijos calculen su posición relativa
         // El cálculo de posición relativa se hace en pasteRecursive
         pasteRecursive(child, pos, newId) // usar 'pos' (posición del root) en lugar de childPos

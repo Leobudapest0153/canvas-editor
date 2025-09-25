@@ -21,7 +21,6 @@ export const useCanvasWithHistory = () => {
   // Función de inicialización que se puede llamar múltiples veces de forma segura
   const ensureInitialized = async () => {
     if (!isInitialized) {
-      console.log('🔗 Inicializando integración canvas-historial')
 
       // Esperar a que todas las propiedades reactivas se estabilicen
       await nextTick()
@@ -40,7 +39,6 @@ export const useCanvasWithHistory = () => {
       history.initializeHistory('Estado inicial del canvas')
       isInitialized = true
 
-      console.log('✅ Integración canvas-historial completada')
     }
   }
 

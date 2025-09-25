@@ -374,14 +374,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     const elemento = elementoPorId.value(elementoId)
     if (!elemento) {
       showToast('Elemento no encontrado')
-      console.error('Elemento no encontrado:', elementoId)
       return
     }
 
     // Verificar que el elemento sea navegable: cuartos, pisos, elementos
     if (!['cuartos', 'pisos', 'elementos'].includes(elemento.tipo)) {
       showToast('Este elemento no permite navegación')
-      console.error('No navegable:', elemento.tipo)
       return
     }
 
@@ -497,7 +495,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     const planta = plantaPorId.value(plantaId)
     if (!planta) {
       showToast('Planta no encontrada')
-      console.error('Planta no encontrada:', plantaId)
       return
     }
 
@@ -576,7 +573,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const defaultHeight = elemento.tipo === 'contenedores' ? 40 : 60
       elementWidthPx = defaultWidth * CM_TO_PX
       elementHeightPx = defaultHeight * CM_TO_PX
-      console.log('Usando dimensiones por defecto')
+      console.warn('Usando dimensiones por defecto')
     }
 
     // El canvas muestra el espacio real del elemento
@@ -685,7 +682,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     try {
       const idx = elementos.value.findIndex(e => e && e.id === id);
       if (idx === -1) {
-        console.warn('[actualizarElementoSinValidacion] Elemento no encontrado:', id);
+        console.warn('Elemento no encontrado:', id);
         return false;
       }
 
@@ -734,7 +731,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       return true;
     } catch (err) {
-      console.error('[actualizarElementoSinValidacion] Error:', err);
+      console.error('Error:', err);
       return false;
     }
   };
@@ -1016,8 +1013,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Actions para elementos
   const agregarElemento = (nuevoElemento, opts = {}) => {
-    console.log('Agregando elemento al store:', nuevoElemento)
-
     const ubic = (
       nuevoElemento.ubicacion ||
       nuevoElemento.ubic ||
@@ -1236,7 +1231,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const setHistoryInstance = (historyComposableInstance) => {
     historyInstance.value = historyComposableInstance
-    console.log('🔗 Instancia de historial establecida en el store')
   }
 
   /**
@@ -1665,7 +1659,6 @@ export const useCanvasStore = defineStore('canvas', () => {
    */
   const setAutoSaveInstance = (autoSaveComposableInstance) => {
     autoSaveInstance.value = autoSaveComposableInstance
-    console.log('💾 Instancia de autosave establecida en el store')
   }
 
 
