@@ -12,7 +12,8 @@
       <div
         v-if="visible && !isDestroyed"
         :class="customPosition"
-        class="pointer-events-none absolute z-50 px-2 py-1 rounded-md bg-slate-900 text-white text-xs shadow text-nowrap"
+        :style="tooltipStyle"
+  class="pointer-events-none absolute z-50 px-2 py-1 rounded-md bg-slate-900 text-white text-xs shadow whitespace-normal leading-snug normal-case"
         role="tooltip"
       >
         {{ label }}
@@ -28,7 +29,9 @@ defineOptions({ name: 'UiTooltip' })
 const props = defineProps({
   label: { type: String, required: true },
   delay: { type: Number, default: 200 },
-  position: { type: String, default: 'top' }
+  position: { type: String, default: 'top' },
+  maxWidth: { type: [Number, String], default: 320 },
+  minWidth: { type: [Number, String], default: 140 }
 })
 
 const containerRef = ref(null)
@@ -37,18 +40,27 @@ const isDestroyed = ref(false)
 let timer
 
 const customPosition = computed(() => {
-  switch(props.position) {
+  switch (props.position) {
     case 'top':
-      return '-top-2 left-1/2 -translate-x-1/2 -translate-y-full'
+      return 'left-1/2 -translate-x-1/2 -translate-y-full -top-2'
     case 'bottom':
-      return '-bottom-2 left-1/2 -translate-x-1/2 translate-y-full'
+      return 'left-1/2 -translate-x-1/2 translate-y-full -bottom-2'
     case 'left':
-      return '-left-2 top-1/2 -translate-y-1/2 -translate-x-full'
+      // Ubicamos totalmente a la izquierda sin forzar shrink
+      return 'right-full mr-2 top-1/2 -translate-y-1/2'
     case 'right':
-      return '-right-2 top-1/2 -translate-y-1/2 translate-x-full'
+      return 'left-full ml-2 top-1/2 -translate-y-1/2'
     default:
-      return '-top-2 left-1/2 -translate-x-1/2 -translate-y-full'
+      return 'left-1/2 -translate-x-1/2 -translate-y-full -top-2'
   }
+})
+
+const tooltipStyle = computed(() => {
+  let mw = props.maxWidth
+  let mnw = props.minWidth
+  if (typeof mw === 'number') mw = `${mw}px`
+  if (typeof mnw === 'number') mnw = `${mnw}px`
+  return { maxWidth: mw, minWidth: mnw }
 })
 
 function onEnter() {
