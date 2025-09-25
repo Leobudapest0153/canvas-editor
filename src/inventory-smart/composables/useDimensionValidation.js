@@ -171,7 +171,7 @@ export function useDimensionValidation() {
         const hijoDesplazadoEnY = posHijoY_raw > 1; // Más de 1cm de desplazamiento
         const seSaleDelArea = (posHijoY_raw + altoHijoCanvas) > dimensionesPadre.largo;
         const hijoTieneAltoProbablementeZ = (dimHijo.alto || 0) > (dimensionesPadre.largo * 0.5); // Su alto sugiere coordenada Z
-        
+
         // Condiciones para detectar posicionamiento en vista frontal:
         // 1. Se sale del área Y está desplazado (caso más común)
         // 2. O tiene alto significativo comparado con el largo del padre (sugiere que su Y es coordenada Z)
@@ -254,7 +254,7 @@ export function useDimensionValidation() {
   function validarContencionEnPadre(elemento) {
     // Si no tiene padre, no hay restricción de contención
     if (!elemento.padre && !elemento.parentId) {
-      return { valida: true, razon: 'El elemento no tiene contenedor padre' };
+      return { valida: true, razon: 'El elemento no tiene estructura padre' };
     }
 
     const parentId = elemento.padre || elemento.parentId;
@@ -265,7 +265,7 @@ export function useDimensionValidation() {
     }
 
     if (!padre || !padre.dimensiones) {
-      return { valida: true, razon: 'No se encontró el contenedor padre o no tiene dimensiones' };
+      return { valida: true, razon: 'No se encontró la estructura padre o no tiene dimensiones' };
     }
 
     const vista = canvasStore.vistaActiva || 'XY'

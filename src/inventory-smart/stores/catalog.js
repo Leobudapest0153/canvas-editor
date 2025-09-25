@@ -43,12 +43,12 @@ export const useCatalogStore = defineStore('catalog', () => {
         if (Array.isArray(it.pisosNiveles) && it.pisosNiveles.length > 0) {
           const esCuarto = it.tipo === 'cuartos'
           it.pisosNiveles.forEach((niv, idx) => {
-            const childId = `${it.id}__${esCuarto ? 'piso' : 'contenedor'}_${idx + 1}`
+            const childId = `${it.id}__${esCuarto ? 'piso' : 'nivel'}_${idx + 1}`
             const child = {
               id: childId,
               nombre: niv?.nombre || (esCuarto ? `Piso ${idx + 1}` : `Nivel ${idx + 1}`),
               tipo: esCuarto ? 'pisos' : 'contenedores',
-              categoria: esCuarto ? 'piso' : 'contenedor',
+              categoria: esCuarto ? 'piso' : 'nivel',
               padre: root.id,
               color: root.color,
               colorBase: root.colorBase,
@@ -77,12 +77,12 @@ export const useCatalogStore = defineStore('catalog', () => {
           root.meta.tienePisosGenerados = true
         } else if (it.tipo === 'cuartos' || it.tipo === 'elementos') {
           const esCuarto = it.tipo === 'cuartos'
-          const childId = `${it.id}__${esCuarto ? 'piso' : 'contenedor'}_1`
+          const childId = `${it.id}__${esCuarto ? 'piso' : 'nivel'}_1`
           const child = {
             id: childId,
             nombre: esCuarto ? 'Piso 1' : 'Nivel 1',
             tipo: esCuarto ? 'pisos' : 'contenedores',
-            categoria: esCuarto ? 'piso' : 'contenedor',
+            categoria: esCuarto ? 'piso' : 'nivel',
             padre: root.id,
             color: root.color,
             colorBase: root.colorBase,

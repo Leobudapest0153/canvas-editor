@@ -20,7 +20,7 @@ const TYPE_PREFIX = {
   pasillos: 'PAS',
   cuartos: 'CRT',
   pisos: 'PIS',
-  elementos: 'ELM',
+  elementos: 'ESP',
   contenedores: 'NVL',
 }
 

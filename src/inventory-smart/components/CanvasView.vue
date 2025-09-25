@@ -1604,7 +1604,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
     } else if (canvasStore.estaEnPiso) {
       tipoPadre = 'el piso'
     } else if (canvasStore.estaEnContenedor) {
-      tipoPadre = 'el contenedor'
+      tipoPadre = 'el nivel'
     } else if (canvasStore.estaEnElemento) {
       tipoPadre = 'el elemento'
     }

@@ -20,9 +20,9 @@ const initialConfig = ref(null)
 // Variable reactiva para mantener la configuración actualizada
 const currentConfig = ref(null)
 
-// Factory para generar datos de productos de contenedor
+// Factory para generar datos de productos de niveles
 const createContainerProductsService = () => {
-  // Datos de ejemplo para diferentes contenedores
+  // Datos de ejemplo para diferentes niveles
   const mockData = [
     { codigo: 'PROD001', descripcion: 'Producto A - Medicamento', cantidad: 150, fechaVencimiento: '2024-01-15' },
     { codigo: 'PROD002', descripcion: 'Producto B - Suplemento vitamínico', cantidad: 75, fechaVencimiento: '2024-10-30' },
@@ -44,15 +44,15 @@ const createContainerProductsService = () => {
   return {
     name: 'containerProducts',
     type: 'container_products',
-    description: 'Servicio de prueba para productos de contenedor',
+    description: 'Servicio de prueba para productos de niveles',
     handler: async ({ containerId, filter = '', pagination = {} }) => {
-      console.log(`Llamando a servicio con ID de contenedor: ${containerId}`);
+      console.log(`Llamando a servicio con ID de nivel: ${containerId}`);
       // Simular delay de red
       await new Promise(resolve => setTimeout(resolve, 800))
 
       const { page = 1, pageSize = 10 } = pagination
 
-      // Obtener N productos random del contenedor
+      // Obtener N productos random del nivel
       let products = mockData.sort(() => 0.5 - Math.random()).slice(0, 5)
 
       // Aplicar filtro si existe

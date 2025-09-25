@@ -454,7 +454,7 @@
               :containerId="elementoSeleccionado.codigo"
             />
             <div v-else class="text-sm text-gray-500 text-center py-4">
-              El contenedor necesita un código para mostrar los productos
+              El nivel necesita un código para mostrar los productos
             </div>
           </div>
         </details>

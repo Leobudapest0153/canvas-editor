@@ -188,7 +188,7 @@
                     </div>
                   </div>
 
-                  <div v-if="ch.fields && ch.fields.length" class="ml-8">
+                  <div v-if="ch.fields && ch.fields.length && ch.op !== 'create'" class="ml-8">
                     <div class="space-y-2">
                       <div
                         v-for="f in ch.fields.filter((ff) => !bothEmpty(ff.before, ff.after))"
