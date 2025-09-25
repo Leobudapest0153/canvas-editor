@@ -24,7 +24,7 @@ export const useStatePersistence = () => {
    * @returns {string} JSON string con todo el estado
    */
   const serialize = (state, options = {}) => {
-    const { validateBeforeSerialize = true, includeMetrics = true, saveTimestamp = false, includeChangeHistory = false } = options
+    const { validateBeforeSerialize = true, includeMetrics = true, saveTimestamp = false, includeChangeHistory = true } = options
 
     if (validateBeforeSerialize) {
       const preValidation = validateStateBeforeSerialization(state)
@@ -186,7 +186,6 @@ export const useStatePersistence = () => {
               exportedAt: timestamp
             }
           }
-          console.log(`Historial de cambios incluido: ${changeHistoryData.entries.length} entradas`)
         }
       } catch (error) {
         console.warn('Error al serializar historial de cambios:', error)
