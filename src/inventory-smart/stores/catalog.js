@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { ELEMENTOS_PREDEFINIDOS, JERARQUIA_PERMITIDA, CATALOGO } from '@/inventory-smart/utils/constants'
+import { ELEMENTOS_PREDEFINIDOS, JERARQUIA_PERMITIDA } from '@/inventory-smart/utils/constants'
 import { toCatalogItemFromStructure } from '@/inventory-smart/composables/useStructureManager'
 
 export const useCatalogStore = defineStore('catalog', () => {
@@ -158,12 +158,12 @@ export const useCatalogStore = defineStore('catalog', () => {
       // - Si estamos viendo Elementos, mostramos los tipos permitidos para plantas (cuartos, elementos, pasillos, ...)
       //   en lugar de restringir solo a SISTEMA_BASE_KEYS para permitir ver elementos creados por el usuario.
       // - Para otros catálogos, mantenemos el filtro por SISTEMA_BASE_KEYS.
-      if (selectedCatalog.value === 'elementos') {
+      // if (selectedCatalog.value === 'elementos') {
         const allowed = allowedTypesForContext(catalogContext.value)
         result = result.filter((item) => allowed.includes(item.tipo))
-      } else {
-        result = result.filter((item) => CATALOGO.SISTEMA_BASE_KEYS.includes(item.id))
-      }
+      // } else {
+      //   result = result.filter((item) => CATALOGO.SISTEMA_BASE_KEYS.includes(item.id))
+      // }
     } else {
       const allowed = allowedTypesForContext(catalogContext.value)
       result = result.filter((item) => allowed.includes(item.tipo))

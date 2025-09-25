@@ -53,13 +53,14 @@
                   class="w-full px-3 py-2 border rounded-md text-sm"
                 />
               </div>
+              <!-- Filtro de tipo (internamente manejado como categoria) -->
               <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Categoría</label>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
                 <select
                   v-model="categoriaSeleccionada"
                   class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white"
                 >
-                  <option :value="null">Todas</option>
+                  <option :value="null">Todos</option>
                   <option v-for="c in categoriasDisponibles" :key="c.id" :value="c.id">
                     {{ c.nombre }}
                   </option>
@@ -257,16 +258,6 @@
       </button>
     </div>
 
-    <ElementEditor
-      :visible="mostrarModalCrear"
-      :categorias="categoriasDisponibles"
-      :formas="FORMAS_DISPONIBLES"
-      :ubicaciones="UBICACIONES_DISPONIBLES"
-      :value="nuevoElemento"
-      @cancel="cerrarModal"
-      @save="onGuardarElemento"
-    />
-
     <AgregarCuartoModal
       :visible="mostrarModalAgregarEspacio"
       :modo="editingItem ? (editingForm?.modo || modo) : modo"
@@ -295,7 +286,6 @@ import {
 // import { CATALOGO, SCALE_WITH_PARENT_KEYS } from '@/inventory-smart/utils/constants'
 // import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
 
-import ElementEditor from './modals/ElementEditor.vue'
 import AgregarCuartoModal from './AgregarCuartoModal.vue'
 import {
   buildStructureFromForm,
@@ -363,7 +353,6 @@ const handleClickOutside = (event) => {
     filtrosVisibles.value = false
   }
 }
-const mostrarModalCrear = ref(false)
 const mostrarModalAgregarEspacio = ref(false)
 const editingItem = ref(null) // item que se edita
 const editingForm = ref(null) // formulario derivado del item
@@ -463,20 +452,6 @@ const elementosFiltrados = computed(() => {
 watch(hayElementosEnTab, (val) => {
   if (!val) filtrosVisibles.value = false
 })
-
-const onGuardarElemento = (elemento) => {
-  const elementoNuevo = {
-    ...elemento,
-    id: `custom_${Date.now()}`,
-    icono: 'box',
-    personalizado: true,
-    tipo: elemento.tipo,
-  }
-  items.value.push(elementoNuevo)
-  cerrarModal()
-  categoriaSeleccionada.value = elementoNuevo.categoria
-  filtroTexto.value = ''
-}
 
 const onGuardarEspacio = (datosEspacio) => {
   try {
@@ -623,10 +598,6 @@ const finalizarArrastre = (event) => {
   console.log('Finalizando arrastre')
   const card = event.currentTarget
   if (card && card.classList) card.classList.remove('opacity-50', 'scale-95')
-}
-
-const cerrarModal = () => {
-  mostrarModalCrear.value = false
 }
 
 // Cargar elementos personalizados del localStorage

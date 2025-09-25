@@ -1006,7 +1006,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       return null
     }
     if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
-      showToast('En elementos solo se pueden agregar contenedores')
+      showToast('En elementos solo se pueden agregar niveles')
       return null
     }
     if (contextoActual === 'contenedores') {
