@@ -564,7 +564,6 @@ const iniciarArrastre = (elemento, event) => {
     event.preventDefault()
     return
   }
-  console.log('Iniciando arrastre del elemento:', elemento)
   // Si el item trae payload de estructura (plantilla/room/space), arrastrar como 'plantilla-catalogo'
   const isStructured = !!elemento?.payload?.rootId && Array.isArray(elemento?.payload?.elements)
   const datosArrastre = isStructured
@@ -578,14 +577,11 @@ const iniciarArrastre = (elemento, event) => {
         elemento: elemento,
         offset: { x: event.offsetX || 0, y: event.offsetY || 0 },
       }
-  console.log('Datos de arrastre:', datosArrastre)
 
   try {
     const dataString = JSON.stringify(datosArrastre)
     event.dataTransfer.setData('application/json', dataString)
     event.dataTransfer.effectAllowed = 'copy'
-    console.log('Data set en dataTransfer:', dataString)
-
     // Efecto visual de arrastre con Tailwind (sin clases en <style>)
     const card = event.currentTarget
     if (card && card.classList) card.classList.add('opacity-50', 'scale-95')
@@ -595,7 +591,6 @@ const iniciarArrastre = (elemento, event) => {
 }
 
 const finalizarArrastre = (event) => {
-  console.log('Finalizando arrastre')
   const card = event.currentTarget
   if (card && card.classList) card.classList.remove('opacity-50', 'scale-95')
 }

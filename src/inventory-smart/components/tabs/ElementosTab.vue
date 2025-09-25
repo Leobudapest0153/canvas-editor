@@ -455,13 +455,6 @@ watch(isPlantaContext, (enPlanta) => {
 // Resultado de búsqueda global (texto) sobre plantillas
 const filteredTemplates = computed(() => catalogStore.searchTemplates(searchText.value))
 
-// Base REAL para mostrar/ocultar filtros y vacío absoluto (todas las plantillas existentes)
-const plantillasBase = computed(() => {
-  const arr = templates.value
-  console.log('plantillasBase computed:', arr?.length || 0, arr)
-  return Array.isArray(arr) ? arr : []
-})
-
 // Computed local para filtrar plantillas por nombre/categoría/ubicación (patrón CapasTab)
 const plantillasFiltradas = computed(() => {
   // Lista visible = búsqueda global (si hay) + filtros locales (nombre/categoría/ubicación)
@@ -633,7 +626,6 @@ const handleDeleteTemplate = async (tpl) => {
 
   try {
     catalogStore.removeTemplate(tpl.id)
-    console.log('After removeTemplate, templates count:', templates.value?.length || 0)
     showSuccess('Plantilla eliminada')
   } catch (e) {
     showError('No se pudo eliminar la plantilla')

@@ -4,7 +4,6 @@ import { generateCodigo, generateNombre } from '@/inventory-smart/utils/codeName
 export function scopeForElement(elemento, allElements = []) {
   const tipoKey = (elemento?.tipo || '').toLowerCase()
   const plantaId = elemento?.plantaId
-  console.log('Element scope:', { tipoKey, plantaId })
   return (Array.isArray(allElements) ? allElements : []).filter((el) => {
     if ((el?.tipo || '').toLowerCase() !== tipoKey) return false
     if (plantaId && el?.plantaId) return el.plantaId === plantaId

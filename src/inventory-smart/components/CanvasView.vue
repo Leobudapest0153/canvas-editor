@@ -1358,7 +1358,6 @@ const handleStageClick = (e) => {
 // === FUNCIONES DE ELEMENTOS ===
 const selectElement = (element) => {
   if (element?.restrictions && element?.restrictions.includes('open-properties')) return
-  console.log('Seleccionando elemento:', element.id)
   const isNotCurrentElement = canvasStore.elementoSeleccionado !== element.id
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado && isNotCurrentElement) {
     const msg = 'No puedes seleccionar un nuevo elemento con cambios pendientes de guardar'
@@ -1378,7 +1377,6 @@ const selectElement = (element) => {
 const handleElementDoubleClick = (evt, elemento) => {
   if (evt.evt.button !== 0) return // Solo botón izquierdo
   if (elemento?.restrictions && elemento.restrictions.includes('enter')) return
-  console.log('Double-click en elemento:', elemento.nombre)
 
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
     const msg = 'No puedes entrar a un elemento si tienes cambios pendientes de guardar'
@@ -1388,7 +1386,6 @@ const handleElementDoubleClick = (evt, elemento) => {
   // Navegables según la nueva jerarquía: cuartos, pisos, elementos
   const navegables = ['cuartos', 'pisos', 'elementos']
   if (navegables.includes(elemento.tipo)) {
-    console.log('Navegando dentro de:', elemento.nombre)
     canvasStore.navegarAElemento(elemento.id)
   }
 }
@@ -1823,7 +1820,6 @@ const createElementFromDrop = (data, dropEvent) => {
     contenedores: elemento.contenedores ? [...elemento.contenedores] : [],
     hijos: [],
   }
-  console.log('✅ Creando elemento desde drop en posición válida:', nuevoElemento)
   canvasStore.agregarElemento(nuevoElemento)
   canvasStore.seleccionarElemento(nuevoElemento.id)
 }
@@ -2095,26 +2091,19 @@ const createElementFromBuffer = (data, dropEvent) => {
 }
 
 const createElementFromTemplate = (data, dropEvent) => {
-  console.log('[templates-dd] intento de drop de plantilla')
   const payload = data.payload || {}
   const root = payload.elements?.find?.((e) => e.id === payload.rootId)
   if (!root) {
-    console.warn('[templates-dd] payload sin root válido')
     showToast('No se pudo insertar la plantilla', 'error')
     return
   }
   const res = runPreDropValidations(root, dropEvent)
   if (!res.ok) {
-    console.log('[templates-dd] drop cancelado por validación', res.reason)
     return
   }
   // Unificar instanciación de estructuras (plantillas/cuarto/espacio)
-  const newId = instantiateStructureOnCanvas(canvasStore, payload, res.position)
-  if (!newId) {
-    showToast('No se pudo insertar la plantilla', 'error')
-  } else {
-    console.log('[templates-dd] plantilla insertada', newId)
-  }
+  instantiateStructureOnCanvas(canvasStore, payload, res.position)
+  showToast('No se pudo insertar la plantilla', 'error')
 }
 
 // Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)

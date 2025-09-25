@@ -121,9 +121,6 @@ watch(
   (newServices) => {
     try {
       servicesStore.registerServices(newServices)
-      if (newServices.length > 0) {
-        console.log(`✅ Registrados ${newServices.length} servicios externos`)
-      }
     } catch (error) {
       console.error('Error al registrar servicios externos:', error)
       showToast('Error al registrar servicios externos', 'error')
@@ -138,7 +135,6 @@ const callExternalService = async (serviceName, params = null, options = {}) => 
     const response = await servicesStore.callService(serviceName, params, options)
     return response
   } catch (error) {
-    console.error(`Error al llamar servicio "${serviceName}":`, error)
     showToast(`Error en servicio: ${serviceName}`, 'error')
     throw error
   }
@@ -179,7 +175,6 @@ const clearLocalBackups = async () => {
       // Fallback a localStorage por compatibilidad
       localStorage.removeItem(AUTOSAVE_CONFIG.STORAGE_KEY)
     }
-    console.log('🧹 Copias de seguridad locales eliminadas')
   } catch (e) {
     console.warn('No se pudieron limpiar los backups locales', e)
   }
@@ -227,7 +222,6 @@ const handleConfigChanged = (configSerializada) => {
     // Emitir al componente padre la configuración actualizada
     emit('configUpdated', configSerializada)
 
-    console.log('Configuración actualizada emitida al componente padre')
   } catch (error) {
     console.error('Error al procesar la configuración actualizada:', error)
     showToast('Error al procesar la configuración actualizada', 'error')
@@ -281,7 +275,6 @@ const handleCopyToBuffer = () => {
   const elementoSeleccionado = canvasStore.elementoSeleccionado
   if (elementoSeleccionado) {
     buffer.copyToBuffer(elementoSeleccionado)
-    console.log('📋 Estructura copiada al buffer')
   }
 }
 
@@ -341,7 +334,6 @@ const getConfigTimestamp = (jsonString) => {
   try {
     const data = JSON.parse(jsonString)
     const ts = data?.meta?.timestamp
-    console.log('Parsed timestamp:', ts)
     const t = ts ? Date.parse(ts) : NaN
     return Number.isFinite(t) ? t : null
   } catch (e) {
@@ -415,7 +407,6 @@ watch(
   () => props.configCanvas,
   async (newConfig, oldConfig) => {
     try {
-      console.log('🔄 Configuración cambiada; importando…')
       // Si no se provee una configuracion inicial
       if (!newConfig) {
         const mensaje = oldConfig ? null : 'Iniciando área de trabajo'

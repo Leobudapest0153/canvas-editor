@@ -46,7 +46,6 @@ const createContainerProductsService = () => {
     type: 'container_products',
     description: 'Servicio de prueba para productos de niveles',
     handler: async ({ containerId, filter = '', pagination = {} }) => {
-      console.log(`Llamando a servicio con ID de nivel: ${containerId}`);
       // Simular delay de red
       await new Promise(resolve => setTimeout(resolve, 800))
 
@@ -69,7 +68,6 @@ const createContainerProductsService = () => {
       const startIndex = (page - 1) * pageSize
       const endIndex = startIndex + pageSize
       const paginatedProducts = products.slice(startIndex, endIndex)
-      console.log(`Retornando ${paginatedProducts.length} productos (Página ${page} de ${Math.ceil(totalCount / pageSize)})`)
       return {
         products: paginatedProducts,
         totalCount,
@@ -94,7 +92,6 @@ const handleConfigUpdated = (nuevaConfig) => {
     currentConfig.value = nuevaConfig
     // DEV: Guardar en localStorage para simular persistencia
     localStorage.setItem(SERIALIZE_CONFIG.STORAGE_KEY, nuevaConfig)
-    console.log('Configuración actualizada guardada en localStorage')
     initialConfig.value = nuevaConfig
 
     // Al implementar aqui se enviaría a la API
@@ -109,7 +106,6 @@ onMounted(() => {
   if (savedConfig) {
     try {
       initialConfig.value = savedConfig
-      console.log('Configuración inicial cargada desde localStorage')
     } catch (error) {
       console.error('Error al parsear la configuración guardada:', error)
     }

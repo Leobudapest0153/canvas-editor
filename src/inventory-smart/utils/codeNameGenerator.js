@@ -60,7 +60,6 @@ function pad(num, size = 3) {
 export function generateCodigo(tipo, ctx = {}) {
   const prefix = getPrefix(tipo)
   const existing = Array.isArray(ctx.existing) ? ctx.existing : []
-  console.log('Generating code for type:', { tipo, prefix, existing })
 
   // Si hay códigos existentes al estilo PREFIX-###, calcular el siguiente
   let maxIdx = 0

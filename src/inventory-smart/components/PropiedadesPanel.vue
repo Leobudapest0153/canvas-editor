@@ -628,11 +628,6 @@ watch(
       currentDims.alto !== newDimensiones.alto
 
     if (hasChanged) {
-      console.debug(
-        '[PropiedadesPanel] Actualizando dimensiones desde transformer:',
-        newDimensiones,
-      )
-
       // Actualizar las dimensiones en el estado editado
       edited.value.dimensiones = { ...newDimensiones }
 
