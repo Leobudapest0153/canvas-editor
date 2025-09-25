@@ -747,6 +747,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   };
 
+
+
   const actualizarElemento = (elementoId, propiedades, saveHistory = false, description = null) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (!elemento) return false
@@ -1177,6 +1179,74 @@ export const useCanvasStore = defineStore('canvas', () => {
     return nuevoElemento.id
   }
 
+  const agregarElementoSinValidacion = (_id, nuevoElemento, saveHistory = true, description = 'Inserción sin validación') => {
+    try {
+      console.log('[insertarElementoSinValidacion] Insertando elemento:', nuevoElemento)
+      if (!nuevoElemento || !nuevoElemento.id) {
+        console.warn('[insertarElementoSinValidacion] Elemento inválido o sin id:', nuevoElemento);
+        return false;
+      }
+
+      // Copia defensiva
+      const next = { ...nuevoElemento };
+
+      // Normalizaciones en cm
+      if (next.dimensiones) {
+        for (const k of ['ancho', 'largo', 'alto']) {
+          if (next.dimensiones[k] != null && Number.isFinite(Number(next.dimensiones[k]))) {
+            next.dimensiones[k] = Math.round(Number(next.dimensiones[k]));
+          }
+        }
+      }
+
+      // Altura respecto al suelo
+      if (next.alturaRespectoAlSuelo != null && Number.isFinite(Number(next.alturaRespectoAlSuelo))) {
+        next.alturaRespectoAlSuelo = Math.max(0, Math.round(Number(next.alturaRespectoAlSuelo)));
+      }
+
+      // Normalizaciones en px
+      for (const k of ['x', 'y', 'width', 'height']) {
+        if (next[k] != null && Number.isFinite(Number(next[k]))) {
+          let v = Math.round(Number(next[k]));
+          if (k === 'width' || k === 'height') v = Math.max(1, v);
+          if (k === 'x' || k === 'y') v = Math.max(0, v);
+          next[k] = v;
+        }
+      }
+
+      // Insertar directamente en el store
+      elementos.value.push(next);
+
+      // Agregar hijo al padre si aplica
+      if (next.padre) {
+        const padre = elementos.value.find((el) => el.id === next.padre);
+        if (padre) {
+          if (!Array.isArray(padre.hijos)) {
+            padre.hijos = [];
+          }
+          if (!padre.hijos.includes(next.id)) {
+            padre.hijos.push(next.id);
+          }
+        }
+      }
+
+      // Guardar en historial
+      if (saveHistory) {
+        if (typeof registrarEnHistorial === 'function') {
+          registrarEnHistorial({ tipo: 'insert', id: next.id, despues: next, descripcion: description });
+        } else if (typeof addToHistory === 'function') {
+          addToHistory({ type: 'insert', id: next.id, after: next, description });
+        }
+      }
+
+      return next.id;
+    } catch (err) {
+      console.error('[insertarElementoSinValidacion] Error:', err);
+      return false;
+    }
+  };
+
+
   const eliminarElemento = (elementoId) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     const index = elementos.value.findIndex((el) => el.id === elementoId)
@@ -1422,10 +1492,21 @@ export const useCanvasStore = defineStore('canvas', () => {
     plantaEnEdicion.value = null
   }
 
-  const abrirCuartoNivelesPropiedades = (idNivel) => {
-    // Solo es para edición
-    if (idNivel) {
-      nivelAEditar.value = elementos.value.find((e) => e.id === idNivel);
+  const abrirCuartoNivelesPropiedades = (idElemento) => {
+    const elemento = elementos.value.find((e) => e.id === idElemento);
+    if (!elemento) {
+      console.error('Elemento no encontrado:', idElemento);
+      return;
+    }
+    // El elemento es un padre
+    if (['elementos', 'cuartos'].includes(elemento.tipo)) {
+      console.log('Vamos a editar un hijo guardando el id del padre:', idElemento);
+      nivelAEditar.value = { padre: idElemento }
+    }
+    // El elemento es un nivel hijo
+    if (['pisos', 'contenedores'].includes(elemento.tipo)) {
+      console.log('Vamos a editar un nivel hijo:', idElemento);
+      nivelAEditar.value = { ...elemento }
     }
     gestionPisosPropiedadesModal.value = true;
   }
@@ -1436,23 +1517,54 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   const guardarCuartoNivelesPropiedades = (nivelActualizado, id) => {
-    if (!id) {
-      console.error('No hay ID de nivel a editar');
-      return;
-    }
-    const level = elementos.value.find(e => e.id === id);
-    if (!level) {
-      console.error('Nivel no encontrado');
-      return;
-    }
 
-    if (nivelActualizado?.dimensiones?.alto > elementos.value.find(e => e.id === level.padre)?.dimensiones?.alto) {
+    const parent = elementos.value.find(e => e.id === nivelAEditar.value.padre);
+    console.log('Parent del nivel a editar:', parent);
+    if (nivelActualizado?.dimensiones?.alto > parent?.dimensiones?.alto) {
       showToast('La altura del nivel no puede exceder la altura del cuarto', 'error');
+      return;
+    }
+    if (!nivelActualizado?.dimensiones.alto || nivelActualizado?.dimensiones?.alto <= 0) {
+      nivelActualizado.dimensiones.alto = Math.floor((parent?.dimensiones?.alto || 300) / (parent?.hijos?.length + 1 ?? 3) );
+    }
+    if (!nivelActualizado?.dimensiones.ancho || nivelActualizado?.dimensiones?.ancho <= 0) {
+      nivelActualizado.dimensiones.ancho = parent?.dimensiones?.ancho || 100;
+    }
+    if (!nivelActualizado?.dimensiones.largo || nivelActualizado?.dimensiones?.largo <= 0) {
+      nivelActualizado.dimensiones.largo = parent?.dimensiones?.largo || 100;
+    }
+    // Si no hay id, es un nuevo nivel
+    if (!id) {
+      const res = proposeLevelChange(elementos.value, 'Nuevo', nivelActualizado || {}, nivelAEditar.value.padre);
+      console.log('Propuesta de nuevo nivel:', res);
+
+      if (res.status === 'ok') {
+        console.log('Aplicando nuevo nivel directamente:', res.draft);
+        res.draft.padre = nivelAEditar.value.padre;
+        const ok = applyLevelChange(
+          elementos.value,
+          res.draft,
+          'ok',
+          {
+            add: agregarElementoSinValidacion,
+            update: actualizarElementoSinValidacion
+          }
+        );
+      }
+      if (res.status === 'needs_confirmation') {
+        console.log('Nuevo nivel requiere confirmación:', res.draft);
+        propuestaAlturasNiveles.value = res.draft;
+        confirmacionAlturasNivelesModal.value = true;
+        showToast('Se requiere confirmación para ajustar otros niveles', 'info');
+        return;
+      }
+
+      cerrarCuartoNivelesPropiedades();
       return;
     }
 
     // 1) Proponer cambio (solo nos importa dimensiones aquí; alto es clave)
-    const res = proposeLevelChange(elementos.value, id, nivelActualizado || {});
+    const res = proposeLevelChange(elementos.value, id, nivelActualizado || {}, nivelAEditar.value.padre);
     if (res.status === 'error') {
       showToast(res.message || 'No se pudo aplicar el cambio', 'error');
       return;
@@ -1464,7 +1576,10 @@ export const useCanvasStore = defineStore('canvas', () => {
         elementos.value,
         res.draft,
         'ok',
-        (eid, patch, save, desc) => actualizarElementoSinValidacion(eid, patch, save, desc)
+          {
+            add: agregarElementoSinValidacion,
+            update: actualizarElementoSinValidacion
+          }
       );
       if (!ok.ok) {
         showToast(ok.message || 'Fallo aplicando el cambio', 'error');
@@ -1485,18 +1600,26 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
-  const confirmarPropuestaAlturasNiveles = (estrategia /* 'clamp' | 'redistribute' */) => {
+  const confirmarPropuestaAlturasNiveles = (estrategia) => {
     if (!propuestaAlturasNiveles.value) {
       showToast('No hay propuesta pendiente', 'error');
       return false;
     }
     const draft = propuestaAlturasNiveles.value;
 
+    // Agregar padre si falta (caso nuevo nivel)
+    if (!draft.padre && nivelAEditar.value?.padre) {
+      draft.padre = nivelAEditar.value.padre;
+    }
+
     const ok = applyLevelChange(
       elementos.value,
       draft,
       estrategia,
-      (eid, patch, save, desc) => actualizarElementoSinValidacion(eid, patch, save, desc)
+      {
+        add: agregarElementoSinValidacion,
+        update: actualizarElementoSinValidacion
+      }
     );
 
     if (!ok.ok) {
