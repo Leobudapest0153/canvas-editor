@@ -49,7 +49,7 @@
                 v-else
                 ref="canvasEditorRef"
                 :polygon="local.polygon"
-                :elements="local.elements"
+                :elements="previewElements"
                 :worldWidth="worldWidth"
                 :worldHeight="worldHeight"
                 :frameBBox="previewFrameBBox"
@@ -405,7 +405,8 @@ function getElementPositionPx(el) {
   const posX = Number(el?.posicion?.x)
   const posY = Number(el?.posicion?.y)
   if (Number.isFinite(posX) && Number.isFinite(posY)) {
-    return { x: posX, y: posY }
+    // Nota: las posiciones en `posicion` vienen en cm → convertir a px
+    return { x: posX * PIXELS_PER_CM, y: posY * PIXELS_PER_CM }
   }
   return null
 }
@@ -523,37 +524,32 @@ function buildRectPolygon(widthPx, lengthPx, originX, originY) {
   ]
 }
 
+const previewElements = computed(() => {
+  const list = Array.isArray(local.elements) ? local.elements : []
+  return list
+    .map((el) => {
+      const dims = getElementDimensionsPx(el)
+      const pos = getElementPositionPx(el)
+      if (!dims || !pos) return null
+      return {
+        id: el?.id ?? el?._id ?? `${Math.random().toString(36).slice(2)}`,
+        nombre: el?.nombre ?? el?.name ?? '',
+        x: Math.round(pos.x),
+        y: Math.round(pos.y),
+        width: Math.round(dims.width),
+        height: Math.round(dims.height),
+        forma: el?.forma || el?.shape || 'rectangular',
+      }
+    })
+    .filter(Boolean)
+})
+
 const previewFrameBBox = computed(() => {
   // Plantas infinitas → preview se encuadra al BBox de elementos con padding.
   if (!local.isInfinite) return null
-  const items = Array.isArray(local.elements) ? local.elements : []
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-  let hasValid = false
-  for (const el of items) {
-    const x = Number(el?.x)
-    const y = Number(el?.y)
-    const width = Number(el?.width)
-    const height = Number(el?.height)
-    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
-      continue
-    }
-    hasValid = true
-    minX = Math.min(minX, x)
-    minY = Math.min(minY, y)
-    maxX = Math.max(maxX, x + width)
-    maxY = Math.max(maxY, y + height)
-  }
-  if (!hasValid) return null
-  const padding = INFINITE_PREVIEW_PADDING
-  return {
-    minX: minX - padding,
-    minY: minY - padding,
-    maxX: maxX + padding,
-    maxY: maxY + padding,
-  }
+  const raw = computeElementsBBox(previewElements.value)
+  if (!raw) return null
+  return padBBox(raw, INFINITE_PREVIEW_PADDING)
 })
 
 const showInfiniteEmptyState = computed(() => local.isInfinite && !previewFrameBBox.value)
@@ -731,12 +727,13 @@ watch(
       local.id = planta.id
       local.name = planta.nombre
       local.polygon = planta.poligono
-      local.shape = planta.forma ?? 'none'
+  // Si la planta era infinita, podría venir sin forma definida. Usar 'rectangle' como default válido.
+  local.shape = planta.forma ?? (planta.isInfinite ? 'rectangle' : 'none')
       local.isInfinite = !!planta.isInfinite
       local.codigo = planta.codigo || ''
 
-      const todosLosElementos = canvasStore.elementos || []
-      local.elements = todosLosElementos.filter((el) => el.plantaId === planta.id && !el.padre)
+  const todosLosElementos = canvasStore.elementos || []
+  local.elements = todosLosElementos.filter((el) => el.plantaId === planta.id && !el.padre)
 
       rectW.value = planta.dimensiones.ancho
       rectL.value = planta.dimensiones.largo
@@ -753,8 +750,13 @@ watch(
     }
 
     nextTick(() => {
+      // Primer ajuste: si es infinita, el fit usará frameBBox computado a partir de elementos
       canvasEditorRef.value?.fitStageToPolygon()
-      isLoadingData.value = false
+      // Forzar un segundo tick por si frameBBox depende de mediciones
+      nextTick(() => {
+        canvasEditorRef.value?.fitStageToPolygon()
+        isLoadingData.value = false
+      })
     })
   },
   { immediate: true, deep: true },
@@ -852,11 +854,10 @@ watch(
       rectL.value * PIXELS_PER_CM,
     )
     if (!res.ok) {
+      // Mantener la selección del usuario aunque el polígono propuesto no sea válido.
+      // Mostramos aviso y no aplicamos el nuevo polígono.
       notice.value = res.message
-      // Revertir el cambio de shape
-      nextTick(() => {
-        local.shape = oldShape
-      })
+      isManuallyEdited.value = true
       return
     }
 
@@ -883,6 +884,10 @@ watch(
     }
     // Si pasa a limitado desde elástico, mostrar hint hasta que se guarde con dimensiones válidas
     if (!isOn && wasOn) {
+      // Asegurar una plantilla válida por defecto para habilitar el selector
+      if (local.shape === 'none') {
+        local.shape = 'rectangle'
+      }
       showLimitedHint.value = true
       suggestFiniteDimensionsFromContent()
       // Calcular la carga requerida por los elementos y autocompletar la capacidad si es necesario
