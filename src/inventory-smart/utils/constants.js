@@ -295,6 +295,13 @@ export const FORMAS_DISPONIBLES = [
   { id: 'circular', nombre: 'Circular' },
 ]
 
+// Catálogo de plantillas de forma permitidas para crear una planta (WorkspaceEditor)
+// NOTA: Usamos ids alineados con el modelo interno existente ('rectangle' y 'circle')
+export const PLANTILLAS_PLANTA = [
+  { id: 'rectangle', nombre: 'Rectángulo' },
+  { id: 'circle', nombre: 'Círculo' },
+]
+
 export const UBICACIONES_DISPONIBLES = [
   { id: 'suelo', nombre: 'Suelo', aplicaA: ['elementos', 'cuartos', 'pisos', 'pasillos'] },
   { id: 'pared', nombre: 'Pared', aplicaA: ['elementos'] },
