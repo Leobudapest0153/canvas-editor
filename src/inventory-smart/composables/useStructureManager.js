@@ -342,7 +342,7 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
         newMap.set(newRootId, root)
       }
       // Dejar que el store genere nombre alfabético
-      delete root.nombre
+      // delete root.nombre
     }
   } catch (e) {
     console.warn('Error ajustando dimensiones de pasillo:', e)
@@ -403,14 +403,6 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
       effectivePos = pos
     }
 
-    console.log(`🎯 Paste element: ${elem.id || elem.nombre} (${elem.tipo})`, {
-      isRoot,
-      hasXYSelf,
-      elemXY: { x: elem.x, y: elem.y },
-      effectivePos,
-      context: isRoot ? 'planta-canvas' : 'padre-canvas'
-    })
-
     // Asegurar color y colorBase en todos los nodos
     const colorMerged = elem.color ?? elem.colorBase ?? (isRoot ? (root.color ?? root.colorBase) : undefined)
     const colorBaseMerged = elem.colorBase ?? elem.color ?? colorMerged
@@ -430,8 +422,8 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     // Limpiar propiedades que setea el store
     if (!parentId) { delete base.plantaId; base.padre = null }
 
-  let newId
-  if (!parentId) newId = canvasStore.agregarElemento(base, { preserveExistingCode: false, resetName: true, regenerateCode: true })
+    let newId
+    if (!parentId) newId = canvasStore.agregarElemento(base, { preserveExistingCode: false, resetName: true, regenerateCode: true })
     else newId = addChildDirect(canvasStore, base, parentId)
     if (!newId) return null
 
@@ -457,21 +449,12 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
       return hasBasicPosition
     })
 
-    console.log('🔍 Regenerate decision:', {
-      isRootWithFloors,
-      hasFloorChildren,
-      shouldRegenerate
-    })
-
     if (shouldRegenerate) {
-      console.log(`🔧 Using regenerateFloors for: ${elem.id || elem.nombre}`)
       regenerateFloors(canvasStore, elem, newMap, newId, base.dimensiones)
     } else if (hasChildren) {
-      console.log(`🎯 Using pasteRecursive for children of: ${elem.id || elem.nombre}`)
       for (const hid of elem.hijos) {
         const child = newMap.get(hid)
         if (!child) continue
-        console.log(`  → Child: ${child.id || child.nombre} at (${child.x}, ${child.y})`)
         // Pasar la posición del root pegado para que los hijos calculen su posición relativa
         // El cálculo de posición relativa se hace en pasteRecursive
         pasteRecursive(child, pos, newId) // usar 'pos' (posición del root) en lugar de childPos
@@ -508,8 +491,8 @@ function addChildDirect(canvasStore, elemento, parentId) {
       else elemento.height = (dims.alto || 10) * 10
     }
 
-  // Generar codigo/nombre de forma unificada como si fuera nuevo (no preservar, resetear nombre)
-  assignCodigoNombre(elemento, canvasStore.elementos, { preserveExistingCode: false, resetName: true, regenerateCode: true })
+    // Generar codigo/nombre de forma unificada como si fuera nuevo (no preservar, resetear nombre)
+    assignCodigoNombre(elemento, canvasStore.elementos, { preserveExistingCode: false, resetName: true, regenerateCode: true })
 
     // Agregar a la lista de elementos
     canvasStore.elementos.push(elemento)

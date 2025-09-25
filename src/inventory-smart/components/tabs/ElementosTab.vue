@@ -122,15 +122,18 @@
                     class="w-full px-3 py-2 border rounded-md text-sm"
                   />
                 </div>
+
+                <!-- Filtro por tipo (internamente manejado como categoría) -->
                 <div>
-                  <label class="block text-xs font-medium text-gray-700 mb-1">Categoría</label>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
                   <select v-model="filtroCategoria" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
-                    <option value="">Todas</option>
+                    <option value="">Todos</option>
                     <option v-for="c in categoriasPlantillas" :key="c.id" :value="c.id">
                       {{ c.nombre }}
                     </option>
                   </select>
                 </div>
+
                 <div>
                   <label class="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
                   <select v-model="filtroUbicacion" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
@@ -423,11 +426,11 @@ const categoriasPlantillas = computed(() => {
 const ubicacionesPlantillas = computed(() => UBICACIONES_DISPONIBLES)
 
 onMounted(() => {
-  const saved = localStorage.getItem('inventory.selectedCatalog')
+  const saved = localStorage.getItem('canvas_selected_catalog')
   if (saved === 'plantillas' || saved === 'elementos') {
     catalogStore.setSelectedCatalog(saved)
   }
-  localStorage.setItem('inventory.selectedCatalog', selectedCatalog.value)
+  localStorage.setItem('canvas_selected_catalog', selectedCatalog.value)
   catalogStore.loadTemplatesFromLocalStorage()
   window.addEventListener('click', onGlobalClick, { capture: true })
   document.addEventListener('mousedown', handleClickOutside)
@@ -439,7 +442,7 @@ onBeforeUnmount(() => {
 })
 
 watch(selectedCatalog, (val) => {
-  localStorage.setItem('inventory.selectedCatalog', val)
+  localStorage.setItem('canvas_selected_catalog', val)
 })
 
 // Si salimos del contexto de planta, forzar modo 'espacio' (ocultamos Cuartos)
@@ -451,13 +454,6 @@ watch(isPlantaContext, (enPlanta) => {
 
 // Resultado de búsqueda global (texto) sobre plantillas
 const filteredTemplates = computed(() => catalogStore.searchTemplates(searchText.value))
-
-// Base REAL para mostrar/ocultar filtros y vacío absoluto (todas las plantillas existentes)
-const plantillasBase = computed(() => {
-  const arr = templates.value
-  console.log('plantillasBase computed:', arr?.length || 0, arr)
-  return Array.isArray(arr) ? arr : []
-})
 
 // Computed local para filtrar plantillas por nombre/categoría/ubicación (patrón CapasTab)
 const plantillasFiltradas = computed(() => {
@@ -630,7 +626,6 @@ const handleDeleteTemplate = async (tpl) => {
 
   try {
     catalogStore.removeTemplate(tpl.id)
-    console.log('After removeTemplate, templates count:', templates.value?.length || 0)
     showSuccess('Plantilla eliminada')
   } catch (e) {
     showError('No se pudo eliminar la plantilla')

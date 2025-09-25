@@ -76,6 +76,27 @@ export function useExternalServices() {
     return await callService(containerService.name, params)
   }
 
+  /**
+   * Obtiene historial de cambios (delegando en servicios externos cuando existen)
+   * @param {Object} opts { page, pageSize, plantaId }
+   */
+  const getChangeHistory = async (opts = {}) => {
+    const services = getAvailableServices()
+    const svc = services.find(s => s.type === 'change_history')
+
+    if (!svc) {
+      // Si no hay servicio externo para historial, devolver null para indicar fallback local
+      return null
+    }
+
+    const params = {
+      page: opts.page ?? 1,
+      pageSize: opts.pageSize ?? 10,
+      plantaId: opts.plantaId ?? null,
+    }
+    return await callService(svc.name, params)
+  }
+
   return {
     callService,
     getAvailableServices,
@@ -86,6 +107,7 @@ export function useExternalServices() {
     getCacheTTL,
     isLoading,
     getError,
-    getContainerProducts
+    getContainerProducts,
+    getChangeHistory
   }
 }

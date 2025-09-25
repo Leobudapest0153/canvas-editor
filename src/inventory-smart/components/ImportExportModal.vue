@@ -227,7 +227,7 @@ const contextoActual = computed(() => {
     return `Elemento: ${elemento?.nombre || 'Desconocido'}`
   } else if (contexto.tipo === 'contenedores') {
     const contenedor = canvasStore.elementoPorId(contexto.id)
-    return `Contenedor: ${contenedor?.nombre || 'Desconocido'}`
+    return `Nivel: ${contenedor?.nombre || 'Desconocido'}`
   }
   return 'Desconocido'
 })

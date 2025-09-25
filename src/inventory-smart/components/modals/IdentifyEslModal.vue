@@ -6,7 +6,7 @@
 
         <!-- Indicador de detección de escáner -->
         <div v-if="detectandoEscaner" class="mb-3 p-2 bg-green-100 border border-green-300 rounded-md text-center text-sm text-green-700">
-          📱 Detectando código de barras...
+          📱 Detectando código...
         </div>
 
         <!-- Animación del escáner -->
@@ -17,14 +17,14 @@
           </div>
         </div>
 
-        <!-- Input para código de barras -->
+        <!-- Input para código -->
         <div class="mb-6">
-          <!-- <label class="block text-sm font-medium text-gray-700 mb-2">Código de barras</label> -->
+          <!-- <label class="block text-sm font-medium text-gray-700 mb-2">Código</label> -->
           <input
             ref="inputRef"
             v-model="codigoBarras"
             type="text"
-            placeholder="Escanee o ingrese el código de barras aquí"
+            placeholder="Escanee o ingrese el código aquí"
             class="w-full p-3 border border-gray-300 rounded-md"
             @keyup.enter="guardar"
           />
@@ -75,7 +75,7 @@ const guardar = () => {
   emit('close')
 }
 
-// Función para manejar el input del código de barras (escáner o manual)
+// Función para manejar el input del código (escáner o manual)
 const handleBarcodeInput = (e) => {
   // Si el foco está en el input, permitir escritura normal
   if (document.activeElement === inputRef.value) {
@@ -134,7 +134,7 @@ const handleBarcodeInput = (e) => {
   barcodeTimeout = setTimeout(() => {
     detectandoEscaner.value = false
 
-    // Si el buffer tiene contenido válido (mínimo 3 caracteres), asumimos que es un código de barras
+    // Si el buffer tiene contenido válido (mínimo 3 caracteres), asumimos que es un código
     if (barcodeBuffer.length >= 3) {
       codigoBarras.value = barcodeBuffer
 

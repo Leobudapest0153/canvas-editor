@@ -72,7 +72,6 @@ export function useDimensionValidation() {
     // Validar contención de elementos hijos
     const validacionHijos = validarContencionHijos(elementoTemporal)
     if (!validacionHijos.valida) {
-      console.log('❌ VALIDACIÓN DE HIJOS FALLIDA:', validacionHijos.razon)
       if (!silencioso) {
         toast.showError(validacionHijos.razon)
       }
@@ -82,7 +81,6 @@ export function useDimensionValidation() {
     // Validar contención en contenedor padre
     const validacionPadre = validarContencionEnPadre(elementoTemporal)
     if (!validacionPadre.valida) {
-      console.log('❌ VALIDACIÓN DE CONTENCIÓN EN PADRE FALLIDA:', validacionPadre.razon)
       if (!silencioso) {
         toast.showError(validacionPadre.razon)
       }
@@ -98,8 +96,6 @@ export function useDimensionValidation() {
     //   }
     //   return validacionVolumen
     // }
-
-    console.log('✅ TODAS LAS VALIDACIONES DE DIMENSIONES FÍSICAS EXITOSAS')
 
     // Mostrar toast de éxito si no se ha mostrado otro toast
     if (!silencioso) {
@@ -171,7 +167,7 @@ export function useDimensionValidation() {
         const hijoDesplazadoEnY = posHijoY_raw > 1; // Más de 1cm de desplazamiento
         const seSaleDelArea = (posHijoY_raw + altoHijoCanvas) > dimensionesPadre.largo;
         const hijoTieneAltoProbablementeZ = (dimHijo.alto || 0) > (dimensionesPadre.largo * 0.5); // Su alto sugiere coordenada Z
-        
+
         // Condiciones para detectar posicionamiento en vista frontal:
         // 1. Se sale del área Y está desplazado (caso más común)
         // 2. O tiene alto significativo comparado con el largo del padre (sugiere que su Y es coordenada Z)
@@ -233,8 +229,6 @@ export function useDimensionValidation() {
         sugerencias.push(`Aumentar ${nombreDimension} ${excesoSegundo.toFixed(1)}cm más`);
       }
 
-      console.log('❌ PROBLEMAS DE CONTENCIÓN DETECTADOS:', mensajesProblemas);
-
       return {
         valida: false,
         razon: `Las nuevas dimensiones no son suficientes para contener a los elementos en su interior`,
@@ -254,7 +248,7 @@ export function useDimensionValidation() {
   function validarContencionEnPadre(elemento) {
     // Si no tiene padre, no hay restricción de contención
     if (!elemento.padre && !elemento.parentId) {
-      return { valida: true, razon: 'El elemento no tiene contenedor padre' };
+      return { valida: true, razon: 'El elemento no tiene estructura padre' };
     }
 
     const parentId = elemento.padre || elemento.parentId;
@@ -265,7 +259,7 @@ export function useDimensionValidation() {
     }
 
     if (!padre || !padre.dimensiones) {
-      return { valida: true, razon: 'No se encontró el contenedor padre o no tiene dimensiones' };
+      return { valida: true, razon: 'No se encontró la estructura padre o no tiene dimensiones' };
     }
 
     const vista = canvasStore.vistaActiva || 'XY'

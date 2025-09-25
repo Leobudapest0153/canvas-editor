@@ -40,8 +40,6 @@ export const useCanvasImportExport = () => {
       document.body.removeChild(link)
 
       URL.revokeObjectURL(url)
-
-      console.log('Canvas exportado exitosamente:', filename)
       return true
     } catch (error) {
       console.error('Error al exportar canvas:', error)
@@ -78,7 +76,6 @@ export const useCanvasImportExport = () => {
           if (!validacion.valid) {
             // Generar reporte detallado para mejor debugging
             const reporte = generateValidationReport(jsonString)
-            console.error('📋 Reporte de validación:', reporte)
 
             let errorMessage = `Archivo JSON inválido: ${validacion.error}`
 
@@ -96,7 +93,7 @@ export const useCanvasImportExport = () => {
 
           // Mostrar información de validación exitosa
           if (validacion.warnings?.length > 0) {
-            console.warn('⚠️ Archivo válido pero con advertencias:', validacion.warnings)
+            console.warn('Archivo válido pero con advertencias:', validacion.warnings)
           }
 
           const exito = canvasStore.deserialize(jsonString)
@@ -114,7 +111,6 @@ export const useCanvasImportExport = () => {
               }
             }
 
-            console.log('Canvas importado exitosamente desde:', archivo.name)
             resolve(true)
           } else {
             reject(new Error('Error al deserializar el archivo JSON'))
@@ -141,7 +137,6 @@ export const useCanvasImportExport = () => {
     try {
       const jsonData = canvasStore.serialize()
       await navigator.clipboard.writeText(jsonData)
-      console.log('Estado copiado al portapapeles')
       return true
     } catch (error) {
       console.error('Error al copiar al portapapeles:', error)
@@ -158,7 +153,6 @@ export const useCanvasImportExport = () => {
       const exito = canvasStore.deserialize(jsonString)
 
       if (exito) {
-        console.log('Estado pegado desde portapapeles')
         return true
       } else {
         throw new Error('JSON inválido en el portapapeles')

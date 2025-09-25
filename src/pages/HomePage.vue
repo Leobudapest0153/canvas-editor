@@ -3,6 +3,7 @@
     <InventorySmart
       :configCanvas="initialConfig"
       :externalServices="externalServices"
+      :author="{ name: 'David Deras', id: '123' }"
       @configUpdated="handleConfigUpdated"
     />
   </div>
@@ -19,9 +20,9 @@ const initialConfig = ref(null)
 // Variable reactiva para mantener la configuración actualizada
 const currentConfig = ref(null)
 
-// Factory para generar datos de productos de contenedor
+// Factory para generar datos de productos de niveles
 const createContainerProductsService = () => {
-  // Datos de ejemplo para diferentes contenedores
+  // Datos de ejemplo para diferentes niveles
   const mockData = [
     { codigo: 'PROD001', descripcion: 'Producto A - Medicamento', cantidad: 150, fechaVencimiento: '2024-01-15' },
     { codigo: 'PROD002', descripcion: 'Producto B - Suplemento vitamínico', cantidad: 75, fechaVencimiento: '2024-10-30' },
@@ -43,15 +44,14 @@ const createContainerProductsService = () => {
   return {
     name: 'containerProducts',
     type: 'container_products',
-    description: 'Servicio de prueba para productos de contenedor',
+    description: 'Servicio de prueba para productos de niveles',
     handler: async ({ containerId, filter = '', pagination = {} }) => {
-      console.log(`Llamando a servicio con ID de contenedor: ${containerId}`);
       // Simular delay de red
       await new Promise(resolve => setTimeout(resolve, 800))
 
       const { page = 1, pageSize = 10 } = pagination
 
-      // Obtener N productos random del contenedor
+      // Obtener N productos random del nivel
       let products = mockData.sort(() => 0.5 - Math.random()).slice(0, 5)
 
       // Aplicar filtro si existe
@@ -68,7 +68,6 @@ const createContainerProductsService = () => {
       const startIndex = (page - 1) * pageSize
       const endIndex = startIndex + pageSize
       const paginatedProducts = products.slice(startIndex, endIndex)
-      console.log(`Retornando ${paginatedProducts.length} productos (Página ${page} de ${Math.ceil(totalCount / pageSize)})`)
       return {
         products: paginatedProducts,
         totalCount,
@@ -93,7 +92,6 @@ const handleConfigUpdated = (nuevaConfig) => {
     currentConfig.value = nuevaConfig
     // DEV: Guardar en localStorage para simular persistencia
     localStorage.setItem(SERIALIZE_CONFIG.STORAGE_KEY, nuevaConfig)
-    console.log('Configuración actualizada guardada en localStorage')
     initialConfig.value = nuevaConfig
 
     // Al implementar aqui se enviaría a la API
@@ -108,7 +106,6 @@ onMounted(() => {
   if (savedConfig) {
     try {
       initialConfig.value = savedConfig
-      console.log('Configuración inicial cargada desde localStorage')
     } catch (error) {
       console.error('Error al parsear la configuración guardada:', error)
     }

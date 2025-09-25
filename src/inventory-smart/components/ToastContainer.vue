@@ -15,7 +15,6 @@ import { inject } from 'vue'
 import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 
 const toastApi = inject(ToastSymbol)
-// Fallback defensivo para pruebas fuera del árbol
 const toasts = toastApi?.toasts ?? { value: [] }
 
 function remove(id) {
