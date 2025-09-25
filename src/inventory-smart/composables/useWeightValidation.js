@@ -31,6 +31,7 @@ import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
 
 export function useWeightValidation() {
   const canvasStore = useCanvasStore()
+  const isInfinitePlant = computed(() => canvasStore.plantaActivaData?.isInfinite === true)
 
   /**
    * Calcula el peso máximo teórico total de todos los elementos hijos directos de un contenedor/elemento/planta
@@ -202,6 +203,19 @@ export function useWeightValidation() {
     // Peso total después de agregar el nuevo elemento
     const pesoTotalFinal = pesoActualTotal + pesoNuevoElemento
 
+    if (isInfinitePlant.value) {
+      return {
+        valido: true,
+        pesoActual: pesoActualTotal,
+        pesoNuevo: pesoNuevoElemento,
+        pesoTotal: pesoTotalFinal,
+        pesoMaximo: 0,
+        exceso: 0,
+        limiteDePeso: false,
+        modoInfinito: true,
+      }
+    }
+
     // Obtener el peso máximo soportado del padre
     let capacidadCargaSoportado = 0
 
@@ -254,6 +268,22 @@ export function useWeightValidation() {
    */
   const calcularPesoDisponible = (padreId, padreType, options = {}) => {
     const { validacionTeorica = true } = options
+    // Calcular el peso actual usado
+    const pesoUsado = validacionTeorica
+      ? calcularPesoTotal(padreId, padreType)
+      : calcularPesoRealTotal(padreId, padreType)
+
+    if (isInfinitePlant.value) {
+      return {
+        disponible: Infinity,
+        usado: pesoUsado,
+        maximo: 0,
+        porcentajeUsado: 0,
+        limiteDePeso: false,
+        modoInfinito: true,
+      }
+    }
+
     // Obtener el peso máximo soportado del padre
     let capacidadCargaSoportado = 0
 
@@ -269,17 +299,12 @@ export function useWeightValidation() {
     if (capacidadCargaSoportado === 0) {
       return {
         disponible: Infinity,
-        usado: 0,
+        usado: pesoUsado,
         maximo: 0,
         porcentajeUsado: 0,
         limiteDePeso: false,
       }
     }
-
-    // Calcular el peso actual usado
-    const pesoUsado = validacionTeorica
-      ? calcularPesoTotal(padreId, padreType)
-      : calcularPesoRealTotal(padreId, padreType)
 
     // Calcular el peso disponible
     const pesoDisponible = Math.max(0, capacidadCargaSoportado - pesoUsado)
@@ -373,6 +398,8 @@ export function useWeightValidation() {
    */
   const contextoActualTieneLimiteDePeso = computed(() => {
     const { tipo, id } = canvasStore.contextoActual
+
+    if (isInfinitePlant.value) return false
 
     if (tipo === 'plantas') {
       const planta = canvasStore.plantaPorId(id)

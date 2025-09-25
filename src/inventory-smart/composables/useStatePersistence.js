@@ -99,6 +99,8 @@ export const useStatePersistence = () => {
           capacidadCargaSoportado: Math.max(0, planta.capacidadCargaSoportado || 5000),
           elementos: Array.isArray(planta.elementos) ? planta.elementos : [],
           activa: Boolean(planta.activa),
+          // Nuevo: flag de planta elástica (persistir si true; fallback false)
+          isInfinite: planta.isInfinite === true,
           propiedadesPersonalizadas: planta.propiedadesPersonalizadas || {},
         }
       }),
@@ -419,6 +421,8 @@ export const useStatePersistence = () => {
             capacidadCargaSoportado: Math.max(0, plantaData.capacidadCargaSoportado || 5000),
             elementos: Array.isArray(plantaData.elementos) ? plantaData.elementos : [],
             activa: plantaData.activa === true,
+            // Nuevo: flag de planta elástica (fallback false si no viene)
+            isInfinite: plantaData.isInfinite === true,
             propiedadesPersonalizadas: plantaData.propiedadesPersonalizadas || {},
           }
 
@@ -737,6 +741,10 @@ export const useStatePersistence = () => {
           }
           if (planta.elementos && !Array.isArray(planta.elementos)) {
             validationResult.warnings.push(`${context}: elementos debe ser un array`)
+          }
+          // Nuevo: validar tipo del flag elástico si viene
+          if (Object.prototype.hasOwnProperty.call(planta, 'isInfinite') && typeof planta.isInfinite !== 'boolean') {
+            validationResult.warnings.push(`${context}: isInfinite debe ser boolean`)
           }
         })
       }

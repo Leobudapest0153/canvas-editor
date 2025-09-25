@@ -14,6 +14,18 @@ export function applyEdgeConstraint(candidate, el, areaBounds, opts = {}) {
   const w = Math.max(0, el?.width || 0)
   const h = Math.max(0, el?.height || 0)
 
+  // Bypass de límites si la planta es infinita (consultar polígono activo si existe)
+  if (areaBounds && areaBounds.polygon && areaBounds.polygon._isInfinite === true) {
+    // Limpiar estado de borde y registrar última posición para mantener histéresis estable
+    try {
+      setEdgeState(id, { edgeX: null, edgeY: null })
+      setLastPos(id, { x: candidate?.x ?? 0, y: candidate?.y ?? 0 })
+    } catch {
+      /* ignore */
+    }
+    return { pos: { x: candidate?.x ?? 0, y: candidate?.y ?? 0 }, hitX: false, hitY: false }
+  }
+
   // BBox de modelo (sin stroke ni sombras) ya es axis-aligned y en coords de mundo
   let x = candidate?.x ?? 0
   let y = candidate?.y ?? 0
