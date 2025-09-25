@@ -451,6 +451,7 @@ export const DECIMAL_PLACES = 2
 
 // MARGEN POR DEFECTO PARA CAPACIDAD DE CARGA AL AUTOCOMPLETAR (5% = 0.05)
 export const LOAD_MARGIN = 0.05
+export const INFINITE_VIEW_PADDING_PX = 40
 
 // Parámetros por defecto para guard de redimensionado
 export const MARGIN_CM = 5 // margen perimetral interno en cm para packing
