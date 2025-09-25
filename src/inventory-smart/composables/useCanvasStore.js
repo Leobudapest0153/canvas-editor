@@ -18,10 +18,10 @@ import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import { useStatePersistence, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS } from '@/inventory-smart/composables/useStatePersistence'
+import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
 import {
   validateWallZBaseRequired,
   validateHeightWithinWarehouse,
@@ -32,6 +32,7 @@ import { proposeLevelChange, applyLevelChange } from '@/inventory-smart/composab
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'
+import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
 import { exportCatalogItemsToDTO, importCatalogItemsFromDTO } from '@/inventory-smart/modules/catalog/catalogItems.serializer.js'
 
 export const useCanvasStore = defineStore('canvas', () => {
@@ -40,6 +41,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Instancia del catálogo
   const catalogStore = useCatalogStore()
+  const changeHistoryStore = useChangeHistoryStore?.() // opcional durante init
 
   // === INTEGRACIÓN CON HISTORIAL ===
   // Instancia del historial - se establece desde useCanvasWithHistory
@@ -372,14 +374,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     const elemento = elementoPorId.value(elementoId)
     if (!elemento) {
       showToast('Elemento no encontrado')
-      console.error('Elemento no encontrado:', elementoId)
       return
     }
 
     // Verificar que el elemento sea navegable: cuartos, pisos, elementos
     if (!['cuartos', 'pisos', 'elementos'].includes(elemento.tipo)) {
       showToast('Este elemento no permite navegación')
-      console.error('No navegable:', elemento.tipo)
       return
     }
 
@@ -495,7 +495,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     const planta = plantaPorId.value(plantaId)
     if (!planta) {
       showToast('Planta no encontrada')
-      console.error('Planta no encontrada:', plantaId)
       return
     }
 
@@ -574,7 +573,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const defaultHeight = elemento.tipo === 'contenedores' ? 40 : 60
       elementWidthPx = defaultWidth * CM_TO_PX
       elementHeightPx = defaultHeight * CM_TO_PX
-      console.log('Usando dimensiones por defecto')
+      console.warn('Usando dimensiones por defecto')
     }
 
     // El canvas muestra el espacio real del elemento
@@ -683,7 +682,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     try {
       const idx = elementos.value.findIndex(e => e && e.id === id);
       if (idx === -1) {
-        console.warn('[actualizarElementoSinValidacion] Elemento no encontrado:', id);
+        console.warn('Elemento no encontrado:', id);
         return false;
       }
 
@@ -732,7 +731,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       return true;
     } catch (err) {
-      console.error('[actualizarElementoSinValidacion] Error:', err);
+      console.error('Error:', err);
       return false;
     }
   };
@@ -1014,8 +1013,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Actions para elementos
   const agregarElemento = (nuevoElemento, opts = {}) => {
-    console.log('Agregando elemento al store:', nuevoElemento)
-
     const ubic = (
       nuevoElemento.ubicacion ||
       nuevoElemento.ubic ||
@@ -1057,11 +1054,11 @@ export const useCanvasStore = defineStore('canvas', () => {
       return null
     }
     if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
-      showToast('En elementos solo se pueden agregar contenedores')
+      showToast('En elementos solo se pueden agregar niveles')
       return null
     }
     if (contextoActual === 'contenedores') {
-      showToast('Los contenedores no pueden contener nada')
+      showToast('Los niveles no pueden contener más elementos')
       return null
     }
 
@@ -1234,7 +1231,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const setHistoryInstance = (historyComposableInstance) => {
     historyInstance.value = historyComposableInstance
-    console.log('🔗 Instancia de historial establecida en el store')
   }
 
   /**
@@ -1252,7 +1248,7 @@ export const useCanvasStore = defineStore('canvas', () => {
    * Serializa el estado completo del canvas a JSON
    * @returns {string} JSON string con todo el estado
    */
-  const serialize = () => {
+  const serialize = (saveTimestamp = false) => {
     const state = {
       plantas: plantas.value.map(p => p?._custom?.value || p),
       elementos: elementos.value.map(e => e?._custom?.value || e),
@@ -1260,7 +1256,15 @@ export const useCanvasStore = defineStore('canvas', () => {
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
       catalogos: catalogos.value,
     }
-    const jsonStr = _serialize(state)
+    // Incluir historial de cambios si existe
+    try {
+      const ch = changeHistoryStore?.serialize?.()
+      if (ch) state.changeHistory = ch
+    } catch (e) {
+      // ignore change history serialization errors
+    }
+
+    const jsonStr = _serialize(state, { validateBeforeSerialize: true, includeMetrics: true, saveTimestamp })
     try {
       const parsed = JSON.parse(jsonStr)
       if (state.templates.length > 0) {
@@ -1333,7 +1337,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }
 
-    const ok = _deserialize(jsonString, storeActions)
+  const ok = _deserialize(jsonString, storeActions)
 
     // Post-procesar: garantizar que todas las plantas y elementos tengan 'codigo'
     try {
@@ -1361,6 +1365,16 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Importar plantillas si existen (retrocompatible)
     try {
       const parsed = JSON.parse(jsonString)
+      // Importar historial de cambios si viene
+      try {
+        if (parsed.changeHistory) {
+          const ch = useChangeHistoryStore?.()
+          ch?.deserialize?.(parsed.changeHistory)
+          ch?.setBaseline?.({ plantas: plantas.value, elementos: elementos.value })
+        }
+      } catch (e) {
+        // ignore change history import errors
+      }
       if (Array.isArray(parsed.plantillas) && parsed.plantillas.length > 0) {
         importTemplatesFromDTO(parsed.plantillas)
       }
@@ -1645,7 +1659,6 @@ export const useCanvasStore = defineStore('canvas', () => {
    */
   const setAutoSaveInstance = (autoSaveComposableInstance) => {
     autoSaveInstance.value = autoSaveComposableInstance
-    console.log('💾 Instancia de autosave establecida en el store')
   }
 
 

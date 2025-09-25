@@ -50,16 +50,16 @@
                 placeholder="Nombre del elemento..."
               />
             </div>
-            <!-- Filtro por categoría -->
+            <!-- Filtro por tipo (internamente manejado como categoría) -->
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide"
-                >Categoría:</label
+                >Tipo:</label
               >
               <select
                 v-model="filtroCategoria"
                 class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
               >
-                <option value="">Todas las categorías</option>
+                <option value="">Todos los tipos</option>
                 <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
                   {{ categoria.nombre }}
                 </option>
@@ -275,7 +275,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
-import { CATEGORIAS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
+import { TODAS_LAS_CATEGORIAS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import TagFilter from '@/inventory-smart/components/TagFilter.vue'
 import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
@@ -305,7 +305,7 @@ const filtrosBotonRef = ref(null)
 const filtrosPanelRef = ref(null)
 
 // Computed properties
-const categorias = computed(() => CATEGORIAS)
+const categorias = computed(() => TODAS_LAS_CATEGORIAS)
 
 const showAuraElement = (elementoId) => {
   if (canvasStore.cambiosNoAplicados) {

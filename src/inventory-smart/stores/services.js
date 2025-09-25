@@ -9,21 +9,6 @@ const state = reactive({
   errors: new Map(),
 })
 
-/**
- * Tipo de servicio soportado
- */
-export const SERVICE_TYPES = {
-  CONTAINER_PRODUCTS: {
-    type: 'container_products',
-    description: 'Obtener listado de productos de un contenedor',
-    expectedResponse: {
-      products: 'Array<Object>',
-      totalCount: 'number',
-      pagination: 'Object',
-    },
-  },
-}
-
 function validateServiceFunction(serviceFunction) {
   if (!serviceFunction || typeof serviceFunction !== 'object') {
     return false
@@ -32,27 +17,39 @@ function validateServiceFunction(serviceFunction) {
   const { name, type, handler } = serviceFunction
 
   if (!name || typeof name !== 'string') {
-    console.error('Service function must have a valid name (string)')
+    console.error('La función del servicio debe tener un nombre válido (string)')
     return false
   }
 
-  if (type !== 'container_products') {
+  if (!['container_products', 'change_history'].includes(type)) {
     console.error(
-      `Service function type "${type}" is not supported. Only 'container_products' is allowed.`,
+      `El tipo de función del servicio "${type}" no está soportado. Permitidos: 'container_products', 'change_history'.`,
     )
     return false
   }
 
   if (!handler || typeof handler !== 'function') {
-    console.error('Service function must have a valid handler (function)')
+    console.error('La función del servicio debe tener un manejador válido (function)')
     return false
   }
 
   return true
 }
 
-function validateServiceResponse(response) {
-  return response && Array.isArray(response.products) && typeof response.totalCount === 'number'
+function validateServiceResponse(type, response) {
+  if (!response) return false
+  if (type === 'container_products') {
+    return Array.isArray(response.products) && typeof response.totalCount === 'number'
+  }
+  if (type === 'change_history') {
+    const ok = Array.isArray(response.items) &&
+      typeof response.total === 'number' &&
+      typeof response.page === 'number' &&
+      typeof response.pageSize === 'number' &&
+      typeof response.totalPages === 'number'
+    return ok
+  }
+  return true
 }
 
 function getCacheKey(serviceName, params = null) {
@@ -89,14 +86,14 @@ function getCacheEntry(cacheMap, key) {
 export const useServicesStore = defineStore('services', () => {
   const registerServices = (servicesArray) => {
     if (!Array.isArray(servicesArray)) {
-      console.error('Services must be provided as an array')
+      console.error('Los servicios deben proporcionarse como un array')
       return
     }
 
     const validServices = servicesArray.filter((service) => {
       const isValid = validateServiceFunction(service)
       if (!isValid) {
-        console.error(`Invalid service function:`, service)
+        console.error(`Función de servicio inválida:`, service)
       }
       return isValid
     })
@@ -106,11 +103,6 @@ export const useServicesStore = defineStore('services', () => {
     state.loading.clear()
     state.errors.clear()
     state.services = validServices
-
-    console.log(
-      `Registered ${validServices.length} external services:`,
-      validServices.map((s) => s.name),
-    )
   }
 
   const updateServices = (servicesArray) => {
@@ -125,7 +117,7 @@ export const useServicesStore = defineStore('services', () => {
     return state.services.map((service) => ({
       name: service.name,
       type: service.type,
-      description: service.description || `Service of type ${service.type}`,
+      description: service.description || `Servicio de tipo ${service.type}`,
     }))
   }
 
@@ -134,7 +126,7 @@ export const useServicesStore = defineStore('services', () => {
 
     const service = getService(serviceName)
     if (!service) {
-      throw new Error(`Service "${serviceName}" not found`)
+      throw new Error(`Servicio "${serviceName}" no encontrado`)
     }
 
     const cacheKey = getCacheKey(serviceName, params)
@@ -143,7 +135,7 @@ export const useServicesStore = defineStore('services', () => {
     if (useCache) {
       const cachedData = getCacheEntry(state.cache, cacheKey)
       if (cachedData !== null) {
-        console.log(`Cache hit for service "${serviceName}" (TTL: ${CACHE_TTL}ms)`)
+        console.log(`Cache encontrado para el servicio "${serviceName}" (TTL: ${CACHE_TTL}ms)`)
         return cachedData
       }
     }
@@ -159,7 +151,7 @@ export const useServicesStore = defineStore('services', () => {
       const servicePromise = service.handler(params)
       const response = await Promise.race([servicePromise, timeoutPromise])
 
-      const isValidResponse = validateServiceResponse(response)
+  const isValidResponse = validateServiceResponse(service.type, response)
       if (!isValidResponse) {
         throw new Error(`Invalid response from service "${serviceName}"`)
       }
@@ -167,12 +159,11 @@ export const useServicesStore = defineStore('services', () => {
       // Guardar en cache con timestamp
       if (useCache) {
         state.cache.set(cacheKey, setCacheEntry(cacheKey, response))
-        console.log(`Response cached for service "${serviceName}" with TTL: ${CACHE_TTL}ms`)
       }
 
       return response
     } catch (error) {
-      console.error(`Error calling service "${serviceName}":`, error)
+      console.error(`Error al llamar al servicio "${serviceName}":`, error)
       state.errors.set(serviceName, error.message)
       throw error
     } finally {
@@ -189,10 +180,8 @@ export const useServicesStore = defineStore('services', () => {
         }
       }
       keysToDelete.forEach((key) => state.cache.delete(key))
-      console.log(`Cache cleared for service "${serviceName}"`)
     } else {
       state.cache.clear()
-      console.log('All service cache cleared')
     }
   }
 
@@ -205,9 +194,6 @@ export const useServicesStore = defineStore('services', () => {
       }
     }
     keysToDelete.forEach((key) => state.cache.delete(key))
-    if (keysToDelete.length > 0) {
-      console.log(`Cleaned ${keysToDelete.length} expired cache entries`)
-    }
     return keysToDelete.length
   }
 
@@ -259,7 +245,6 @@ export const useServicesStore = defineStore('services', () => {
     getServiceError,
     hasServices,
     servicesCount,
-    SERVICE_TYPES,
     CACHE_TTL,
   }
 })
