@@ -10,6 +10,7 @@
  * - Validación de estructura de datos
  * - Manejo de errores en operaciones de persistencia
  * - Gestión de catálogos dinámicos
+ * - Serialización/deserialización opcional del historial de cambios
  */
 
 import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS } from "../utils/constants"
@@ -19,10 +20,11 @@ export const useStatePersistence = () => {
    * Serializa el estado completo del canvas a JSON
    * @param {Object} state - Estado del store (plantas, elementos, etc.)
    * @param {Object} options - Opciones de serialización
+   * @param {boolean} options.includeChangeHistory - Si incluir el historial de cambios (opcional)
    * @returns {string} JSON string con todo el estado
    */
   const serialize = (state, options = {}) => {
-    const { validateBeforeSerialize = true, includeMetrics = true, saveTimestamp = false } = options
+    const { validateBeforeSerialize = true, includeMetrics = true, saveTimestamp = false, includeChangeHistory = false } = options
 
     if (validateBeforeSerialize) {
       const preValidation = validateStateBeforeSerialization(state)
@@ -173,9 +175,33 @@ export const useStatePersistence = () => {
       }),
     }
 
+    if (includeChangeHistory && state.changeHistory) {
+      try {
+        const changeHistoryData = typeof state.changeHistory.serialize === 'function'
+          ? state.changeHistory.serialize()
+          : state.changeHistory
+
+        if (changeHistoryData && changeHistoryData.entries) {
+          serializedState.changeHistory = {
+            entries: changeHistoryData.entries,
+            meta: {
+              totalEntries: changeHistoryData.entries.length,
+              exportedAt: timestamp
+            }
+          }
+          console.log(`Historial de cambios incluido: ${changeHistoryData.entries.length} entradas`)
+        }
+      } catch (error) {
+        console.warn('Error al serializar historial de cambios:', error)
+      }
+    }
+
     // Añadir métrica de plantillas (retrocompatible)
     if (serializedState.meta?.metrics) {
       serializedState.meta.metrics.totalPlantillas = state.templates?.length || 0
+      if (serializedState.changeHistory?.entries) {
+        serializedState.meta.metrics.totalChangeHistory = serializedState.changeHistory.entries.length
+      }
     }
 
     // Guardar timestamp en localStorage si se solicita
@@ -556,6 +582,19 @@ export const useStatePersistence = () => {
         }
       })
 
+      let changeHistoryRestored = false
+      if (state.changeHistory && storeActions.setChangeHistory) {
+        try {
+          if (state.changeHistory.entries && Array.isArray(state.changeHistory.entries)) {
+            storeActions.setChangeHistory(state.changeHistory.entries)
+            changeHistoryRestored = true
+            console.log(`Historial de cambios restaurado: ${state.changeHistory.entries.length} entradas`)
+          }
+        } catch (error) {
+          console.warn('Error al restaurar historial de cambios:', error)
+        }
+      }
+
       // === ESTABLECER NAVEGACIÓN INICIAL ===
       const primeraPlanta = state.plantas[0]
       storeActions.setInitialNavigation(primeraPlanta.id, primeraPlanta.nombre)
@@ -567,6 +606,10 @@ export const useStatePersistence = () => {
         elementosOmitidos,
         plantaActiva: primeraPlanta.id,
         warnings: validation.warnings?.length || 0,
+        changeHistory: {
+          restored: changeHistoryRestored,
+          entries: changeHistoryRestored ? state.changeHistory.entries.length : 0
+        },
         catalogos: {
           tiposEspacio: state.catalogos?.tiposEspacio?.length || DEFAULT_TIPOS_ESPACIO.length,
           tiposCuarto: state.catalogos?.tiposCuarto?.length || DEFAULT_TIPOS_CUARTO.length,
@@ -864,7 +907,33 @@ export const useStatePersistence = () => {
         })
       }
 
-      // === INFORMACIÓN ADICIONAL ===
+      if (data.changeHistory) {
+        if (typeof data.changeHistory !== 'object') {
+          validationResult.warnings.push('changeHistory debe ser un objeto')
+        } else {
+          if (!Array.isArray(data.changeHistory.entries)) {
+            validationResult.warnings.push('changeHistory.entries debe ser un array')
+          } else {
+            // Validar estructura básica de entradas del historial
+            data.changeHistory.entries.forEach((entry, index) => {
+              if (!entry || typeof entry !== 'object') {
+                validationResult.warnings.push(`Entrada de historial ${index + 1}: estructura inválida`)
+              } else {
+                if (!entry.id) {
+                  validationResult.warnings.push(`Entrada de historial ${index + 1}: falta ID`)
+                }
+                if (!entry.timestamp) {
+                  validationResult.warnings.push(`Entrada de historial ${index + 1}: falta timestamp`)
+                }
+                if (!entry.changes || !Array.isArray(entry.changes)) {
+                  validationResult.warnings.push(`Entrada de historial ${index + 1}: changes debe ser un array`)
+                }
+              }
+            })
+          }
+        }
+      }
+
       validationResult.info = {
         plantas: data.plantas?.length || 0,
         elementos: data.elementos?.length || 0,
@@ -873,7 +942,15 @@ export const useStatePersistence = () => {
         app: data.meta?.app || 'desconocida',
         elementosPorTipo: {},
         elementosConHijos: 0,
-        elementosHuerfanos: 0
+        elementosHuerfanos: 0,
+        changeHistory: data.changeHistory ? {
+          hasChangeHistory: true,
+          entries: data.changeHistory.entries?.length || 0,
+          exportedAt: data.changeHistory.meta?.exportedAt || null
+        } : {
+          hasChangeHistory: false,
+          entries: 0
+        }
       }
 
       // Estadísticas de elementos
