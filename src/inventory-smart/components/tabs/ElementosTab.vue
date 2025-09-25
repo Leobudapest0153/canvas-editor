@@ -426,11 +426,11 @@ const categoriasPlantillas = computed(() => {
 const ubicacionesPlantillas = computed(() => UBICACIONES_DISPONIBLES)
 
 onMounted(() => {
-  const saved = localStorage.getItem('inventory.selectedCatalog')
+  const saved = localStorage.getItem('canvas_selected_catalog')
   if (saved === 'plantillas' || saved === 'elementos') {
     catalogStore.setSelectedCatalog(saved)
   }
-  localStorage.setItem('inventory.selectedCatalog', selectedCatalog.value)
+  localStorage.setItem('canvas_selected_catalog', selectedCatalog.value)
   catalogStore.loadTemplatesFromLocalStorage()
   window.addEventListener('click', onGlobalClick, { capture: true })
   document.addEventListener('mousedown', handleClickOutside)
@@ -442,7 +442,7 @@ onBeforeUnmount(() => {
 })
 
 watch(selectedCatalog, (val) => {
-  localStorage.setItem('inventory.selectedCatalog', val)
+  localStorage.setItem('canvas_selected_catalog', val)
 })
 
 // Si salimos del contexto de planta, forzar modo 'espacio' (ocultamos Cuartos)

@@ -600,38 +600,6 @@ const finalizarArrastre = (event) => {
   if (card && card.classList) card.classList.remove('opacity-50', 'scale-95')
 }
 
-// Cargar elementos personalizados del localStorage
-onMounted(() => {
-  const elementosGuardados = localStorage.getItem('elementos-personalizados')
-  if (elementosGuardados) {
-    try {
-      JSON.parse(elementosGuardados).forEach((el) => {
-        if (!items.value.some((existing) => existing.id === el.id)) {
-          items.value.push(el)
-        }
-      })
-    } catch (error) {
-      console.error('Error cargando elementos personalizados:', error)
-    }
-  }
-  document.addEventListener('mousedown', handleClickOutside)
-})
-
-// Guardar elementos personalizados en localStorage
-const guardarElementosPersonalizados = () => {
-  const personalizados = items.value.filter((el) => el.personalizado)
-  localStorage.setItem('elementos-personalizados', JSON.stringify(personalizados))
-}
-
-// Observar cambios en elementos personalizados para guardar
-watch(
-  () => items.value,
-  () => {
-    guardarElementosPersonalizados()
-  },
-  { deep: true },
-)
-
 onUnmounted(() => {
   document.removeEventListener('mousedown', handleClickOutside)
 })
