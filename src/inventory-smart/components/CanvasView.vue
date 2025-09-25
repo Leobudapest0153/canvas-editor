@@ -971,7 +971,7 @@ const floorBoundary = computed(() => {
 const layerConfig = computed(() => {
   const baseWidth = canvasStore.canvasAdaptativo?.width || 0
   const baseHeight = canvasStore.canvasAdaptativo?.height || 0
-  if (!isInfinitePlant.value) {
+  if (!isInfinitePlant.value || !canvasStore.estaEnPlanta) {
     return { width: baseWidth, height: baseHeight }
   }
   const zoom = canvasStore.zoom || 1
@@ -1387,6 +1387,20 @@ const handleElementDoubleClick = (evt, elemento) => {
   const navegables = ['cuartos', 'pisos', 'elementos']
   if (navegables.includes(elemento.tipo)) {
     canvasStore.navegarAElemento(elemento.id)
+
+    nextTick(() => {
+      nextTick(() => {
+        const runFit = () => {
+          if (!isInfinitePlant.value) return
+          fitToPlanta()
+        }
+        if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+          window.requestAnimationFrame(runFit)
+        } else {
+          setTimeout(runFit, 16)
+        }
+      })
+    })
   }
 }
 
@@ -2406,7 +2420,7 @@ watch(
     await nextTick()
     await nextTick()
 
-    if (ctx.tipo === 'plantas' && isInfinitePlant.value) {
+    if (isInfinitePlant.value) {
       await nextTick()
       fitToPlanta()
       return
