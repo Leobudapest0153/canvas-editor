@@ -31,7 +31,7 @@ import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
 
 export function useWeightValidation() {
   const canvasStore = useCanvasStore()
-  const isInfinitePlant = computed(() => canvasStore.plantaActivaData?.isInfinite === true)
+  const isInfinitePlant = computed(() => canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true)
 
   /**
    * Calcula el peso máximo teórico total de todos los elementos hijos directos de un contenedor/elemento/planta
