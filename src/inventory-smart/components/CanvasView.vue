@@ -34,7 +34,7 @@
     >
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
         <v-line
-          v-if="plantPolygon.length && !canvasStore.plantaActivaData?.isInfinite"
+          v-if="plantPolygon.length && !isInfinitePlant"
           :config="{
             points: plantPolygonFlat,
             closed: true,
@@ -453,7 +453,7 @@
       <v-layer ref="uiLayerRef" :config="{ listening: false }">
         <!-- Debug: mostrar información según el contexto -->
         <v-text
-          v-if="!canvasStore.estaEnPlanta || canvasStore.plantaActivaData?.isInfinite !== true"
+          v-if="!canvasStore.estaEnPlanta || !isInfinitePlant"
           :config="{
             x: floorLabelPositions.main.x,
             y: floorLabelPositions.main.y,
@@ -467,7 +467,7 @@
           }"
         />
         <v-text
-          v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite !== true"
+          v-if="canvasStore.estaEnPlanta && !isInfinitePlant"
           :config="{
             x: floorLabelPositions.secondary.x,
             y: floorLabelPositions.secondary.y,
@@ -869,7 +869,7 @@ const stageConfig = computed(() => {
 })
 
 const activeBounds = computed(() => getActiveBounds(canvasStore))
-const isInfinitePlant = computed(() => canvasStore.plantaActivaData?.isInfinite === true)
+const isInfinitePlant = computed(() => canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true)
 
 const plantPolygon = computed(() => activeBounds.value.polygonPx)
 
