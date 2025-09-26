@@ -11,6 +11,8 @@ const infinitePadding = Number.isFinite(INFINITE_VIEW_PADDING_PX) ? INFINITE_VIE
 
 export function useZoom(stageSize, layerConfig) {
   const canvasStore = useCanvasStore()
+  const isPlantInfiniteActive = (planta = canvasStore.plantaActivaData) =>
+    canvasStore.estaEnPlanta && (planta?.isInfinite === true)
 
   /**
    * Calcula el bounding box para diferentes contextos
@@ -21,7 +23,7 @@ export function useZoom(stageSize, layerConfig) {
       const structure = canvasStore.estructuraContenedorActual
       const baseWidth = layerConfig.value.width || Math.max(1, Number(structure.width) || 1)
       const baseHeight = layerConfig.value.height || Math.max(1, Number(structure.height) || 1)
-      const applyPadding = canvasStore.plantaActivaData?.isInfinite === true
+      const applyPadding = isPlantInfiniteActive()
       const padding = applyPadding ? infinitePadding : 0
       const width = Math.max(1, baseWidth)
       const height = Math.max(1, baseHeight)
@@ -36,7 +38,7 @@ export function useZoom(stageSize, layerConfig) {
     // Contexto 2: planta activa -> priorizar contenido si existe
     if (canvasStore.plantaActivaData) {
       const planta = canvasStore.plantaActivaData
-      const isInfinite = planta?.isInfinite === true
+      const isInfinite = isPlantInfiniteActive(planta)
 
       if (!isInfinite) {
         const frame = canvasStore.canvasAdaptativo?.frame
@@ -123,7 +125,7 @@ export function useZoom(stageSize, layerConfig) {
     }
 
     // Contexto 3: fallback al layerConfig
-    if (canvasStore.plantaActivaData?.isInfinite !== true && layerConfig.value?.width && layerConfig.value?.height) {
+    if (!isPlantInfiniteActive() && layerConfig.value?.width && layerConfig.value?.height) {
       return { x: 0, y: 0, width: Math.max(1, layerConfig.value.width), height: Math.max(1, layerConfig.value.height) }
     }
 
@@ -154,7 +156,7 @@ export function useZoom(stageSize, layerConfig) {
    * Calcula el zoom mínimo dinámico basado en el contexto actual
    */
   const getDynamicMinZoom = () => {
-    if (canvasStore.plantaActivaData?.isInfinite === true) {
+    if (isPlantInfiniteActive()) {
       return 0.001
     }
 
