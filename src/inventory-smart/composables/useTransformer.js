@@ -116,7 +116,7 @@ export function useTransformer({
           }
 
           const isElasticBoundary = boundaryMode === 'elastic'
-          const isInfiniteFloor = canvasStore.plantaActivaData?.isInfinite === true
+          const isInfiniteFloor = canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true
 
           const minWidth = Math.max(MINW, newBox.width)
           const minHeight = Math.max(MINH, newBox.height)
