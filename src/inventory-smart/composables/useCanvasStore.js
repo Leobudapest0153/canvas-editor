@@ -115,6 +115,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   const elementoDestacadoId = ref(null)
   const idsElementosFiltrados = ref(null)
   const elementoAura = ref(null)
+  // Opacidad animada (fade-out). 1 al iniciar, decrece a 0.
+  const auraOpacity = ref(0)
 
   // Edición de niveles
   const nivelAEditar = ref(null);
@@ -1749,31 +1751,194 @@ export const useCanvasStore = defineStore('canvas', () => {
     agregarEtiquetaAElemento(elementoId, newId)
   }
   const destacarElemento = (elementoId) => {
-    const elemento = elementoPorId.value(elementoId)
-    if (!elemento) return
-
+    const el = elementoPorId.value(elementoId)
+    if (!el) return
     elementoDestacadoId.value = elementoId
 
-    // Creamos la configuración del aura basada en el elemento
-    const paddingAura = 30 / zoom.value // Píxeles extra de tamaño para el aura
-    elementoAura.value = {
-      // Usamos un ID único para el aura para evitar conflictos de key
-      id: `aura_${elemento.id}`,
-      forma: elemento.forma,
-      x: elemento.x - paddingAura / 2,
-      y: elemento.y - paddingAura / 2,
-      width: elemento.width + paddingAura,
-      height: elemento.height + paddingAura,
-      color: elemento.color,
+    const stage = typeof window !== 'undefined' ? window.__konvaStage : null
+    const PADDING_VISUAL = 40 // px en pantalla
+    let worldX, worldY, worldW, worldH
+
+    // Helpers reales de dimensiones (coinciden con CanvasView)
+    const getDrawWidth = (typeof window !== 'undefined' && window.__getDrawWidth) ? window.__getDrawWidth : (e) => e.width || 0
+    const getDrawHeight = (typeof window !== 'undefined' && window.__getDrawHeight) ? window.__getDrawHeight : (e) => e.height || 0
+
+    // 1. Intentar bounding box real via Konva para incluir rotaciones / grupos
+    if (stage && typeof stage.findOne === 'function') {
+      try {
+        const node = stage.findOne(`#${el.id}`)
+        if (node && typeof node.getClientRect === 'function') {
+          const rect = node.getClientRect({ skipStroke: false, skipShadow: true })
+          const scale = stage.scaleX ? (stage.scaleX() || 1) : 1
+          const stageX = stage.x ? (stage.x() || 0) : 0
+          const stageY = stage.y ? (stage.y() || 0) : 0
+          // Convertir de coords de pantalla (aplican pan+scale) a coords de mundo lógico
+          worldX = (rect.x - stageX) / scale
+          worldY = (rect.y - stageY) / scale
+          worldW = rect.width / scale
+          worldH = rect.height / scale
+        }
+      } catch (e) {
+        /* fallback below */
+      }
     }
 
-    // Limpiamos todo después de un tiempo
-    setTimeout(() => {
-      if (elementoDestacadoId.value === elementoId) {
+    // 2. Fallback si no se obtuvo node/rect
+    if (worldW == null || !Number.isFinite(worldW) || worldW === 0) {
+      worldW = getDrawWidth(el) || el.width || 0
+      worldH = getDrawHeight(el) || el.height || 0
+      worldX = el.x || 0
+      worldY = el.y || 0
+    }
+
+    const z = zoom.value || 1
+    const padWorld = PADDING_VISUAL / z
+
+    // Animación PULSO: el aura se expande y contrae en bucle suave (no desaparece)
+  const BASE_PADDING = padWorld
+  const PULSE_EXTRA = 6 / z // amplitud adicional
+  const CYCLE = 1400 // ms ciclo completo expandir+contraer
+  const MAX_DURATION = 3000 // ms total de vida del pulso (antes 5000)
+  const startTime = performance.now()
+    auraOpacity.value = 0.75 // opacidad base estable
+
+    // Cancelar animación previa
+    if (destacarElemento._fadeRaf) cancelAnimationFrame(destacarElemento._fadeRaf)
+
+    const animatePulse = (now) => {
+      if (elementoDestacadoId.value !== elementoId) return
+      const elapsed = now - startTime
+      if (elapsed >= MAX_DURATION) {
         elementoDestacadoId.value = null
-        elementoAura.value = null // <-- Limpiar el aura
+        elementoAura.value = null
+        return
       }
-    }, 2500) // Aumentamos un poco el tiempo a 2.5 segundos
+      // fase 0..1
+      const phase = (elapsed % CYCLE) / CYCLE
+      // curva senoidal para expandir y volver: 0 -> 1 -> 0
+      const wave = 0.5 - 0.5 * Math.cos(phase * Math.PI * 2)
+      const padding = BASE_PADDING + PULSE_EXTRA * wave
+      // opacidad ligeramente modulada 0.65 - 0.85
+      auraOpacity.value = 0.65 + 0.20 * (1 - Math.abs(0.5 - wave) * 2) // más intensa cerca del centro
+
+      elementoAura.value = {
+        id: `aura_${el.id}`,
+        forma: el.forma,
+        x: worldX - padding,
+        y: worldY - padding,
+        width: worldW + padding * 2,
+        height: worldH + padding * 2,
+        color: el.color || '#4f46e5',
+      }
+      destacarElemento._fadeRaf = requestAnimationFrame(animatePulse)
+    }
+    destacarElemento._fadeRaf = requestAnimationFrame(animatePulse)
+  }
+
+  /**
+   * Enfoca (zoom + pan) el elemento indicado haciendo que quepa dentro del viewport
+   * con un padding visual y animación opcional.
+   * @param {string} elementoId
+   * @param {{paddingPx?:number, fitRatio?:number, animate?:boolean, duration?:number}} opts
+   */
+  const focusElemento = (elementoId, opts = {}) => {
+    const el = elementoPorId.value(elementoId)
+    if (!el) return
+
+    const stage = typeof window !== 'undefined' ? window.__konvaStage : null
+    if (!stage) return
+
+  const paddingPx = Number.isFinite(opts.paddingPx) ? opts.paddingPx : 40
+  const fitRatio = Number.isFinite(opts.fitRatio) ? opts.fitRatio : 0.92 // queremos que casi llene el viewport
+    const animate = opts.animate !== false // por defecto true
+    const duration = Number.isFinite(opts.duration) ? opts.duration : 320
+
+    // Obtener bounding box lógico del elemento (similar a destacarElemento) con fallback inmediato
+    let worldX, worldY, worldW, worldH
+    const fallbackDims = () => {
+      const getDrawWidth = (typeof window !== 'undefined' && window.__getDrawWidth) ? window.__getDrawWidth : (e) => e.width || 0
+      const getDrawHeight = (typeof window !== 'undefined' && window.__getDrawHeight) ? window.__getDrawHeight : (e) => e.height || 0
+      worldW = getDrawWidth(el) || el.width || el?.dimensiones?.ancho * CM_TO_PX || 0
+      worldH = getDrawHeight(el) || el.height || el?.dimensiones?.largo * CM_TO_PX || el?.dimensiones?.alto * CM_TO_PX || 0
+      worldX = el.x || 0
+      worldY = el.y || 0
+    }
+    fallbackDims()
+    try {
+      const node = stage.findOne(`#${el.id}`)
+      if (node && typeof node.getClientRect === 'function') {
+        const rect = node.getClientRect({ skipStroke: false, skipShadow: true })
+        const scale = stage.scaleX ? (stage.scaleX() || 1) : 1
+        const stageX = stage.x ? (stage.x() || 0) : 0
+        const stageY = stage.y ? (stage.y() || 0) : 0
+        const rx = (rect.x - stageX) / scale
+        const ry = (rect.y - stageY) / scale
+        const rw = rect.width / scale
+        const rh = rect.height / scale
+        if (Number.isFinite(rw) && rw > 0 && Number.isFinite(rh) && rh > 0) {
+          worldX = rx; worldY = ry; worldW = rw; worldH = rh
+        }
+      }
+    } catch { /* ignore, usamos fallback */ }
+
+    const viewportW = stage.width() || 1
+    const viewportH = stage.height() || 1
+
+    // Calcular escala objetivo
+  const targetScaleX = (viewportW - paddingPx * 2) / Math.max(1, worldW)
+  const targetScaleY = (viewportH - paddingPx * 2) / Math.max(1, worldH)
+  // Usar el menor para asegurar que ambos ejes entren
+  let targetScale = Math.min(targetScaleX, targetScaleY) * fitRatio
+    if (!Number.isFinite(targetScale) || targetScale <= 0) targetScale = 1
+    targetScale = Math.max(0.05, Math.min(5, targetScale))
+
+    // Si el elemento ya cabe sobradamente y el zoom actual es mayor, no aumentar más (solo pan)
+    const currentScale = zoom.value || 1
+    if (currentScale > targetScale * 1.15) {
+      // Mantener zoom actual pero ajustar targetScale para animación suave hacia abajo solo si es mucho mayor
+      targetScale = currentScale * 0.95
+    }
+
+    // Centro del elemento
+    const cx = worldX + worldW / 2
+    const cy = worldY + worldH / 2
+
+    // Calcular pan para centrar
+    const targetPanX = (viewportW / 2) - cx * targetScale
+    const targetPanY = (viewportH / 2) - cy * targetScale
+
+    if (!animate) {
+      configurarZoom(targetScale)
+      configurarPan(targetPanX, targetPanY)
+      return
+    }
+
+    // Animación interpolada
+    if (focusElemento._raf) cancelAnimationFrame(focusElemento._raf)
+    const startZoom = zoom.value
+    const startPanX = panX.value
+    const startPanY = panY.value
+    const start = performance.now()
+
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
+
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / duration)
+      const k = easeOutCubic(t)
+  const zNew = startZoom + (targetScale - startZoom) * k
+  const pX = startPanX + (targetPanX - startPanX) * k
+  const pY = startPanY + (targetPanY - startPanY) * k
+  // Usar configuradores para mantener lógica consistente (historial debounce se maneja al final manualmente)
+  zoom.value = zNew
+  panX.value = pX
+  panY.value = pY
+      if (t < 1) {
+        focusElemento._raf = requestAnimationFrame(step)
+      } else {
+        saveZoomPanToHistory()
+      }
+    }
+    focusElemento._raf = requestAnimationFrame(step)
   }
 
   const actualizarIdsFiltrados = (ids) => {
@@ -1838,7 +2003,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     etiquetasSeleccionadas,
     elementoDestacadoId,
     idsElementosFiltrados,
-    elementoAura,
+  elementoAura,
+  auraOpacity,
     isDraggable,
     cambiosNoAplicados,
   // Catálogos dinámicos
@@ -1934,6 +2100,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // == Destacar
     destacarElemento,
+  focusElemento,
     actualizarIdsFiltrados,
 
     setDraggableMode,
