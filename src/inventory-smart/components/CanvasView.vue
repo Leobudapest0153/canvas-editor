@@ -1320,6 +1320,20 @@ const onKeyDown = (e) => {
 onMounted(() => window.addEventListener('keydown', onKeyDown))
 onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
 
+// Exponer stage globalmente para funciones de enfoque (focusElemento / destacarElemento)
+onMounted(() => {
+  nextTick(() => {
+    if (typeof window !== 'undefined') {
+      try { window.__konvaStage = stageRef.value?.getNode?.() || null } catch { /* noop */ }
+    }
+  })
+})
+onUnmounted(() => {
+  if (typeof window !== 'undefined' && window.__konvaStage) {
+    try { delete window.__konvaStage } catch { /* ignore */ }
+  }
+})
+
 // === FUNCIONES DE CANVAS/STAGE ===
 const handleStageMouseDown = (e) => {
   // Si el click es en el stage (no en un elemento), habilitar arrastre del canvas
@@ -1898,6 +1912,7 @@ const getOrientationBarRect = (elemento) => {
         listening: false,
         opacity: 0.95,
       }
+
     }
     if (o === 90) {
       const height = Math.max(1, h - 2 * margin)
@@ -2306,7 +2321,9 @@ function resetVolatileState() {
 }
 
 if (typeof window !== 'undefined') {
-  window.__canvasApi = { recomputeBoundsAndIndex, forceRedraw, resetVolatileState }
+  window.__getElementPixelDimensions = getElementPixelDimensions;
+  window.__getDrawWidth = getDrawWidth;
+  window.__getDrawHeight = getDrawHeight;
 }
 
 watch(

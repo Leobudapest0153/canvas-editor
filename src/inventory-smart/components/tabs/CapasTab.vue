@@ -312,7 +312,11 @@ const showAuraElement = (elementoId) => {
     showToast('No puedes buscar un elemento si tienes cambios pendientes', 'warn');
     return;
   }
-  canvasStore.destacarElemento(elementoId);
+  // Primero enfocar (zoom+pan) para garantizar que el nodo esté en viewport
+  canvasStore.focusElemento(elementoId, { paddingPx: 60, fitRatio: 0.95, animate: true, duration: 450 });
+  // Luego (en el siguiente frame) destacar para tomar bounding correcto tras animación inicial
+  requestAnimationFrame(() => canvasStore.destacarElemento(elementoId));
+  // Seleccionar
   canvasStore.seleccionarElemento(elementoId);
 }
 
