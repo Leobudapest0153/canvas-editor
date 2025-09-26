@@ -17,7 +17,7 @@
       <div class="px-6 py-4 flex-shrink-0">
         <div class="flex items-center justify-center">
           <h2 class="text-xl font-semibold text-primary">
-            Agregar {{ modo === 'cuarto' ? 'cuarto' : 'espacio' }}
+            {{ props.initialForm && typeof props.initialForm === 'object' ? 'Editar' : 'Agregar' }} {{ modo === 'cuarto' ? 'cuarto' : 'espacio' }}
           </h2>
         </div>
       </div>
@@ -43,6 +43,7 @@
                         touchedGeneral.nombre && !validNombre ? 'border-red-400' : 'border-gray-300'
                       "
                       :placeholder="`Nombre del ${modo}`"
+                      @input="touchedGeneral.nombre = true"
                       @blur="touchedGeneral.nombre = true"
                     />
                     <p
@@ -84,7 +85,6 @@
                         : 'border-gray-300'
                     "
                     @change="touchedGeneral.tipoSeleccionado = true"
-                    @blur="touchedGeneral.tipoSeleccionado = true"
                   >
                     <option value="">Seleccionar tipo</option>
                     <option
@@ -103,8 +103,90 @@
                   </p>
                 </div>
 
-                <!-- Orientación (siempre visible) -->
-                <div>
+                <!-- Bloque específico para espacios: orientación, ubicación y altura en pared -->
+                <template v-if="modo === 'espacio'">
+                  <!-- Orientación y Ubicación en la misma fila -->
+                  <div class="grid grid-cols-2 gap-4">
+                    <!-- Orientación -->
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Orientación*</label>
+                      <select
+                        v-model="datosGenerales.orientacion"
+                        class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="
+                          touchedGeneral.orientacion && !validOrientacion
+                            ? 'border-red-400'
+                            : 'border-gray-300'
+                        "
+                        @change="touchedGeneral.orientacion = true"
+                      >
+                        <option value="">Seleccionar orientación</option>
+                        <option v-for="opt in ORIENTACIONES" :key="opt.id" :value="opt.id">
+                          {{ opt.nombre }}
+                        </option>
+                      </select>
+                      <p
+                        v-if="touchedGeneral.orientacion && !validOrientacion"
+                        class="mt-1 text-xs text-red-600"
+                      >
+                        Selecciona una orientación.
+                      </p>
+                    </div>
+
+                    <!-- Ubicación -->
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Ubicación*</label>
+                      <select
+                        v-model="datosGenerales.ubicacion"
+                        class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="
+                          touchedGeneral.ubicacion && !validUbicacion
+                            ? 'border-red-400'
+                            : 'border-gray-300'
+                        "
+                        @change="touchedGeneral.ubicacion = true"
+                      >
+                        <option value="">Seleccionar ubicación</option>
+                        <option v-for="ubicacion in UBICACIONES_DISPONIBLES" :key="ubicacion.id" :value="ubicacion.id">
+                          {{ ubicacion.nombre }}
+                        </option>
+                      </select>
+                      <p
+                        v-if="touchedGeneral.ubicacion && !validUbicacion"
+                        class="mt-1 text-xs text-red-600"
+                      >
+                        Selecciona una ubicación.
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Altura respecto al suelo (solo espacios en pared) -->
+                  <div v-if="datosGenerales.ubicacion === 'pared'" class="grid grid-cols-2 gap-4 mt-2">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Altura respecto al suelo (m)*</label>
+                      <input
+                        v-model.number="datosGenerales.alturaRespectoAlSuelo"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="
+                          touchedGeneral.alturaRespectoAlSuelo && !validAlturaRespectoAlSuelo
+                            ? 'border-red-400'
+                            : 'border-gray-300'
+                        "
+                        @input="touchedGeneral.alturaRespectoAlSuelo = true"
+                        @blur="touchedGeneral.alturaRespectoAlSuelo = true"
+                      />
+                      <p v-if="touchedGeneral.alturaRespectoAlSuelo && !validAlturaRespectoAlSuelo" class="mt-1 text-xs text-red-600">
+                        Ingresa una altura válida mayor a 0.
+                      </p>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Orientación solo (para cuartos) -->
+                <div v-else>
                   <label class="block text-sm font-medium text-gray-700 mb-2">Orientación*</label>
                   <select
                     v-model="datosGenerales.orientacion"
@@ -115,7 +197,6 @@
                         : 'border-gray-300'
                     "
                     @change="touchedGeneral.orientacion = true"
-                    @blur="touchedGeneral.orientacion = true"
                   >
                     <option value="">Seleccionar orientación</option>
                     <option v-for="opt in ORIENTACIONES" :key="opt.id" :value="opt.id">
@@ -159,7 +240,6 @@
                       touchedGeneral.forma && !validForma ? 'border-red-400' : 'border-gray-300'
                     "
                     @change="touchedGeneral.forma = true"
-                    @blur="touchedGeneral.forma = true"
                   >
                     <option value="">Seleccionar forma</option>
                     <option v-for="forma in formasDisponibles" :key="forma.id" :value="forma.id">
@@ -171,88 +251,125 @@
                   </p>
                 </div>
 
-                <!-- Largo y Alto -->
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Largo (m)*</label>
-                    <input
-                      v-model.number="dimensiones.largo"
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      :class="
-                        touchedGeneral.largo && !validLargo ? 'border-red-400' : 'border-gray-300'
-                      "
-                      @blur="touchedGeneral.largo = true"
-                    />
-                    <p v-if="touchedGeneral.largo && !validLargo" class="mt-1 text-xs text-red-600">
-                      Ingresa un valor mayor a 0.
-                    </p>
+                <!-- Dimensiones dinámicas según forma -->
+                <template v-if="dimensiones.forma === 'circular'">
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Diámetro (m)*</label>
+                      <input
+                        v-model.number="diametro"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.ancho && !validAncho ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.ancho = true; touchedGeneral.largo = true"
+                        @blur="touchedGeneral.ancho = true; touchedGeneral.largo = true"
+                      />
+                      <p v-if="(touchedGeneral.ancho || touchedGeneral.largo) && !validAncho" class="mt-1 text-xs text-red-600">
+                        Ingresa un valor mayor a 0.
+                      </p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Alto (m)*</label>
+                      <input
+                        v-model.number="dimensiones.alto"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.alto && !validAlto ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.alto = true"
+                        @blur="touchedGeneral.alto = true"
+                      />
+                      <p v-if="touchedGeneral.alto && !validAlto" class="mt-1 text-xs text-red-600">
+                        Ingresa un valor mayor a 0.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Alto (m)*</label>
-                    <input
-                      v-model.number="dimensiones.alto"
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      :class="
-                        touchedGeneral.alto && !validAlto ? 'border-red-400' : 'border-gray-300'
-                      "
-                      @blur="touchedGeneral.alto = true"
-                    />
-                    <p v-if="touchedGeneral.alto && !validAlto" class="mt-1 text-xs text-red-600">
-                      Ingresa un valor mayor a 0.
-                    </p>
+                  <div class="grid grid-cols-2 gap-4 mt-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Capacidad de carga (kg)*</label>
+                      <input
+                        v-model.number="dimensiones.capacidadCarga"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.capacidadCarga && !validCapacidad ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.capacidadCarga = true"
+                        @blur="touchedGeneral.capacidadCarga = true"
+                      />
+                      <p v-if="touchedGeneral.capacidadCarga && !validCapacidad" class="mt-1 text-xs text-red-600">
+                        Ingresa un valor mayor a 0.
+                      </p>
+                    </div>
                   </div>
-                </div>
-
-                <!-- Ancho y Capacidad -->
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Ancho (m)*</label>
-                    <input
-                      v-model.number="dimensiones.ancho"
-                      type="number"
-                      min="0.1"
-                      step="0.1"
-                      class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      :class="
-                        touchedGeneral.ancho && !validAncho ? 'border-red-400' : 'border-gray-300'
-                      "
-                      @blur="touchedGeneral.ancho = true"
-                    />
-                    <p v-if="touchedGeneral.ancho && !validAncho" class="mt-1 text-xs text-red-600">
-                      Ingresa un valor mayor a 0.
-                    </p>
+                </template>
+                <template v-else>
+                  <!-- Largo y Alto -->
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Largo (m)*</label>
+                      <input
+                        v-model.number="dimensiones.largo"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.largo && !validLargo ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.largo = true"
+                        @blur="touchedGeneral.largo = true"
+                      />
+                      <p v-if="touchedGeneral.largo && !validLargo" class="mt-1 text-xs text-red-600">Ingresa un valor mayor a 0.</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Alto (m)*</label>
+                      <input
+                        v-model.number="dimensiones.alto"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.alto && !validAlto ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.alto = true"
+                        @blur="touchedGeneral.alto = true"
+                      />
+                      <p v-if="touchedGeneral.alto && !validAlto" class="mt-1 text-xs text-red-600">Ingresa un valor mayor a 0.</p>
+                    </div>
                   </div>
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2"
-                      >Capacidad de carga (kg)*</label
-                    >
-                    <input
-                      v-model.number="dimensiones.capacidadCarga"
-                      type="number"
-                      min="0"
-                      step="1"
-                      class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      :class="
-                        touchedGeneral.capacidadCarga && !validCapacidad
-                          ? 'border-red-400'
-                          : 'border-gray-300'
-                      "
-                      @blur="touchedGeneral.capacidadCarga = true"
-                    />
-                    <p
-                      v-if="touchedGeneral.capacidadCarga && !validCapacidad"
-                      class="mt-1 text-xs text-red-600"
-                    >
-                      Ingresa un valor mayor a 0.
-                    </p>
+                  <!-- Ancho y Capacidad -->
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Ancho (m)*</label>
+                      <input
+                        v-model.number="dimensiones.ancho"
+                        type="number"
+                        min="0.1"
+                        step="0.1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.ancho && !validAncho ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.ancho = true"
+                        @blur="touchedGeneral.ancho = true"
+                      />
+                      <p v-if="touchedGeneral.ancho && !validAncho" class="mt-1 text-xs text-red-600">Ingresa un valor mayor a 0.</p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Capacidad de carga (kg)*</label>
+                      <input
+                        v-model.number="dimensiones.capacidadCarga"
+                        type="number"
+                        min="0"
+                        step="1"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="touchedGeneral.capacidadCarga && !validCapacidad ? 'border-red-400' : 'border-gray-300'"
+                        @input="touchedGeneral.capacidadCarga = true"
+                        @blur="touchedGeneral.capacidadCarga = true"
+                      />
+                      <p v-if="touchedGeneral.capacidadCarga && !validCapacidad" class="mt-1 text-xs text-red-600">Ingresa un valor mayor a 0.</p>
+                    </div>
                   </div>
-                </div>
+                </template>
               </div>
             </div>
           </div>
@@ -266,6 +383,15 @@
             </div>
 
             <div class="space-y-6 overflow-y-auto flex-1">
+              <!-- Errores agregados de sumas globales -->
+              <div v-if="excesoAltoNiveles || excesoCapacidadNiveles" class="mb-2 space-y-1">
+                <p v-if="excesoAltoNiveles" class="text-xs text-red-600">
+                  La suma de los altos de los {{ modo === 'cuarto' ? 'pisos' : 'niveles' }} excede el alto total ({{ dimensiones.alto }} m)
+                </p>
+                <p v-if="excesoCapacidadNiveles" class="text-xs text-red-600">
+                  La suma de las capacidades de carga excede la capacidad total ({{ dimensiones.capacidadCarga }} kg)
+                </p>
+              </div>
               <div
                 v-for="(pisoNivel, index) in pisosNiveles"
                 :key="pisoNivel.id"
@@ -325,7 +451,7 @@
 
                 <div class="space-y-4">
                   <!-- Nombre -->
-                  <div>
+                    <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                       Nombre del {{ modo === 'cuarto' ? 'piso' : 'nivel' }}
                     </label>
@@ -360,8 +486,12 @@
                         type="number"
                         min="0.10"
                         step="any"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="excedeLargo(pisoNivel) ? 'border-red-400' : 'border-gray-300'"
                       />
+                      <p v-if="excedeLargo(pisoNivel)" class="mt-1 text-xs text-red-600">
+                        El largo excede el largo total ({{ dimensiones.largo || 0 }} m)
+                      </p>
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-2">Alto (m)</label>
@@ -384,8 +514,12 @@
                         type="number"
                         min="0.10"
                         step="any"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        :class="excedeAncho(pisoNivel) ? 'border-red-400' : 'border-gray-300'"
                       />
+                      <p v-if="excedeAncho(pisoNivel)" class="mt-1 text-xs text-red-600">
+                        El ancho excede el ancho total ({{ dimensiones.ancho || 0 }} m)
+                      </p>
                     </div>
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-2"
@@ -499,7 +633,7 @@
                           </div>
                           <ul class="p-2 space-y-1">
                             <li
-                              v-for="opt in TIPOS_PRODUCTO_ADMITIDOS"
+                              v-for="opt in catalogos.tiposProductoAdmitidos"
                               :key="opt.id"
                               class="px-2 py-1 rounded hover:bg-gray-50"
                             >
@@ -596,8 +730,7 @@
         </button>
         <button
           @click="guardar"
-          :disabled="!esFormularioValido"
-          class="bg-primary cursor-pointer px-4 py-2 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          class="bg-primary cursor-pointer px-4 py-2 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
           Aceptar
         </button>
@@ -620,15 +753,15 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import {
   FORMAS_DISPONIBLES,
-  TIPOS_CUARTO,
-  TIPOS_ESPACIO,
   TIPOS_ZONA_CUARTO,
   TIPOS_ZONA_ESPACIO,
-  TIPOS_PRODUCTO_ADMITIDOS,
   ORIENTACIONES,
+  UBICACIONES_DISPONIBLES,
 } from '@/inventory-smart/utils/constants'
 import UiTooltip from './ui/UiTooltip.vue'
 
@@ -638,9 +771,13 @@ const setDropdownRef = (id, el) => {
   if (el) dropdownRefs.set(id, el)
 }
 
-const mapaTiposProducto = Object.fromEntries(
-  (TIPOS_PRODUCTO_ADMITIDOS || []).map((t) => [t.id, t.nombre]),
-)
+// Catálogos dinámicos desde el store
+const canvasStore = useCanvasStore()
+const { catalogos } = storeToRefs(canvasStore)
+
+const mapaTiposProducto = computed(() => Object.fromEntries(
+  (catalogos.value.tiposProductoAdmitidos || []).map((t) => [t.id, t.nombre])
+))
 
 const handleClickOutside = (e) => {
   if (!openDropdownId.value) return
@@ -676,6 +813,11 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
 })
 
+// Helpers locales desde catálogos dinámicos
+const TIPOS_PRODUCTO_ADMITIDOS_LOCAL = computed(() => catalogos.value.tiposProductoAdmitidos || [])
+const TIPOS_CUARTO_LOCAL = computed(() => catalogos.value.tiposCuarto || [])
+const TIPOS_ESPACIO_LOCAL = computed(() => catalogos.value.tiposEspacio || [])
+
 const toggleTipoProducto = (pisoNivel, id) => {
   if (!Array.isArray(pisoNivel.tiposProductos)) pisoNivel.tiposProductos = []
   const idx = pisoNivel.tiposProductos.indexOf(id)
@@ -684,7 +826,7 @@ const toggleTipoProducto = (pisoNivel, id) => {
 }
 
 const seleccionarTodosTipos = (pisoNivel) => {
-  pisoNivel.tiposProductos = TIPOS_PRODUCTO_ADMITIDOS.map((t) => t.id)
+  pisoNivel.tiposProductos = (catalogos.value.tiposProductoAdmitidos || []).map((t) => t.id)
 }
 
 const limpiarTipos = (pisoNivel) => {
@@ -702,6 +844,11 @@ const props = defineProps({
     required: true,
     validator: (value) => ['cuarto', 'espacio'].includes(value),
   },
+  // Formulario inicial opcional para modo edición
+  initialForm: {
+    type: Object,
+    default: null,
+  },
 })
 
 const emit = defineEmits(['close', 'save'])
@@ -714,6 +861,8 @@ const datosGenerales = ref({
   tipoSeleccionado: '',
   descripcion: '',
   orientacion: '',
+  ubicacion: '',
+  alturaRespectoAlSuelo: null,
 })
 
 const dimensiones = ref({
@@ -724,12 +873,17 @@ const dimensiones = ref({
   capacidadCarga: null,
 })
 
+// Diámetro (solo aplica si forma === 'circular')
+const diametro = ref(null)
+
 const pisosNiveles = ref([])
 
 const touchedGeneral = ref({
   nombre: false,
   tipoSeleccionado: false,
   orientacion: false,
+  ubicacion: false,
+  alturaRespectoAlSuelo: false,
   forma: false,
   largo: false,
   alto: false,
@@ -739,20 +893,67 @@ const touchedGeneral = ref({
 const validNombre = computed(() => datosGenerales.value.nombre.trim() !== '')
 const validTipo = computed(() => datosGenerales.value.tipoSeleccionado !== '')
 const validOrientacion = computed(() => datosGenerales.value.orientacion !== '')
+const validUbicacion = computed(() => datosGenerales.value.ubicacion !== '')
+const validAlturaRespectoAlSuelo = computed(() => {
+  // Obligatorio solo cuando es espacio y ubicación = 'pared'
+  if (props.modo !== 'espacio') return true
+  if (datosGenerales.value.ubicacion !== 'pared') return true
+  const v = Number(datosGenerales.value.alturaRespectoAlSuelo)
+  return Number.isFinite(v) && v > 0
+})
 const validForma = computed(() => dimensiones.value.forma !== '')
 const validLargo = computed(() => Number(dimensiones.value.largo) > 0)
 const validAlto = computed(() => Number(dimensiones.value.alto) > 0)
 const validAncho = computed(() => Number(dimensiones.value.ancho) > 0)
 const validCapacidad = computed(() => Number(dimensiones.value.capacidadCarga) > 0)
 
+// Mantener ancho y largo iguales cuando sea circular
+watch(
+  () => dimensiones.value.forma,
+  (nueva) => {
+    if (nueva === 'circular') {
+      // Inicializar diametro tomando el ancho o largo existente
+      const base = Number(dimensiones.value.ancho) || Number(dimensiones.value.largo) || null
+      if (base) {
+        diametro.value = base
+        dimensiones.value.ancho = base
+        dimensiones.value.largo = base
+      } else {
+        diametro.value = null
+      }
+    }
+  }
+)
+
+watch(
+  () => diametro.value,
+  (nuevo) => {
+    if (dimensiones.value.forma === 'circular' && Number(nuevo) > 0) {
+      dimensiones.value.ancho = Number(nuevo)
+      dimensiones.value.largo = Number(nuevo)
+    }
+  }
+)
+
+// Si el usuario cambia manualmente ancho estando circular (por autofill u otros), reflejar
+watch(
+  () => dimensiones.value.ancho,
+  (nuevoAncho) => {
+    if (dimensiones.value.forma === 'circular' && Number(nuevoAncho) > 0) {
+      dimensiones.value.largo = Number(nuevoAncho)
+      diametro.value = Number(nuevoAncho)
+    }
+  }
+)
+
 const ensureTouchedForLevel = (nivel) => {
   if (!nivel._touched) nivel._touched = { tiposProductos: false, tipoZona: false, nombre: false }
   return nivel._touched
 }
 
-// Computed
 const tiposDisponibles = computed(() => {
-  return props.modo === 'cuarto' ? TIPOS_CUARTO : TIPOS_ESPACIO
+  const tipos = props.modo === 'cuarto' ? catalogos.value.tiposCuarto : catalogos.value.tiposEspacio
+  return tipos.filter((t) => t.id !== 'pasillo')
 })
 
 const formasDisponibles = computed(() => {
@@ -784,8 +985,14 @@ const tiposZonaUI = computed(() => {
 const esFormularioValido = computed(() => {
   const dg = datosGenerales.value
   const dim = dimensiones.value
-  const hasGeneral =
-    dg.nombre.trim() !== '' && dg.tipoSeleccionado !== '' && dg.color && dg.orientacion !== ''
+
+  let hasGeneral = dg.nombre.trim() !== '' && dg.tipoSeleccionado !== '' && dg.color && dg.orientacion !== ''
+
+  // Para espacios, también validar ubicación y, si es pared, alturaRespectoAlSuelo
+  if (props.modo === 'espacio') {
+    hasGeneral = hasGeneral && dg.ubicacion !== '' && validAlturaRespectoAlSuelo.value
+  }
+
   const hasDims =
     dim.forma !== '' && dim.largo > 0 && dim.alto > 0 && dim.ancho > 0 && dim.capacidadCarga > 0
   // En niveles/pisos, solo los campos de "Características" son obligatorios (tipoZona). Los demás se auto-calculan.
@@ -845,45 +1052,101 @@ const autoCompletarDimensionesNiveles = () => {
   })
 }
 
-const validarNivelesContraGlobal = () => {
-  const errs = []
-  const eps = 1e-6
-  const largoG = Number(dimensiones.value.largo)
-  const anchoG = Number(dimensiones.value.ancho)
+// Validaciones en tiempo real para niveles
+const eps = 1e-6
+const excesoAltoNiveles = computed(() => {
   const altoG = Number(dimensiones.value.alto)
+  if (!(altoG > 0)) return false
+  const sumaAlto = pisosNiveles.value.reduce((acc, p) => acc + Number(p.alto || 0), 0)
+  return sumaAlto > altoG + eps
+})
+const excesoCapacidadNiveles = computed(() => {
   const capG = Number(dimensiones.value.capacidadCarga)
-
-  let sumaAlto = 0
-  let sumaCap = 0
-  pisosNiveles.value.forEach((p, idx) => {
-    if (p.largo > largoG + eps)
-      errs.push(
-        `El largo del ${props.modo === 'cuarto' ? 'piso' : 'nivel'} ${idx + 1} excede el largo total`,
-      )
-    if (p.ancho > anchoG + eps)
-      errs.push(
-        `El ancho del ${props.modo === 'cuarto' ? 'piso' : 'nivel'} ${idx + 1} excede el ancho total`,
-      )
-    sumaAlto += Number(p.alto || 0)
-    sumaCap += Number(p.capacidadCarga || 0)
-  })
-  if (Math.abs(sumaAlto - altoG) > eps)
-    errs.push('La suma de los altos de los niveles/pisos no coincide con el alto total')
-  if (Math.abs(sumaCap - capG) > eps)
-    errs.push(
-      'La suma de las capacidades de carga de los niveles/pisos no coincide con la capacidad total',
-    )
-  return errs
+  if (!(capG > 0)) return false
+  const sumaCap = pisosNiveles.value.reduce((acc, p) => acc + Number(p.capacidadCarga || 0), 0)
+  return sumaCap > capG + eps
+})
+const excedeLargo = (p) => {
+  const largoG = Number(dimensiones.value.largo)
+  if (!(largoG > 0)) return false
+  return Number(p.largo) > largoG + eps
+}
+const excedeAncho = (p) => {
+  const anchoG = Number(dimensiones.value.ancho)
+  if (!(anchoG > 0)) return false
+  return Number(p.ancho) > anchoG + eps
 }
 
 // Métodos
 const inicializarFormulario = () => {
+  // Si viene un formulario inicial (editar), poblar desde ahí
+  const f = props.initialForm
+  if (f && typeof f === 'object') {
+    // Modo lo controla el padre, aquí solo tomamos los valores
+    const dg = f.datosGenerales || {}
+    datosGenerales.value = {
+      nombre: dg.nombre || '',
+      color: dg.color || '#3B82F6',
+      tipoSeleccionado: dg.tipoSeleccionado || '',
+      descripcion: dg.descripcion || '',
+      orientacion: dg.orientacion || '',
+      ubicacion: props.modo === 'espacio' ? (dg.ubicacion || '') : '',
+      alturaRespectoAlSuelo:
+        props.modo === 'espacio' && dg.ubicacion === 'pared'
+          ? (typeof dg.alturaRespectoAlSuelo === 'number' ? dg.alturaRespectoAlSuelo : null)
+          : null,
+    }
+
+    const dim = f.dimensiones || {}
+    dimensiones.value = {
+      forma: dim.forma || '',
+      largo: dim.largo ?? null,
+      alto: dim.alto ?? null,
+      ancho: dim.ancho ?? null,
+      capacidadCarga: dim.capacidadCarga ?? null,
+    }
+
+    const niveles = Array.isArray(f.pisosNiveles) ? f.pisosNiveles : []
+    pisosNiveles.value = niveles.length
+      ? niveles.map((n, idx) => ({
+          id: idx + 1,
+          nombre: n.nombre || `${props.modo === 'cuarto' ? 'Piso' : 'Nivel'} ${idx + 1}`,
+          largo: n.largo ?? null,
+          alto: n.alto ?? null,
+          ancho: n.ancho ?? null,
+          capacidadCarga: n.capacidadCarga ?? null,
+          tiposProductos: Array.isArray(n.tiposProductos) ? n.tiposProductos.slice() : [],
+          tipoZona: n.tipoZona || 'almacenaje',
+          permiteFragiles: !!n.permiteFragiles,
+          _touched: { tiposProductos: false, tipoZona: false, nombre: false },
+        }))
+      : [
+          {
+            id: 1,
+            nombre: `${props.modo === 'cuarto' ? 'Piso' : 'Nivel'} 1`,
+            largo: null,
+            alto: null,
+            ancho: null,
+            capacidadCarga: null,
+            tiposProductos: [],
+            tipoZona: 'almacenaje',
+            permiteFragiles: false,
+            _touched: { tiposProductos: false, tipoZona: false, nombre: false },
+          },
+        ]
+    resetTouched()
+    return
+  }
+
+  // Caso creación (sin formulario inicial)
   datosGenerales.value = {
     nombre: '',
     color: '#3B82F6',
     tipoSeleccionado: '',
     descripcion: '',
     orientacion: '',
+    ubicacion: '',
+    alturaRespectoAlSuelo: null,
   }
 
   dimensiones.value = {
@@ -944,6 +1207,8 @@ const resetTouched = () => {
     nombre: false,
     tipoSeleccionado: false,
     orientacion: false,
+    ubicacion: false,
+    alturaRespectoAlSuelo: false,
     forma: false,
     largo: false,
     alto: false,
@@ -960,16 +1225,29 @@ const cerrarModal = () => {
   emit('close')
 }
 
+const marcarTodoInvalido = () => {
+  Object.keys(touchedGeneral.value).forEach(k => touchedGeneral.value[k] = true)
+  pisosNiveles.value.forEach(p => {
+    ensureTouchedForLevel(p)
+    p._touched.nombre = true
+    p._touched.tiposProductos = true
+    p._touched.tipoZona = true
+  })
+}
+
 const guardar = () => {
-  if (!esFormularioValido.value) return
+  // Si algo es inválido, marcar y salir
+  if (!esFormularioValido.value) {
+    marcarTodoInvalido()
+    return
+  }
 
   // Completar automáticamente dimensiones faltantes de niveles
   autoCompletarDimensionesNiveles()
 
-  // Validar consistencia respecto a dimensiones globales
-  const errores = validarNivelesContraGlobal()
-  if (errores.length > 0) {
-    showError(errores.join('\n'))
+  // Validar excedentes después de autocompletar
+  if (excesoAltoNiveles.value || excesoCapacidadNiveles.value || pisosNiveles.value.some(p => excedeLargo(p) || excedeAncho(p))) {
+    marcarTodoInvalido()
     return
   }
 
@@ -979,7 +1257,6 @@ const guardar = () => {
     pisosNiveles: pisosNiveles.value,
     modo: props.modo,
   }
-
   emit('save', datos)
   cerrarModal()
 }
@@ -991,6 +1268,14 @@ watch(
       inicializarFormulario()
     }
   },
+)
+
+watch(
+  () => props.initialForm,
+  (val) => {
+    if (props.visible && val) inicializarFormulario()
+  },
+  { deep: true },
 )
 
 inicializarFormulario()

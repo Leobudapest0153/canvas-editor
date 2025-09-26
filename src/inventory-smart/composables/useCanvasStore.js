@@ -1,3 +1,5 @@
+import { generateCodigo, generateNombre } from '@/inventory-smart/utils/codeNameGenerator.js'
+import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
 /**
  * useCanvasStore.js
  *
@@ -16,7 +18,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX, DIMENSIONS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
@@ -26,9 +28,11 @@ import {
   validateZStacking,
   errorsPlacement,
 } from '@/inventory-smart/validation/placementOrchestrator'
+import { proposeLevelChange, applyLevelChange } from '@/inventory-smart/composables/useLevelStacking'
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'
+import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
 import { exportCatalogItemsToDTO, importCatalogItemsFromDTO } from '@/inventory-smart/modules/catalog/catalogItems.serializer.js'
 
 export const useCanvasStore = defineStore('canvas', () => {
@@ -37,6 +41,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Instancia del catálogo
   const catalogStore = useCatalogStore()
+  const changeHistoryStore = useChangeHistoryStore?.() // opcional durante init
 
   // === INTEGRACIÓN CON HISTORIAL ===
   // Instancia del historial - se establece desde useCanvasWithHistory
@@ -55,7 +60,9 @@ export const useCanvasStore = defineStore('canvas', () => {
         ancho: 1500, // cm
         largo: 1500, // cm
       },
-      pesoMaximoSoportado: 5000, // kg
+      capacidadCargaSoportado: 5000, // kg
+      // Nuevo flag para plantas elásticas (por defecto false)
+      isInfinite: false,
       poligono: [
         {
           x: 0,
@@ -112,7 +119,36 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Edición de niveles
   const nivelAEditar = ref(null);
 
+  const confirmacionAlturasNivelesModal = ref(false);
+  const propuestaAlturasNiveles = ref(null);
+
   const isDraggable = ref(true)
+
+  // === CATÁLOGOS DINÁMICOS (persistidos via useStatePersistence) ===
+  const catalogos = ref({
+    tiposEspacio: DEFAULT_TIPOS_ESPACIO,
+    tiposCuarto: DEFAULT_TIPOS_CUARTO,
+    tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+  })
+
+  const setCatalogos = (cats) => {
+    try {
+      const safe = {
+        tiposEspacio: Array.isArray(cats?.tiposEspacio) ? cats.tiposEspacio : DEFAULT_TIPOS_ESPACIO,
+        tiposCuarto: Array.isArray(cats?.tiposCuarto) ? cats.tiposCuarto : DEFAULT_TIPOS_CUARTO,
+        tiposProductoAdmitidos: Array.isArray(cats?.tiposProductoAdmitidos)
+          ? cats.tiposProductoAdmitidos
+          : DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+      }
+      catalogos.value = safe
+    } catch {
+      catalogos.value = {
+        tiposEspacio: DEFAULT_TIPOS_ESPACIO,
+        tiposCuarto: DEFAULT_TIPOS_CUARTO,
+        tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
+      }
+    }
+  }
   // Configuración de grilla y snap
   // Por defecto desactivamos la cuadrícula (0 = sin cuadricula visual ni snap a grilla)
   const gridSize = ref(0) // px entre líneas de grilla (0 desactiva)
@@ -338,14 +374,12 @@ export const useCanvasStore = defineStore('canvas', () => {
     const elemento = elementoPorId.value(elementoId)
     if (!elemento) {
       showToast('Elemento no encontrado')
-      console.error('Elemento no encontrado:', elementoId)
       return
     }
 
     // Verificar que el elemento sea navegable: cuartos, pisos, elementos
     if (!['cuartos', 'pisos', 'elementos'].includes(elemento.tipo)) {
       showToast('Este elemento no permite navegación')
-      console.error('No navegable:', elemento.tipo)
       return
     }
 
@@ -356,7 +390,18 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     // Actualizar contexto de navegación
-    const nuevoPath = [...contextoNavegacion.value.path]
+    let nuevoPath = [...contextoNavegacion.value.path]
+    if (nuevoPath.length === 0) {
+      // Buscar la planta raíz activa
+      const planta = plantaPorId.value(plantaActiva.value)
+      if (planta) {
+        nuevoPath.push({
+          tipo: 'plantas',
+          id: planta.id,
+          nombre: planta.nombre,
+        })
+      }
+    }
     nuevoPath.push({
       tipo: elemento.tipo,
       id: elementoId,
@@ -461,7 +506,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     const planta = plantaPorId.value(plantaId)
     if (!planta) {
       showToast('Planta no encontrada')
-      console.error('Planta no encontrada:', plantaId)
       return
     }
 
@@ -540,7 +584,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const defaultHeight = elemento.tipo === 'contenedores' ? 40 : 60
       elementWidthPx = defaultWidth * CM_TO_PX
       elementHeightPx = defaultHeight * CM_TO_PX
-      console.log('Usando dimensiones por defecto')
+      console.warn('Usando dimensiones por defecto')
     }
 
     // El canvas muestra el espacio real del elemento
@@ -552,23 +596,72 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   const calcularCanvasAdaptativoPlanta = (planta) => {
-    // Calcular tamaño del canvas basado en las dimensiones de la planta
+    // Calcular tamaño y origen del canvas basado en la planta activa
     if (!planta) {
-      // Fallback por defecto
       canvasAdaptativo.value = {
         width: 800,
         height: 600,
         escala: 1,
+        frame: { x: 0, y: 0, width: 800, height: 600 },
       }
       return
     }
 
-    // Convertir dimensiones de cm a pixels usando la constante CM_TO_PX
-    // Para plantas, usamos la conversión directa 1:1 (sin factor de escala adicional)
+    const dims = planta.dimensiones || {}
+    const widthPxFromDims = (Number(dims.ancho) || 0) * CM_TO_PX
+    const heightPxFromDims = (Number(dims.largo) || 0) * CM_TO_PX
+
+    let originX = 0
+    let originY = 0
+    let frameWidth = widthPxFromDims
+    let frameHeight = heightPxFromDims
+
+    if (Array.isArray(planta.poligono) && planta.poligono.length >= 3) {
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+
+      for (const point of planta.poligono) {
+        const x = Number(point?.x ?? point?.[0])
+        const y = Number(point?.y ?? point?.[1])
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+        minX = Math.min(minX, x)
+        minY = Math.min(minY, y)
+        maxX = Math.max(maxX, x)
+        maxY = Math.max(maxY, y)
+      }
+
+      if (
+        Number.isFinite(minX) &&
+        Number.isFinite(minY) &&
+        Number.isFinite(maxX) &&
+        Number.isFinite(maxY) &&
+        maxX > minX &&
+        maxY > minY
+      ) {
+        originX = Math.floor(minX)
+        originY = Math.floor(minY)
+        frameWidth = Math.max(1, Math.ceil(maxX) - originX)
+        frameHeight = Math.max(1, Math.ceil(maxY) - originY)
+      }
+    }
+
+    if (!Number.isFinite(frameWidth) || frameWidth <= 0) frameWidth = widthPxFromDims || 0
+    if (!Number.isFinite(frameHeight) || frameHeight <= 0) frameHeight = heightPxFromDims || 0
+
     canvasAdaptativo.value = {
-      width: planta.dimensiones.ancho * CM_TO_PX, // ancho = x
-      height: planta.dimensiones.largo * CM_TO_PX, // largo = y
-      escala: CM_TO_PX, // La escala es la conversión cm->px
+      width: frameWidth || widthPxFromDims,
+      height: frameHeight || heightPxFromDims,
+      escala: CM_TO_PX,
+      originX,
+      originY,
+      frame: {
+        x: originX,
+        y: originY,
+        width: frameWidth || widthPxFromDims,
+        height: frameHeight || heightPxFromDims,
+      },
     }
   }
 
@@ -593,6 +686,66 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }
   }
+
+  // Actualización directa SIN validaciones de colocación/vecinos.
+  // patch típico: { dimensiones: { alto: number, ancho?: number, largo?: number }, alturaRespectoAlSuelo?: number }
+  const actualizarElementoSinValidacion = (id, patch = {}, description = 'Actualización sin validación') => {
+    try {
+      const idx = elementos.value.findIndex(e => e && e.id === id);
+      if (idx === -1) {
+        console.warn('Elemento no encontrado:', id);
+        return false;
+      }
+
+      const prev = elementos.value[idx];
+
+      const next = {
+        ...prev,
+        ...patch,
+        dimensiones: {
+          ...(prev?.dimensiones || {}),
+          ...(patch?.dimensiones || {}),
+        },
+      };
+
+      // Normalizaciones en cm
+      if (next.dimensiones) {
+        for (const k of ['ancho', 'largo', 'alto']) {
+          if (next.dimensiones[k] != null && Number.isFinite(Number(next.dimensiones[k]))) {
+            next.dimensiones[k] = Math.round(Number(next.dimensiones[k]));
+          }
+        }
+      }
+      if (patch.alturaRespectoAlSuelo != null && Number.isFinite(Number(patch.alturaRespectoAlSuelo))) {
+        next.alturaRespectoAlSuelo = Math.max(0, Math.round(Number(patch.alturaRespectoAlSuelo)));
+      }
+
+      // Normalizaciones en px
+      for (const k of ['x', 'y', 'width', 'height']) {
+        if (patch[k] != null && Number.isFinite(Number(patch[k]))) {
+          let v = Math.round(Number(patch[k]));
+          if (k === 'width' || k === 'height') v = Math.max(1, v);
+          if (k === 'x' || k === 'y') v = Math.max(0, v);
+          next[k] = v;
+        }
+      }
+
+      elementos.value.splice(idx, 1, next);
+
+      // if (saveHistory) {
+      //   if (typeof registrarEnHistorial === 'function') {
+      //     registrarEnHistorial({ tipo: 'update', id, antes: prev, despues: next, descripcion: description });
+      //   } else if (typeof addToHistory === 'function') {
+      //     addToHistory({ type: 'update', id, before: prev, after: next, description });
+      //   }
+      // }
+
+      return true;
+    } catch (err) {
+      console.error('Error:', err);
+      return false;
+    }
+  };
 
   const actualizarElemento = (elementoId, propiedades, saveHistory = false, description = null) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
@@ -651,7 +804,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     try {
       const state = {
         plantas: plantas.value,
-        elementos: elementos.value
+        elementos: elementos.value,
+        catalogos: catalogos.value,
       }
       const data = _serialize(state)
       return _persist(data)
@@ -750,8 +904,14 @@ export const useCanvasStore = defineStore('canvas', () => {
   const agregarPlanta = (nuevaPlanta) => {
     const id = `planta_${Date.now()}`
 
+    // Asignar código a la planta (secuencial PLA-###)
+    let codigo = undefined
+    const existentes = Array.isArray(plantas.value) ? plantas.value : []
+    codigo = generateCodigo('plantas', { existing: existentes })
+
     plantas.value.push({
       id,
+      codigo,
       nombre: nuevaPlanta.nombre || 'Nueva Planta',
       descripcion: nuevaPlanta.descripcion || '',
       elementos: [],
@@ -761,7 +921,9 @@ export const useCanvasStore = defineStore('canvas', () => {
         ancho: nuevaPlanta.dimensiones?.ancho || 0,
         largo: nuevaPlanta.dimensiones?.largo || 0,
       },
-      pesoMaximoSoportado: nuevaPlanta.pesoMaximoSoportado || 3000,
+      capacidadCargaSoportado: nuevaPlanta.capacidadCargaSoportado || 3000,
+      // Flag de planta elástica: por defecto false
+      isInfinite: false,
       ...nuevaPlanta,
     })
     return id
@@ -861,9 +1023,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   // Actions para elementos
-  const agregarElemento = (nuevoElemento) => {
-    console.log('Agregando elemento al store:', nuevoElemento)
-
+  const agregarElemento = (nuevoElemento, opts = {}) => {
     const ubic = (
       nuevoElemento.ubicacion ||
       nuevoElemento.ubic ||
@@ -905,11 +1065,11 @@ export const useCanvasStore = defineStore('canvas', () => {
       return null
     }
     if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
-      showToast('En elementos solo se pueden agregar contenedores')
+      showToast('En elementos solo se pueden agregar niveles')
       return null
     }
     if (contextoActual === 'contenedores') {
-      showToast('Los contenedores no pueden contener nada')
+      showToast('Los niveles no pueden contener más elementos')
       return null
     }
 
@@ -937,6 +1097,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       nuevoElemento.plantaId = contextoNavegacion.value.id
       nuevoElemento.padre = null
       nuevoElemento.etiquetas = [] // Sin etiquetas inicialmente
+      nuevoElemento.codigoEsl = '' // Sin código ESL inicialmente
 
       // Actualizar el array de elementos en la planta
       const planta = plantas.value.find((p) => p.id === contextoNavegacion.value.id)
@@ -962,9 +1123,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       const shouldAuto = true
       if (shouldAuto && ['cuartos','pisos','elementos','pasillos'].includes(nuevoElemento.tipo)) {
         const typeKey = nuevoElemento.systemTypeKey || nuevoElemento.id
-        const isSystemDefault = !!(
-          typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey)
-        )
+        const isSystemDefault = !!(typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey))
         const isLocked = nuevoElemento.dimensionLock === true
         if (isSystemDefault && !isLocked) {
           const planta = plantas.value.find((p) => p.id === nuevoElemento.plantaId)
@@ -994,6 +1153,20 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     } catch (e) {
       console.warn('Auto-scale on create failed:', e)
+    }
+
+    // Asignación unificada de 'codigo' y nombre (pasillos)
+    try {
+      assignCodigoNombre(nuevoElemento, elementos.value, opts)
+    } catch (e) {
+      console.warn('No se pudo generar codigo/nombre:', e)
+      if (!nuevoElemento.codigo) {
+        try {
+          const pref = (nuevoElemento?.tipo || 'ELM').toString().slice(0, 3).toUpperCase()
+          const count = elementos.value.filter((el) => (el?.tipo || '').toLowerCase() === (nuevoElemento?.tipo || '').toLowerCase()).length + 1
+          nuevoElemento.codigo = `${pref}-${String(count).padStart(3, '0')}`
+        } catch { nuevoElemento.codigo = 'ELM-001' }
+      }
     }
 
     elementos.value.push(nuevoElemento)
@@ -1069,7 +1242,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const setHistoryInstance = (historyComposableInstance) => {
     historyInstance.value = historyComposableInstance
-    console.log('🔗 Instancia de historial establecida en el store')
   }
 
   /**
@@ -1087,14 +1259,23 @@ export const useCanvasStore = defineStore('canvas', () => {
    * Serializa el estado completo del canvas a JSON
    * @returns {string} JSON string con todo el estado
    */
-  const serialize = () => {
+  const serialize = (saveTimestamp = false) => {
     const state = {
       plantas: plantas.value.map(p => p?._custom?.value || p),
       elementos: elementos.value.map(e => e?._custom?.value || e),
       templates: catalogStore.templates?.map?.(t => t?._custom?.value || t) || [],
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
+      catalogos: catalogos.value,
     }
-    const jsonStr = _serialize(state)
+    // Incluir historial de cambios si existe
+    try {
+      const ch = changeHistoryStore?.serialize?.()
+      if (ch) state.changeHistory = ch
+    } catch (e) {
+      // ignore change history serialization errors
+    }
+
+    const jsonStr = _serialize(state, { validateBeforeSerialize: true, includeMetrics: true, saveTimestamp })
     try {
       const parsed = JSON.parse(jsonStr)
       if (state.templates.length > 0) {
@@ -1137,6 +1318,9 @@ export const useCanvasStore = defineStore('canvas', () => {
       addElemento: (elementoData) => {
         elementos.value.push(elementoData)
       },
+      setCatalogos: (cats) => {
+        setCatalogos(cats)
+      },
       setInitialNavigation: (plantaId, plantaNombre) => {
         // Establecer la primera planta como activa siempre
         plantaActiva.value = plantaId
@@ -1164,11 +1348,44 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }
 
-    const ok = _deserialize(jsonString, storeActions)
+  const ok = _deserialize(jsonString, storeActions)
+
+    // Post-procesar: garantizar que todas las plantas y elementos tengan 'codigo'
+    try {
+      // Plantas: asignar códigos únicos incrementando la lista existente a medida que asignamos
+      if (Array.isArray(plantas.value)) {
+        const existentes = plantas.value.filter(p => !!p)
+        const existentesConCodigo = existentes.filter(p => !!p.codigo)
+        for (const p of existentes) {
+          if (!p.codigo) {
+            p.codigo = generateCodigo('plantas', { existing: existentesConCodigo })
+            existentesConCodigo.push(p)
+          }
+        }
+      }
+      // Elementos
+      if (Array.isArray(elementos.value)) {
+        for (const el of elementos.value) {
+          try { assignCodigoNombre(el, elementos.value) } catch { /* ignore */ }
+        }
+      }
+    } catch (e) {
+      console.warn('Post-procesamiento de codigo/nombre tras deserializar falló:', e)
+    }
 
     // Importar plantillas si existen (retrocompatible)
     try {
       const parsed = JSON.parse(jsonString)
+      // Importar historial de cambios si viene
+      try {
+        if (parsed.changeHistory) {
+          const ch = useChangeHistoryStore?.()
+          ch?.deserialize?.(parsed.changeHistory)
+          ch?.setBaseline?.({ plantas: plantas.value, elementos: elementos.value })
+        }
+      } catch (e) {
+        // ignore change history import errors
+      }
       if (Array.isArray(parsed.plantillas) && parsed.plantillas.length > 0) {
         importTemplatesFromDTO(parsed.plantillas)
       }
@@ -1216,6 +1433,90 @@ export const useCanvasStore = defineStore('canvas', () => {
   const cerrarCuartoNivelesPropiedades = () => {
     gestionPisosPropiedadesModal.value = false;
     nivelAEditar.value = null;
+  }
+
+  const guardarCuartoNivelesPropiedades = (nivelActualizado, id) => {
+    if (!id) {
+      console.error('No hay ID de nivel a editar');
+      return;
+    }
+    const level = elementos.value.find(e => e.id === id);
+    if (!level) {
+      console.error('Nivel no encontrado');
+      return;
+    }
+
+    if (nivelActualizado?.dimensiones?.alto > elementos.value.find(e => e.id === level.padre)?.dimensiones?.alto) {
+      showToast('La altura del nivel no puede exceder la altura del cuarto', 'error');
+      return;
+    }
+
+    // 1) Proponer cambio (solo nos importa dimensiones aquí; alto es clave)
+    const res = proposeLevelChange(elementos.value, id, nivelActualizado || {});
+    if (res.status === 'error') {
+      showToast(res.message || 'No se pudo aplicar el cambio', 'error');
+      return;
+    }
+
+    if (res.status === 'ok') {
+      // 2) Aplicar directamente
+      const ok = applyLevelChange(
+        elementos.value,
+        res.draft,
+        'ok',
+        (eid, patch, save, desc) => actualizarElementoSinValidacion(eid, patch, save, desc)
+      );
+      if (!ok.ok) {
+        showToast(ok.message || 'Fallo aplicando el cambio', 'error');
+        return;
+      }
+      showToast('Nivel actualizado', 'success');
+      cerrarCuartoNivelesPropiedades();
+      return;
+    }
+
+    if (res.status === 'needs_confirmation') {
+      // 3) Guardar propuesta y abrir submodal de confirmación (no cerrar el modal principal)
+      propuestaAlturasNiveles.value = res.draft;
+      confirmacionAlturasNivelesModal.value = true;
+      // Opcional: notificación informativa
+      showToast('Se requiere confirmación para ajustar otros niveles', 'info');
+      return;
+    }
+  }
+
+  const confirmarPropuestaAlturasNiveles = (estrategia /* 'clamp' | 'redistribute' */) => {
+    if (!propuestaAlturasNiveles.value) {
+      showToast('No hay propuesta pendiente', 'error');
+      return false;
+    }
+    const draft = propuestaAlturasNiveles.value;
+
+    const ok = applyLevelChange(
+      elementos.value,
+      draft,
+      estrategia,
+      (eid, patch, save, desc) => actualizarElementoSinValidacion(eid, patch, save, desc)
+    );
+
+    if (!ok.ok) {
+      showToast(ok.message || 'Fallo aplicando el cambio', 'error');
+      return false;
+    }
+
+    // Limpiar estado y cerrar ambos modales
+    confirmacionAlturasNivelesModal.value = false;
+    propuestaAlturasNiveles.value = null;
+
+    showToast('Niveles ajustados', 'success');
+    cerrarCuartoNivelesPropiedades();
+    return true;
+  }
+
+  const cancelarPropuestaAlturasNiveles = () => {
+    confirmacionAlturasNivelesModal.value = false;
+    // Mantener el modal principal abierto para que el usuario corrija manualmente
+    return true;
   }
 
   /* Funciones de filtros*/
@@ -1369,7 +1670,6 @@ export const useCanvasStore = defineStore('canvas', () => {
    */
   const setAutoSaveInstance = (autoSaveComposableInstance) => {
     autoSaveInstance.value = autoSaveComposableInstance
-    console.log('💾 Instancia de autosave establecida en el store')
   }
 
 
@@ -1418,6 +1718,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     elementoAura,
     isDraggable,
     cambiosNoAplicados,
+  // Catálogos dinámicos
+  catalogos,
+  setCatalogos,
     gestionPisosPropiedadesModal,
     nivelAEditar,
 
@@ -1515,5 +1818,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     // == Edición de plantas desde las propiedades
     abrirCuartoNivelesPropiedades,
     cerrarCuartoNivelesPropiedades,
+    guardarCuartoNivelesPropiedades,
+    confirmarPropuestaAlturasNiveles,
+    cancelarPropuestaAlturasNiveles,
+    propuestaAlturasNiveles,
+    confirmacionAlturasNivelesModal,
+    actualizarElementoSinValidacion,
   }
 })

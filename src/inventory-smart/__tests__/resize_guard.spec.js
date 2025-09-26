@@ -101,7 +101,7 @@ describe('PlantasPanel - snapshot solo en confirmaciones', () => {
         elementos: [],
         activa: true,
         dimensiones: { ancho: 200, largo: 200, alto: 280 },
-        pesoMaximoSoportado: 3000,
+        capacidadCargaSoportado: 3000,
       },
     ]
     store.plantaActiva = 'planta_1'
@@ -128,7 +128,7 @@ describe('PlantasPanel - snapshot solo en confirmaciones', () => {
       nombre: 'Planta Baja',
       descripcion: '',
       dimensiones: { ancho: 180, largo: 200, alto: 280 },
-      pesoMaximoSoportado: 3000,
+      capacidadCargaSoportado: 3000,
     }
 
     wrapper.vm.onDimChange()

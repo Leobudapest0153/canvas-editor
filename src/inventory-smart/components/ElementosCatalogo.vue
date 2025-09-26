@@ -17,9 +17,9 @@
   <div class="elementos-catalogo h-full flex flex-col bg-white border-r border-gray-200">
     <!-- Header del catálogo -->
     <div class="catalogo-header p-1 border-gray-200">
-      <div class="relative px-4 mb-1">
+  <div class="relative px-4 mb-1" v-if="hayElementosEnTab">
         <div class="flex items-center justify-between" ref="filtrosBotonRef">
-          <UiTooltip label="Desplegar filtros" position="bottom" :delay="200" class="w-full">
+          <UiTooltip position="top" label="Desplegar filtros" :delay="200" class="w-full">
             <button
               @click="toggleFiltros"
               class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-700 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -53,27 +53,33 @@
                   class="w-full px-3 py-2 border rounded-md text-sm"
                 />
               </div>
+              <!-- Filtro de tipo (internamente manejado como categoria) -->
               <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Categoría</label>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
                 <select
                   v-model="categoriaSeleccionada"
                   class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white"
                 >
-                  <option :value="null">Todas</option>
+                  <option :value="null">Todos</option>
                   <option v-for="c in categoriasDisponibles" :key="c.id" :value="c.id">
                     {{ c.nombre }}
                   </option>
                 </select>
               </div>
-              <div>
+              <div v-if="modo !== 'cuarto'">
                 <label class="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
                 <select
                   v-model="ubicacionSeleccionada"
                   class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white"
                 >
                   <option value="">Todas</option>
-                  <option value="suelo">Suelo</option>
-                  <option value="pared">Pared</option>
+                  <option
+                    v-for="u in ubicacionesDisponibles"
+                    :key="u.id"
+                    :value="u.id"
+                  >
+                    {{ u.nombre }}
+                  </option>
                 </select>
               </div>
               <div class="pt-1">
@@ -113,7 +119,7 @@
               d="M12 4v16m8-8H4"
             />
           </svg>
-          <span class="ml-1 text-sm font-medium">
+          <span class="ml-1 text-sm">
             Agregar {{ modo === 'cuarto' ? 'cuarto' : 'espacio' }}
           </span>
         </button></UiTooltip
@@ -135,25 +141,28 @@
               elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria),
           }"
         >
+          <!-- Botón de acciones (tres puntos) -->
+          <button
+            type="button"
+            class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded cursor-pointer"
+            aria-haspopup="menu"
+            :aria-expanded="kebabMenu.visible && kebabMenu.item?.id === elemento.id ? 'true' : 'false'"
+            :aria-controls="`el-menu-${elemento.id}`"
+            title="Acciones"
+            v-if="!isKebabRestricted(elemento)"
+            @click.stop="toggleKebab($event, elemento)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+              <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 14a1.5 1.5 0 110 3 1.5 1.5 0 010-3z" />
+            </svg>
+          </button>
           <!-- Preview del elemento -->
-          <div class="elemento-preview flex items-center justify-center mb-3">
-            <div
-              :class="[
-                'preview-shape rounded flex items-center justify-center relative shadow-sm border border-white/20',
-                getShapeClass(elemento.forma),
-                elemento.forma === 'circular' ? 'w-10 h-10' : 'w-12 h-8',
-              ]"
-              :style="{
-                backgroundColor:
-                  elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria),
-              }"
-            >
-              <component :is="getIconComponent(elemento.icono)" class="w-4 h-4 text-white" />
-              <span
-                v-if="elemento.ubicacion === 'pared'"
-                class="absolute -top-1 -right-1 w-2 h-2 bg-orange-500 rounded-full"
-              ></span>
-            </div>
+          <div class="flex items-center justify-center mb-3">
+            <component
+              :is="getIconComponentForElement(elemento)"
+              :backgroundColor="elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria)"
+              class="w-12 h-8"
+            />
           </div>
 
           <!-- Información del elemento -->
@@ -175,7 +184,7 @@
               </div>
               <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
-                <span class="spec-value text-gray-700">{{ elemento.pesoMaximo }}kg</span>
+                <span class="spec-value text-gray-700">{{ elemento.capacidadCarga }}kg</span>
               </div>
               <!-- <div class="spec-item flex justify-between text-xs">
                 <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
@@ -186,14 +195,17 @@
             <!-- Badge de tipo y categoría -->
             <div class="mt-2 flex gap-1">
               <span
-                class="inline-block px-2 py-1 text-xs rounded-full text-white"
-                :style="{ backgroundColor: getColorPorTipo(elemento.tipo) }"
+                class="inline-block px-2 py-1 text-xs rounded-full"
+                :style="{
+                  backgroundColor: getColorPorTipo(elemento.tipo),
+                  color: getContrastTextColor(getColorPorTipo(elemento.tipo))
+                }"
               >
-                {{ getTipoNombre(elemento.tipo) }}
-              </span>
-              <span class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
                 {{ getCategoriaName(elemento.categoria) }}
               </span>
+              <!-- <span class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
+                {{ getCategoriaName(elemento.categoria) }}
+              </span> -->
             </div>
           </div>
         </div>
@@ -221,20 +233,36 @@
       </div>
     </div>
 
-    <ElementEditor
-      :visible="mostrarModalCrear"
-      :categorias="categoriasDisponibles"
-      :formas="FORMAS_DISPONIBLES"
-      :ubicaciones="UBICACIONES_DISPONIBLES"
-      :value="nuevoElemento"
-      @cancel="cerrarModal"
-      @save="onGuardarElemento"
-    />
+    <!-- Menú contextual para elementos (kebab) -->
+    <div
+      v-if="kebabMenu.visible"
+      class="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-1"
+      :style="{ left: kebabMenu.x + 'px', top: kebabMenu.y + 'px' }"
+      role="menu"
+      :id="`el-menu-${kebabMenu.item?.id || 'ctx'}`"
+      @keydown.esc.stop.prevent="closeKebab"
+    >
+      <button
+        class="block cursor-pointer w-full text-left px-3 py-2 rounded hover:bg-gray-50"
+        role="menuitem"
+        @click.stop="startEdit(kebabMenu.item)"
+      >
+        Editar
+      </button>
+      <button
+        class="block cursor-pointer w-full text-left px-3 py-2 rounded text-red-600 hover:bg-red-50"
+        role="menuitem"
+        @click.stop="handleDeleteItem(kebabMenu.item)"
+      >
+        Eliminar
+      </button>
+    </div>
 
     <AgregarCuartoModal
       :visible="mostrarModalAgregarEspacio"
-      :modo
-      @close="mostrarModalAgregarEspacio = false"
+      :modo="editingItem ? (editingForm?.modo || modo) : modo"
+      :initialForm="editingItem ? editingForm : null"
+      @close="cancelEdit"
       @save="onGuardarEspacio"
     />
   </div>
@@ -251,19 +279,27 @@ import {
   TIPOS_ENTIDAD,
   getColorPorTipo,
   getColorCategoria,
+  getContrastTextColor,
   FORMAS_DISPONIBLES,
   UBICACIONES_DISPONIBLES,
 } from '@/inventory-smart/utils/constants'
-import { CATALOGO } from '@/inventory-smart/utils/constants'
-import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
+// import { CATALOGO, SCALE_WITH_PARENT_KEYS } from '@/inventory-smart/utils/constants'
+// import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
 
-import ElementEditor from './modals/ElementEditor.vue'
 import AgregarCuartoModal from './AgregarCuartoModal.vue'
 import {
   buildStructureFromForm,
   toCatalogItemFromStructure,
+  toFormFromCatalogItem,
+  buildUpdatedCatalogItem,
+  removeCatalogItem,
 } from '@/inventory-smart/composables/useStructureManager'
 import { formatLengthsCm } from '../utils/units'
+import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
+import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
+import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
+import { useToast } from '@/inventory-smart/composables/useToast'
+import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 
 // Props
 const props = defineProps({
@@ -277,9 +313,11 @@ const modo = computed(() => props.modo)
 
 // Stores
 const canvasStore = useCanvasStore()
+const { showToast } = useToast();
 const catalogStore = useCatalogStore()
 const { filteredCatalogItems, catalogContext, searchText, selectedCategory, items } =
   storeToRefs(catalogStore)
+const confirmDialog = useConfirmDialog()
 
 // Estado local
 const filtroTexto = searchText
@@ -315,8 +353,10 @@ const handleClickOutside = (event) => {
     filtrosVisibles.value = false
   }
 }
-const mostrarModalCrear = ref(false)
 const mostrarModalAgregarEspacio = ref(false)
+const editingItem = ref(null) // item que se edita
+const editingForm = ref(null) // formulario derivado del item
+const kebabMenu = ref({ visible: false, x: 0, y: 0, item: null })
 
 // Formulario para nuevo elemento
 const nuevoElemento = ref({
@@ -329,7 +369,7 @@ const nuevoElemento = ref({
     largo: 100,
     alto: 75,
   },
-  pesoMaximo: 50,
+  capacidadCarga: 50,
   ubicacion: 'suelo',
   descripcion: '',
   icono: 'box',
@@ -348,36 +388,42 @@ const nuevoElemento = ref({
 
 // const puedeCrearElementosPersonalizados = computed(() => catalogContext.value.mode !== 'root')
 
-// Computed: categorías disponibles según el contexto
-const categoriasDisponibles = computed(() => {
-  const tipos = catalogStore.allowedTypesForContext(catalogContext.value)
-  let cats = TODAS_LAS_CATEGORIAS.filter((cat) => tipos.includes(cat.tipo))
-  // Ajuste por modo: en 'cuarto' solo categorías de 'cuartos'; en 'espacio' excluye 'cuartos'
-  if (modo.value === 'cuarto') {
-    cats = cats.filter((c) => c.tipo === 'cuartos')
-  } else {
-    cats = cats.filter((c) => c.tipo !== 'cuartos')
-  }
-  return cats
+// Computed: categorías disponibles según el tab (dinámicos desde store)
+const categoriasDisponibles = computed(() => (modo.value === 'cuarto' ? canvasStore.catalogos.tiposCuarto : canvasStore.catalogos.tiposEspacio))
+
+// Ubicaciones disponibles según el modo actual
+const ubicacionesDisponibles = computed(() => {
+  // Mapear el modo a los tipos que aplican en constantes
+  const aplicaTipo = modo.value === 'cuarto' ? 'cuartos' : 'elementos'
+  return UBICACIONES_DISPONIBLES.filter((u) => (u.aplicaA || []).includes(aplicaTipo))
 })
 
-// Computed local para filtrar los elementos del catálogo (igual que en CapasTab.vue)
-const elementosFiltrados = computed(() => {
-  // Partimos de lo que la store ya nos devuelve (filtrado por contexto y búsqueda global)
+// Si la ubicación seleccionada ya no es válida para el modo, limpiar
+watch([ubicacionSeleccionada, ubicacionesDisponibles], () => {
+  const ids = new Set(ubicacionesDisponibles.value.map((u) => u.id))
+  if (ubicacionSeleccionada.value && !ids.has(ubicacionSeleccionada.value)) {
+    ubicacionSeleccionada.value = ''
+  }
+})
+
+// Base por modo (sin filtros de texto/categoría/ubicación) — sirve para decidir si mostrar Filtros
+const elementosBasePorModo = computed(() => {
   const base = Array.isArray(filteredCatalogItems.value)
     ? filteredCatalogItems.value.slice()
     : Array.isArray(items.value)
       ? items.value.slice()
       : []
+  return modo.value === 'cuarto'
+    ? base.filter((el) => el.tipo === 'cuartos')
+    : base.filter((el) => el.tipo !== 'cuartos')
+})
 
-  let out = base
+const hayElementosEnTab = computed(() => (elementosBasePorModo.value.length > 0))
 
-  // Filtro por modo: en 'cuarto' solo items tipo 'cuartos'; en 'espacio' todos menos 'cuartos'
-  if (modo.value === 'cuarto') {
-    out = out.filter((el) => el.tipo === 'cuartos')
-  } else {
-    out = out.filter((el) => el.tipo !== 'cuartos')
-  }
+// Computed local para filtrar los elementos del catálogo (igual que en CapasTab.vue)
+const elementosFiltrados = computed(() => {
+  // Partimos del base por modo y aplicamos filtros UI
+  let out = elementosBasePorModo.value.slice()
 
   // Filtro por texto (nombre o descripción)
   if (filtroTexto && filtroTexto.value) {
@@ -402,37 +448,39 @@ const elementosFiltrados = computed(() => {
   return out
 })
 
-const onGuardarElemento = (elemento) => {
-  const elementoNuevo = {
-    ...elemento,
-    id: `custom_${Date.now()}`,
-    icono: 'box',
-    personalizado: true,
-    tipo: elemento.tipo,
-  }
-  items.value.push(elementoNuevo)
-  cerrarModal()
-  categoriaSeleccionada.value = elementoNuevo.categoria
-  filtroTexto.value = ''
-}
+// Cerrar panel de filtros si el tab queda sin elementos base
+watch(hayElementosEnTab, (val) => {
+  if (!val) filtrosVisibles.value = false
+})
 
 const onGuardarEspacio = (datosEspacio) => {
   try {
-    const structure = buildStructureFromForm(datosEspacio)
-    const kind = datosEspacio.tipo === 'cuarto' ? 'room' : 'space'
-    const item = toCatalogItemFromStructure({
-      name: datosEspacio.datosGenerales?.nombre,
-      description: datosEspacio.datosGenerales?.descripcion,
-      structure,
-      kind,
-      color: datosEspacio.datosGenerales?.color,
-    })
-    items.value.push(item)
+    if (editingItem.value) {
+      // Editar existente
+      const updated = buildUpdatedCatalogItem(editingItem.value, datosEspacio)
+      const idx = items.value.findIndex((it) => it.id === editingItem.value.id)
+      if (idx !== -1) items.value[idx] = updated
+    } else {
+      // Crear nuevo
+      const structure = buildStructureFromForm(datosEspacio)
+      const kind = datosEspacio.tipo === 'cuarto' ? 'room' : 'space'
+      const item = toCatalogItemFromStructure({
+        name: datosEspacio.datosGenerales?.nombre,
+        description: datosEspacio.datosGenerales?.descripcion,
+        structure,
+        kind,
+        color: datosEspacio.datosGenerales?.color,
+      })
+      items.value.push(item)
+    }
     categoriaSeleccionada.value = null
     filtroTexto.value = ''
     mostrarModalAgregarEspacio.value = false
   } catch (e) {
-    console.error('No se pudo crear estructura desde formulario', e)
+    console.error('No se pudo procesar estructura desde formulario', e)
+  } finally {
+    editingItem.value = null
+    editingForm.value = null
   }
 }
 
@@ -441,6 +489,13 @@ watch([() => categoriaSeleccionada.value, () => categoriasDisponibles.value], ()
   const ids = new Set((categoriasDisponibles.value || []).map((c) => c.id))
   if (categoriaSeleccionada.value && !ids.has(categoriaSeleccionada.value)) {
     categoriaSeleccionada.value = null
+  }
+})
+
+// Si cambiamos a modo 'cuarto', limpiar la ubicación para que no quede filtro oculto aplicado
+watch(modo, (nuevo) => {
+  if (nuevo === 'cuarto') {
+    ubicacionSeleccionada.value = ''
   }
 })
 
@@ -454,50 +509,61 @@ const getCategoriaName = (categoriaId) => {
   return categoria ? categoria.nombre : 'Sin categoría'
 }
 
-const getIconComponent = (iconType) => {
-  const icons = {
-    rack: 'svg',
-    shelf: 'svg',
-    table: 'svg',
-    cabinet: 'svg',
-    box: 'svg',
-  }
-  return icons[iconType] || 'svg'
-}
-
-const getShapeClass = (forma) => {
-  switch (forma) {
-    case 'rectangular':
-      return 'rounded-sm'
-    case 'circular':
-      return 'rounded-full aspect-square' // Añadimos aspect-square para mantener la relación de aspecto 1:1
-    default:
-      return 'rounded-sm'
+const getIconComponentForElement = (elemento) => {
+  // Determinar el componente de icono basado en tipo y ubicación
+  if (elemento.tipo === 'cuartos') {
+    return RoomIcon
+  } else if (elemento.ubicacion === 'pared') {
+    return SpaceOnWallIcon
+  } else {
+    return SpaceIcon
   }
 }
 
-// Dims preview para elementos de sistema por defecto
-const isSystemDefaultItem = (item) =>
-  !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
-
-const getCardDims = (item) => {
-  try {
-    if (!item?.dimensiones) return { ancho: 0, largo: 0, alto: 0 }
-    if (!isSystemDefaultItem(item)) return item.dimensiones
-    const planta = canvasStore.plantaActivaData
-    const dimsPlanta = planta?.dimensiones
-    if (!dimsPlanta) return item.dimensiones
-    const parentDims = { w: dimsPlanta.ancho, h: dimsPlanta.largo, d: dimsPlanta.alto }
-    const dims = computeDimsByAxisScale(item.id, parentDims, { snap: true })
-    return dims || item.dimensiones
-  } catch {
-    return item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
-  }
+// Tipos para los que se oculta el menú de acciones
+const isKebabRestricted = (item) => {
+  const t = item?.tipo
+  return t === 'pasillos' || t === 'contenedores' || t === 'pisos'
 }
+
+// const isSystemDefaultItem = (item) =>
+//   !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
+
+// const getCardDims = (item) => {
+//   try {
+//     if (!item?.dimensiones) return { ancho: 0, largo: 0, alto: 0 }
+//     // Solo escalar para tipos explícitos (pasillo/cuarto/piso). Para elementos regulares
+//     // como estantes o anaqueles, mostrar dimensiones base del catálogo.
+//     if (!(isSystemDefaultItem(item) && SCALE_WITH_PARENT_KEYS.includes(item.id))) {
+//       return item.dimensiones
+//     }
+//     const planta = canvasStore.plantaActivaData
+//     const dimsPlanta = planta?.dimensiones
+//     if (!dimsPlanta) return item.dimensiones
+//     const parentDims = { w: dimsPlanta.ancho, h: dimsPlanta.largo, d: dimsPlanta.alto }
+//     const dims = computeDimsByAxisScale(item.id, parentDims, { snap: true })
+//     return dims || item.dimensiones
+//   } catch {
+//     return item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
+//   }
+// }
+
+// Comportamiento actual: sin escalado, siempre dimensiones base del catálogo
+const getCardDims = (item) => item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
 
 // Drag and Drop
 const iniciarArrastre = (elemento, event) => {
-  console.log('Iniciando arrastre del elemento:', elemento)
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn');
+    event.preventDefault()
+    return
+  }
+
+  if (['cuartos', 'elementos'].includes(canvasStore.contextoNavegacion.tipo)) {
+    showToast('No puedes arrastrar elementos mientras estás editando un cuarto o elemento.', 'warn');
+    event.preventDefault()
+    return
+  }
   // Si el item trae payload de estructura (plantilla/room/space), arrastrar como 'plantilla-catalogo'
   const isStructured = !!elemento?.payload?.rootId && Array.isArray(elemento?.payload?.elements)
   const datosArrastre = isStructured
@@ -511,14 +577,11 @@ const iniciarArrastre = (elemento, event) => {
         elemento: elemento,
         offset: { x: event.offsetX || 0, y: event.offsetY || 0 },
       }
-  console.log('Datos de arrastre:', datosArrastre)
 
   try {
     const dataString = JSON.stringify(datosArrastre)
     event.dataTransfer.setData('application/json', dataString)
     event.dataTransfer.effectAllowed = 'copy'
-    console.log('Data set en dataTransfer:', dataString)
-
     // Efecto visual de arrastre con Tailwind (sin clases en <style>)
     const card = event.currentTarget
     if (card && card.classList) card.classList.add('opacity-50', 'scale-95')
@@ -528,46 +591,9 @@ const iniciarArrastre = (elemento, event) => {
 }
 
 const finalizarArrastre = (event) => {
-  console.log('Finalizando arrastre')
   const card = event.currentTarget
   if (card && card.classList) card.classList.remove('opacity-50', 'scale-95')
 }
-
-const cerrarModal = () => {
-  mostrarModalCrear.value = false
-}
-
-// Cargar elementos personalizados del localStorage
-onMounted(() => {
-  const elementosGuardados = localStorage.getItem('elementos-personalizados')
-  if (elementosGuardados) {
-    try {
-      JSON.parse(elementosGuardados).forEach((el) => {
-        if (!items.value.some((existing) => existing.id === el.id)) {
-          items.value.push(el)
-        }
-      })
-    } catch (error) {
-      console.error('Error cargando elementos personalizados:', error)
-    }
-  }
-  document.addEventListener('mousedown', handleClickOutside)
-})
-
-// Guardar elementos personalizados en localStorage
-const guardarElementosPersonalizados = () => {
-  const personalizados = items.value.filter((el) => el.personalizado)
-  localStorage.setItem('elementos-personalizados', JSON.stringify(personalizados))
-}
-
-// Observar cambios en elementos personalizados para guardar
-watch(
-  () => items.value,
-  () => {
-    guardarElementosPersonalizados()
-  },
-  { deep: true },
-)
 
 onUnmounted(() => {
   document.removeEventListener('mousedown', handleClickOutside)
@@ -613,6 +639,65 @@ watch(
   },
   { immediate: true },
 )
+
+// --- Lógica del menú kebab y edición/eliminación ---
+const toggleKebab = (evt, item) => {
+  evt.preventDefault()
+  if (isKebabRestricted(item)) return
+  const isSame = kebabMenu.value.visible && kebabMenu.value.item?.id === item.id
+  kebabMenu.value = isSame
+    ? { visible: false, x: 0, y: 0, item: null }
+    : { visible: true, x: evt.clientX, y: evt.clientY, item }
+}
+
+const closeKebab = () => {
+  kebabMenu.value = { visible: false, x: 0, y: 0, item: null }
+}
+
+const startEdit = (item) => {
+  if (!item) return closeKebab()
+  const form = toFormFromCatalogItem(item)
+  if (!form) return closeKebab()
+  editingItem.value = item
+  editingForm.value = form
+  mostrarModalAgregarEspacio.value = true
+  closeKebab()
+}
+
+const cancelEdit = () => {
+  mostrarModalAgregarEspacio.value = false
+  editingItem.value = null
+  editingForm.value = null
+}
+
+const handleDeleteItem = async (item) => {
+  if (!item) return closeKebab()
+  const ok = await confirmDialog.confirm({
+    title: 'Eliminar elemento',
+    message: `Se eliminará “${item.nombre}” del catálogo. Esta acción no afectará elementos ya colocados.`,
+    confirmLabel: 'Eliminar',
+    cancelLabel: 'Cancelar',
+  })
+  if (!ok) return closeKebab()
+  removeCatalogItem(items.value, item.id)
+  closeKebab()
+}
+
+// Cerrar kebab al hacer click fuera
+const onGlobalClickKebab = (e) => {
+  if (!kebabMenu.value.visible) return
+  const menuId = `el-menu-${kebabMenu.value.item?.id || 'ctx'}`
+  const path = e.composedPath ? e.composedPath() : (e.path || [])
+  const clickedInside = path.some((n) => n?.id === menuId)
+  if (!clickedInside) closeKebab()
+}
+
+onMounted(() => {
+  window.addEventListener('click', onGlobalClickKebab, { capture: true })
+})
+onUnmounted(() => {
+  window.removeEventListener('click', onGlobalClickKebab, { capture: true })
+})
 </script>
 
 <style scoped>

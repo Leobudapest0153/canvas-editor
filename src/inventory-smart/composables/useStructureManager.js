@@ -8,6 +8,8 @@
  */
 
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { generateCodigo, generateNombre } from '@/inventory-smart/utils/codeNameGenerator.js'
+import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
 
 const uid = (prefix) => `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
 
@@ -40,11 +42,15 @@ export function buildStructureFromForm(form) {
     color: datosGenerales.color || '#3B82F6',
     colorBase: datosGenerales.color || '#3B82F6',
     dimensiones: dimsCm,
-    pesoMaximo: Number(dimensiones.capacidadCarga) || 0,
-    ubicacion: 'suelo',
+    capacidadCarga: Number(dimensiones.capacidadCarga) || 0,
+    ubicacion: modo === 'cuarto' ? 'suelo' : datosGenerales.ubicacion,
     descripcion: datosGenerales.descripcion || '',
     icono: modo === 'cuarto' ? 'home' : 'box',
     hijos: [],
+    // Altura respecto al suelo (solo aplica a espacios en pared). Convertir m→cm
+    ...(modo === 'espacio' && datosGenerales.ubicacion === 'pared' && Number.isFinite(Number(datosGenerales.alturaRespectoAlSuelo))
+      ? { alturaRespectoAlSuelo: Math.round(Number(datosGenerales.alturaRespectoAlSuelo) * 100) }
+      : {}),
     // Metadata que indica que al instanciar debe regenerar pisos
     meta: { tienePisosGenerados: true },
     // Calcular width/height directamente para evitar problemas de serialización
@@ -130,7 +136,7 @@ export function toCatalogItemFromStructure({
     color: color || root?.color || root?.colorBase || '#3B82F6',
     colorBase: color || root?.colorBase || root?.color || '#3B82F6',
     dimensiones: { ...(root?.dimensiones || {}) },
-    pesoMaximo: root?.pesoMaximo || 0,
+    capacidadCarga: root?.capacidadCarga || 0,
     ubicacion: root?.ubicacion || 'suelo',
     descripcion: description || root?.descripcion || '',
     icono: root?.icono || 'box',
@@ -147,6 +153,150 @@ export function toCatalogItemFromStructure({
     },
     tags,
   }
+}
+
+/**
+ * Convierte un item de catálogo (con payload de estructura) en datos de formulario
+ * para ser editado con AgregarCuartoModal.vue
+ */
+export function toFormFromCatalogItem(item) {
+  const fromCm = (cm) => (Number.isFinite(cm) ? Number(cm) / 100 : null)
+
+  // Caso 1: item con payload de estructura
+  if (item?.payload?.rootId && Array.isArray(item?.payload?.elements)) {
+    const elems = item.payload.elements
+    const root = elems.find((e) => e.id === item.payload.rootId) || elems[0]
+    if (!root) return null
+    const modo = root.tipo === 'cuartos' ? 'cuarto' : 'espacio'
+
+    const datosGenerales = {
+      nombre: root.nombre || item.nombre || '',
+      color: root.color || root.colorBase || item.color || '#3B82F6',
+      tipoSeleccionado: root.categoria || '',
+      descripcion: root.descripcion || item.descripcion || '',
+      orientacion: root.orientacion || '',
+      ubicacion: modo === 'espacio' ? (root.ubicacion || item.ubicacion || '') : '',
+      // Si es espacio en pared, exponer alturaRespectoAlSuelo en metros
+      ...(modo === 'espacio' && (root.ubicacion || item.ubicacion) === 'pared'
+        ? { alturaRespectoAlSuelo: fromCm(root.alturaRespectoAlSuelo ?? item.alturaRespectoAlSuelo) }
+        : {}),
+    }
+
+    const d = root.dimensiones || {}
+    const dimensiones = {
+      forma: root.forma || '',
+      largo: fromCm(d.largo),
+      alto: fromCm(d.alto),
+      ancho: fromCm(d.ancho),
+      capacidadCarga: Number(root.capacidadCarga ?? root.pesoMaximo) || 0,
+    }
+
+    // Recuperar pisos/niveles internos, en orden por índice
+    const childIds = Array.isArray(root.hijos) ? root.hijos : []
+    const childElems = childIds
+      .map((hid) => elems.find((e) => e.id === hid))
+      .filter((h) => h && (h.meta?.esPisoInterno || h.meta?.esNivelInterno))
+      .sort((a, b) => {
+        const ia = a.meta?.indicePiso || a.meta?.indiceNivel || 0
+        const ib = b.meta?.indicePiso || b.meta?.indiceNivel || 0
+        return ia - ib
+      })
+
+    const pisosNiveles = childElems.map((c, idx) => {
+      const cd = c.dimensiones || {}
+      return {
+        id: idx + 1,
+        nombre: c.nombre || `${modo === 'cuarto' ? 'Piso' : 'Nivel'} ${idx + 1}`,
+        largo: fromCm(cd.largo),
+        alto: fromCm(cd.alto),
+        ancho: fromCm(cd.ancho),
+        capacidadCarga: Number(c.capacidadCarga) || 0,
+        tiposProductos: Array.isArray(c.tiposProductos) ? c.tiposProductos.slice() : [],
+        tipoZona: c.tipoZona || 'almacenaje',
+        permiteFragiles: !!c.permiteFragiles,
+        _touched: { tiposProductos: false, tipoZona: false, nombre: false },
+      }
+    })
+
+    return { modo, datosGenerales, dimensiones, pisosNiveles }
+  }
+
+  // Caso 2: item sin payload (fallback) — construir formulario mínimo
+  if (item && typeof item === 'object') {
+    const modo = (item.tipo === 'cuartos') ? 'cuarto' : 'espacio'
+    const d = item.dimensiones || {}
+    const datosGenerales = {
+      nombre: item.nombre || '',
+      color: item.color || item.colorBase || '#3B82F6',
+      tipoSeleccionado: item.categoria || '',
+      descripcion: item.descripcion || '',
+      orientacion: item.orientacion || '',
+      ubicacion: modo === 'espacio' ? (item.ubicacion || '') : '',
+      ...(modo === 'espacio' && item.ubicacion === 'pared'
+        ? { alturaRespectoAlSuelo: fromCm(item.alturaRespectoAlSuelo) }
+        : {}),
+    }
+    const dimensiones = {
+      forma: item.forma || '',
+      largo: fromCm(d.largo),
+      alto: fromCm(d.alto),
+      ancho: fromCm(d.ancho),
+      capacidadCarga: Number(item.capacidadCarga ?? item.pesoMaximo) || 0,
+    }
+    const pisosNiveles = [
+      {
+        id: 1,
+        nombre: modo === 'cuarto' ? 'Piso 1' : 'Nivel 1',
+        largo: null,
+        alto: null,
+        ancho: null,
+        capacidadCarga: null,
+        tiposProductos: [],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+        _touched: { tiposProductos: false, tipoZona: false, nombre: false },
+      },
+    ]
+    return { modo, datosGenerales, dimensiones, pisosNiveles }
+  }
+
+  return null
+}
+
+/**
+ * Construye un item de catálogo actualizado a partir de un formulario,
+ * preservando el id y metadatos relevantes del item original.
+ */
+export function buildUpdatedCatalogItem(originalItem, form) {
+  if (!originalItem) throw new Error('Item original requerido')
+  const structure = buildStructureFromForm(form)
+  const kind = form.modo === 'cuarto' ? 'room' : 'space'
+  const updated = toCatalogItemFromStructure({
+    name: form?.datosGenerales?.nombre,
+    description: form?.datosGenerales?.descripcion,
+    structure,
+    kind,
+    color: form?.datosGenerales?.color,
+    tags: Array.isArray(originalItem.tags) ? originalItem.tags : [],
+  })
+  // Preservar id y algunos metadatos
+  updated.id = originalItem.id
+  updated.createdAt = originalItem.createdAt || updated.createdAt
+  updated.updatedAt = new Date().toISOString()
+  // Si el original tenía props específicas, mezclarlas
+  updated.props = { ...(updated.props || {}), ...(originalItem.props || {}) }
+  return updated
+}
+
+/**
+ * Elimina un item del arreglo de catálogo por id. Retorna true si se eliminó.
+ */
+export function removeCatalogItem(itemsArray, id) {
+  if (!Array.isArray(itemsArray)) return false
+  const idx = itemsArray.findIndex((it) => it.id === id)
+  if (idx === -1) return false
+  itemsArray.splice(idx, 1)
+  return true
 }
 
 /**
@@ -191,6 +341,8 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
         root = { ...root, dimensiones: dims }
         newMap.set(newRootId, root)
       }
+      // Dejar que el store genere nombre alfabético
+      // delete root.nombre
     }
   } catch (e) {
     console.warn('Error ajustando dimensiones de pasillo:', e)
@@ -251,14 +403,6 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
       effectivePos = pos
     }
 
-    console.log(`🎯 Paste element: ${elem.id || elem.nombre} (${elem.tipo})`, {
-      isRoot,
-      hasXYSelf,
-      elemXY: { x: elem.x, y: elem.y },
-      effectivePos,
-      context: isRoot ? 'planta-canvas' : 'padre-canvas'
-    })
-
     // Asegurar color y colorBase en todos los nodos
     const colorMerged = elem.color ?? elem.colorBase ?? (isRoot ? (root.color ?? root.colorBase) : undefined)
     const colorBaseMerged = elem.colorBase ?? elem.color ?? colorMerged
@@ -279,7 +423,7 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     if (!parentId) { delete base.plantaId; base.padre = null }
 
     let newId
-    if (!parentId) newId = canvasStore.agregarElemento(base)
+    if (!parentId) newId = canvasStore.agregarElemento(base, { preserveExistingCode: false, resetName: true, regenerateCode: true })
     else newId = addChildDirect(canvasStore, base, parentId)
     if (!newId) return null
 
@@ -305,21 +449,12 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
       return hasBasicPosition
     })
 
-    console.log('🔍 Regenerate decision:', {
-      isRootWithFloors,
-      hasFloorChildren,
-      shouldRegenerate
-    })
-
     if (shouldRegenerate) {
-      console.log(`🔧 Using regenerateFloors for: ${elem.id || elem.nombre}`)
       regenerateFloors(canvasStore, elem, newMap, newId, base.dimensiones)
     } else if (hasChildren) {
-      console.log(`🎯 Using pasteRecursive for children of: ${elem.id || elem.nombre}`)
       for (const hid of elem.hijos) {
         const child = newMap.get(hid)
         if (!child) continue
-        console.log(`  → Child: ${child.id || child.nombre} at (${child.x}, ${child.y})`)
         // Pasar la posición del root pegado para que los hijos calculen su posición relativa
         // El cálculo de posición relativa se hace en pasteRecursive
         pasteRecursive(child, pos, newId) // usar 'pos' (posición del root) en lugar de childPos
@@ -355,6 +490,9 @@ function addChildDirect(canvasStore, elemento, parentId) {
       else if (tipo === 'cuartos' || tipo === 'pasillos') elemento.height = (dims.largo || 10) * 10
       else elemento.height = (dims.alto || 10) * 10
     }
+
+    // Generar codigo/nombre de forma unificada como si fuera nuevo (no preservar, resetear nombre)
+    assignCodigoNombre(elemento, canvasStore.elementos, { preserveExistingCode: false, resetName: true, regenerateCode: true })
 
     // Agregar a la lista de elementos
     canvasStore.elementos.push(elemento)

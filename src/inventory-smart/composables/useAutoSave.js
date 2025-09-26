@@ -157,15 +157,14 @@ export function useAutoSave(canvasStore, options = {}) {
       if (success) {
         lastSaveTime.value = new Date()
         totalBackups.value = updatedBackups.length
-        console.log('✅ Autosave realizado:', metadata.id)
         return true
       } else {
-        console.error('❌ Error guardando autosave')
+        console.error('Error guardando autosave')
         return false
       }
 
     } catch (error) {
-      console.error('❌ Error en performBackup:', error)
+      console.error('Error en performBackup:', error)
       return false
     } finally {
       isLoading.value = false
@@ -225,16 +224,13 @@ export function useAutoSave(canvasStore, options = {}) {
         // Guardar la lista filtrada
         await saveBackupsList(filteredBackups)
         totalBackups.value = filteredBackups.length
-
-        console.log('✅ Copia de seguridad restaurada:', backupId)
-        console.log(`🗑️ Eliminadas ${backups.length - filteredBackups.length} copias posteriores`)
         return true
       } else {
         throw new Error('Error al deserializar la copia de seguridad')
       }
 
     } catch (error) {
-      console.error('❌ Error restaurando copia de seguridad:', error)
+      console.error('Error restaurando copia de seguridad:', error)
       throw error
     } finally {
       isLoading.value = false
@@ -252,7 +248,6 @@ export function useAutoSave(canvasStore, options = {}) {
       const success = await saveBackupsList(filteredBackups)
       if (success) {
         totalBackups.value = filteredBackups.length
-        console.log('🗑️ Copia de seguridad eliminada:', backupId)
         return true
       }
       return false
@@ -270,7 +265,6 @@ export function useAutoSave(canvasStore, options = {}) {
       const success = await config.storageAdapter.remove(config.storageKey)
       if (success) {
         totalBackups.value = 0
-        console.log('🧹 Todas las copias de seguridad eliminadas')
         return true
       }
       return false
@@ -295,14 +289,11 @@ export function useAutoSave(canvasStore, options = {}) {
       if (!backup) throw new Error('No existe una copia marcada como versión del servidor')
       const success = canvasStore.deserialize(backup.data)
       if (!success) throw new Error('Error al deserializar la versión del servidor')
-
       // Eliminar todas las copias de seguridad después de restaurar la versión del servidor
       await clearAllBackups()
-      console.log('🗑️ Todas las copias de seguridad eliminadas tras restaurar versión del servidor')
-
       return true
     } catch (error) {
-      console.error('❌ Error restaurando versión del servidor:', error)
+      console.error('Error restaurando versión del servidor:', error)
       throw error
     } finally {
       isLoading.value = false
@@ -321,8 +312,6 @@ export function useAutoSave(canvasStore, options = {}) {
       autoSaveTimer = setInterval(() => {
         performBackup()
       }, config.intervalMs)
-
-      console.log(`🔄 Autosave iniciado (cada ${config.intervalMs/1000}s)`)
     }
   }
 
@@ -333,7 +322,6 @@ export function useAutoSave(canvasStore, options = {}) {
     if (autoSaveTimer) {
       clearInterval(autoSaveTimer)
       autoSaveTimer = null
-      console.log('⏸️ Autosave detenido')
     }
   }
 

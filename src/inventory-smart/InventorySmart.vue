@@ -1,7 +1,7 @@
 <template>
   <div id="inventory-smart">
     <!-- Panel de plantas -->
-    <PlantasPanel @configChanged="handleConfigChanged" />
+  <PlantasPanel :author="author" @configChanged="handleConfigChanged" />
 
     <!-- Navegación jerárquica -->
     <NavegacionJerarquica />
@@ -14,7 +14,10 @@
 
       <!-- Canvas principal -->
       <div class="app-canvas">
-        <CanvasView :safeRight="canvasStore.mostrarPropiedades ? 320 : 20" />
+        <CanvasView
+          ref="canvasViewRef"
+          :safeRight="canvasStore.mostrarPropiedades ? 320 : 20"
+        />
       </div>
 
       <!-- Panel de propiedades (superpuesto para no empujar el canvas) -->
@@ -52,14 +55,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, provide } from 'vue'
 import SidebarPanel from './components/SidebarPanel.vue'
 import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
 import PropiedadesPanel from './components/PropiedadesPanel.vue'
 import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import WorkspaceEditor from './components/WorkspaceEditor.vue'
-import ManagmentFloorRoomPropertiesModal from './components/ManagmentFloorRoomPropertiesModal.vue'
+import ManagmentFloorRoomPropertiesModal from './components/modals/ManagmentFloorRoomPropertiesModal.vue'
 import { useCanvasImportExport } from './composables/useCanvasImportExport'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
@@ -71,27 +74,89 @@ import ConfirmModal from './components/ConfirmModal.vue'
 import LoaderOverlay from './components/LoaderOverlay.vue'
 import { AUTOSAVE_CONFIG } from '@/inventory-smart/utils/constants'
 import ConfirmReplaceModal from '@/inventory-smart/components/modals/ConfirmReplaceModal.vue'
+import { useServicesStore } from './stores/services.js'
+import { useStatePersistence } from './composables/useStatePersistence'
 
 const props = defineProps({
   configCanvas: {
     type: [String, null],
     default: () => '',
   },
-})
-
-// Definir emits para comunicar cambios al componente padre
+  author: {
+    type: Object,
+    default: () => null,
+    validator: (a) => {
+      if (a == null) return true
+      return typeof a.id === 'string' && typeof a.name === 'string'
+    }
+  },
+  externalServices: {
+    type: Array,
+    default: () => [],
+    validator: (services) => {
+      if (!Array.isArray(services)) return false
+      return services.every(service =>
+        service &&
+        typeof service.name === 'string' &&
+        service.type === 'container_products' &&
+        typeof service.handler === 'function'
+      )
+    }
+  }
+})// Definir emits para comunicar cambios al componente padre
 const emit = defineEmits(['configUpdated'])
 
 const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
 const { deleteSelected } = useDeleteElement()
-const { handlePaste } = useAutoPaste()
+const { handlePaste: autoPaste } = useAutoPaste()
 const { showToast } = useToast()
+const servicesStore = useServicesStore()
+
+// ======= Gestión de Servicios Externos =======
+// Registrar servicios externos en la store cuando cambien las props
+watch(
+  () => props.externalServices,
+  (newServices) => {
+    try {
+      servicesStore.registerServices(newServices)
+    } catch (error) {
+      console.error('Error al registrar servicios externos:', error)
+      showToast('Error al registrar servicios externos', 'error')
+    }
+  },
+  { immediate: true }
+)
+
+// Función auxiliar para llamar servicios externos
+const callExternalService = async (serviceName, params = null, options = {}) => {
+  try {
+    const response = await servicesStore.callService(serviceName, params, options)
+    return response
+  } catch (error) {
+    showToast(`Error en servicio: ${serviceName}`, 'error')
+    throw error
+  }
+}
+
+// Exponer funciones para uso en componentes hijos si es necesario
+const externalServicesAPI = {
+  callService: callExternalService,
+  listServices: servicesStore.listServices,
+  hasServices: servicesStore.hasServices,
+  clearCache: servicesStore.clearCache,
+  isServiceLoading: servicesStore.isServiceLoading,
+  getServiceError: servicesStore.getServiceError
+}
+
+const canvasViewRef = ref(null)
 
 // Estado del modal de aviso de reemplazo por servidor
 const showReplaceNotice = ref(false)
 let pendingServerConfig = null
+// Flag para evitar ejecuciones duplicadas del handler (confirmar + cerrar)
+const isApplyingServerConfig = ref(false)
 
 // Helper: obtener la instancia de autosave registrada en el store
 const getAutoSaveInstance = () => {
@@ -110,21 +175,23 @@ const clearLocalBackups = async () => {
       // Fallback a localStorage por compatibilidad
       localStorage.removeItem(AUTOSAVE_CONFIG.STORAGE_KEY)
     }
-    console.log('🧹 Copias de seguridad locales eliminadas')
   } catch (e) {
     console.warn('No se pudieron limpiar los backups locales', e)
   }
 }
 
 const applyPendingServerConfig = async () => {
+  // Evitar ejecuciones duplicadas (p. ej., si el modal emite confirmar y luego cerrar)
+  if (isApplyingServerConfig.value) return
   if (!pendingServerConfig) {
     showReplaceNotice.value = false
     return
   }
+  isApplyingServerConfig.value = true
   try {
     showToast('Aplicando configuración del servidor…', 'info')
     const instance = getAutoSaveInstance()
-    const wasEnabled = instance?.isEnabled?.value === true
+    const wasEnabled = instance?.isEnabled === true
     // Pausar autosave si aplica
     instance?.stopAutoSave?.()
     // Al aplicar servidor, limpiar backups locales
@@ -139,6 +206,7 @@ const applyPendingServerConfig = async () => {
   } finally {
     pendingServerConfig = null
     showReplaceNotice.value = false
+    isApplyingServerConfig.value = false
   }
 }
 
@@ -154,7 +222,6 @@ const handleConfigChanged = (configSerializada) => {
     // Emitir al componente padre la configuración actualizada
     emit('configUpdated', configSerializada)
 
-    console.log('Configuración actualizada emitida al componente padre')
   } catch (error) {
     console.error('Error al procesar la configuración actualizada:', error)
     showToast('Error al procesar la configuración actualizada', 'error')
@@ -190,7 +257,7 @@ const handleKeydown = (e) => {
       handleCopyToBuffer()
     } else if (e.key === 'v') {
       e.preventDefault()
-      handlePaste()
+      triggerPaste()
     }
   } else if (e.key === 'Delete' || e.key === 'Backspace') {
     // Supr o Retroceso -> eliminar seleccionado
@@ -208,7 +275,56 @@ const handleCopyToBuffer = () => {
   const elementoSeleccionado = canvasStore.elementoSeleccionado
   if (elementoSeleccionado) {
     buffer.copyToBuffer(elementoSeleccionado)
-    console.log('📋 Estructura copiada al buffer')
+  }
+}
+
+const triggerPaste = () => {
+  try {
+    const stage = canvasViewRef.value?.getStage?.()
+    const viewportSize = canvasViewRef.value?.getStageSize?.() || null
+    const viewportWorld = canvasViewRef.value?.getViewportWorldRect?.() || null
+
+    let startPosition = null
+
+    if (stage && typeof stage.getPointerPosition === 'function') {
+      const pointer = stage.getPointerPosition()
+      const scale = typeof stage.scaleX === 'function' ? stage.scaleX() || 1 : 1
+      const stageX = typeof stage.x === 'function' ? stage.x() || 0 : 0
+      const stageY = typeof stage.y === 'function' ? stage.y() || 0 : 0
+
+      if (pointer) {
+        startPosition = {
+          x: (pointer.x - stageX) / (scale || 1),
+          y: (pointer.y - stageY) / (scale || 1),
+        }
+      }
+
+      if (!startPosition && viewportSize) {
+        startPosition = {
+          x: (viewportSize.width / 2 - stageX) / (scale || 1),
+          y: (viewportSize.height / 2 - stageY) / (scale || 1),
+        }
+      }
+    }
+
+    if (!startPosition && viewportSize) {
+      const scale = canvasStore.zoom || 1
+      const stageX = canvasStore.panX || 0
+      const stageY = canvasStore.panY || 0
+      startPosition = {
+        x: (viewportSize.width / 2 - stageX) / (scale || 1),
+        y: (viewportSize.height / 2 - stageY) / (scale || 1),
+      }
+    }
+
+    void autoPaste({
+      startPosition: startPosition || null,
+      viewportSize,
+      viewportWorld,
+    })
+  } catch (error) {
+    console.warn('No se pudo calcular el punto inicial para pegar:', error)
+    void autoPaste()
   }
 }
 
@@ -221,6 +337,7 @@ const getConfigTimestamp = (jsonString) => {
     const t = ts ? Date.parse(ts) : NaN
     return Number.isFinite(t) ? t : null
   } catch (e) {
+    console.warn('No se pudo parsear timestamp de configuración', e)
     return null
   }
 }
@@ -272,6 +389,9 @@ const fmtDate = (iso) => {
 onMounted(() => {
   try {
     window.addEventListener('keydown', handleKeydown)
+
+    // Provide de la API de servicios externos para componentes hijos
+    provide('externalServicesAPI', externalServicesAPI)
   } catch (error) {
     window.removeEventListener('keydown', handleKeydown)
     showToast('Ha ocurrido un error al importar la configuración', 'error')
@@ -308,10 +428,11 @@ watch(
       // Comparar timestamps entre servidor y backup local más reciente
       const serverTs = getConfigTimestamp(newConfig)
       const latestBackup = getLatestLocalBackup()
-      const backupTs = latestBackup?.ts ?? null
+      const { getLastSerializationTimestamp } = useStatePersistence()
+      const latestBackupTimestamp = Date.parse(getLastSerializationTimestamp())
 
       // Si hay backup y es más reciente que el servidor -> restaurar backup automáticamente
-      if (latestBackup && backupTs && (!serverTs || backupTs > serverTs)) {
+      if (latestBackup && latestBackupTimestamp && (!latestBackupTimestamp || latestBackupTimestamp > serverTs)) {
         const restored = canvasStore.deserialize(latestBackup.data)
         if (restored) {
           showToast(
@@ -323,7 +444,7 @@ watch(
       }
 
       // Si el servidor es más reciente que el backup local -> solo avisar y aplicar servidor
-      if (serverTs && latestBackup && backupTs && serverTs > backupTs) {
+      if (serverTs && latestBackup && latestBackupTimestamp && serverTs > latestBackupTimestamp) {
         pendingServerConfig = newConfig
         showReplaceNotice.value = true
         return
@@ -333,7 +454,7 @@ watch(
       const mensaje = oldConfig ? null : 'Iniciando área de trabajo'
       if (mensaje) showToast(mensaje, 'info' )
       const instance = getAutoSaveInstance()
-      const wasEnabled = instance?.isEnabled?.value === true
+      const wasEnabled = instance?.isEnabled === true
       instance?.stopAutoSave?.()
       await clearLocalBackups()
       const ok = canvasStore.deserialize(newConfig)
@@ -347,7 +468,6 @@ watch(
       console.error('Error al importar la configuración:', error)
     }
   },
-  { immediate: true },
 )
 </script>
 
@@ -366,6 +486,39 @@ watch(
   --color-primary-700: #33366d;
   --color-primary-800: #1a1b4a;
   --color-primary-900: #0d0e2a;
+
+  --color-primary-gray: #202939;
+  --color-primary-gray-100: #f5f6fa;
+  --color-primary-gray-200: #e5e7eb;
+  --color-primary-gray-300: #d1d5db;
+  --color-primary-gray-400: #9ca3af;
+  --color-primary-gray-500: #6b7280;
+  --color-primary-gray-600: #4b5563;
+  --color-primary-gray-700: #374151;
+  --color-primary-gray-800: #1f2937;
+  --color-primary-gray-900: #111827;
+
+  --color-ice-blue: #e5e7eb;
+  --color-ice-blue-100: #f9fafb;
+  --color-ice-blue-200: #f3f4f6;
+  --color-ice-blue-300: #e5e7eb;
+  --color-ice-blue-400: #d1d5db;
+  --color-ice-blue-500: #9ca3af;
+  --color-ice-blue-600: #6b7280;
+  --color-ice-blue-700: #4b5563;
+  --color-ice-blue-800: #374151;
+  --color-ice-blue-900: #1f2937;
+
+  --color-success: #4ba345;
+  --color-success-100: #ecf9f0;
+  --color-success-200: #d1f0db;
+  --color-success-300: #a3e1b7;
+  --color-success-400: #75d292;
+  --color-success-500: #47c36e;
+  --color-success-600: #389856;
+  --color-success-700: #276b3e;
+  --color-success-800: #164f27;
+  --color-success-900: #0b3114;
 }
 
 :root {
@@ -594,6 +747,20 @@ watch(
 /* No crear archivos nuevos; mantener consistencia con el resto del proyecto */
 .template-drag--invalid {
   outline: 2px dashed red;
+}
+
+/* Cambios recientes */
+.elastic-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  font-weight: 700;
+  font-size: 12px;
+  border-radius: 9999px;
+  color: #0f172a;
+  background: #a7f3d0; /* emerald-200 */
+  border: 1px solid #34d399; /* emerald-400 */
 }
 </style>
 

@@ -2,6 +2,8 @@
   <div id="app">
     <InventorySmart
       :configCanvas="initialConfig"
+      :externalServices="externalServices"
+      :author="{ name: 'David Deras', id: '123' }"
       @configUpdated="handleConfigUpdated"
     />
   </div>
@@ -18,6 +20,70 @@ const initialConfig = ref(null)
 // Variable reactiva para mantener la configuración actualizada
 const currentConfig = ref(null)
 
+// Factory para generar datos de productos de niveles
+const createContainerProductsService = () => {
+  // Datos de ejemplo para diferentes niveles
+  const mockData = [
+    { codigo: 'PROD001', descripcion: 'Producto A - Medicamento', cantidad: 150, fechaVencimiento: '2024-01-15' },
+    { codigo: 'PROD002', descripcion: 'Producto B - Suplemento vitamínico', cantidad: 75, fechaVencimiento: '2024-10-30' },
+    { codigo: 'PROD003', descripcion: 'Producto C - Antibiótico', cantidad: 25, fechaVencimiento: '2023-12-10' },
+    { codigo: 'PROD004', descripcion: 'Producto D - Analgésico', cantidad: 200, fechaVencimiento: '2024-06-20' },
+    { codigo: 'PROD005', descripcion: 'Producto E - Jarabe para la tos', cantidad: 60, fechaVencimiento: '2024-03-15' },
+    { codigo: 'TOOL001', descripcion: 'Destornillador Phillips #2', cantidad: 50, fechaVencimiento: null },
+    { codigo: 'TOOL002', descripcion: 'Llave inglesa 12mm', cantidad: 30, fechaVencimiento: null },
+    { codigo: 'TOOL003', descripcion: 'Martillo de goma', cantidad: 20, fechaVencimiento: null },
+    { codigo: 'TOOL004', descripcion: 'Alicate universal', cantidad: 15, fechaVencimiento: null },
+    { codigo: 'FOOD001', descripcion: 'Arroz integral 1kg', cantidad: 80, fechaVencimiento: '2024-08-15' },
+    { codigo: 'FOOD002', descripcion: 'Frijoles negros 500g', cantidad: 45, fechaVencimiento: '2024-07-22' },
+    { codigo: 'FOOD003', descripcion: 'Aceite de oliva 750ml', cantidad: 25, fechaVencimiento: '2024-12-01' },
+    { codigo: 'FOOD004', descripcion: 'Pasta integral 500g', cantidad: 60, fechaVencimiento: '2024-05-10' },
+    { codigo: 'FOOD005', descripcion: 'Quinoa orgánica 1kg', cantidad: 30, fechaVencimiento: '2024-09-30' },
+    { codigo: 'FOOD006', descripcion: 'Lentejas rojas 500g', cantidad: 40, fechaVencimiento: '2024-06-15' }
+  ]
+
+  return {
+    name: 'containerProducts',
+    type: 'container_products',
+    description: 'Servicio de prueba para productos de niveles',
+    handler: async ({ containerId, filter = '', pagination = {} }) => {
+      // Simular delay de red
+      await new Promise(resolve => setTimeout(resolve, 800))
+
+      const { page = 1, pageSize = 10 } = pagination
+
+      // Obtener N productos random del nivel
+      let products = mockData.sort(() => 0.5 - Math.random()).slice(0, 5)
+
+      // Aplicar filtro si existe
+      if (filter.trim()) {
+        const filterLower = filter.toLowerCase()
+        products = products.filter(product =>
+          product.codigo.toLowerCase().includes(filterLower) ||
+          product.descripcion.toLowerCase().includes(filterLower)
+        )
+      }
+
+      // Calcular paginación
+      const totalCount = products.length
+      const startIndex = (page - 1) * pageSize
+      const endIndex = startIndex + pageSize
+      const paginatedProducts = products.slice(startIndex, endIndex)
+      return {
+        products: paginatedProducts,
+        totalCount,
+        pagination: {
+          page,
+          pageSize,
+          totalPages: Math.ceil(totalCount / pageSize)
+        }
+      }
+    }
+  }
+}
+
+// Servicios externos
+const externalServices = ref([createContainerProductsService()])
+
 // Manejador para cuando se actualiza la configuración desde InventorySmart
 const handleConfigUpdated = (nuevaConfig) => {
   try {
@@ -26,7 +92,6 @@ const handleConfigUpdated = (nuevaConfig) => {
     currentConfig.value = nuevaConfig
     // DEV: Guardar en localStorage para simular persistencia
     localStorage.setItem(SERIALIZE_CONFIG.STORAGE_KEY, nuevaConfig)
-    console.log('Configuración actualizada guardada en localStorage')
     initialConfig.value = nuevaConfig
 
     // Al implementar aqui se enviaría a la API
@@ -41,7 +106,6 @@ onMounted(() => {
   if (savedConfig) {
     try {
       initialConfig.value = savedConfig
-      console.log('Configuración inicial cargada desde localStorage')
     } catch (error) {
       console.error('Error al parsear la configuración guardada:', error)
     }

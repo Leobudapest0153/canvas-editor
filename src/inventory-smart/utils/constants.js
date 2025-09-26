@@ -4,28 +4,67 @@
  * Constantes y elementos predefinidos para el catálogo del editor.
  */
 
-// === Tipos de entidades ===
-
 /**
-  * Las restricciones pueden tomar los siguientes valores
-  * enter: Limita que se pueda acceder usando doble clic
-  * drag: Limita arrastrar el elemento y que este pueda ser redimensionado. Restringe las acciones en la barra flotante
-  * open-properties: No permite que se pueda seleccionar un elemento, lo que conlleva a que no se
-  * puedan abrir las propiedades ni tampoco ser redimensionado o activar las acciones de la barra
-  * flotante
-  * read-only-properties: Coloca las campos de propiedades como disable (Requiere que no esté
-    * presente open-properties)
-  */
+ * Las restricciones pueden tomar los siguientes valores
+ * enter: Limita que se pueda acceder usando doble clic
+ * drag: Limita arrastrar el elemento y que este pueda ser redimensionado. Restringe las acciones en la barra flotante
+ * open-properties: No permite que se pueda seleccionar un elemento, lo que conlleva a que no se
+ * puedan abrir las propiedades ni tampoco ser redimensionado o activar las acciones de la barra
+ * flotante
+ * read-only-properties: Coloca las campos de propiedades como disable (Requiere que no esté
+ * presente open-properties)
+ */
 export const TIPOS_ENTIDAD = [
-  { id: 'plantas', nombre: 'Plantas', color: '#10b981', icono: '🏢', restrictions: [] },
-  { id: 'cuartos', nombre: 'Cuartos', color: '#0ea5e9', icono: '🏠', restrictions: [] },
-  { id: 'pisos', nombre: 'Pisos', color: '#22c55e', icono: '🧱', restrictions: ['read-only-properties', 'right-click', 'drag'] },
-  { id: 'pasillos', nombre: 'Pasillos', color: '#111827', icono: '🛣️', restrictions: [] },
-  { id: 'elementos', nombre: 'Elementos', color: '#3b82f6', icono: '📦', restrictions: [] },
-  { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', icono: '🗃️', restrictions: ['read-only-properties', 'right-click', 'drag'] },
+  {
+    id: 'plantas',
+    nombre: 'Plantas',
+    nombreSingular: 'Planta',
+    color: '#1C1E4D',
+    icono: '🏢',
+    restrictions: [],
+  },
+  {
+    id: 'cuartos',
+    nombre: 'Cuartos',
+    nombreSingular: 'Cuarto',
+    color: '#1C1E4D',
+    icono: '🏠',
+    restrictions: [],
+  },
+  {
+    id: 'pisos',
+    nombre: 'Pisos',
+    nombreSingular: 'Piso',
+    color: '#1C1E4D',
+    icono: '🧱',
+    restrictions: ['read-only-properties', 'right-click', 'drag'],
+  },
+  {
+    id: 'pasillos',
+    nombre: 'Pasillos',
+    nombreSingular: 'Pasillo',
+    color: '#1C1E4D',
+    icono: '🛣️',
+    restrictions: [],
+  },
+  {
+    id: 'elementos',
+    nombre: 'Espacios',
+    nombreSingular: 'Espacio',
+    color: '#1C1E4D',
+    icono: '📦',
+    restrictions: [],
+  },
+  {
+    id: 'contenedores',
+    nombre: 'Niveles',
+    nombreSingular: 'Nivel',
+    color: '#1C1E4D',
+    icono: '🗃️',
+    restrictions: ['read-only-properties', 'right-click', 'drag'],
+  },
 ]
 
-// === REGLAS DE JERARQUÍA ===
 export const JERARQUIA_PERMITIDA = {
   plantas: ['cuartos', 'elementos', 'pasillos'],
   cuartos: ['pisos'],
@@ -47,35 +86,32 @@ export const CATALOGO = {
 }
 
 export const ELEMENTOS_PREDEFINIDOS = [
-  // === ESPACIOS / ESTRUCTURAS ===
-
-  // Pasillo base (no navegable, altura = 100% de la planta)
+  // Pasillo base
   {
     id: 'pasillo_base',
     nombre: 'Pasillo',
     tipo: 'pasillos',
-    categoria: 'pasillos',
+    categoria: 'pasillo',
     forma: 'rectangular',
     orientacion: 0,
-    colorBase: '#ffffff',
+    colorBase: '#EDEDED',
     dimensiones: {
       ancho: 150,
       largo: 600,
-      alto: 10, // será igualado a planta.alto
+      alto: 10,
     },
-    pesoMaximo: 0,
+    capacidadCarga: 0,
     ubicacion: 'suelo',
     descripcion: 'Pasillo de circulación',
     icono: 'road',
     props: { system: true, catalogVisible: true },
   },
-
-  // Cuarto frío (navegable)
+  // Cuarto frío
   {
     id: 'cuarto_frio',
     nombre: 'Cuarto frío',
     tipo: 'cuartos',
-    categoria: 'cuartos',
+    categoria: 'almacenamiento',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#e0f2fe',
@@ -84,14 +120,21 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 400,
       alto: 250,
     },
-    pesoMaximo: 0,
+    capacidadCarga: 500,
     ubicacion: 'suelo',
     descripcion: 'Cuarto especial',
     icono: 'home',
     props: { system: true, catalogVisible: true },
+    pisosNiveles: [
+      {
+        nombre: 'Piso 1',
+        tiposProductos: ['refrigerados', 'congelados'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
-
-  // Piso base (navegable)
+  // Piso de cuarto
   {
     id: 'piso_base',
     nombre: 'Piso',
@@ -105,21 +148,18 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 100,
       alto: 10,
     },
-    pesoMaximo: 0,
+    capacidadCarga: 500,
     ubicacion: 'suelo',
     descripcion: 'Piso interno de cuarto',
     icono: 'brick',
     props: { system: true, catalogVisible: true },
   },
-
-  // === ELEMENTOS (visibles cuando el contexto lo permita) ===
-
   // Anaqueles
   {
     id: 'anaquel_metalico_grande',
-    nombre: 'Anaquel 2 x 2',
-    tipo: 'elementos', // NUEVO CAMPO
-    categoria: 'anaqueles',
+    nombre: 'Anaquel',
+    tipo: 'elementos',
+    categoria: 'anaquel_metal',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#3b82f6',
@@ -128,19 +168,26 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 200,
       alto: 180,
     },
-    pesoMaximo: 500, // kg
+    capacidadCarga: 500,
     ubicacion: 'suelo',
     descripcion: 'Anaquel metálico de alta capacidad para almacenamiento pesado',
     icono: 'rack',
     props: { system: true },
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos', 'voluminosos'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
-
   // Estante de pared
   {
     id: 'estante_pared_pequeno',
     nombre: 'Estante de Pared',
-    tipo: 'elementos', // NUEVO CAMPO
-    categoria: 'estantes',
+    tipo: 'elementos',
+    categoria: 'estante_madera',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#10b981',
@@ -149,20 +196,27 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 25,
       alto: 20,
     },
-    pesoMaximo: 50, // kg
+    capacidadCarga: 50,
     ubicacion: 'pared',
-    alturaRespectoAlSuelo: 150, // cm - altura típica para estantes de pared
+    alturaRespectoAlSuelo: 150,
     descripcion: 'Estante montado en pared para almacenamiento ligero',
     icono: 'shelf',
     props: { system: true },
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos', 'fragiles'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: true,
+      },
+    ],
   },
-
   // Armario de pared
   {
     id: 'armario_pared_alto',
     nombre: 'Armario de Pared Alto',
-    tipo: 'elementos', // NUEVO CAMPO
-    categoria: 'armarios',
+    tipo: 'elementos',
+    categoria: 'armario',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#7c3aed',
@@ -171,20 +225,27 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 30,
       alto: 80,
     },
-    pesoMaximo: 100, // kg
+    capacidadCarga: 100,
     ubicacion: 'pared',
-    alturaRespectoAlSuelo: 50, // cm - altura moderada para armarios
+    alturaRespectoAlSuelo: 50,
     descripcion: 'Armario montado en pared para almacenamiento vertical',
     icono: 'cabinet',
     props: { system: true },
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
-
   // Barril
   {
     id: 'barril_basico',
     nombre: 'Barril',
     tipo: 'elementos',
-    categoria: 'contenedores',
+    categoria: 'barril',
     forma: 'circular',
     orientacion: 0,
     colorBase: '#f97316',
@@ -193,15 +254,20 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 60,
       alto: 90,
     },
-    pesoMaximo: 200, // kg
+    capacidadCarga: 200,
     ubicacion: 'suelo',
     descripcion: 'Barril estándar de madera',
     icono: 'barrel',
     props: { system: true },
+    pisosNiveles: [
+      {
+        nombre: 'Nivel 1',
+        tiposProductos: ['secos'],
+        tipoZona: 'almacenaje',
+        permiteFragiles: false,
+      },
+    ],
   },
-
-  // === CONTENEDORES (solo pueden ir en elementos) ===
-
   // Contenedor básico (único disponible)
   {
     id: 'contenedor_base',
@@ -216,48 +282,12 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 10,
       alto: 10,
     },
-    pesoMaximo: 1,
+    capacidadCarga: 1,
     ubicacion: 'interior',
     descripcion: 'Contenedor básico para almacenamiento organizado (nivel de elemento)',
     icono: 'box',
     props: { system: true },
   },
-]
-
-// === CATEGORÍAS POR TIPO ===
-export const CATEGORIAS_ELEMENTOS = [
-  { id: 'anaqueles', nombre: 'Anaqueles', color: '#3b82f6', tipo: 'elementos' },
-  { id: 'estantes', nombre: 'Estantes', color: '#10b981', tipo: 'elementos' },
-  { id: 'mesas', nombre: 'Mesas', color: '#f59e0b', tipo: 'elementos' },
-  { id: 'armarios', nombre: 'Armarios', color: '#7c3aed', tipo: 'elementos' },
-]
-
-export const CATEGORIAS_CONTENEDORES = [
-  { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626', tipo: 'contenedores' },
-]
-
-export const CATEGORIAS_CUARTOS = [
-  { id: 'cuartos', nombre: 'Cuartos', color: '#0ea5e9', tipo: 'cuartos' },
-]
-
-export const CATEGORIAS_PISOS = [
-  { id: 'pisos', nombre: 'Pisos', color: '#22c55e', tipo: 'pisos' },
-]
-
-export const CATEGORIAS_PASILLOS = [
-  { id: 'pasillos', nombre: 'Pasillos', color: '#111827', tipo: 'pasillos' },
-]
-
-// === CATEGORÍAS LEGACY (mantener por compatibilidad temporal) ===
-export const CATEGORIAS = [
-  { id: 'anaqueles', nombre: 'Anaqueles', color: '#3b82f6' },
-  { id: 'estantes', nombre: 'Estantes', color: '#10b981' },
-  { id: 'mesas', nombre: 'Mesas', color: '#f59e0b' },
-  { id: 'armarios', nombre: 'Armarios', color: '#7c3aed' },
-  { id: 'contenedores', nombre: 'Contenedores', color: '#dc2626' },
-  { id: 'cuartos', nombre: 'Cuartos', color: '#0ea5e9' },
-  { id: 'pisos', nombre: 'Pisos', color: '#22c55e' },
-  { id: 'pasillos', nombre: 'Pasillos', color: '#111827' },
 ]
 
 export const FORMAS_DISPONIBLES = [
@@ -268,27 +298,6 @@ export const FORMAS_DISPONIBLES = [
 export const UBICACIONES_DISPONIBLES = [
   { id: 'suelo', nombre: 'Suelo', aplicaA: ['elementos', 'cuartos', 'pisos', 'pasillos'] },
   { id: 'pared', nombre: 'Pared', aplicaA: ['elementos'] },
-  { id: 'interior', nombre: 'Interior', aplicaA: ['contenedores'] },
-]
-
-// === CATÁLOGOS PARA CUARTOS Y ESPACIOS ===
-
-export const TIPOS_CUARTO = [
-  { id: 'almacen', nombre: 'Almacén General' },
-  { id: 'cuarto_frio', nombre: 'Cuarto Frío' },
-  { id: 'oficina', nombre: 'Oficina' },
-  { id: 'recepcion', nombre: 'Recepción' },
-  { id: 'despacho', nombre: 'Despacho' },
-  { id: 'mantenimiento', nombre: 'Mantenimiento' },
-]
-
-export const TIPOS_ESPACIO = [
-  { id: 'zona_picking', nombre: 'Zona de Picking' },
-  { id: 'zona_packing', nombre: 'Zona de Packing' },
-  { id: 'zona_carga', nombre: 'Zona de Carga/Descarga' },
-  { id: 'zona_clasificacion', nombre: 'Zona de Clasificación' },
-  { id: 'zona_temporal', nombre: 'Almacenamiento Temporal' },
-  { id: 'pasillo_principal', nombre: 'Pasillo Principal' },
 ]
 
 export const TIPOS_ZONA_CUARTO = [
@@ -297,30 +306,24 @@ export const TIPOS_ZONA_CUARTO = [
 ]
 
 export const TIPOS_ZONA_ESPACIO = [
-  { id: 'picking', nombre: 'Zona de picking' },
+  { id: 'picking', nombre: 'Zona de picking' }
 ]
 
-// === TODAS LAS CATEGORÍAS UNIFICADAS ===
-export const TODAS_LAS_CATEGORIAS = [
-  ...CATEGORIAS_ELEMENTOS,
-  ...CATEGORIAS_CONTENEDORES,
-  ...CATEGORIAS_CUARTOS,
-  ...CATEGORIAS_PISOS,
-  ...CATEGORIAS_PASILLOS,
-  ...TIPOS_CUARTO,
-  ...TIPOS_ESPACIO
+// == Catálogos default (reales vendrán de la configuración)
+export const DEFAULT_TIPOS_ESPACIO = [
+  { id: 'anaquel_metal', nombre: 'Anaquel metal' },
+  { id: 'estante_madera', nombre: 'Estante madera' },
+  { id: 'repisa_aluminio', nombre: 'Repisa aluminio' },
+  { id: 'barril', nombre: 'Barril' },
+  { id: 'armario', nombre: 'Armario' },
+  { id: 'pasillo', nombre: 'Pasillo' },
 ]
-
-// Orientaciones para cuartos (grados)
-export const ORIENTACIONES = [
-  { id: '0', nombre: '0°' },
-  { id: '90', nombre: '90°' },
-  { id: '180', nombre: '180°' },
-  { id: '270', nombre: '270°' },
+export const DEFAULT_TIPOS_CUARTO = [
+  { id: 'almacenamiento', nombre: 'Zona de almacenaje' },
+  { id: 'zona_de_descarga', nombre: 'Zona de Descarga' },
+  { id: 'almacenaje', nombre: 'Almacenaje' },
 ]
-
-// Tipos de productos que se pueden admitir en un piso/nivel
-export const TIPOS_PRODUCTO_ADMITIDOS = [
+export const DEFAULT_TIPOS_PRODUCTO_ADMITIDOS = [
   { id: 'secos', nombre: 'Productos secos' },
   { id: 'refrigerados', nombre: 'Refrigerados' },
   { id: 'congelados', nombre: 'Congelados' },
@@ -329,86 +332,63 @@ export const TIPOS_PRODUCTO_ADMITIDOS = [
   { id: 'voluminosos', nombre: 'Voluminosos' },
 ]
 
-// === FUNCIONES DE UTILIDAD ===
+// == Catálogos default
 
-/**
- * Obtiene las categorías permitidas según el tipo de entidad
- */
-export const getCategoriasPorTipo = (tipo) => {
-  switch (tipo) {
-    case 'elementos':
-      return CATEGORIAS_ELEMENTOS
-    case 'contenedores':
-      return CATEGORIAS_CONTENEDORES
-    case 'cuartos':
-      return CATEGORIAS_CUARTOS
-    case 'pisos':
-      return CATEGORIAS_PISOS
-    case 'pasillos':
-      return CATEGORIAS_PASILLOS
-    default:
-      return []
-  }
-}
+export const DEFAULT_TIPOS_CONTENEDOR = [{ id: 'nivel', nombre: 'Nivel' }]
 
-/**
- * Verifica si un tipo puede contener otro según la jerarquía
- */
+export const DEFAULT_TIPOS_PISO = [{ id: 'piso', nombre: 'Piso' }]
+
+export const TODAS_LAS_CATEGORIAS = [...DEFAULT_TIPOS_CUARTO, ...DEFAULT_TIPOS_ESPACIO, ...DEFAULT_TIPOS_CONTENEDOR, ...DEFAULT_TIPOS_PISO]
+
+export const ORIENTACIONES = [
+  { id: '0', nombre: '0°' },
+  { id: '90', nombre: '90°' },
+  { id: '180', nombre: '180°' },
+  { id: '270', nombre: '270°' },
+]
+
 export const puedeContener = (tipoPadre, tipoHijo) => {
   return JERARQUIA_PERMITIDA[tipoPadre]?.includes(tipoHijo) || false
 }
 
-/**
- * Obtiene el color por defecto para un tipo
- */
 export const getColorPorTipo = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.color || '#6b7280'
 }
 
-/**
- * Obtiene el icono por defecto para un tipo
- */
+export const getColorPorCategoria = (categoriaId) => {
+  const cat = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
+  return cat?.color || '#3b82f6'
+}
+
 export const getIconoPorTipo = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.icono || '📦'
 }
 
-/**
- * Obtiene el color asociado a una categoría del catálogo
- */
 export const getColorCategoria = (categoriaId) => {
+  // Buscar categoria, su tipo y devolver color
   const cat = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
-  return cat?.color || '#3b82f6'
+  if (!cat) return '#6b7280'
+  const tipoInfo = TIPOS_ENTIDAD.find((t) => puedeContener(t.id, cat.id))
+  return tipoInfo?.color || '#6b7280'
 }
 
-export const COLORES_DISPONIBLES = [
-  '#3b82f6',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#8b5cf6',
-  '#06b6d4',
-  '#84cc16',
-  '#f97316',
-  '#ec4899',
-  '#6b7280',
-]
-
-// === Escalas y tolerancias de interacción ===
-export const TOLERANCE_CM = 0.1 // tolerancia en cm para colisiones y ajustes
-// Conversión de centímetros a pixeles en la visualización (usada para layer/planta)
+// Tolerancia para colisiones y ajustes
+export const TOLERANCE_CM = 0.1
+// Conversión de centímetros a pixeles
 export const CM_TO_PX = 10
 // Tolerancia para aplicar "pegado" al borde en px
 export const SNAP_EPS = 4
 // Tamaño de grilla para snap y búsqueda en espiral
 export const GRID_SIZE = 0
-
-// === CONFIGURACIÓN DE PRECISIÓN ===
-// Precisión decimal para dimensiones en centímetros (0.01 = 2 decimales)
+// Precisión decimal para dimensiones (0.01 = 2 decimales)
 export const PRECISION_CM = 0.01
 // Número de decimales para redondeo
 export const DECIMAL_PLACES = 2
+// MARGEN POR DEFECTO PARA CAPACIDAD DE CARGA AL AUTOCOMPLETAR (5% = 0.05)
+export const LOAD_MARGIN = 0.05
+export const INFINITE_VIEW_PADDING_PX = 40
 
 // Parámetros por defecto para guard de redimensionado
 export const MARGIN_CM = 5 // margen perimetral interno en cm para packing
@@ -416,10 +396,10 @@ export const FACTOR_UTILIZACION = 0.9 // porcentaje máximo de ocupación de ár
 
 // === CONFIGURACIÓN DE AUTOSAVE ===
 export const AUTOSAVE_CONFIG = {
-  INTERVAL_MS: 60000, // 30 segundos
-  MAX_BACKUPS: 10, // máximo número de copias de seguridad
+  INTERVAL_MS: 60000,
+  MAX_BACKUPS: 10,
   STORAGE_KEY: 'canvas_autosave_backups',
-  ENABLED: true, // habilitar/deshabilitar autosave
+  ENABLED: true,
 }
 
 export const SERIALIZE_CONFIG = {
@@ -427,7 +407,6 @@ export const SERIALIZE_CONFIG = {
 }
 
 // === POLÍTICAS DE DIMENSIONES (escalado por eje) ===
-// Nota: Reusar constantes existentes; no duplicar conversiones.
 export const DIMENSIONS = {
   axisScaleDefault: { x: 0.2, y: 0.2, z: 0.2 },
   // Overrides por tipo (usar keys reales del catálogo/base)
@@ -453,7 +432,6 @@ export const DIMENSIONS = {
     piso_base: { min: { w: 50, h: 10, d: 50 }, max: { w: 2000, h: 500, d: 2000 } },
   },
   autoResizeOnParentChange: true,
-  // Reusar conversión de cm→px existente
   gridPxPerCm: CM_TO_PX,
 }
 
@@ -465,12 +443,21 @@ export const OFFSETS = {
   },
 }
 
-// (Opcional) Política de peso — OFF por defecto
+// Política de peso — OFF por defecto
 export const WEIGHT = {
   enableDefaultShareFromParent: false,
   defaultShare: 0.2,
 }
 
-// === VERSIONADO DE EXPORT / SCHEMAS ===
 export const EXPORT_FORMAT_VERSION = '1.1.0'
 export const SCHEMA_VERSION_PLANTILLAS = 1
+
+export const getContrastTextColor = (hexColor) => {
+  if (!hexColor || typeof hexColor !== 'string') return '#ffffff'
+  const hex = hexColor.replace('#', '')
+  const r = parseInt(hex.substr(0, 2), 16)
+  const g = parseInt(hex.substr(2, 2), 16)
+  const b = parseInt(hex.substr(4, 2), 16)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance < 0.5 ? '#ffffff' : '#000000'
+}

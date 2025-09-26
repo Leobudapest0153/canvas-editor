@@ -38,6 +38,11 @@ export function useAutoPaste() {
   const { showToast } = useToast()
   const { startLoading, stopLoading, isOperationInProgress } = useLoader()
 
+  const pasteOffsetStep = { x: 16, y: 16 }
+  let lastPasteContextKey = null
+  let lastPasteAnchor = null
+  let lastOffsetApplied = 0
+
   /**
    * Calcula el centroide de un polígono
    */
@@ -162,13 +167,102 @@ export function useAutoPaste() {
    * Obtiene las dimensiones del área disponible en el contexto actual
    * considerando la vista activa (XY o XZ), las dimensiones apropiadas y el polígono de la planta
    */
-  const getAreaBounds = () => {
+  const getAreaBounds = (options = {}) => {
     const contexto = canvasStore.contextoActual
     const vistaActiva = canvasStore.vistaActiva
     const canvasAdaptativo = canvasStore.canvasAdaptativo
+    const { startPosition = null, viewportSize = null, viewportWorld = null } = options || {}
     let bounds = { minX: 0, minY: 0, maxX: 0, maxY: 0 }
     let polygonPoints = null
     let insetPolygon = null
+
+    const isInfiniteFloor =
+      contexto?.tipo === 'plantas' && canvasStore.plantaActivaData?.isInfinite === true
+
+    if (isInfiniteFloor) {
+      const zoom = canvasStore.zoom || 1
+      const panX = canvasStore.panX || 0
+      const panY = canvasStore.panY || 0
+
+      const baseRect =
+        viewportWorld &&
+        Number.isFinite(viewportWorld.minX) &&
+        Number.isFinite(viewportWorld.minY) &&
+        Number.isFinite(viewportWorld.maxX) &&
+        Number.isFinite(viewportWorld.maxY)
+          ? viewportWorld
+          : (() => {
+              const widthScreen = viewportSize?.width ?? canvasAdaptativo?.width ?? 2000
+              const heightScreen = viewportSize?.height ?? canvasAdaptativo?.height ?? 2000
+              const safeZoom = zoom || 1
+              const minX = (-panX) / safeZoom
+              const minY = (-panY) / safeZoom
+              const widthWorld = (widthScreen || 0) / safeZoom
+              const heightWorld = (heightScreen || 0) / safeZoom
+              return {
+                minX,
+                minY,
+                maxX: minX + Math.max(1, widthWorld || 0),
+                maxY: minY + Math.max(1, heightWorld || 0),
+              }
+            })()
+
+      let { minX, minY, maxX, maxY } = baseRect
+
+      const spanX = Math.max(1, maxX - minX)
+      const spanY = Math.max(1, maxY - minY)
+      const padX = Math.max(200, spanX * 0.25)
+      const padY = Math.max(200, spanY * 0.25)
+
+      minX -= padX
+      maxX += padX
+      minY -= padY
+      maxY += padY
+
+      if (startPosition) {
+        const ensurePadX = Math.max(padX, spanX * 0.5)
+        const ensurePadY = Math.max(padY, spanY * 0.5)
+        minX = Math.min(minX, startPosition.x - ensurePadX)
+        maxX = Math.max(maxX, startPosition.x + ensurePadX)
+        minY = Math.min(minY, startPosition.y - ensurePadY)
+        maxY = Math.max(maxY, startPosition.y + ensurePadY)
+      }
+
+      if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+        minX = -1000
+        maxX = 1000
+      }
+
+      if (!Number.isFinite(minY) || !Number.isFinite(maxY)) {
+        minY = -1000
+        maxY = 1000
+      }
+
+      if (maxX <= minX) {
+        const centerX = startPosition?.x ?? (minX + maxX) / 2
+        const width = Math.max(spanX, 400)
+        minX = centerX - width / 2
+        maxX = centerX + width / 2
+      }
+
+      if (maxY <= minY) {
+        const centerY = startPosition?.y ?? (minY + maxY) / 2
+        const height = Math.max(spanY, 400)
+        minY = centerY - height / 2
+        maxY = centerY + height / 2
+      }
+
+      return {
+        minX,
+        minY,
+        maxX,
+        maxY,
+        polygon: null,
+        insetPolygon: null,
+        hasPolygon: false,
+        mode: 'elastic',
+      }
+    }
 
     if (contexto.tipo === 'plantas') {
       const planta = canvasStore.plantaPorId(contexto.id)
@@ -235,7 +329,8 @@ export function useAutoPaste() {
       ...bounds,
       polygon: polygonPoints,
       insetPolygon: insetPolygon,
-      hasPolygon: !!polygonPoints && polygonPoints.length > 0
+      hasPolygon: !!polygonPoints && polygonPoints.length > 0,
+      mode: 'fixed',
     }
   }
 
@@ -310,7 +405,7 @@ export function useAutoPaste() {
         }
       }
     } catch (error) {
-      console.warn('⚠️ Error en validación de peso (ignorado):', error.message)
+      console.warn('Error en validación de peso (ignorado):', error.message)
     }
 
     // 4. Usar los guards de placement para validación crítica
@@ -325,7 +420,7 @@ export function useAutoPaste() {
         }
       }
     } catch (error) {
-      console.warn('⚠️ Error en placement guards:', error.message)
+      console.warn('Error en placement guards:', error.message)
       return {
         valid: false,
         reason: `Error en validación de placement: ${error.message}`
@@ -442,9 +537,16 @@ export function useAutoPaste() {
     let initialX, initialY
 
     if (startPosition) {
-      // Si se especifica una posición, usarla (con límites)
-      initialX = Math.max(areaBounds.minX, Math.min(startPosition.x, areaBounds.maxX - elementWidth))
-      initialY = Math.max(areaBounds.minY, Math.min(startPosition.y, areaBounds.maxY - elementHeight))
+      const desiredX = startPosition.x - elementWidth / 2
+      const desiredY = startPosition.y - elementHeight / 2
+      initialX = Math.max(
+        areaBounds.minX,
+        Math.min(desiredX, areaBounds.maxX - elementWidth),
+      )
+      initialY = Math.max(
+        areaBounds.minY,
+        Math.min(desiredY, areaBounds.maxY - elementHeight),
+      )
     } else if (areaBounds.hasPolygon && areaBounds.polygon) {
       // Si hay polígono, intentar usar su centroide como punto inicial
       const centroid = calculatePolygonCentroid(areaBounds.polygon)
@@ -548,7 +650,7 @@ export function useAutoPaste() {
   /**
    * Pega automáticamente el primer elemento del buffer
    */
-  const handlePaste = async () => {
+  const handlePaste = async (options = {}) => {
     // Verificar si ya hay una operación de pegado en progreso
     if (isOperationInProgress('paste')) {
       showToast('Ya hay una operación de pegado en curso. Espera a que termine.', 'warning')
@@ -556,6 +658,43 @@ export function useAutoPaste() {
     }
 
     let loadingId = null
+    const { startPosition: providedStart = null, viewportSize = null, viewportWorld = null } = options || {}
+
+    const contextKey = [
+      canvasStore.contextoActual?.tipo || 'unknown',
+      canvasStore.contextoActual?.id || 'unknown',
+      canvasStore.plantaActiva || 'none',
+    ].join(':')
+
+    if (contextKey !== lastPasteContextKey) {
+      lastPasteContextKey = contextKey
+      lastPasteAnchor = null
+      lastOffsetApplied = 0
+    }
+
+    const anchor =
+      providedStart &&
+      Number.isFinite(providedStart.x) &&
+      Number.isFinite(providedStart.y)
+        ? { x: providedStart.x, y: providedStart.y }
+        : null
+
+    let effectiveStart = anchor ? { ...anchor } : null
+    let pendingOffsetCount = 0
+    const OFFSET_THRESHOLD = 4
+
+    if (anchor && lastPasteAnchor) {
+      const dx = anchor.x - lastPasteAnchor.x
+      const dy = anchor.y - lastPasteAnchor.y
+      const distance = Math.hypot(dx, dy)
+      if (distance < OFFSET_THRESHOLD) {
+        pendingOffsetCount = lastOffsetApplied + 1
+        effectiveStart = {
+          x: anchor.x + pasteOffsetStep.x * pendingOffsetCount,
+          y: anchor.y + pasteOffsetStep.y * pendingOffsetCount,
+        }
+      }
+    }
 
     try {
       // Verificar que hay elementos en el buffer
@@ -591,15 +730,28 @@ export function useAutoPaste() {
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Obtener límites del área actual
-      const areaBounds = getAreaBounds()
+      const areaBounds = getAreaBounds({
+        startPosition: anchor ?? effectiveStart ?? null,
+        viewportSize,
+        viewportWorld,
+      })
 
-      if (areaBounds.maxX === 0 || areaBounds.maxY === 0) {
+      if (
+        !Number.isFinite(areaBounds.minX) ||
+        !Number.isFinite(areaBounds.maxX) ||
+        !Number.isFinite(areaBounds.minY) ||
+        !Number.isFinite(areaBounds.maxY)
+      ) {
         showToast('No se pudieron determinar los límites del área actual.', 'error')
         return false
       }
 
       // Buscar espacio disponible
-      const spaceResult = findAvailableSpace(elemento, areaBounds)
+      const spaceResult = findAvailableSpace(
+        elemento,
+        areaBounds,
+        effectiveStart || anchor || null,
+      )
 
       if (!spaceResult.found) {
         const elementType = elemento.ubicacion === 'pared' ? 'de pared' : 'de suelo'
@@ -609,8 +761,6 @@ export function useAutoPaste() {
         )
         return false
       }
-
-      console.log('✅ Espacio encontrado:', spaceResult.position)
 
       // Validar la colocación en la posición encontrada
       const validation = validatePlacement(elemento, spaceResult.position, areaBounds)
@@ -636,6 +786,18 @@ export function useAutoPaste() {
         // Seleccionar el elemento recién pegado
         canvasStore.seleccionarElemento(elementoId)
         // canvasStore.destacarElemento(elementoId)
+
+        if (anchor) {
+          lastPasteAnchor = { ...anchor }
+          lastOffsetApplied = pendingOffsetCount
+        } else if (effectiveStart) {
+          lastPasteAnchor = { ...effectiveStart }
+          lastOffsetApplied = pendingOffsetCount
+        } else {
+          lastPasteAnchor = null
+          lastOffsetApplied = 0
+        }
+        lastPasteContextKey = contextKey
 
         return true
       } else {

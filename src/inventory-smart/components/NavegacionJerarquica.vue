@@ -84,21 +84,21 @@
         </div>
         <div class="context-details">
           <span v-if="canvasStore.estaEnPlanta">
-            {{ canvasStore.elementosVisibles.length }} items (cuartos, elementos, pasillos)
+            {{ canvasStore.elementosVisibles.length }} items (cuartos, espacios, pasillos)
           </span>
           <span v-else-if="canvasStore.estaEnCuarto">
             {{ canvasStore.elementosVisibles.length }} pisos
           </span>
           <span v-else-if="canvasStore.estaEnPiso">
-            {{ canvasStore.elementosVisibles.length }} elementos
+            {{ canvasStore.elementosVisibles.length }} espacios
           </span>
           <span v-else-if="canvasStore.estaEnElemento">
-            {{ canvasStore.elementosVisibles.length }} contenedores
+            {{ canvasStore.elementosVisibles.length }} niveles
             <br />
             <small>Interior de {{ elementoActual?.nombre }}</small>
           </span>
           <span v-else-if="canvasStore.estaEnContenedor">
-            {{ canvasStore.elementosVisibles.length }} items (elementos + contenedores)
+            {{ canvasStore.elementosVisibles.length }} items (espacios + niveles)
             <br />
             <small>Interior de {{ elementoActual?.nombre }}</small>
           </span>
@@ -337,22 +337,6 @@ const previousCrumb = computed(() => {
 .context-details small {
   font-size: 0.625rem;
   color: #9ca3af;
-}
-
-.plant-selector {
-  padding: 0.5rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  background: white;
-  font-size: 0.875rem;
-  color: #374151;
-  min-width: 120px;
-}
-
-.plant-selector:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 /* Responsive */

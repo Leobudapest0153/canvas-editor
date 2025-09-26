@@ -1,4 +1,5 @@
 import { watch, getCurrentInstance, onUnmounted } from 'vue'
+import { isPlantInfinite } from '@/inventory-smart/utils/polygonBounds'
 
 // Automatically enable Konva node caching during drag operations.
 // - On `dragstart`: calls `node.cache()` and `node.draw()`
@@ -17,6 +18,7 @@ export function useCacheOnDrag(refNode) {
 
   const onDragStart = () => {
     try {
+      if (isPlantInfinite()) return
       node && node.cache && node.cache()
       node && node.draw && node.draw()
     } catch {

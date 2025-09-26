@@ -29,7 +29,7 @@ export const exportCatalogItemsToDTO = (items = []) => {
         ubicacion: el.ubicacion,
         orientacion: el.orientacion,
         alturaRespectoAlSuelo: el.alturaRespectoAlSuelo,
-        pesoMaximo: el.pesoMaximo,
+        capacidadCarga: el.capacidadCarga,
         volumenMaximo: el.volumenMaximo,
         meta: el.meta ? { ...el.meta } : undefined,
       }))
@@ -83,7 +83,7 @@ export const importCatalogItemsFromDTO = (dtos = []) => {
         ubicacion: n.ubicacion,
         orientacion: n.orientacion,
         alturaRespectoAlSuelo: n.alturaRespectoAlSuelo,
-        pesoMaximo: n.pesoMaximo,
+        capacidadCarga: n.capacidadCarga,
         volumenMaximo: n.volumenMaximo,
         meta: n.meta ? { ...n.meta } : undefined,
       }))
@@ -104,7 +104,7 @@ export const importCatalogItemsFromDTO = (dtos = []) => {
         forma: rootNode?.forma,
         ubicacion: rootNode?.ubicacion,
         orientacion: rootNode?.orientacion,
-        pesoMaximo: rootNode?.pesoMaximo,
+        capacidadCarga: rootNode?.capacidadCarga,
         payload: { rootId, elements },
         props: { system: true, catalogVisible: true },
       }

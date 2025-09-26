@@ -50,16 +50,16 @@
                 placeholder="Nombre del elemento..."
               />
             </div>
-            <!-- Filtro por categoría -->
+            <!-- Filtro por tipo (internamente manejado como categoría) -->
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide"
-                >Categoría:</label
+                >Tipo:</label
               >
               <select
                 v-model="filtroCategoria"
                 class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
               >
-                <option value="">Todas las categorías</option>
+                <option value="">Todos los tipos</option>
                 <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
                   {{ categoria.nombre }}
                 </option>
@@ -163,11 +163,12 @@
           @click="seleccionarElemento(elemento.id)"
         >
           <!-- Visual -->
-          <div
-            class="w-10 h-10 rounded-md flex-shrink-0 flex items-center justify-center"
-            :style="{ backgroundColor: elemento.colorBase || '#E0E0E0' }"
-          >
-            <span class="text-xl">{{ elemento.icono || '📦' }}</span>
+          <div class="flex-shrink-0">
+            <component
+              :is="getIconComponent(elemento)"
+              :backgroundColor="elemento.colorBase || elemento.color || '#E0E0E0'"
+              class="w-10 h-10"
+            />
           </div>
           <!-- Info -->
           <div class="flex-1 overflow-hidden">
@@ -182,7 +183,7 @@
               :delay="200"
             >
             <button
-              @click.stop="() => {canvasStore.seleccionarElemento(elemento.id);  canvasStore.destacarElemento(elemento.id);}"
+              @click.stop="showAuraElement(elemento.id)"
               class="p-0 text-gray-400 hover:text-blue-600 cursor-pointer"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -274,13 +275,16 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
-import { CATEGORIAS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
+import { TODAS_LAS_CATEGORIAS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import TagFilter from '@/inventory-smart/components/TagFilter.vue'
 import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import {useDeleteElement} from '@/inventory-smart/composables/useDeleteElement'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useToast } from '@/inventory-smart/composables/useToast'
+import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
+import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
+import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
 const { showToast } = useToast()
 // Composables
 const canvasStore = useCanvasStore()
@@ -301,11 +305,31 @@ const filtrosBotonRef = ref(null)
 const filtrosPanelRef = ref(null)
 
 // Computed properties
-const categorias = computed(() => CATEGORIAS)
+const categorias = computed(() => TODAS_LAS_CATEGORIAS)
+
+const showAuraElement = (elementoId) => {
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes buscar un elemento si tienes cambios pendientes', 'warn');
+    return;
+  }
+  canvasStore.destacarElemento(elementoId);
+  canvasStore.seleccionarElemento(elementoId);
+}
 
 const getTipoNombre = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.nombre || 'Desconocido'
+}
+
+const getIconComponent = (elemento) => {
+  // Determinar el componente de icono basado en tipo y ubicación
+  if (elemento.tipo === 'cuartos') {
+    return RoomIcon
+  } else if (elemento.ubicacion === 'pared') {
+    return SpaceOnWallIcon
+  } else {
+    return SpaceIcon
+  }
 }
 
 const elementosFiltrados = computed(() => {
@@ -367,6 +391,14 @@ const limpiarFiltros = () => {
 
 const onDelete = async (id) => {
   if (!id) return
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No se pueden eliminar elementos con cambios pendientes de guardar', 'warn')
+    return
+  }
+  if (['elementos', 'cuartos'].includes(canvasStore.contextoNavegacion.tipo)) {
+    showToast('No se pueden eliminar elementos en la vista actual', 'warn');
+    return
+  }
   const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
   if (el && (el.bloqueado === true || el.locked === true)) {
     showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
