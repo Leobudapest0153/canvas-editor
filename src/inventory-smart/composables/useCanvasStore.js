@@ -1234,11 +1234,16 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       // Guardar en historial
       if (saveHistory) {
-        if (typeof registrarEnHistorial === 'function') {
-          registrarEnHistorial({ tipo: 'insert', id: next.id, despues: next, descripcion: description });
-        } else if (typeof addToHistory === 'function') {
-          addToHistory({ type: 'insert', id: next.id, after: next, description });
-        }
+        // Historial: funciones legacy pueden no existir en el entorno actual
+        try {
+          const rH = typeof globalThis !== 'undefined' ? globalThis.registrarEnHistorial : undefined
+          const aH = typeof globalThis !== 'undefined' ? globalThis.addToHistory : undefined
+          if (typeof rH === 'function') {
+            rH({ tipo: 'insert', id: next.id, despues: next, descripcion: description })
+          } else if (typeof aH === 'function') {
+            aH({ type: 'insert', id: next.id, after: next, description })
+          }
+        } catch { /* ignore historial error */ }
       }
 
       return next.id;
@@ -1527,7 +1532,9 @@ export const useCanvasStore = defineStore('canvas', () => {
       return;
     }
     if (!nivelActualizado?.dimensiones.alto || nivelActualizado?.dimensiones?.alto <= 0) {
-      nivelActualizado.dimensiones.alto = Math.floor((parent?.dimensiones?.alto || 300) / (parent?.hijos?.length + 1 ?? 3) );
+  // Evitar uso incorrecto de ?? dentro de expresión ya evaluada; aplicar fallback final
+  const divisor = (parent?.hijos?.length || 0) + 1; // siempre >=1
+  nivelActualizado.dimensiones.alto = Math.floor((parent?.dimensiones?.alto || 300) / (divisor || 3));
     }
     if (!nivelActualizado?.dimensiones.ancho || nivelActualizado?.dimensiones?.ancho <= 0) {
       nivelActualizado.dimensiones.ancho = parent?.dimensiones?.ancho || 100;
@@ -1844,101 +1851,151 @@ export const useCanvasStore = defineStore('canvas', () => {
   const focusElemento = (elementoId, opts = {}) => {
     const el = elementoPorId.value(elementoId)
     if (!el) return
-
     const stage = typeof window !== 'undefined' ? window.__konvaStage : null
     if (!stage) return
-
   const paddingPx = Number.isFinite(opts.paddingPx) ? opts.paddingPx : 40
-  const fitRatio = Number.isFinite(opts.fitRatio) ? opts.fitRatio : 0.92 // queremos que casi llene el viewport
-    const animate = opts.animate !== false // por defecto true
-    const duration = Number.isFinite(opts.duration) ? opts.duration : 320
+  const fitRatio = Number.isFinite(opts.fitRatio) ? opts.fitRatio : 0.92
+  const animate = opts.animate !== false
+  const duration = Number.isFinite(opts.duration) ? opts.duration : 340
+  const coarseSnapThreshold = Number.isFinite(opts.coarseSnapThreshold) ? opts.coarseSnapThreshold : 0.3 // diferencia relativa de escala para decidir snap
+    const exact = opts.exact === true
 
-    // Obtener bounding box lógico del elemento (similar a destacarElemento) con fallback inmediato
-    let worldX, worldY, worldW, worldH
-    const fallbackDims = () => {
-      const getDrawWidth = (typeof window !== 'undefined' && window.__getDrawWidth) ? window.__getDrawWidth : (e) => e.width || 0
-      const getDrawHeight = (typeof window !== 'undefined' && window.__getDrawHeight) ? window.__getDrawHeight : (e) => e.height || 0
-      worldW = getDrawWidth(el) || el.width || el?.dimensiones?.ancho * CM_TO_PX || 0
-      worldH = getDrawHeight(el) || el.height || el?.dimensiones?.largo * CM_TO_PX || el?.dimensiones?.alto * CM_TO_PX || 0
-      worldX = el.x || 0
-      worldY = el.y || 0
-    }
-    fallbackDims()
-    try {
-      const node = stage.findOne(`#${el.id}`)
-      if (node && typeof node.getClientRect === 'function') {
-        const rect = node.getClientRect({ skipStroke: false, skipShadow: true })
-        const scale = stage.scaleX ? (stage.scaleX() || 1) : 1
-        const stageX = stage.x ? (stage.x() || 0) : 0
-        const stageY = stage.y ? (stage.y() || 0) : 0
-        const rx = (rect.x - stageX) / scale
-        const ry = (rect.y - stageY) / scale
-        const rw = rect.width / scale
-        const rh = rect.height / scale
-        if (Number.isFinite(rw) && rw > 0 && Number.isFinite(rh) && rh > 0) {
-          worldX = rx; worldY = ry; worldW = rw; worldH = rh
+    if (focusElemento._raf) cancelAnimationFrame(focusElemento._raf)
+
+    const getDrawWidth = (typeof window !== 'undefined' && window.__getDrawWidth) ? window.__getDrawWidth : (e) => e.width || 0
+    const getDrawHeight = (typeof window !== 'undefined' && window.__getDrawHeight) ? window.__getDrawHeight : (e) => e.height || 0
+    const fallbackW = getDrawWidth(el) || el.width || (el?.dimensiones?.ancho ? el.dimensiones.ancho * CM_TO_PX : 0) || 1
+    const dimLargo = el?.dimensiones?.largo ? el.dimensiones.largo * CM_TO_PX : 0
+    const dimAlto = el?.dimensiones?.alto ? el.dimensiones.alto * CM_TO_PX : 0
+    const fallbackH = getDrawHeight(el) || el.height || Math.max(dimLargo, dimAlto) || 1
+    const fallbackX = el.x || 0
+    const fallbackY = el.y || 0
+
+    // Persistencia simple para saber si ya enfocamos este elemento antes (evita primera animación grande)
+    if (!focusElemento._focusedIds) focusElemento._focusedIds = new Set()
+    const alreadyFocused = focusElemento._focusedIds.has(el.id)
+
+    const computeAndAnimate = (bbox) => {
+      const viewportW = stage.width() || 1
+      const viewportH = stage.height() || 1
+      const usableW = Math.max(1, viewportW - paddingPx * 2)
+      const usableH = Math.max(1, viewportH - paddingPx * 2)
+      let targetScale = Math.min(usableW / bbox.w, usableH / bbox.h)
+      if (!exact) targetScale *= fitRatio
+      if (!Number.isFinite(targetScale) || targetScale <= 0) targetScale = 1
+      targetScale = Math.max(0.05, Math.min(5, targetScale))
+      const cx = bbox.x + bbox.w / 2
+      const cy = bbox.y + bbox.h / 2
+      const targetPanX = (viewportW / 2) - cx * targetScale
+      const targetPanY = (viewportH / 2) - cy * targetScale
+      const currentScale = zoom.value || 1
+      const scaleDiffRel = Math.abs(targetScale - currentScale) / Math.max(currentScale, 0.0001)
+      const shouldSnap = !alreadyFocused && scaleDiffRel > coarseSnapThreshold
+      if (!animate || shouldSnap) {
+        configurarZoom(targetScale)
+        configurarPan(targetPanX, targetPanY)
+        focusElemento._focusedIds.add(el.id)
+        return
+      }
+      const startZoom = zoom.value
+      const startPanX = panX.value
+      const startPanY = panY.value
+      const startTime = performance.now()
+      const ease = (t) => 1 - Math.pow(1 - t, 3)
+      const step = (now) => {
+        const tt = Math.min(1, (now - startTime) / duration)
+        const k = ease(tt)
+        zoom.value = startZoom + (targetScale - startZoom) * k
+        panX.value = startPanX + (targetPanX - startPanX) * k
+        panY.value = startPanY + (targetPanY - startPanY) * k
+        if (tt < 1) {
+          focusElemento._raf = requestAnimationFrame(step)
+        } else {
+          saveZoomPanToHistory()
+          focusElemento._focusedIds.add(el.id)
         }
       }
-    } catch { /* ignore, usamos fallback */ }
-
-    const viewportW = stage.width() || 1
-    const viewportH = stage.height() || 1
-
-    // Calcular escala objetivo
-  const targetScaleX = (viewportW - paddingPx * 2) / Math.max(1, worldW)
-  const targetScaleY = (viewportH - paddingPx * 2) / Math.max(1, worldH)
-  // Usar el menor para asegurar que ambos ejes entren
-  let targetScale = Math.min(targetScaleX, targetScaleY) * fitRatio
-    if (!Number.isFinite(targetScale) || targetScale <= 0) targetScale = 1
-    targetScale = Math.max(0.05, Math.min(5, targetScale))
-
-    // Si el elemento ya cabe sobradamente y el zoom actual es mayor, no aumentar más (solo pan)
-    const currentScale = zoom.value || 1
-    if (currentScale > targetScale * 1.15) {
-      // Mantener zoom actual pero ajustar targetScale para animación suave hacia abajo solo si es mucho mayor
-      targetScale = currentScale * 0.95
+      focusElemento._raf = requestAnimationFrame(step)
     }
 
-    // Centro del elemento
-    const cx = worldX + worldW / 2
-    const cy = worldY + worldH / 2
-
-    // Calcular pan para centrar
-    const targetPanX = (viewportW / 2) - cx * targetScale
-    const targetPanY = (viewportH / 2) - cy * targetScale
-
-    if (!animate) {
-      configurarZoom(targetScale)
-      configurarPan(targetPanX, targetPanY)
-      return
-    }
-
-    // Animación interpolada
-    if (focusElemento._raf) cancelAnimationFrame(focusElemento._raf)
-    const startZoom = zoom.value
-    const startPanX = panX.value
-    const startPanY = panY.value
-    const start = performance.now()
-
-    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
-
-    const step = (now) => {
-      const t = Math.min(1, (now - start) / duration)
-      const k = easeOutCubic(t)
-  const zNew = startZoom + (targetScale - startZoom) * k
-  const pX = startPanX + (targetPanX - startPanX) * k
-  const pY = startPanY + (targetPanY - startPanY) * k
-  // Usar configuradores para mantener lógica consistente (historial debounce se maneja al final manualmente)
-  zoom.value = zNew
-  panX.value = pX
-  panY.value = pY
-      if (t < 1) {
-        focusElemento._raf = requestAnimationFrame(step)
+    // Primera medición diferida para usar rect real antes de animar
+    requestAnimationFrame(() => {
+      let bx = fallbackX, by = fallbackY, bw = fallbackW, bh = fallbackH
+      let haveReal = false
+      try {
+        const node = stage.findOne(`#${el.id}`)
+        if (node && typeof node.getClientRect === 'function') {
+          const rect = node.getClientRect({ skipStroke: false, skipShadow: true })
+          const scaleNow = stage.scaleX ? (stage.scaleX() || 1) : 1
+          const stageX = stage.x ? (stage.x() || 0) : 0
+          const stageY = stage.y ? (stage.y() || 0) : 0
+          const rx = (rect.x - stageX) / scaleNow
+          const ry = (rect.y - stageY) / scaleNow
+          const rw = rect.width / scaleNow
+          const rh = rect.height / scaleNow
+          if (Number.isFinite(rw) && rw > 0 && Number.isFinite(rh) && rh > 0) {
+            // Descarta si es absurdamente pequeño (<35% fallback) para evitar mid-group
+            const tooSmall = (rw < fallbackW * 0.35) || (rh < fallbackH * 0.35)
+            if (!tooSmall) {
+              bx = rx; by = ry; bw = rw; bh = rh; haveReal = true
+            }
+          }
+        }
+      } catch { /* ignore */ }
+      if (!haveReal) {
+        // Segundo frame para intentar rect real antes de animar
+        requestAnimationFrame(() => {
+          try {
+            const node2 = stage.findOne(`#${el.id}`)
+            if (node2 && typeof node2.getClientRect === 'function') {
+              const rect2 = node2.getClientRect({ skipStroke: false, skipShadow: true })
+              const sc = stage.scaleX ? (stage.scaleX() || 1) : 1
+              const sx = stage.x ? (stage.x() || 0) : 0
+              const sy = stage.y ? (stage.y() || 0) : 0
+              const rx2 = (rect2.x - sx) / sc
+              const ry2 = (rect2.y - sy) / sc
+              const rw2 = rect2.width / sc
+              const rh2 = rect2.height / sc
+              if (Number.isFinite(rw2) && rw2 > 0 && Number.isFinite(rh2) && rh2 > 0) {
+                const tooSmall2 = (rw2 < fallbackW * 0.35) || (rh2 < fallbackH * 0.35)
+                if (!tooSmall2) {
+                  bx = rx2; by = ry2; bw = rw2; bh = rh2
+                }
+              }
+            }
+          } catch { /* ignore second try */ }
+          if ((bw === fallbackW && bh === fallbackH) || bw < 2 || bh < 2) {
+            // Tercer frame (último intento) si seguimos solo con fallback o valores irrisorios
+            requestAnimationFrame(() => {
+              try {
+                const node3 = stage.findOne(`#${el.id}`)
+                if (node3 && typeof node3.getClientRect === 'function') {
+                  const rect3 = node3.getClientRect({ skipStroke: false, skipShadow: true })
+                  const sc3 = stage.scaleX ? (stage.scaleX() || 1) : 1
+                  const sx3 = stage.x ? (stage.x() || 0) : 0
+                  const sy3 = stage.y ? (stage.y() || 0) : 0
+                  const rx3 = (rect3.x - sx3) / sc3
+                  const ry3 = (rect3.y - sy3) / sc3
+                  const rw3 = rect3.width / sc3
+                  const rh3 = rect3.height / sc3
+                  if (Number.isFinite(rw3) && rw3 > 0 && Number.isFinite(rh3) && rh3 > 0) {
+                    const tooSmall3 = (rw3 < fallbackW * 0.35) || (rh3 < fallbackH * 0.35)
+                    if (!tooSmall3) {
+                      bx = rx3; by = ry3; bw = rw3; bh = rh3
+                    }
+                  }
+                }
+              } catch { /* ignore third try */ }
+              computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
+            })
+          } else {
+            computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
+          }
+        })
       } else {
-        saveZoomPanToHistory()
+        computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
       }
-    }
-    focusElemento._raf = requestAnimationFrame(step)
+    })
   }
 
   const actualizarIdsFiltrados = (ids) => {
