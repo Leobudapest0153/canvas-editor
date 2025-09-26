@@ -1871,11 +1871,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     const fallbackX = el.x || 0
     const fallbackY = el.y || 0
 
-    // Persistencia simple para saber si ya enfocamos este elemento antes (evita primera animación grande)
-    if (!focusElemento._focusedIds) focusElemento._focusedIds = new Set()
-    const alreadyFocused = focusElemento._focusedIds.has(el.id)
+    // Estado previo por elemento para permitir refinamiento y decidir snap dinámicamente
+    if (!focusElemento._last) focusElemento._last = Object.create(null)
+    const prevState = focusElemento._last[el.id]
 
-    const computeAndAnimate = (bbox) => {
+    const computeAndAnimate = (bbox, phase = 0) => {
       const viewportW = stage.width() || 1
       const viewportH = stage.height() || 1
       const usableW = Math.max(1, viewportW - paddingPx * 2)
@@ -1890,11 +1890,14 @@ export const useCanvasStore = defineStore('canvas', () => {
       const targetPanY = (viewportH / 2) - cy * targetScale
       const currentScale = zoom.value || 1
       const scaleDiffRel = Math.abs(targetScale - currentScale) / Math.max(currentScale, 0.0001)
-      const shouldSnap = !alreadyFocused && scaleDiffRel > coarseSnapThreshold
+      // Si cambio grande o usuario pidió no animar
+      const shouldSnap = scaleDiffRel > coarseSnapThreshold
       if (!animate || shouldSnap) {
         configurarZoom(targetScale)
         configurarPan(targetPanX, targetPanY)
-        focusElemento._focusedIds.add(el.id)
+        focusElemento._last[el.id] = { scale: targetScale, w: bbox.w, h: bbox.h }
+        // Programar verificación para ajustar si el bounding real difiere tras layout final
+        scheduleRefine(targetScale, targetPanX, targetPanY, bbox, phase)
         return
       }
       const startZoom = zoom.value
@@ -1912,10 +1915,76 @@ export const useCanvasStore = defineStore('canvas', () => {
           focusElemento._raf = requestAnimationFrame(step)
         } else {
           saveZoomPanToHistory()
-          focusElemento._focusedIds.add(el.id)
+          focusElemento._last[el.id] = { scale: targetScale, w: bbox.w, h: bbox.h }
+          scheduleRefine(targetScale, targetPanX, targetPanY, bbox, phase)
         }
       }
       focusElemento._raf = requestAnimationFrame(step)
+    }
+
+    const scheduleRefine = (appliedScale, appliedPanX, appliedPanY, appliedBBox, phase) => {
+      const refine = () => {
+        try {
+          const node = stage.findOne(`#${el.id}`)
+          if (!node || typeof node.getClientRect !== 'function') return
+          const rect = node.getClientRect({ skipStroke: false, skipShadow: true })
+          const sc = stage.scaleX ? (stage.scaleX() || 1) : 1
+          const sx = stage.x ? (stage.x() || 0) : 0
+          const sy = stage.y ? (stage.y() || 0) : 0
+          const rx = (rect.x - sx) / sc
+          const ry = (rect.y - sy) / sc
+          const rw = rect.width / sc
+          const rh = rect.height / sc
+          if (!(rw > 0 && rh > 0)) return
+          // Recalcular objetivo con bounding real
+          const viewportW = stage.width() || 1
+            const viewportH = stage.height() || 1
+            const usableW = Math.max(1, viewportW - paddingPx * 2)
+            const usableH = Math.max(1, viewportH - paddingPx * 2)
+            let idealScale = Math.min(usableW / rw, usableH / rh)
+            if (!exact) idealScale *= fitRatio
+            idealScale = Math.max(0.05, Math.min(5, idealScale))
+          const diff = Math.abs(idealScale - appliedScale) / Math.max(idealScale, 0.0001)
+          // Si la diferencia es significativa refinamos (pero evitar bucles infinitos: solo 1 refinamiento por invocación)
+          if (diff > 0.08 && phase < 2) {
+            const cx = rx + rw / 2
+            const cy = ry + rh / 2
+            const newPanX = (viewportW / 2) - cx * idealScale
+            const newPanY = (viewportH / 2) - cy * idealScale
+            // Si la corrección es muy grande, aplicar snap; si es moderada, animación breve
+            const large = diff > 0.35
+            if (large) {
+              configurarZoom(idealScale)
+              configurarPan(newPanX, newPanY)
+              focusElemento._last[el.id] = { scale: idealScale, w: rw, h: rh }
+            } else {
+              // animación corta de refinamiento
+              const startZoom = zoom.value
+              const startPanX = panX.value
+              const startPanY = panY.value
+              const startTime = performance.now()
+              const refineDur = 140 + Math.min(180, diff * 400) // escala ligera
+              const ease = (t) => 1 - Math.pow(1 - t, 3)
+              const step = (now) => {
+                const tt = Math.min(1, (now - startTime) / refineDur)
+                const k = ease(tt)
+                zoom.value = startZoom + (idealScale - startZoom) * k
+                panX.value = startPanX + (newPanX - startPanX) * k
+                panY.value = startPanY + (newPanY - startPanY) * k
+                if (tt < 1) {
+                  focusElemento._raf = requestAnimationFrame(step)
+                } else {
+                  saveZoomPanToHistory()
+                  focusElemento._last[el.id] = { scale: idealScale, w: rw, h: rh }
+                }
+              }
+              focusElemento._raf = requestAnimationFrame(step)
+            }
+          }
+        } catch { /* ignore refine errors */ }
+      }
+      // Dos frames después de aplicar para asegurar layout estable
+      requestAnimationFrame(() => requestAnimationFrame(refine))
     }
 
     // Primera medición diferida para usar rect real antes de animar
