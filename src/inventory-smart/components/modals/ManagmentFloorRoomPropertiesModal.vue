@@ -162,7 +162,7 @@
                   Placeholder
                 </template>
                 <template v-else>
-                  {{ formValue.tiposProductos.join(', ') }}
+                  {{ selectedTiposDisplay }}
                 </template>
               </span>
               <svg
@@ -191,17 +191,23 @@
               <ul class="max-h-40 overflow-y-auto">
                 <li
                   v-for="option in filteredOptions"
-                  :key="option"
+                  :key="option.value"
                   class="px-3 py-2 hover:bg-gray-100 flex items-center gap-2"
+                  :class="{ 'opacity-50 cursor-not-allowed': isAllSelected && !option.isAll }"
                 >
                   <input
                     type="checkbox"
-                    :id="option"
-                    v-model="formValue.tiposProductos"
-                    :value="option"
-                    class="text-primary-700"
+                    :id="option.value"
+                    :checked="formValue.tiposProductos.includes(option.value)"
+                    :disabled="isAllSelected && !option.isAll"
+                    @change="toggleProductType(option.value)"
+                    class="text-primary-700 cursor-pointer disabled:cursor-not-allowed"
                   />
-                  <label :for="option" class="text-sm text-[#111928]">{{ option }}</label>
+                  <label
+                    :for="option.value"
+                    class="text-sm text-[#111928]"
+                    :class="isAllSelected && !option.isAll ? 'cursor-not-allowed' : 'cursor-pointer'"
+                  >{{ option.label }}</label>
                 </li>
               </ul>
             </div>
@@ -247,15 +253,35 @@ const dropdownRef = ref();
 
 const search = ref('');
 
-const options = [
-  'Todos',
-  'Materiales peligrosos',
-  'Materiales radioactivos',
-  'Materiales tóxicos'
+const ALL_OPTION = 'Todos';
+const productOptions = [
+  { label: ALL_OPTION, value: ALL_OPTION, isAll: true },
+  { label: 'Materiales peligrosos', value: 'Materiales peligrosos' },
+  { label: 'Materiales radioactivos', value: 'Materiales radioactivos' },
+  { label: 'Materiales tóxicos', value: 'Materiales tóxicos' },
 ];
+const individualOptionValues = productOptions
+  .filter((option) => !option.isAll)
+  .map((option) => option.value);
+const normalizeTiposProductos = (tipos) => {
+  if (!Array.isArray(tipos)) return [];
+  const unique = [];
+  tipos.forEach((tipo) => {
+    if (!tipo || unique.includes(tipo)) return;
+    unique.push(tipo);
+  });
+  if (unique.includes(ALL_OPTION)) {
+    return [ALL_OPTION];
+  }
+  const hasAllIndividuals =
+    individualOptionValues.length > 0 &&
+    unique.length === individualOptionValues.length &&
+    individualOptionValues.every((value) => unique.includes(value));
+  return hasAllIndividuals ? [ALL_OPTION] : unique;
+};
 const filteredOptions = computed(() =>
-  options.filter(opt =>
-    opt.toLowerCase().includes(search.value.toLowerCase())
+  productOptions.filter((option) =>
+    option.label.toLowerCase().includes(search.value.toLowerCase())
   )
 );
 
@@ -279,9 +305,56 @@ const formValue = ref({
   },
   capacidadCarga: canvasStore.nivelAEditar?.pesoMaximo ?? '',
   tipoZona: canvasStore.nivelAEditar?.tipoZona ?? '',
-  tiposProductos: canvasStore.nivelAEditar?.tiposProductos ?? [],
+  tiposProductos: normalizeTiposProductos(canvasStore.nivelAEditar?.tiposProductos ?? []),
   permiteFragiles: canvasStore.nivelAEditar?.permiteFragiles ?? false
 });
+const arraysEqual = (a, b) => {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+};
+
+const isAllSelected = computed(() =>
+  formValue.value.tiposProductos.includes(ALL_OPTION)
+);
+
+const selectedTiposDisplay = computed(() => {
+  if (formValue.value.tiposProductos.length === 0) return '';
+  if (isAllSelected.value) return ALL_OPTION;
+  return formValue.value.tiposProductos.join(', ');
+});
+
+const toggleProductType = (optionValue) => {
+  const current = Array.isArray(formValue.value.tiposProductos)
+    ? [...formValue.value.tiposProductos]
+    : [];
+
+  if (optionValue === ALL_OPTION) {
+    formValue.value.tiposProductos = current.includes(ALL_OPTION) ? [] : [ALL_OPTION];
+    return;
+  }
+
+  const withoutAll = current.filter((value) => value !== ALL_OPTION);
+  const hasValue = withoutAll.includes(optionValue);
+  const updated = hasValue
+    ? withoutAll.filter((value) => value !== optionValue)
+    : [...withoutAll, optionValue];
+
+  formValue.value.tiposProductos = normalizeTiposProductos(updated);
+};
+
+watch(
+  () => formValue.value.tiposProductos,
+  (value) => {
+    const current = Array.isArray(value) ? value : [];
+    const normalized = normalizeTiposProductos(current);
+    if (!arraysEqual(current, normalized)) {
+      formValue.value.tiposProductos = normalized;
+    }
+  },
+  { deep: true }
+);
+
 
 
 // Cierra dropdown al hacer clic fuera
@@ -328,7 +401,7 @@ watch(() => canvasStore.nivelAEditar, (newVal) => {
     },
     capacidadCarga: newVal?.capacidadCarga ?? '',
     tipoZona: newVal?.tipoZona ?? '',
-    tiposProductos: newVal?.tiposProductos ?? [],
+    tiposProductos: normalizeTiposProductos(newVal?.tiposProductos ?? []),
     permiteFragiles: newVal?.permiteFragiles ?? false
   };
 }, { immediate: true, deep: true });
