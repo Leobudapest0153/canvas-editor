@@ -1,5 +1,6 @@
 import { generateCodigo, generateNombre } from '@/inventory-smart/utils/codeNameGenerator.js'
 import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
+import { resolvePasilloAssignment, PASILLO_ASSIGNMENT_DEFAULTS } from '@/inventory-smart/utils/pasilloAssignment.js'
 /**
  * useCanvasStore.js
  *
@@ -88,6 +89,128 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Estado básico para desarrollo
   const elementos = ref([])
+
+  const PASILLO_SCOPE_TYPES = new Set(['pisos', 'cuartos'])
+  const PASILLO_SCOPE_FALLBACK = '__scope:root__'
+
+  const makeElementIndex = () => {
+    const map = new Map()
+    for (const el of elementos.value) {
+      if (el?.id) {
+        map.set(el.id, el)
+      }
+    }
+    return map
+  }
+
+  const computeScopeKey = (element, index = null) => {
+    if (!element) return PASILLO_SCOPE_FALLBACK
+    const idx = index || makeElementIndex()
+    let current = element
+    let depthGuard = 0
+    while (current?.padre && depthGuard < 50) {
+      const parent = idx.get(current.padre)
+      if (!parent) break
+      if (PASILLO_SCOPE_TYPES.has(parent.tipo)) {
+        return `${parent.tipo}:${parent.id}`
+      }
+      current = parent
+      depthGuard += 1
+    }
+    const plantaId = element.plantaId || current?.plantaId
+    return plantaId ? `planta:${plantaId}` : PASILLO_SCOPE_FALLBACK
+  }
+
+  const buildPasilloAssignmentContext = () => {
+    const index = makeElementIndex()
+    const scopeMemo = new Map()
+
+    const getScope = (element) => {
+      if (!element?.id) return PASILLO_SCOPE_FALLBACK
+      if (scopeMemo.has(element.id)) {
+        return scopeMemo.get(element.id)
+      }
+      const scope = computeScopeKey(element, index)
+      scopeMemo.set(element.id, scope)
+      return scope
+    }
+
+    const pasillosByScope = new Map()
+    for (const el of index.values()) {
+      if (el?.tipo === 'pasillos') {
+        const scope = getScope(el)
+        const key = scope || PASILLO_SCOPE_FALLBACK
+        if (!pasillosByScope.has(key)) pasillosByScope.set(key, [])
+        pasillosByScope.get(key).push(el)
+      }
+    }
+
+    const getPasillosForScope = (scope) => {
+      const key = scope || PASILLO_SCOPE_FALLBACK
+      return pasillosByScope.get(key) || []
+    }
+
+    return {
+      index,
+      getScope,
+      getPasillosForScope,
+      settings: PASILLO_ASSIGNMENT_DEFAULTS,
+    }
+  }
+
+  const assignPasilloWithContext = (ctx, element) => {
+    if (!element) return
+    if (element.tipo === 'pasillos') {
+      element.pasilloId = null
+      return
+    }
+    if (!Object.prototype.hasOwnProperty.call(element, 'pasilloId')) {
+      element.pasilloId = null
+    }
+    const scope = ctx.getScope(element)
+    const pasillos = ctx.getPasillosForScope(scope)
+    if (!pasillos.length) {
+      element.pasilloId = null
+      return
+    }
+    const match = resolvePasilloAssignment({
+      element,
+      pasillos,
+      config: ctx.settings,
+    })
+    const newId = match?.id ?? null
+    element.pasilloId = newId
+  }
+
+  const applyPasilloAssignments = (ctx, { scope = null, elementIds = null } = {}) => {
+    if (Array.isArray(elementIds) && elementIds.length > 0) {
+      for (const id of elementIds) {
+        const target = ctx.index.get(id)
+        if (target) assignPasilloWithContext(ctx, target)
+      }
+      return
+    }
+
+    if (scope != null) {
+      for (const target of ctx.index.values()) {
+        if (target?.tipo === 'pasillos') continue
+        if (ctx.getScope(target) === scope) {
+          assignPasilloWithContext(ctx, target)
+        }
+      }
+      return
+    }
+
+    for (const target of ctx.index.values()) {
+      if (target?.tipo === 'pasillos') continue
+      assignPasilloWithContext(ctx, target)
+    }
+  }
+
+  const recomputePasilloAssignments = (options = {}) => {
+    const ctx = buildPasilloAssignmentContext()
+    applyPasilloAssignments(ctx, options)
+  }
 
   // Etiquetas
   const etiquetas = ref([
@@ -693,6 +816,14 @@ export const useCanvasStore = defineStore('canvas', () => {
       elemento.x = x
       elemento.y = y
 
+      const ctx = buildPasilloAssignmentContext()
+      if (elemento.tipo === 'pasillos') {
+        const scope = ctx.getScope(elemento)
+        applyPasilloAssignments(ctx, { scope })
+      } else {
+        applyPasilloAssignments(ctx, { elementIds: [elemento.id] })
+      }
+
       // Solo guardar en historial si se especifica explícitamente
       if (saveHistory && description) {
         saveToHistory(description)
@@ -711,6 +842,10 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
 
       const prev = elementos.value[idx];
+      const indexBefore = makeElementIndex()
+      const previousScope = prev?.tipo === 'pasillos'
+        ? computeScopeKey(prev, indexBefore)
+        : null
 
       const next = {
         ...prev,
@@ -743,7 +878,28 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
       }
 
+      if (!Object.prototype.hasOwnProperty.call(next, 'pasilloId')) {
+        next.pasilloId = prev?.pasilloId ?? null
+      }
+      if (next.tipo === 'pasillos') {
+        next.pasilloId = null
+      }
+
       elementos.value.splice(idx, 1, next);
+
+      const ctx = buildPasilloAssignmentContext()
+      if (next.tipo === 'pasillos') {
+        const newScope = ctx.getScope(next)
+        applyPasilloAssignments(ctx, { scope: newScope })
+        if (previousScope && newScope !== previousScope) {
+          applyPasilloAssignments(ctx, { scope: previousScope })
+        }
+      } else {
+        applyPasilloAssignments(ctx, { elementIds: [next.id] })
+        if (prev?.tipo === 'pasillos' && previousScope) {
+          applyPasilloAssignments(ctx, { scope: previousScope })
+        }
+      }
 
       // if (saveHistory) {
       //   if (typeof registrarEnHistorial === 'function') {
@@ -766,6 +922,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (!elemento) return false
     if (!runPlacementValidators(elemento, propiedades)) return false
+    const prevWasPasillo = elemento.tipo === 'pasillos'
+    const previousScope = prevWasPasillo ? computeScopeKey(elemento, makeElementIndex()) : null
     if (elemento) {
       for (const key in propiedades) {
         if (
@@ -802,6 +960,24 @@ export const useCanvasStore = defineStore('canvas', () => {
             elemento.height = elemento.dimensiones.alto * CM_TO_PX
           }
           // Nota: largo no afecta a width/height en vista de frente (XZ)
+        }
+      }
+
+      const ctx = buildPasilloAssignmentContext()
+      if (elemento.tipo === 'pasillos') {
+        elemento.pasilloId = null
+        const newScope = ctx.getScope(elemento)
+        applyPasilloAssignments(ctx, { scope: newScope })
+        if (previousScope && newScope !== previousScope) {
+          applyPasilloAssignments(ctx, { scope: previousScope })
+        }
+      } else {
+        if (!Object.prototype.hasOwnProperty.call(elemento, 'pasilloId')) {
+          elemento.pasilloId = null
+        }
+        applyPasilloAssignments(ctx, { elementIds: [elemento.id] })
+        if (prevWasPasillo && previousScope) {
+          applyPasilloAssignments(ctx, { scope: previousScope })
         }
       }
 
@@ -1188,6 +1364,13 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }
 
+    if (!Object.prototype.hasOwnProperty.call(nuevoElemento, 'pasilloId')) {
+      nuevoElemento.pasilloId = null
+    }
+    if (nuevoElemento.tipo === 'pasillos') {
+      nuevoElemento.pasilloId = null
+    }
+
     elementos.value.push(nuevoElemento)
 
     // Normalización inmediata post-inserción: asegurar que en vista XY height represente largo (caso Anaquel)
@@ -1201,6 +1384,14 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
       }
     } catch (e) { /* noop */ }
+
+    const ctx = buildPasilloAssignmentContext()
+    if (nuevoElemento.tipo === 'pasillos') {
+      const scope = ctx.getScope(nuevoElemento)
+      applyPasilloAssignments(ctx, { scope })
+    } else {
+      applyPasilloAssignments(ctx, { elementIds: [nuevoElemento.id] })
+    }
 
     // Guardar estado en historial
     saveToHistory(`Elemento agregado: ${nuevoElemento.nombre || nuevoElemento.tipo}`)
@@ -1243,8 +1434,23 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
       }
 
+      if (!Object.prototype.hasOwnProperty.call(next, 'pasilloId')) {
+        next.pasilloId = null
+      }
+      if (next.tipo === 'pasillos') {
+        next.pasilloId = null
+      }
+
       // Insertar directamente en el store
       elementos.value.push(next);
+
+      const ctx = buildPasilloAssignmentContext()
+      if (next.tipo === 'pasillos') {
+        const scope = ctx.getScope(next)
+        applyPasilloAssignments(ctx, { scope })
+      } else {
+        applyPasilloAssignments(ctx, { elementIds: [next.id] })
+      }
 
       // Agregar hijo al padre si aplica
       if (next.padre) {
@@ -1284,6 +1490,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   const eliminarElemento = (elementoId) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     const index = elementos.value.findIndex((el) => el.id === elementoId)
+    const wasPasillo = elemento?.tipo === 'pasillos'
+    const previousScope = wasPasillo ? computeScopeKey(elemento, makeElementIndex()) : null
 
     if (index > -1) {
       // Remover de la planta si no tiene padre
@@ -1309,6 +1517,11 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
 
       elementos.value.splice(index, 1)
+
+      if (wasPasillo && previousScope) {
+        const ctx = buildPasilloAssignmentContext()
+        applyPasilloAssignments(ctx, { scope: previousScope })
+      }
 
       // Deseleccionar si era el elemento seleccionado
       if (elementoSeleccionado.value === elementoId) {
@@ -1498,6 +1711,12 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     } catch (e) {
       console.warn('No se pudieron importar plantillas', e)
+    }
+
+    try {
+      recomputePasilloAssignments()
+    } catch (e) {
+      console.warn('No se pudieron recalcular asignaciones de pasillo tras deserializar', e)
     }
 
     return ok
@@ -2208,6 +2427,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Actions - Elementos
     agregarElemento,
+  agregarElementoSinValidacion,
     eliminarElemento,
     toggleElementoVisibilidad,
 
@@ -2267,5 +2487,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     propuestaAlturasNiveles,
     confirmacionAlturasNivelesModal,
     actualizarElementoSinValidacion,
+    recomputePasilloAssignments,
   }
 })
