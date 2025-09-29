@@ -130,6 +130,11 @@ export const useCanvasHistory = () => {
         changes: changes.length
       })
     } finally {
+      try {
+        canvasStore?.recomputePasilloAssignments?.()
+      } catch (e) {
+        console.warn('No se pudieron recalcular asignaciones de pasillo durante applyIncrementalChanges', e)
+      }
       isUndoRedoOperation.value = false
     }
   }
@@ -154,6 +159,12 @@ export const useCanvasHistory = () => {
       canvasStore.zoom = snapshot.zoom
       canvasStore.panX = snapshot.panX
       canvasStore.panY = snapshot.panY
+
+      try {
+        canvasStore?.recomputePasilloAssignments?.()
+      } catch (e) {
+        console.warn('No se pudieron recalcular asignaciones de pasillo al restaurar snapshot', e)
+      }
     } catch (error) {
       console.error('Error al restaurar snapshot:', error)
       historyEvents.errors.push({
