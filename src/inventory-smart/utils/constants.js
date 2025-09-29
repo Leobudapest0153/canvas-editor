@@ -20,7 +20,7 @@ export const TIPOS_ENTIDAD = [
     nombre: 'Plantas',
     nombreSingular: 'Planta',
     color: '#1C1E4D',
-    icono: '🏢',
+    icono: 'warehouse',
     restrictions: [],
   },
   {
@@ -28,7 +28,7 @@ export const TIPOS_ENTIDAD = [
     nombre: 'Cuartos',
     nombreSingular: 'Cuarto',
     color: '#1C1E4D',
-    icono: '🏠',
+    icono: 'room',
     restrictions: [],
   },
   {
@@ -36,7 +36,7 @@ export const TIPOS_ENTIDAD = [
     nombre: 'Pisos',
     nombreSingular: 'Piso',
     color: '#1C1E4D',
-    icono: '🧱',
+    icono: 'mezzanine',
     restrictions: ['read-only-properties', 'right-click', 'drag'],
   },
   {
@@ -44,7 +44,7 @@ export const TIPOS_ENTIDAD = [
     nombre: 'Pasillos',
     nombreSingular: 'Pasillo',
     color: '#1C1E4D',
-    icono: '🛣️',
+    icono: 'space',
     restrictions: [],
   },
   {
@@ -52,7 +52,7 @@ export const TIPOS_ENTIDAD = [
     nombre: 'Espacios',
     nombreSingular: 'Espacio',
     color: '#1C1E4D',
-    icono: '📦',
+    icono: 'space',
     restrictions: [],
   },
   {
@@ -60,7 +60,7 @@ export const TIPOS_ENTIDAD = [
     nombre: 'Niveles',
     nombreSingular: 'Nivel',
     color: '#1C1E4D',
-    icono: '🗃️',
+    icono: 'space',
     restrictions: ['read-only-properties', 'right-click', 'drag'],
   },
 ]

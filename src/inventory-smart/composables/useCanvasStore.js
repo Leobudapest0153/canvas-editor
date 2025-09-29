@@ -323,7 +323,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         tipo: 'plantas',
         id: planta.id,
         nombre: planta.nombre,
-        icono: '🏢',
+        icono: 'warehouse',
       })
     }
 
@@ -357,30 +357,30 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Helper function para iconos
   const getIconoElemento = (tipo, categoria) => {
-    // Iconos por tipo
-    if (tipo === 'pasillos') return '🛣️'
-    if (tipo === 'cuartos') return '🏠'
-    if (tipo === 'pisos') return '🧱'
+    // Iconos por tipo - usando nombres de SVG
+    if (tipo === 'pasillos') return 'space'
+    if (tipo === 'cuartos') return 'room'
+    if (tipo === 'pisos') return 'mezzanine'
     if (tipo === 'contenedores') {
       const iconosContenedores = {
-        cajas: '📦',
-        bins: '🗑️',
-        bandejas: '🪣',
+        cajas: 'space',
+        bins: 'space',
+        bandejas: 'space',
       }
-      return iconosContenedores[categoria] || '🗃️'
+      return iconosContenedores[categoria] || 'space'
     }
 
     if (tipo === 'elementos') {
       const iconosElementos = {
-        anaqueles: '📚',
-        estantes: '📋',
-        mesas: '🪑',
-        armarios: '🗄️',
+        anaqueles: 'space-on-wall',
+        estantes: 'space-on-wall',
+        mesas: 'space',
+        armarios: 'space',
       }
-      return iconosElementos[categoria] || '📦'
+      return iconosElementos[categoria] || 'space'
     }
 
-    return '📦'
+    return 'space'
   }
 
   const navegarAElemento = (elementoId) => {
