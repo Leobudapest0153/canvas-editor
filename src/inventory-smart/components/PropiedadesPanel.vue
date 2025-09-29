@@ -341,7 +341,7 @@
         >
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">
             <div class="flex justify-between items-center w-full -mt-6 pl-4">
-              Pisos
+              {{ elementoSeleccionado.tipo == 'cuartos' ? 'Pisos' : 'Niveles' }}
               <button
                 :disabled="isSaving || isElementRestricted"
                 @click="canvasStore.abrirCuartoNivelesPropiedades(elementoSeleccionado.id)"
