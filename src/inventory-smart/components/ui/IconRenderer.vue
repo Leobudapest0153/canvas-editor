@@ -40,21 +40,19 @@ const props = defineProps({
 const svgContents = {
   // Tipos principales
   warehouse: `
-  <g stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <!-- Warehouse outline -->
-    <path d="M24 2L8 8v21h8V18h16v11h8V8L24 2z"/>
-    <!-- Door/header line -->
-    <path d="M12 11h24"/>
-  </g>
-  `,
+ <g>
+  <path stroke="currentColor" stroke-width="3" id="svg_1" d="m9.48483,11.82093l14.72726,-10.0785l14.72726,10.0785m-3.15584,-2.23967l0,16.7975l-23.14283,0l0,-16.7975m8.41558,7.83883l6.31168,0l0,8.95867l-6.31168,0l0,-8.95867z" stroke-linejoin="round" fill="none"/>
+ </g>
+ `,
 
   room: `
-    <!-- Habitación simple centrada -->
-    <!-- Paredes exteriores -->
-    <rect x="3" y="1.5" width="40" height="25" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-    <!-- Puerta -->
-    <path d="M3 18 L12 18" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-  `,
+ <g>
+  <path stroke="currentColor" id="svg_2" stroke-width="3" d="m6.23646,19.56534l17.31742,6.72953l17.48288,-6.79201l0,-11.0787l-17.48374,-6.79201l-17.31742,6.72953l0.00086,11.20365z" stroke-linejoin="round" stroke-linecap="round" fill="none"/>
+  <line stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" id="svg_5" y2="18.86766" x2="40.31385" y1="12.79763" x1="23.68318" fill="none"/>
+  <path transform="rotate(67.7965 23.7163 7.51977)" stroke="currentColor" stroke-width="3" id="svg_13" d="m19.29523,5.86539l8.84215,3.30875" opacity="undefined" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <line transform="rotate(-3.23338 15.1274 16.4155)" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" id="svg_15" y2="19.22587" x2="6.46643" y1="13.60507" x1="23.78828" fill="none"/>
+ </g>
+ `,
 
   mezzanine: `
     <!-- Estructura del mezzanine -->
