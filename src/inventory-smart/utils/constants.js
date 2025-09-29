@@ -270,10 +270,10 @@ export const ELEMENTOS_PREDEFINIDOS = [
   },
   // Contenedor básico (único disponible)
   {
-    id: 'contenedor_base',
-    nombre: 'Contenedor Base',
+    id: 'nivel_base',
+    nombre: 'Nivel Base',
     tipo: 'contenedores',
-    categoria: 'contenedores',
+    categoria: 'nivel',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#F0FAFF',
