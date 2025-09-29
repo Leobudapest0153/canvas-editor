@@ -38,17 +38,6 @@
     <!-- Gestión de plantas -->
     <WorkspaceEditor />
 
-    <!-- Modal de aviso: el servidor trae cambios más recientes; se descartarán locales -->
-    <ConfirmReplaceModal
-      :mostrar="showReplaceNotice"
-      modo="notice"
-      tipo="info"
-      titulo="Se detectaron cambios en el servidor"
-      mensaje="Para evitar conflictos, se descartarán los cambios locales que tenías sin guardar y se aplicará la configuración más reciente del servidor."
-      :closeOnBackdrop="true"
-      @confirmar="applyPendingServerConfig"
-      @cerrar="applyPendingServerConfig"
-    />
     <!-- Gestión de pisos de cuartos desde las propiedades -->
     <ManagmentFloorRoomPropertiesModal/>
   </div>
@@ -72,10 +61,8 @@ import { useToast } from './composables/useToast'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import LoaderOverlay from './components/LoaderOverlay.vue'
-import { AUTOSAVE_CONFIG } from '@/inventory-smart/utils/constants'
-import ConfirmReplaceModal from '@/inventory-smart/components/modals/ConfirmReplaceModal.vue'
+// removed autosave/backup constants
 import { useServicesStore } from './stores/services.js'
-import { useStatePersistence } from './composables/useStatePersistence'
 
 const props = defineProps({
   configCanvas: {
@@ -151,64 +138,6 @@ const externalServicesAPI = {
 }
 
 const canvasViewRef = ref(null)
-
-// Estado del modal de aviso de reemplazo por servidor
-const showReplaceNotice = ref(false)
-let pendingServerConfig = null
-// Flag para evitar ejecuciones duplicadas del handler (confirmar + cerrar)
-const isApplyingServerConfig = ref(false)
-
-// Helper: obtener la instancia de autosave registrada en el store
-const getAutoSaveInstance = () => {
-  const auto = canvasStore?.autoSaveInstance
-  return auto && ('value' in auto ? auto.value : auto)
-}
-
-// Limpia las copias de seguridad locales (autosave)
-const clearLocalBackups = async () => {
-  try {
-    // Reutilizar instancia de autosave si está registrada en el store
-    const instance = getAutoSaveInstance()
-    if (instance?.clearAllBackups) {
-      await instance.clearAllBackups()
-    } else {
-      // Fallback a localStorage por compatibilidad
-      localStorage.removeItem(AUTOSAVE_CONFIG.STORAGE_KEY)
-    }
-  } catch (e) {
-    console.warn('No se pudieron limpiar los backups locales', e)
-  }
-}
-
-const applyPendingServerConfig = async () => {
-  // Evitar ejecuciones duplicadas (p. ej., si el modal emite confirmar y luego cerrar)
-  if (isApplyingServerConfig.value) return
-  if (!pendingServerConfig) {
-    showReplaceNotice.value = false
-    return
-  }
-  isApplyingServerConfig.value = true
-  try {
-    showToast('Aplicando configuración del servidor…', 'info')
-    const instance = getAutoSaveInstance()
-    const wasEnabled = instance?.isEnabled === true
-    // Pausar autosave si aplica
-    instance?.stopAutoSave?.()
-    // Al aplicar servidor, limpiar backups locales
-    await clearLocalBackups()
-    const ok = canvasStore.deserialize(pendingServerConfig)
-    // Crear un backup inmediato del estado aplicado
-    if (ok && instance?.performBackup) {
-      await instance.performBackup({ isServerVersion: true })
-    }
-    // Reanudar autosave si estaba activo
-    if (wasEnabled) instance?.startAutoSave?.()
-  } finally {
-    pendingServerConfig = null
-    showReplaceNotice.value = false
-    isApplyingServerConfig.value = false
-  }
-}
 
 // Manejador para cuando PlantasPanel emite cambios de configuración
 const handleConfigChanged = (configSerializada) => {
@@ -328,63 +257,7 @@ const triggerPaste = () => {
   }
 }
 
-// ======= Resolución de conflictos (Servidor vs Backups locales) =======
-// Helper: obtener timestamp (ms) desde una configuración serializada
-const getConfigTimestamp = (jsonString) => {
-  try {
-    const data = JSON.parse(jsonString)
-    const ts = data?.meta?.timestamp
-    const t = ts ? Date.parse(ts) : NaN
-    return Number.isFinite(t) ? t : null
-  } catch (e) {
-    console.warn('No se pudo parsear timestamp de configuración', e)
-    return null
-  }
-}
-
-// Helper: carga la copia de seguridad local más reciente
-const getLatestLocalBackup = () => {
-  try {
-    const raw = localStorage.getItem(AUTOSAVE_CONFIG.STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    const backups = Array.isArray(parsed?.backups) ? parsed.backups : []
-    if (!backups.length) return null
-    // Elegir por timestamp más reciente (fallback a meta interna si existe)
-    const withTs = backups.map((b) => {
-      let t = b?.timestamp ? Date.parse(b.timestamp) : NaN
-      if (!Number.isFinite(t)) {
-        try {
-          const d = JSON.parse(b?.data || '{}')
-          const mt = Date.parse(d?.meta?.timestamp)
-          if (Number.isFinite(mt)) t = mt
-        } catch (e) { /* noop */ }
-      }
-      return { ...b, _ts: Number.isFinite(t) ? t : 0 }
-    })
-    withTs.sort((a, b) => b._ts - a._ts)
-    const latest = withTs[0]
-    // Normalizar resultado
-    return latest ? { id: latest.id, timestamp: latest.timestamp, ts: latest._ts, data: latest.data } : null
-  } catch (e) {
-    return null
-  }
-}
-
-const fmtDate = (iso) => {
-  try {
-    return new Date(iso).toLocaleString('es-ES', {
-      hour12: true,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  } catch {
-    return iso || ''
-  }
-}
+// (Removed backup/restore/version comparison helpers)
 
 onMounted(() => {
   try {
@@ -418,51 +291,16 @@ watch(
         return
       }
 
-      // Validar la prop
+      // Validar la prop y aplicar directamente la configuración del servidor
       const isValid = validarJSON(newConfig)
       if (!isValid) {
         showToast('La configuración importada no es válida', 'error')
         return
       }
 
-      // Comparar timestamps entre servidor y backup local más reciente
-      const serverTs = getConfigTimestamp(newConfig)
-      const latestBackup = getLatestLocalBackup()
-      const { getLastSerializationTimestamp } = useStatePersistence()
-      const latestBackupTimestamp = Date.parse(getLastSerializationTimestamp())
-
-      // Si hay backup y es más reciente que el servidor -> restaurar backup automáticamente
-      if (latestBackup && latestBackupTimestamp && (!latestBackupTimestamp || latestBackupTimestamp > serverTs)) {
-        const restored = canvasStore.deserialize(latestBackup.data)
-        if (restored) {
-          showToast(
-            `Restaurando últimos cambios sin guardar (${fmtDate(latestBackup.timestamp)}).`,
-            'info',
-          )
-          return
-        }
-      }
-
-      // Si el servidor es más reciente que el backup local -> solo avisar y aplicar servidor
-      if (serverTs && latestBackup && latestBackupTimestamp && serverTs > latestBackupTimestamp) {
-        pendingServerConfig = newConfig
-        showReplaceNotice.value = true
-        return
-      }
-
-      // Caso por defecto: aplicar servidor (y limpiar backups locales)
       const mensaje = oldConfig ? null : 'Iniciando área de trabajo'
       if (mensaje) showToast(mensaje, 'info' )
-      const instance = getAutoSaveInstance()
-      const wasEnabled = instance?.isEnabled === true
-      instance?.stopAutoSave?.()
-      await clearLocalBackups()
-      const ok = canvasStore.deserialize(newConfig)
-      // Crear un backup inmediato del estado del servidor
-      if (ok && instance?.performBackup) {
-        await instance.performBackup({ isServerVersion: true })
-      }
-      if (wasEnabled) instance?.startAutoSave?.()
+      canvasStore.deserialize(newConfig)
     } catch (error) {
       showToast('Ha ocurrido un error al importar la configuración', 'error')
       console.error('Error al importar la configuración:', error)
@@ -474,7 +312,7 @@ watch(
 <style>
 @import 'tailwindcss';
 
-/* Ignorar warning de unknown at rule */
+/* Ignorar warning de unknown at rule @theme */
 @theme {
   --color-primary: #1c1e4d;
   --color-primary-100: #f0f1f5;

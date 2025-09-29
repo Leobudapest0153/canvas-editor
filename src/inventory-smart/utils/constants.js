@@ -402,6 +402,7 @@ export const MARGIN_CM = 5 // margen perimetral interno en cm para packing
 export const FACTOR_UTILIZACION = 0.9 // porcentaje máximo de ocupación de área
 
 // === CONFIGURACIÓN DE AUTOSAVE ===
+// !DEPRECATED: Se eliminó la lógica de copias de seguridad automáticas.
 export const AUTOSAVE_CONFIG = {
   INTERVAL_MS: 60000,
   MAX_BACKUPS: 10,

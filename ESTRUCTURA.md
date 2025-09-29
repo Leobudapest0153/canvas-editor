@@ -39,7 +39,6 @@ Estructura relevante:
 - `ElementosCatalogo.vue` — Catálogo y drag & drop al canvas
 - `PropiedadesPanel.vue` — Edición de propiedades del elemento seleccionado
 - `HistorialPanel.vue` — UI de undo/redo
-- `BackupModal.vue` — Persistencia
 - `ToastContainer.vue` — Render de toasts del plugin
 - `WorkspaceEditor.vue` — Editor de plantas
 
@@ -52,7 +51,7 @@ Algunos hooks destacados:
 - `useElementDrag.js`, `useRafDrag.js`, `useObjectSnapping.js` — Drag y snapping
 - `usePlacementGuards.js`, `usePlantResizeGuard.js` — Reglas de placement y resize
 - `useContextMenu.js`, `useConfirmDialog.js`, `useToast.js` — UX y diálogo
-- `useAutoSave.js`, `useStatePersistence.js`, `useCanvasImportExport.js` — Persistencia
+- `useStatePersistence.js`, `useCanvasImportExport.js` — Persistencia
 - `usePerfMode.js`, `useCacheOnDrag.js` — Rendimiento
 - `useWeightValidation.js`, `useDimensionValidation.js` — Validaciones de negocio
 
