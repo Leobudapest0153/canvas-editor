@@ -100,11 +100,28 @@ export const useCanvasStore = defineStore('canvas', () => {
   const elementoSeleccionado = ref(null)
   const cambiosNoAplicados = ref(false);
 
+  // === NAVEGACIÓN JERÁRQUICA (se declara antes de vistaActiva para evitar ReferenceError) ===
+  const contextoNavegacion = ref({
+    tipo: 'plantas',
+    id: 'planta_1',
+    path: [],
+  })
+
   const vistaActiva = computed(() => {
     const t = contextoNavegacion.value.tipo
     if (t === 'plantas' || t === 'pisos') return 'XY'
     if (t === 'elementos' || t === 'cuartos') return 'XZ'
     return 'XY'
+  })
+
+  // Recalcular footprint canvas (width/height) al cambiar la vista
+  watch(() => vistaActiva.value, (vista) => {
+    for (const el of elementos.value) {
+      if (!el?.dimensiones) continue
+      const { width, height } = toCanvasSizePx(el.dimensiones, vista)
+      if (el.width !== width) el.width = width
+      if (el.height !== height) el.height = height
+    }
   })
   const zoom = ref(1)
   const crearPlanta = ref(false)
@@ -168,13 +185,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     snapGridEps.value = Math.max(0, Math.min(50, e))
   }
 
-  // === NAVEGACIÓN JERÁRQUICA ===
-  // Contexto de navegación: representa la "ubicación" actual en la jerarquía
-  const contextoNavegacion = ref({
-    tipo: 'plantas', // 'plantas' | 'cuartos' | 'pisos' | 'elementos' | 'contenedores'
-    id: 'planta_1', // ID de la planta, elemento o contenedor actual
-    path: [], // Array de objetos: [{ tipo: 'plantas', id: 'planta_1', nombre: 'Planta Baja' }]
-  })
+  // (contextoNavegacion ya declarado arriba)
 
   // Tamaño del canvas adaptativo según el contexto
   const canvasAdaptativo = ref({
@@ -1141,8 +1152,12 @@ export const useCanvasStore = defineStore('canvas', () => {
             if (dims) {
               // Ajustar dimensiones de modelo
               nuevoElemento.dimensiones = { ...nuevoElemento.dimensiones, ...dims }
-              // Ajustar canvas en px según vista actual
-              const view = ['cuartos','pisos','pasillos'].includes(nuevoElemento.tipo) ? 'XY' : 'XZ'
+              // Ajustar canvas en px según la vista ACTUAL (fix Option A: evita forzar 'XZ' en elementos cuando estamos en planta/XY)
+              let view = vistaActiva.value
+              // Si la vista calculada es XZ pero estamos creando en contexto planta (tipo 'plantas'), forzar XY para footprint inicial.
+              if (view === 'XZ' && contextoNavegacion.value?.tipo === 'plantas') {
+                view = 'XY'
+              }
               const { width, height } = toCanvasSizePx(dims, view)
               if (Number.isFinite(width)) nuevoElemento.width = width
               if (Number.isFinite(height)) nuevoElemento.height = height
@@ -1174,6 +1189,18 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     elementos.value.push(nuevoElemento)
+
+    // Normalización inmediata post-inserción: asegurar que en vista XY height represente largo (caso Anaquel)
+    try {
+      const currentView = vistaActiva.value
+      if (currentView === 'XY' && nuevoElemento?.dimensiones) {
+        const expected = nuevoElemento.dimensiones.largo * CM_TO_PX
+        // Solo remapear si difiere exactamente del uso de alto
+        if (nuevoElemento.height !== expected && nuevoElemento.dimensiones.alto * CM_TO_PX === nuevoElemento.height) {
+          nuevoElemento.height = expected
+        }
+      }
+    } catch (e) { /* noop */ }
 
     // Guardar estado en historial
     saveToHistory(`Elemento agregado: ${nuevoElemento.nombre || nuevoElemento.tipo}`)
