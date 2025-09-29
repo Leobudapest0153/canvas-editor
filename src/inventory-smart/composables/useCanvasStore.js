@@ -828,6 +828,15 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (saveHistory && description) {
         saveToHistory(description)
       }
+
+      // Reordenar visibles si corresponde al contexto actual (plantas, pisos, elementos)
+      try {
+        const ctxTipo = contextoNavegacion.value?.tipo
+        const ctxId = contextoNavegacion.value?.id
+        if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+          reorderVisibleByHeightForContext(ctxTipo, ctxId)
+        }
+      } catch (e) { /* noop */ }
     }
   }
 
@@ -916,6 +925,17 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   };
 
+  // Después de actualizar sin validación, reordenar visibles si aplica
+  const _afterUpdateReorderIfNeeded = () => {
+    try {
+      const ctxTipo = contextoNavegacion.value?.tipo
+      const ctxId = contextoNavegacion.value?.id
+      if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+        reorderVisibleByHeightForContext(ctxTipo, ctxId)
+      }
+    } catch (e) { /* noop */ }
+  }
+
 
 
   const actualizarElemento = (elementoId, propiedades, saveHistory = false, description = null) => {
@@ -987,6 +1007,14 @@ export const useCanvasStore = defineStore('canvas', () => {
           description || `Propiedades actualizadas: ${Object.keys(propiedades).join(', ')}`
         saveToHistory(descripcionAuto)
       }
+      // Reordenar visibles después de una actualización normal
+      try {
+        const ctxTipo = contextoNavegacion.value?.tipo
+        const ctxId = contextoNavegacion.value?.id
+        if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+          reorderVisibleByHeightForContext(ctxTipo, ctxId)
+        }
+      } catch (e) { /* noop */ }
     }
     return true
   }
@@ -1013,7 +1041,14 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (el) {
         el.updatedAt = new Date().toISOString()
       }
-      // persist()
+      // Reordenar visibles si corresponde (persist no forzado aquí)
+      try {
+        const ctxTipo = contextoNavegacion.value?.tipo
+        const ctxId = contextoNavegacion.value?.id
+        if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+          reorderVisibleByHeightForContext(ctxTipo, ctxId)
+        }
+      } catch (e) { /* noop */ }
     }
     return ok
   }
@@ -1396,6 +1431,15 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Guardar estado en historial
     saveToHistory(`Elemento agregado: ${nuevoElemento.nombre || nuevoElemento.tipo}`)
 
+    // Reordenar elementos visibles según altura si el contexto actual es plantas o elementos
+    try {
+      const ctxTipo = contextoNavegacion.value?.tipo
+      const ctxId = contextoNavegacion.value?.id
+      if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+        reorderVisibleByHeightForContext(ctxTipo, ctxId)
+      }
+    } catch (e) { /* noop */ }
+
     return nuevoElemento.id
   }
 
@@ -1478,6 +1522,15 @@ export const useCanvasStore = defineStore('canvas', () => {
           }
         } catch { /* ignore historial error */ }
       }
+
+      // Reordenar visibles si corresponde al contexto actual
+      try {
+        const ctxTipo = contextoNavegacion.value?.tipo
+        const ctxId = contextoNavegacion.value?.id
+        if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+          reorderVisibleByHeightForContext(ctxTipo, ctxId)
+        }
+      } catch (e) { /* noop */ }
 
       return next.id;
     } catch (err) {
@@ -2357,6 +2410,75 @@ export const useCanvasStore = defineStore('canvas', () => {
     { immediate: true },
   )
 
+  /**
+   * Reordena en-place los elementos visibles del contexto dado según
+   * `alturaRespectoAlSuelo`, poniendo al final aquellos con mayor altura.
+   * Operamos por índices para tocar únicamente las posiciones visibles
+   * y evitar resort de toda la lista global `elementos.value`.
+   *
+   * @param {string} contextType - tipo de contexto (p. ej. 'plantas' o 'elementos')
+   * @param {string} contextId - id del contexto (planta o elemento padre)
+   */
+  const reorderVisibleByHeightForContext = (contextType, contextId) => {
+    try {
+      if (!contextType) return
+
+      // Determinar los ids y sus índices en elementos.value que son "visibles"
+      const visibleCriteria = []
+
+      if (contextType === 'plantas') {
+        for (let i = 0; i < elementos.value.length; i++) {
+          const el = elementos.value[i]
+          if (!el) continue
+          if (el.plantaId === contextId && !el.padre && ['cuartos', 'elementos'].includes(el.tipo)) {
+            visibleCriteria.push({ index: i, el })
+          }
+        }
+      } else if (contextType === 'pisos') {
+        // contexto 'pisos': visibles son los hijos del elemento padre de tipo 'pisos'
+        const padre = elementos.value.find((e) => e.id === contextId)
+        if (padre?.hijos && Array.isArray(padre.hijos)) {
+          const hijoSet = new Set(padre.hijos)
+          for (let i = 0; i < elementos.value.length; i++) {
+            const el = elementos.value[i]
+            if (!el) continue
+            if (hijoSet.has(el.id) && el.tipo === 'pisos') {
+              visibleCriteria.push({ index: i, el })
+            }
+          }
+        }
+      } else {
+        return
+      }
+
+      if (!visibleCriteria.length) return
+
+      // Establecer orden estable: usar alturaRespectoAlSuelo (num); fallback a 0.
+      const withOrder = visibleCriteria.map((v, idx) => ({
+        origIndex: idx,
+        index: v.index,
+        el: v.el,
+        key: Number((v.el && Number(v.el.alturaRespectoAlSuelo)) || 0),
+      }))
+
+      // Orden ascendente para que los mayores queden al final
+      withOrder.sort((a, b) => {
+        if (a.key === b.key) return a.origIndex - b.origIndex
+        return a.key - b.key
+      })
+
+      // Reasignar en los índices detectados (manteniendo otros elementos intactos)
+      for (let i = 0; i < withOrder.length; i++) {
+        const targetIndex = visibleCriteria[i].index
+        const sourceEl = withOrder[i].el
+        elementos.value[targetIndex] = sourceEl
+      }
+    } catch (e) {
+      // No bloquear la inserción si falla el reorder
+      console.warn('reorderVisibleByHeightForContext failed', e)
+    }
+  }
+
   return {
     // State
     elementos,
@@ -2490,3 +2612,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     recomputePasilloAssignments,
   }
 })
+
+
+
