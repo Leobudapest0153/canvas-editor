@@ -175,15 +175,13 @@
         <!-- -- -- -->
 
         <!-- Botón Regresar -->
-        <UiTooltip label="Salir del editor" position="bottom" :delay="200">
           <button
             type="button"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500 rounded-lg transition-colors cursor-pointer"
-            @click="() => (false)"
+            @click="onBack"
           >
             <span>Regresar</span>
           </button>
-        </UiTooltip>
 
         <!-- Botón Historial de cambios -->
         <UiTooltip label="Historial de cambios" position="bottom" :delay="200">
@@ -498,8 +496,8 @@
 </template>
 
 <script setup>
-// Definir emits
-const emit = defineEmits(['configChanged'])
+// Definir emits (agregado 'regresar')
+const emit = defineEmits(['configChanged', 'regresar'])
 
 import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
@@ -616,6 +614,15 @@ const elementosEnPlantaAEliminar = computed(() => {
 // Métodos
 const openHistorialModal = () => {
   showHistorialModal.value = true
+}
+
+// Emitir acción de regresar para que el componente padre pueda manejar navegación/salida
+const onBack = () => {
+  try {
+    emit('regresar')
+  } catch (e) {
+    console.warn('No se pudo emitir evento regresar', e)
+  }
 }
 
 const closeHistorialModal = () => {

@@ -1,7 +1,7 @@
 <template>
   <div id="inventory-smart">
     <!-- Panel de plantas -->
-  <PlantasPanel :author="author" @configChanged="handleConfigChanged" />
+  <PlantasPanel :author="author" @configChanged="handleConfigChanged" @regresar="handleBack" />
 
     <!-- Navegación jerárquica -->
     <NavegacionJerarquica />
@@ -104,7 +104,7 @@ const props = defineProps({
     }
   }
 })// Definir emits para comunicar cambios al componente padre
-const emit = defineEmits(['configUpdated'])
+const emit = defineEmits(['configUpdated', 'regresar'])
 
 const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
@@ -225,6 +225,15 @@ const handleConfigChanged = (configSerializada) => {
   } catch (error) {
     console.error('Error al procesar la configuración actualizada:', error)
     showToast('Error al procesar la configuración actualizada', 'error')
+  }
+}
+
+// Propagar evento regresar
+const handleBack = () => {
+  try {
+    emit('regresar')
+  } catch (e) {
+    console.warn('No se pudo emitir evento regresar desde InventorySmart', e)
   }
 }
 
