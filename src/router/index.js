@@ -8,6 +8,11 @@ const router = createRouter({
       name: 'Inicio',
       component: () => import('@/pages/HomePage.vue')
     },
+    {
+      path: '/three-preview',
+      name: 'ThreePreview',
+      component: () => import('@/pages/ThreePreviewPage.vue')
+    },
   ],
 })
 

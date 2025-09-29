@@ -1,5 +1,8 @@
 <template>
   <div id="app">
+    <nav class="three-entry">
+      <RouterLink class="three-entry__link" to="/three-preview">Abrir visor 3D</RouterLink>
+    </nav>
     <InventorySmart
       :configCanvas="initialConfig"
       :externalServices="externalServices"
@@ -113,4 +116,29 @@ onMounted(() => {
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+.three-entry {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.three-entry__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #2563eb, #22d3ee);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.three-entry__link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 15px 40px rgba(45, 212, 191, 0.3);
+}
+</style>

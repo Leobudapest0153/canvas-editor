@@ -106,6 +106,12 @@ Constantes útiles en `src/inventory-smart/utils/constants.js`:
 
 El componente gestiona conflictos entre backups locales y configuraciones provenientes del servidor mostrando un aviso cuando la versión del servidor es más reciente.
 
+## Vista previa 3D
+
+- Ruta dedicada: [`/three-preview`](src/pages/ThreePreviewPage.vue) (accesible desde la pantalla principal con el botón **Abrir visor 3D**).
+- Acción Pinia: `serializeForThreePreview` en `useCanvasStore` devuelve el JSON listo para Three.js sin métricas ni historial.
+- Documentación detallada y flujo de trabajo en [`docs/three-preview.md`](docs/three-preview.md).
+
 ## Atajos de teclado
 
 - Ctrl/Cmd + Z — Deshacer
