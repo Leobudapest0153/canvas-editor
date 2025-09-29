@@ -79,6 +79,19 @@
               </div>
             </div>
 
+            <div v-if="pasilloAsignadoNombre && !esPasillo">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Pasillo asignado</label>
+              <input
+                :value="pasilloAsignadoNombre"
+                type="text"
+                class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-600 cursor-not-allowed"
+                disabled
+              />
+              <p v-if="pasilloAsignado" class="text-xs text-gray-500 mt-1">
+                El nombre se sincroniza automáticamente según el pasillo relacionado.
+              </p>
+            </div>
+
             <!-- Orientación (oculta para pasillos y circulares) -->
             <div v-if="!esPasillo && !esCircular">
               <label class="block text-xs font-medium text-gray-600 mb-1">Orientación</label>
@@ -1237,6 +1250,26 @@ const ocultarAnchoLargo = computed(() => esCircular.value)
 const esPasillo = computed(
   () => (elementoSeleccionado.value?.tipo || '').toLowerCase() === 'pasillos',
 )
+
+// Reflejamos el pasillo calculado (pasilloId) en el panel para ayudar a depurar asignaciones.
+const pasilloAsignado = computed(() => {
+  if (!elementoSeleccionado.value || esPasillo.value) return null
+  const id = elementoSeleccionado.value.pasilloId
+  if (!id) return null
+  return canvasStore.elementoPorId(id) || null
+})
+
+// Mostramos un nombre amigable y dejamos un fallback determinista si el pasillo fue removido.
+const pasilloAsignadoNombre = computed(() => {
+  if (!elementoSeleccionado.value || esPasillo.value) return ''
+  const id = elementoSeleccionado.value.pasilloId
+  if (!id) return ''
+  const pasillo = pasilloAsignado.value
+  if (pasillo) {
+    return pasillo.nombre || pasillo.codigo || `Pasillo ${pasillo.id}`
+  }
+  return `Pasillo no disponible (ID: ${id})`
+})
 
 /**
  * Uso real del elemento
