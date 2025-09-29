@@ -11,6 +11,8 @@ const infinitePadding = Number.isFinite(INFINITE_VIEW_PADDING_PX) ? INFINITE_VIE
 
 export function useZoom(stageSize, layerConfig) {
   const canvasStore = useCanvasStore()
+  const isPlantInfiniteActive = (planta = canvasStore.plantaActivaData) =>
+    canvasStore.estaEnPlanta && (planta?.isInfinite === true)
 
   /**
    * Calcula el bounding box para diferentes contextos
@@ -21,7 +23,7 @@ export function useZoom(stageSize, layerConfig) {
       const structure = canvasStore.estructuraContenedorActual
       const baseWidth = layerConfig.value.width || Math.max(1, Number(structure.width) || 1)
       const baseHeight = layerConfig.value.height || Math.max(1, Number(structure.height) || 1)
-      const applyPadding = canvasStore.plantaActivaData?.isInfinite === true
+      const applyPadding = isPlantInfiniteActive()
       const padding = applyPadding ? infinitePadding : 0
       const width = Math.max(1, baseWidth)
       const height = Math.max(1, baseHeight)
@@ -36,7 +38,7 @@ export function useZoom(stageSize, layerConfig) {
     // Contexto 2: planta activa -> priorizar contenido si existe
     if (canvasStore.plantaActivaData) {
       const planta = canvasStore.plantaActivaData
-      const isInfinite = planta?.isInfinite === true
+      const isInfinite = isPlantInfiniteActive(planta)
 
       if (!isInfinite) {
         const frame = canvasStore.canvasAdaptativo?.frame
@@ -123,7 +125,7 @@ export function useZoom(stageSize, layerConfig) {
     }
 
     // Contexto 3: fallback al layerConfig
-    if (canvasStore.plantaActivaData?.isInfinite !== true && layerConfig.value?.width && layerConfig.value?.height) {
+    if (!isPlantInfiniteActive() && layerConfig.value?.width && layerConfig.value?.height) {
       return { x: 0, y: 0, width: Math.max(1, layerConfig.value.width), height: Math.max(1, layerConfig.value.height) }
     }
 
@@ -153,17 +155,21 @@ export function useZoom(stageSize, layerConfig) {
   /**
    * Calcula el zoom mínimo dinámico basado en el contexto actual
    */
-  const getDynamicMinZoom = () => {
-    if (canvasStore.plantaActivaData?.isInfinite === true) {
+  const getDynamicMinZoom = (options = {}) => {
+    if (isPlantInfiniteActive()) {
       return 0.001
     }
 
-    const margin = 40
-    const vw = Math.max(16, stageSize.value.width - margin * 2)
-    const vh = Math.max(16, stageSize.value.height - margin * 2)
+    const margin = Number.isFinite(options.margin) ? options.margin : 40
+    const baseViewport = options.viewport || stageSize.value || {}
+    const viewportWidth = Number(baseViewport.width) || 0
+    const viewportHeight = Number(baseViewport.height) || 0
+    const vw = Math.max(16, viewportWidth - margin * 2)
+    const vh = Math.max(16, viewportHeight - margin * 2)
 
-    const bbox = calculateBoundingBox()
-    const chosen = chooseBestBoundingBox(bbox, { width: vw, height: vh })
+  const hasExplicitBBox = Object.prototype.hasOwnProperty.call(options, 'bbox')
+  const bboxSource = hasExplicitBBox ? options.bbox : calculateBoundingBox()
+    const chosen = chooseBestBoundingBox(bboxSource, { width: vw, height: vh })
 
     // Calcular escala de encuadre
     if (chosen) {
@@ -190,16 +196,63 @@ export function useZoom(stageSize, layerConfig) {
   /**
    * Establece el zoom al valor mínimo dinámico y centra la vista en 0,0
    */
-  const fitToMinZoom = (stage) => {
-    if (!stage) return
+  const calculateFitTarget = () => {
+    const stageViewport = stageSize.value || { width: 0, height: 0 }
+    const margin = 40
+    const viewport = {
+      width: Math.max(16, (Number(stageViewport.width) || 0) - margin * 2),
+      height: Math.max(16, (Number(stageViewport.height) || 0) - margin * 2)
+    }
 
-    const dynamicMinZoom = getDynamicMinZoom()
+    const bboxRaw = calculateBoundingBox()
+    const chosen = chooseBestBoundingBox(bboxRaw, viewport)
+    const dynamicMinZoom = getDynamicMinZoom({ margin, viewport: stageViewport, bbox: bboxRaw })
+
+    if (!chosen) {
+      const centerX = (Number(stageViewport.width) || 0) / 2
+      const centerY = (Number(stageViewport.height) || 0) / 2
+      return {
+        scale: dynamicMinZoom,
+        minZoom: dynamicMinZoom,
+        position: { x: centerX, y: centerY },
+        bbox: null,
+        viewport,
+        margin,
+        mode: 'fallback'
+      }
+    }
+
+    const scaleX = chosen.width > 0 ? viewport.width / chosen.width : 1
+    const scaleY = chosen.height > 0 ? viewport.height / chosen.height : 1
+    const fitScale = Math.min(scaleX, scaleY)
+    const targetScale = Math.max(dynamicMinZoom, Number.isFinite(fitScale) && fitScale > 0 ? fitScale : dynamicMinZoom)
+
+    const stageWidth = Number(stageViewport.width) || 0
+    const stageHeight = Number(stageViewport.height) || 0
+    const stageX = (stageWidth - chosen.width * targetScale) / 2 - chosen.x * targetScale
+    const stageY = (stageHeight - chosen.height * targetScale) / 2 - chosen.y * targetScale
+
+    return {
+      scale: targetScale,
+      minZoom: dynamicMinZoom,
+      position: { x: stageX, y: stageY },
+      bbox: chosen,
+      viewport,
+      margin,
+      mode: 'content'
+    }
+  }
+
+  const fitToMinZoom = (stage) => {
+    if (!stage) return null
+
+    const target = calculateFitTarget()
+    const dynamicMinZoom = target?.minZoom ?? getDynamicMinZoom()
 
     // Resetear transformaciones del stage antes de aplicar nuevas (si existen)
     safeStageCall(stage, 'scale', { x: 1, y: 1 })
     safeStageCall(stage, 'position', { x: 0, y: 0 })
 
-    // Centrar en 0,0 con el zoom mínimo
     const centerX = stageSize.value.width / 2
     const centerY = stageSize.value.height / 2
 
@@ -213,6 +266,19 @@ export function useZoom(stageSize, layerConfig) {
 
     // Forzar redibujado
     safeStageCall(stage, 'batchDraw')
+
+    return {
+      scale: dynamicMinZoom,
+      minZoom: dynamicMinZoom,
+      position: { x: centerX, y: centerY },
+      bbox: null,
+      viewport: target?.viewport ?? {
+        width: Math.max(16, stageSize.value.width - 80),
+        height: Math.max(16, stageSize.value.height - 80)
+      },
+      margin: target?.margin ?? 40,
+      mode: 'fallback'
+    }
   }
 
   /**
@@ -220,51 +286,36 @@ export function useZoom(stageSize, layerConfig) {
    * Versión avanzada que maneja múltiples contextos y centra inteligentemente
    */
   const fitToContent = (stage) => {
-    if (!stage) return
+    if (!stage) return null
 
     try {
-      const margin = 40
-      const vw = Math.max(16, stageSize.value.width - margin * 2)
-      const vh = Math.max(16, stageSize.value.height - margin * 2)
+      const target = calculateFitTarget()
 
-      const bbox = calculateBoundingBox()
-      const chosen = chooseBestBoundingBox(bbox, { width: vw, height: vh })
-
-      if (!chosen) {
-        // Fallback: centrar en 0,0 con zoom mínimo
-        fitToMinZoom(stage)
-        return
+      if (!target) {
+        return fitToMinZoom(stage)
       }
-
-      const dynamicMinZoom = getDynamicMinZoom()
-
-      const scaleX = chosen.width > 0 ? vw / chosen.width : 1
-      const scaleY = chosen.height > 0 ? vh / chosen.height : 1
-      const fitScale = Math.min(scaleX, scaleY)
-      const targetScale = Math.max(dynamicMinZoom, Number.isFinite(fitScale) && fitScale > 0 ? fitScale : dynamicMinZoom)
 
       // IMPORTANTE: Resetear transformaciones del stage antes de aplicar nuevas
       safeStageCall(stage, 'scale', { x: 1, y: 1 })
       safeStageCall(stage, 'position', { x: 0, y: 0 })
 
       // Calcular pan para centrar bbox en viewport (en coords de stage)
-      const stageX = (stageSize.value.width - chosen.width * targetScale) / 2 - chosen.x * targetScale
-      const stageY = (stageSize.value.height - chosen.height * targetScale) / 2 - chosen.y * targetScale
-
       // Aplicar transformaciones desde estado limpio
-      safeStageCall(stage, 'scale', { x: targetScale, y: targetScale })
-      safeStageCall(stage, 'position', { x: stageX, y: stageY })
+      safeStageCall(stage, 'scale', { x: target.scale, y: target.scale })
+      safeStageCall(stage, 'position', { x: target.position.x, y: target.position.y })
 
       // Sincronizar con el store DESPUÉS de aplicar al stage
-      canvasStore.configurarZoom(targetScale, dynamicMinZoom)
-      canvasStore.configurarPan(stageX, stageY)
+      canvasStore.configurarZoom(target.scale, target.minZoom)
+      canvasStore.configurarPan(target.position.x, target.position.y)
 
       // Forzar redibujado
       safeStageCall(stage, 'batchDraw')
+
+      return target
     } catch (e) {
       console.error('fitToContent error', e)
       // Fallback seguro
-      fitToMinZoom(stage)
+      return fitToMinZoom(stage)
     }
   }
 
@@ -272,6 +323,7 @@ export function useZoom(stageSize, layerConfig) {
     getDynamicMinZoom,
     fitToMinZoom,
     fitToContent,
+    calculateFitTarget,
     calculateBoundingBox,
     chooseBestBoundingBox
   }

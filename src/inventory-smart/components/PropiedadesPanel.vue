@@ -508,6 +508,7 @@ import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation.js'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation.js'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
+import { resolveAutoGrowthPlacement } from '@/inventory-smart/utils/autoGrowthPlacement'
 import { t } from '@/inventory-smart/utils/translator'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { toPrecisionCm } from '../utils/fixedDimensions'
@@ -806,11 +807,14 @@ const guardar = async () => {
   }
 
   // Solo validar dimensiones si realmente cambiaron las dimensiones
+  const dimensionesOriginales = snapshotOriginal.value?.dimensiones || {}
   const dimensionesCambiaron =
-    Math.abs((valorDimensionAnterior.value.ancho || 0) - anchoCm) > 0.01 ||
-    Math.abs((valorDimensionAnterior.value.largo || 0) - largoCm) > 0.01 ||
-    Math.abs((valorDimensionAnterior.value.alto || 0) - altoCm) > 0.01 ||
-    (esCircular.value && Math.abs((valorDiametroAnterior.value || 0) - anchoCm) > 0.01)
+    Math.abs((dimensionesOriginales.ancho || 0) - anchoCm) > 0.01 ||
+    Math.abs((dimensionesOriginales.largo || 0) - largoCm) > 0.01 ||
+    Math.abs((dimensionesOriginales.alto || 0) - altoCm) > 0.01 ||
+    (esCircular.value && Math.abs((snapshotOriginal.value?.diametroCm || 0) - anchoCm) > 0.01)
+
+  let autoPlacement = null
 
   if (dimensionesCambiaron) {
     // Crear elemento temporal con las nuevas dimensiones para validación completa
@@ -843,6 +847,20 @@ const guardar = async () => {
       areaBounds.polygon = canvasStore.plantaActivaData?.poligono || null
     } else {
       console.debug('[PropiedadesPanel] Validando sin polígono (vista lateral)')
+    }
+
+    autoPlacement = resolveAutoGrowthPlacement({
+      element: elementoSeleccionado.value,
+      newWidth: elementoTemporal.width,
+      newHeight: elementoTemporal.height,
+      areaBounds,
+      neighbors,
+      vista,
+    })
+
+    if (autoPlacement?.applied) {
+      elementoTemporal.x = autoPlacement.x
+      elementoTemporal.y = autoPlacement.y
     }
 
     const isValidPosition = isPlacementValid({
@@ -891,6 +909,16 @@ const guardar = async () => {
   }
   delete patch.tags
 
+  if (autoPlacement?.applied) {
+    patch.x = autoPlacement.x
+    patch.y = autoPlacement.y
+    patch.posicion = {
+      ...(elementoSeleccionado.value?.posicion || {}),
+      x: autoPlacement.x,
+      y: autoPlacement.y,
+    }
+  }
+
   // Mapear propiedad ESL
   if (edited.value?.codigoEsl !== snapshotOriginal.value?.codigoEsl) {
     patch.codigoEsl = edited.value?.codigoEsl || ''
@@ -914,7 +942,10 @@ const guardar = async () => {
         patch.y = yTopPx
       }
       // Guardar en estructura de posición para futuras vistas XZ
-      patch.posicion = { ...(elementoSeleccionado.value?.posicion || {}), y: yTopPx }
+      patch.posicion = {
+        ...(patch.posicion || elementoSeleccionado.value?.posicion || {}),
+        y: yTopPx,
+      }
     }
   }
 
@@ -1014,6 +1045,20 @@ const ejecutarValidacionDimensiones = () => {
     areaBounds.polygon = canvasStore.plantaActivaData?.poligono || null
   } else {
     console.debug('[PropiedadesPanel] Validando sin polígono (vista lateral)')
+  }
+
+  const autoPlacementPreview = resolveAutoGrowthPlacement({
+    element: elementoSeleccionado.value,
+    newWidth: elementoTemporal.width,
+    newHeight: elementoTemporal.height,
+    areaBounds,
+    neighbors,
+    vista,
+  })
+
+  if (autoPlacementPreview?.applied) {
+    elementoTemporal.x = autoPlacementPreview.x
+    elementoTemporal.y = autoPlacementPreview.y
   }
 
   const isValidPosition = isPlacementValid({

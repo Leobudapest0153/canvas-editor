@@ -34,7 +34,7 @@
     >
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
         <v-line
-          v-if="plantPolygon.length && !canvasStore.plantaActivaData?.isInfinite"
+          v-if="plantPolygon.length && !isInfinitePlant"
           :config="{
             points: plantPolygonFlat,
             closed: true,
@@ -453,7 +453,7 @@
       <v-layer ref="uiLayerRef" :config="{ listening: false }">
         <!-- Debug: mostrar información según el contexto -->
         <v-text
-          v-if="!canvasStore.estaEnPlanta || canvasStore.plantaActivaData?.isInfinite !== true"
+          v-if="!canvasStore.estaEnPlanta || !isInfinitePlant"
           :config="{
             x: floorLabelPositions.main.x,
             y: floorLabelPositions.main.y,
@@ -467,7 +467,7 @@
           }"
         />
         <v-text
-          v-if="canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite !== true"
+          v-if="canvasStore.estaEnPlanta && !isInfinitePlant"
           :config="{
             x: floorLabelPositions.secondary.x,
             y: floorLabelPositions.secondary.y,
@@ -707,6 +707,7 @@ const layerRef = ref(null)
 const backgroundLayerRef = ref(null)
 const overlaysLayerRef = ref(null)
 const indicatorsLayerRef = ref(null)
+const lastFitTarget = ref(null)
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -869,7 +870,7 @@ const stageConfig = computed(() => {
 })
 
 const activeBounds = computed(() => getActiveBounds(canvasStore))
-const isInfinitePlant = computed(() => canvasStore.plantaActivaData?.isInfinite === true)
+const isInfinitePlant = computed(() => canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true)
 
 const plantPolygon = computed(() => activeBounds.value.polygonPx)
 
@@ -1318,6 +1319,20 @@ const onKeyDown = (e) => {
 
 onMounted(() => window.addEventListener('keydown', onKeyDown))
 onUnmounted(() => window.removeEventListener('keydown', onKeyDown))
+
+// Exponer stage globalmente para funciones de enfoque (focusElemento / destacarElemento)
+onMounted(() => {
+  nextTick(() => {
+    if (typeof window !== 'undefined') {
+      try { window.__konvaStage = stageRef.value?.getNode?.() || null } catch { /* noop */ }
+    }
+  })
+})
+onUnmounted(() => {
+  if (typeof window !== 'undefined' && window.__konvaStage) {
+    try { delete window.__konvaStage } catch { /* ignore */ }
+  }
+})
 
 // === FUNCIONES DE CANVAS/STAGE ===
 const handleStageMouseDown = (e) => {
@@ -1897,6 +1912,7 @@ const getOrientationBarRect = (elemento) => {
         listening: false,
         opacity: 0.95,
       }
+
     }
     if (o === 90) {
       const height = Math.max(1, h - 2 * margin)
@@ -2305,7 +2321,9 @@ function resetVolatileState() {
 }
 
 if (typeof window !== 'undefined') {
-  window.__canvasApi = { recomputeBoundsAndIndex, forceRedraw, resetVolatileState }
+  window.__getElementPixelDimensions = getElementPixelDimensions;
+  window.__getDrawWidth = getDrawWidth;
+  window.__getDrawHeight = getDrawHeight;
 }
 
 watch(
@@ -2338,39 +2356,21 @@ const fitToPlanta = () => {
 
     if (!stage) {
       // Fallback seguro: usar min zoom y centrar
-      fitToMinZoom(stageRef.value?.getNode?.())
-      return
+      const fallback = fitToMinZoom(stage)
+      lastFitTarget.value = fallback
+      return fallback
     }
 
     // Ajustar directamente al contenido (BBox + margen)
-    fitToContent(stage)
+    let target = fitToContent(stage)
+    if (!target) {
+      target = fitToMinZoom(stage)
+    }
 
-    // Sincronizar llamada explícita para compatibilidad con pruebas:
-    // intentar usar el bbox del polígono crudo (sin interpretar unidades)
-    const dynamicMinZoom = getDynamicMinZoom()
-    let z = dynamicMinZoom
-    try {
-      const poly = canvasStore.plantaActivaData?.poligono
-      if (Array.isArray(poly) && poly.length >= 3) {
-        const xs = poly.map((p) => Number(p.x) || 0)
-        const ys = poly.map((p) => Number(p.y) || 0)
-        const minX = Math.min(...xs)
-        const maxX = Math.max(...xs)
-        const minY = Math.min(...ys)
-        const maxY = Math.max(...ys)
-        const bw = Math.max(1, maxX - minX)
-        const bh = Math.max(1, maxY - minY)
-        const margin = 40
-        const vw = Math.max(16, stageSize.value.width - margin * 2)
-        const vh = Math.max(16, stageSize.value.height - margin * 2)
-        const sx = vw / bw
-        const sy = vh / bh
-        const fit = Math.min(sx, sy)
-        if (Number.isFinite(fit) && fit > 0) z = fit
-      }
-    } catch { /* ignore */ }
+    lastFitTarget.value = target
 
     if (isInfinitePlant.value) {
+      const dynamicMinZoom = target?.minZoom ?? getDynamicMinZoom()
       const hasRenderableElements = Array.isArray(canvasStore.elementosVisibles)
         ? canvasStore.elementosVisibles.some((el) => el?.visible !== false)
         : false
@@ -2390,17 +2390,38 @@ const fitToPlanta = () => {
         canvasStore.configurarPan(centerX, centerY)
 
         stage.batchDraw?.()
+
+        target = {
+          scale: fallbackZoom,
+          minZoom: dynamicMinZoom,
+          position: { x: centerX, y: centerY },
+          bbox: target?.bbox ?? null,
+          viewport: target?.viewport ?? null,
+          margin: target?.margin ?? 40,
+          mode: 'infinite-fallback'
+        }
       } else {
         canvasStore.configurarZoom(canvasStore.zoom, dynamicMinZoom)
+        target = {
+          ...target,
+          scale: canvasStore.zoom,
+          minZoom: dynamicMinZoom,
+          mode: target?.mode ?? 'content'
+        }
       }
-    } else {
-      canvasStore.configurarZoom(z, z)
     }
+
+    lastFitTarget.value = target
+    return target
   } catch (e) {
     console.error('fitToPlanta error', e)
     try {
       const stage = stageRef.value?.getNode?.()
-      if (stage) fitToMinZoom(stage)
+      if (stage) {
+        const fallback = fitToMinZoom(stage)
+        lastFitTarget.value = fallback
+        return fallback
+      }
     } catch {
       /* ignore */
     }
@@ -2422,19 +2443,9 @@ watch(
 
     if (isInfinitePlant.value) {
       await nextTick()
-      fitToPlanta()
-      return
     }
 
-    const dynamicMinZoom = getDynamicMinZoom()
-    canvasStore.configurarZoom(dynamicMinZoom, dynamicMinZoom)
-
-    const stage = stageRef.value?.getNode?.()
-    if (stage) {
-      const centerX = stageSize.value.width / 2
-      const centerY = stageSize.value.height / 2
-      canvasStore.configurarPan(centerX, centerY)
-    }
+    fitToPlanta()
   },
   { immediate: false },
 )

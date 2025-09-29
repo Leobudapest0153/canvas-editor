@@ -115,6 +115,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   const elementoDestacadoId = ref(null)
   const idsElementosFiltrados = ref(null)
   const elementoAura = ref(null)
+  // Opacidad animada (fade-out). 1 al iniciar, decrece a 0.
+  const auraOpacity = ref(0)
 
   // Edición de niveles
   const nivelAEditar = ref(null);
@@ -1232,11 +1234,16 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       // Guardar en historial
       if (saveHistory) {
-        if (typeof registrarEnHistorial === 'function') {
-          registrarEnHistorial({ tipo: 'insert', id: next.id, despues: next, descripcion: description });
-        } else if (typeof addToHistory === 'function') {
-          addToHistory({ type: 'insert', id: next.id, after: next, description });
-        }
+        // Historial: funciones legacy pueden no existir en el entorno actual
+        try {
+          const rH = typeof globalThis !== 'undefined' ? globalThis.registrarEnHistorial : undefined
+          const aH = typeof globalThis !== 'undefined' ? globalThis.addToHistory : undefined
+          if (typeof rH === 'function') {
+            rH({ tipo: 'insert', id: next.id, despues: next, descripcion: description })
+          } else if (typeof aH === 'function') {
+            aH({ type: 'insert', id: next.id, after: next, description })
+          }
+        } catch { /* ignore historial error */ }
       }
 
       return next.id;
@@ -1525,7 +1532,9 @@ export const useCanvasStore = defineStore('canvas', () => {
       return;
     }
     if (!nivelActualizado?.dimensiones.alto || nivelActualizado?.dimensiones?.alto <= 0) {
-      nivelActualizado.dimensiones.alto = Math.floor((parent?.dimensiones?.alto || 300) / (parent?.hijos?.length + 1 ?? 3) );
+  // Evitar uso incorrecto de ?? dentro de expresión ya evaluada; aplicar fallback final
+  const divisor = (parent?.hijos?.length || 0) + 1; // siempre >=1
+  nivelActualizado.dimensiones.alto = Math.floor((parent?.dimensiones?.alto || 300) / (divisor || 3));
     }
     if (!nivelActualizado?.dimensiones.ancho || nivelActualizado?.dimensiones?.ancho <= 0) {
       nivelActualizado.dimensiones.ancho = parent?.dimensiones?.ancho || 100;
@@ -1749,31 +1758,313 @@ export const useCanvasStore = defineStore('canvas', () => {
     agregarEtiquetaAElemento(elementoId, newId)
   }
   const destacarElemento = (elementoId) => {
-    const elemento = elementoPorId.value(elementoId)
-    if (!elemento) return
-
+    const el = elementoPorId.value(elementoId)
+    if (!el) return
     elementoDestacadoId.value = elementoId
 
-    // Creamos la configuración del aura basada en el elemento
-    const paddingAura = 30 / zoom.value // Píxeles extra de tamaño para el aura
-    elementoAura.value = {
-      // Usamos un ID único para el aura para evitar conflictos de key
-      id: `aura_${elemento.id}`,
-      forma: elemento.forma,
-      x: elemento.x - paddingAura / 2,
-      y: elemento.y - paddingAura / 2,
-      width: elemento.width + paddingAura,
-      height: elemento.height + paddingAura,
-      color: elemento.color,
+    const stage = typeof window !== 'undefined' ? window.__konvaStage : null
+    const PADDING_VISUAL = 40 // px en pantalla
+    let worldX, worldY, worldW, worldH
+
+    // Helpers reales de dimensiones (coinciden con CanvasView)
+    const getDrawWidth = (typeof window !== 'undefined' && window.__getDrawWidth) ? window.__getDrawWidth : (e) => e.width || 0
+    const getDrawHeight = (typeof window !== 'undefined' && window.__getDrawHeight) ? window.__getDrawHeight : (e) => e.height || 0
+
+    // 1. Intentar bounding box real via Konva para incluir rotaciones / grupos
+    if (stage && typeof stage.findOne === 'function') {
+      try {
+        const node = stage.findOne(`#${el.id}`)
+        if (node && typeof node.getClientRect === 'function') {
+          const rect = node.getClientRect({ skipStroke: false, skipShadow: true })
+          const scale = stage.scaleX ? (stage.scaleX() || 1) : 1
+          const stageX = stage.x ? (stage.x() || 0) : 0
+          const stageY = stage.y ? (stage.y() || 0) : 0
+          // Convertir de coords de pantalla (aplican pan+scale) a coords de mundo lógico
+          worldX = (rect.x - stageX) / scale
+          worldY = (rect.y - stageY) / scale
+          worldW = rect.width / scale
+          worldH = rect.height / scale
+        }
+      } catch (e) {
+        /* fallback below */
+      }
     }
 
-    // Limpiamos todo después de un tiempo
-    setTimeout(() => {
-      if (elementoDestacadoId.value === elementoId) {
+    // 2. Fallback si no se obtuvo node/rect
+    if (worldW == null || !Number.isFinite(worldW) || worldW === 0) {
+      worldW = getDrawWidth(el) || el.width || 0
+      worldH = getDrawHeight(el) || el.height || 0
+      worldX = el.x || 0
+      worldY = el.y || 0
+    }
+
+    const z = zoom.value || 1
+    const padWorld = PADDING_VISUAL / z
+
+    // Animación PULSO: el aura se expande y contrae en bucle suave (no desaparece)
+  const BASE_PADDING = padWorld
+  const PULSE_EXTRA = 6 / z // amplitud adicional
+  const CYCLE = 1400 // ms ciclo completo expandir+contraer
+  const MAX_DURATION = 3000 // ms total de vida del pulso (antes 5000)
+  const startTime = performance.now()
+    auraOpacity.value = 0.75 // opacidad base estable
+
+    // Cancelar animación previa
+    if (destacarElemento._fadeRaf) cancelAnimationFrame(destacarElemento._fadeRaf)
+
+    const animatePulse = (now) => {
+      if (elementoDestacadoId.value !== elementoId) return
+      const elapsed = now - startTime
+      if (elapsed >= MAX_DURATION) {
         elementoDestacadoId.value = null
-        elementoAura.value = null // <-- Limpiar el aura
+        elementoAura.value = null
+        return
       }
-    }, 2500) // Aumentamos un poco el tiempo a 2.5 segundos
+      // fase 0..1
+      const phase = (elapsed % CYCLE) / CYCLE
+      // curva senoidal para expandir y volver: 0 -> 1 -> 0
+      const wave = 0.5 - 0.5 * Math.cos(phase * Math.PI * 2)
+      const padding = BASE_PADDING + PULSE_EXTRA * wave
+      // opacidad ligeramente modulada 0.65 - 0.85
+      auraOpacity.value = 0.65 + 0.20 * (1 - Math.abs(0.5 - wave) * 2) // más intensa cerca del centro
+
+      elementoAura.value = {
+        id: `aura_${el.id}`,
+        forma: el.forma,
+        x: worldX - padding,
+        y: worldY - padding,
+        width: worldW + padding * 2,
+        height: worldH + padding * 2,
+        color: el.color || '#4f46e5',
+      }
+      destacarElemento._fadeRaf = requestAnimationFrame(animatePulse)
+    }
+    destacarElemento._fadeRaf = requestAnimationFrame(animatePulse)
+  }
+
+  /**
+   * Enfoca (zoom + pan) el elemento indicado haciendo que quepa dentro del viewport
+   * con un padding visual y animación opcional.
+   * @param {string} elementoId
+   * @param {{paddingPx?:number, fitRatio?:number, animate?:boolean, duration?:number}} opts
+   */
+  const focusElemento = (elementoId, opts = {}) => {
+    const el = elementoPorId.value(elementoId)
+    if (!el) return
+    const stage = typeof window !== 'undefined' ? window.__konvaStage : null
+    if (!stage) return
+  const paddingPx = Number.isFinite(opts.paddingPx) ? opts.paddingPx : 40
+  const fitRatio = Number.isFinite(opts.fitRatio) ? opts.fitRatio : 0.92
+  const animate = opts.animate !== false
+  const duration = Number.isFinite(opts.duration) ? opts.duration : 340
+  const coarseSnapThreshold = Number.isFinite(opts.coarseSnapThreshold) ? opts.coarseSnapThreshold : 0.3 // diferencia relativa de escala para decidir snap
+    const exact = opts.exact === true
+
+    if (focusElemento._raf) cancelAnimationFrame(focusElemento._raf)
+
+    const getDrawWidth = (typeof window !== 'undefined' && window.__getDrawWidth) ? window.__getDrawWidth : (e) => e.width || 0
+    const getDrawHeight = (typeof window !== 'undefined' && window.__getDrawHeight) ? window.__getDrawHeight : (e) => e.height || 0
+    const fallbackW = getDrawWidth(el) || el.width || (el?.dimensiones?.ancho ? el.dimensiones.ancho * CM_TO_PX : 0) || 1
+    const dimLargo = el?.dimensiones?.largo ? el.dimensiones.largo * CM_TO_PX : 0
+    const dimAlto = el?.dimensiones?.alto ? el.dimensiones.alto * CM_TO_PX : 0
+    const fallbackH = getDrawHeight(el) || el.height || Math.max(dimLargo, dimAlto) || 1
+    const fallbackX = el.x || 0
+    const fallbackY = el.y || 0
+
+    // Estado previo por elemento para permitir refinamiento y decidir snap dinámicamente
+    if (!focusElemento._last) focusElemento._last = Object.create(null)
+    const prevState = focusElemento._last[el.id]
+
+    const computeAndAnimate = (bbox, phase = 0) => {
+      const viewportW = stage.width() || 1
+      const viewportH = stage.height() || 1
+      const usableW = Math.max(1, viewportW - paddingPx * 2)
+      const usableH = Math.max(1, viewportH - paddingPx * 2)
+      let targetScale = Math.min(usableW / bbox.w, usableH / bbox.h)
+      if (!exact) targetScale *= fitRatio
+      if (!Number.isFinite(targetScale) || targetScale <= 0) targetScale = 1
+      targetScale = Math.max(0.05, Math.min(5, targetScale))
+      const cx = bbox.x + bbox.w / 2
+      const cy = bbox.y + bbox.h / 2
+      const targetPanX = (viewportW / 2) - cx * targetScale
+      const targetPanY = (viewportH / 2) - cy * targetScale
+      const currentScale = zoom.value || 1
+      const scaleDiffRel = Math.abs(targetScale - currentScale) / Math.max(currentScale, 0.0001)
+      // Si cambio grande o usuario pidió no animar
+      const shouldSnap = scaleDiffRel > coarseSnapThreshold
+      if (!animate || shouldSnap) {
+        configurarZoom(targetScale)
+        configurarPan(targetPanX, targetPanY)
+        focusElemento._last[el.id] = { scale: targetScale, w: bbox.w, h: bbox.h }
+        // Programar verificación para ajustar si el bounding real difiere tras layout final
+        scheduleRefine(targetScale, targetPanX, targetPanY, bbox, phase)
+        return
+      }
+      const startZoom = zoom.value
+      const startPanX = panX.value
+      const startPanY = panY.value
+      const startTime = performance.now()
+      const ease = (t) => 1 - Math.pow(1 - t, 3)
+      const step = (now) => {
+        const tt = Math.min(1, (now - startTime) / duration)
+        const k = ease(tt)
+        zoom.value = startZoom + (targetScale - startZoom) * k
+        panX.value = startPanX + (targetPanX - startPanX) * k
+        panY.value = startPanY + (targetPanY - startPanY) * k
+        if (tt < 1) {
+          focusElemento._raf = requestAnimationFrame(step)
+        } else {
+          saveZoomPanToHistory()
+          focusElemento._last[el.id] = { scale: targetScale, w: bbox.w, h: bbox.h }
+          scheduleRefine(targetScale, targetPanX, targetPanY, bbox, phase)
+        }
+      }
+      focusElemento._raf = requestAnimationFrame(step)
+    }
+
+    const scheduleRefine = (appliedScale, appliedPanX, appliedPanY, appliedBBox, phase) => {
+      const refine = () => {
+        try {
+          const node = stage.findOne(`#${el.id}`)
+          if (!node || typeof node.getClientRect !== 'function') return
+          const rect = node.getClientRect({ skipStroke: false, skipShadow: true })
+          const sc = stage.scaleX ? (stage.scaleX() || 1) : 1
+          const sx = stage.x ? (stage.x() || 0) : 0
+          const sy = stage.y ? (stage.y() || 0) : 0
+          const rx = (rect.x - sx) / sc
+          const ry = (rect.y - sy) / sc
+          const rw = rect.width / sc
+          const rh = rect.height / sc
+          if (!(rw > 0 && rh > 0)) return
+          // Recalcular objetivo con bounding real
+          const viewportW = stage.width() || 1
+            const viewportH = stage.height() || 1
+            const usableW = Math.max(1, viewportW - paddingPx * 2)
+            const usableH = Math.max(1, viewportH - paddingPx * 2)
+            let idealScale = Math.min(usableW / rw, usableH / rh)
+            if (!exact) idealScale *= fitRatio
+            idealScale = Math.max(0.05, Math.min(5, idealScale))
+          const diff = Math.abs(idealScale - appliedScale) / Math.max(idealScale, 0.0001)
+          // Si la diferencia es significativa refinamos (pero evitar bucles infinitos: solo 1 refinamiento por invocación)
+          if (diff > 0.08 && phase < 2) {
+            const cx = rx + rw / 2
+            const cy = ry + rh / 2
+            const newPanX = (viewportW / 2) - cx * idealScale
+            const newPanY = (viewportH / 2) - cy * idealScale
+            // Si la corrección es muy grande, aplicar snap; si es moderada, animación breve
+            const large = diff > 0.35
+            if (large) {
+              configurarZoom(idealScale)
+              configurarPan(newPanX, newPanY)
+              focusElemento._last[el.id] = { scale: idealScale, w: rw, h: rh }
+            } else {
+              // animación corta de refinamiento
+              const startZoom = zoom.value
+              const startPanX = panX.value
+              const startPanY = panY.value
+              const startTime = performance.now()
+              const refineDur = 140 + Math.min(180, diff * 400) // escala ligera
+              const ease = (t) => 1 - Math.pow(1 - t, 3)
+              const step = (now) => {
+                const tt = Math.min(1, (now - startTime) / refineDur)
+                const k = ease(tt)
+                zoom.value = startZoom + (idealScale - startZoom) * k
+                panX.value = startPanX + (newPanX - startPanX) * k
+                panY.value = startPanY + (newPanY - startPanY) * k
+                if (tt < 1) {
+                  focusElemento._raf = requestAnimationFrame(step)
+                } else {
+                  saveZoomPanToHistory()
+                  focusElemento._last[el.id] = { scale: idealScale, w: rw, h: rh }
+                }
+              }
+              focusElemento._raf = requestAnimationFrame(step)
+            }
+          }
+        } catch { /* ignore refine errors */ }
+      }
+      // Dos frames después de aplicar para asegurar layout estable
+      requestAnimationFrame(() => requestAnimationFrame(refine))
+    }
+
+    // Primera medición diferida para usar rect real antes de animar
+    requestAnimationFrame(() => {
+      let bx = fallbackX, by = fallbackY, bw = fallbackW, bh = fallbackH
+      let haveReal = false
+      try {
+        const node = stage.findOne(`#${el.id}`)
+        if (node && typeof node.getClientRect === 'function') {
+          const rect = node.getClientRect({ skipStroke: false, skipShadow: true })
+          const scaleNow = stage.scaleX ? (stage.scaleX() || 1) : 1
+          const stageX = stage.x ? (stage.x() || 0) : 0
+          const stageY = stage.y ? (stage.y() || 0) : 0
+          const rx = (rect.x - stageX) / scaleNow
+          const ry = (rect.y - stageY) / scaleNow
+          const rw = rect.width / scaleNow
+          const rh = rect.height / scaleNow
+          if (Number.isFinite(rw) && rw > 0 && Number.isFinite(rh) && rh > 0) {
+            // Descarta si es absurdamente pequeño (<35% fallback) para evitar mid-group
+            const tooSmall = (rw < fallbackW * 0.35) || (rh < fallbackH * 0.35)
+            if (!tooSmall) {
+              bx = rx; by = ry; bw = rw; bh = rh; haveReal = true
+            }
+          }
+        }
+      } catch { /* ignore */ }
+      if (!haveReal) {
+        // Segundo frame para intentar rect real antes de animar
+        requestAnimationFrame(() => {
+          try {
+            const node2 = stage.findOne(`#${el.id}`)
+            if (node2 && typeof node2.getClientRect === 'function') {
+              const rect2 = node2.getClientRect({ skipStroke: false, skipShadow: true })
+              const sc = stage.scaleX ? (stage.scaleX() || 1) : 1
+              const sx = stage.x ? (stage.x() || 0) : 0
+              const sy = stage.y ? (stage.y() || 0) : 0
+              const rx2 = (rect2.x - sx) / sc
+              const ry2 = (rect2.y - sy) / sc
+              const rw2 = rect2.width / sc
+              const rh2 = rect2.height / sc
+              if (Number.isFinite(rw2) && rw2 > 0 && Number.isFinite(rh2) && rh2 > 0) {
+                const tooSmall2 = (rw2 < fallbackW * 0.35) || (rh2 < fallbackH * 0.35)
+                if (!tooSmall2) {
+                  bx = rx2; by = ry2; bw = rw2; bh = rh2
+                }
+              }
+            }
+          } catch { /* ignore second try */ }
+          if ((bw === fallbackW && bh === fallbackH) || bw < 2 || bh < 2) {
+            // Tercer frame (último intento) si seguimos solo con fallback o valores irrisorios
+            requestAnimationFrame(() => {
+              try {
+                const node3 = stage.findOne(`#${el.id}`)
+                if (node3 && typeof node3.getClientRect === 'function') {
+                  const rect3 = node3.getClientRect({ skipStroke: false, skipShadow: true })
+                  const sc3 = stage.scaleX ? (stage.scaleX() || 1) : 1
+                  const sx3 = stage.x ? (stage.x() || 0) : 0
+                  const sy3 = stage.y ? (stage.y() || 0) : 0
+                  const rx3 = (rect3.x - sx3) / sc3
+                  const ry3 = (rect3.y - sy3) / sc3
+                  const rw3 = rect3.width / sc3
+                  const rh3 = rect3.height / sc3
+                  if (Number.isFinite(rw3) && rw3 > 0 && Number.isFinite(rh3) && rh3 > 0) {
+                    const tooSmall3 = (rw3 < fallbackW * 0.35) || (rh3 < fallbackH * 0.35)
+                    if (!tooSmall3) {
+                      bx = rx3; by = ry3; bw = rw3; bh = rh3
+                    }
+                  }
+                }
+              } catch { /* ignore third try */ }
+              computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
+            })
+          } else {
+            computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
+          }
+        })
+      } else {
+        computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
+      }
+    })
   }
 
   const actualizarIdsFiltrados = (ids) => {
@@ -1838,7 +2129,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     etiquetasSeleccionadas,
     elementoDestacadoId,
     idsElementosFiltrados,
-    elementoAura,
+  elementoAura,
+  auraOpacity,
     isDraggable,
     cambiosNoAplicados,
   // Catálogos dinámicos
@@ -1934,6 +2226,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // == Destacar
     destacarElemento,
+  focusElemento,
     actualizarIdsFiltrados,
 
     setDraggableMode,
