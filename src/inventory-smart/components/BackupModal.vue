@@ -1,4 +1,6 @@
 <!--
+  !DEPRECATED: Se eliminó la lógica de copias de seguridad automáticas.
+
   BackupModal.vue
 
   Modal para gestionar copias de seguridad automáticas.
