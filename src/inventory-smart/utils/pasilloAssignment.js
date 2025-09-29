@@ -1,5 +1,16 @@
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
 
+/**
+ * Algoritmo de asignación de pasillos
+ * -----------------------------------
+ * 1. Construimos un “rayo” que representa la cara orientada del elemento.
+ * 2. Evaluamos todos los pasillos dentro del scope actual midiendo solape, distancia y alineación.
+ * 3. Aplicamos empates en cascada para obtener un resultado determinista (solape > distancia >
+ *    alineación > prioridad de negocio > alineación al centro > distancia al centro > id).
+ *
+ * La idea es maximizar la sección visible compartida con el elemento y documentar los criterios
+ * para facilitar futuras extensiones sin dependencias implícitas.
+ */
 export const PASILLO_ASSIGNMENT_DEFAULTS = {
   axisOverlapTolerancePx: 8,
   gapTolerancePx: 6,
@@ -26,6 +37,7 @@ const toFinite = (value) => {
   return Number.isFinite(num) ? num : 0
 }
 
+// Obtiene dimensiones en píxeles cuando sólo contamos con valores en centímetros.
 const fallbackDimension = (element, key) => {
   const dims = element?.dimensiones || {}
   if (dims[key] != null && Number.isFinite(Number(dims[key]))) {
@@ -34,6 +46,7 @@ const fallbackDimension = (element, key) => {
   return 0
 }
 
+// Normaliza bounding boxes en píxeles para elementos/pasillos aunque falten atributos de Konva.
 const extractBounds = (element) => {
   if (!element) {
     return { x: 0, y: 0, width: 0, height: 0 }
@@ -68,6 +81,7 @@ const normalizeAngle = (value) => {
   return normalized
 }
 
+// Permite comparar ejes ignorando el sentido (0° y 180° son equivalentes, igual 90° y 270°).
 const normalizeAxisAngle = (value) => {
   const ang = normalizeAngle(value)
   if (ang == null) return null
@@ -82,6 +96,7 @@ const FACE_AXIS_FOR_ORIENTATION = {
   270: 90,
 }
 
+// Heurística best-effort: intenta deducir el eje “principal” del pasillo sin depender de un único campo.
 const inferPasilloAxisAngle = (pasillo, bounds) => {
   if (!pasillo) return bounds.width >= bounds.height ? 0 : 90
 
@@ -124,6 +139,7 @@ const PRIORITY_LABELS = new Map([
   ['auxiliary', 2],
 ])
 
+// Traduce diferentes representaciones de prioridad (número, booleano, string) a un valor comparable.
 const normalizePriorityValue = (value) => {
   if (value == null) return null
   if (typeof value === 'number') {
@@ -147,6 +163,7 @@ const normalizePriorityValue = (value) => {
   return null
 }
 
+// Busca en distintos campos una etiqueta de prioridad sin forzar un contrato rígido con backend.
 const resolveBusinessPriority = (pasillo) => {
   if (!pasillo) return null
 
@@ -178,6 +195,7 @@ const resolveBusinessPriority = (pasillo) => {
   return null
 }
 
+// Compara prioridades controlando valores nulos y tolerancias para evitar saltos por ruido.
 const comparePriorities = (bestPriority, currentPriority, epsilon) => {
   const bestValue = normalizePriorityValue(bestPriority)
   const currentValue = normalizePriorityValue(currentPriority)
@@ -191,6 +209,7 @@ const comparePriorities = (bestPriority, currentPriority, epsilon) => {
   return 0
 }
 
+// Construye la franja frontal que usaremos para proyectar solapes contra los pasillos.
 const buildRay = (bounds, orientation, settings) => {
   const pad = settings.axisOverlapTolerancePx ?? 0
   const center = {
@@ -252,6 +271,7 @@ const buildRay = (bounds, orientation, settings) => {
   }
 }
 
+// Calcula las métricas necesarias (solape, distancias, alineaciones, prioridad) para un pasillo.
 const computeHit = (ray, pasillo, pasilloBounds, settings) => {
   const axis = ray.axis
   const dir = ray.direction
@@ -354,7 +374,8 @@ export const resolvePasilloAssignment = ({ element, pasillos, config = {} }) => 
       continue
     }
 
-    const overlapDiff = current.visibleLength - best.visibleLength
+  // 1) Priorizar el pasillo que comparte la mayor longitud de “fachada” visible.
+  const overlapDiff = current.visibleLength - best.visibleLength
     if (overlapDiff > settings.overlapEpsilonPx) {
       best = current
       continue
@@ -363,7 +384,8 @@ export const resolvePasilloAssignment = ({ element, pasillos, config = {} }) => 
       continue
     }
 
-    const distanceDiff = best.distance - current.distance
+  // 2) Si el solape empata, elegimos el más cercano en la dirección frontal.
+  const distanceDiff = best.distance - current.distance
     if (distanceDiff > settings.distanceEpsilonPx) {
       best = current
       continue
@@ -372,7 +394,8 @@ export const resolvePasilloAssignment = ({ element, pasillos, config = {} }) => 
       continue
     }
 
-    const alignmentDiff = best.alignmentDelta - current.alignmentDelta
+  // 3) Recompensar al pasillo cuyo eje está mejor alineado con la cara del elemento.
+  const alignmentDiff = best.alignmentDelta - current.alignmentDelta
     if (alignmentDiff > settings.alignmentEpsilonDeg) {
       best = current
       continue
@@ -381,7 +404,8 @@ export const resolvePasilloAssignment = ({ element, pasillos, config = {} }) => 
       continue
     }
 
-    const priorityComparison = comparePriorities(
+  // 4) Si la prioridad de negocio indica un pasillo principal/auxiliar, respetarla.
+  const priorityComparison = comparePriorities(
       best.businessPriority,
       current.businessPriority,
       settings.priorityEpsilon,
@@ -394,7 +418,8 @@ export const resolvePasilloAssignment = ({ element, pasillos, config = {} }) => 
       continue
     }
 
-    const axisCenterDiff = best.axisCenterDelta - current.axisCenterDelta
+  // 5) Empate geométrico: mantener la trayectoria más centrada respecto al elemento.
+  const axisCenterDiff = best.axisCenterDelta - current.axisCenterDelta
     if (axisCenterDiff > settings.axisCenterEpsilonPx) {
       best = current
       continue
@@ -403,7 +428,8 @@ export const resolvePasilloAssignment = ({ element, pasillos, config = {} }) => 
       continue
     }
 
-    const centerDiff = best.centerDistance - current.centerDistance
+  // 6) Último check geométrico: distancia euclidiana entre centros.
+  const centerDiff = best.centerDistance - current.centerDistance
     if (centerDiff > settings.distanceEpsilonPx) {
       best = current
       continue
@@ -412,7 +438,8 @@ export const resolvePasilloAssignment = ({ element, pasillos, config = {} }) => 
       continue
     }
 
-    const bestId = String(best.id)
+  // 7) Determinismo total: si todo lo demás empata usar el id.
+  const bestId = String(best.id)
     const currentId = String(current.id)
     if (currentId < bestId) {
       best = current
