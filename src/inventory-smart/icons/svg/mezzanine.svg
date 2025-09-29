@@ -1,0 +1,21 @@
+<svg viewBox="0 0 48 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Estructura del mezzanine -->
+    <!-- Piso inferior (base) -->
+    <rect x="2" y="23" width="44" height="3" fill="currentColor" opacity="0.8" />
+
+    <!-- Piso del mezzanine (elevado) -->
+    <rect x="4" y="2" width="40" height="6" fill="currentColor" opacity="0.9" />
+
+    <!-- Columnas de soporte -->
+    <rect x="8" y="8" width="3" height="18" fill="currentColor" opacity="0.9" />
+    <rect x="17" y="8" width="3" height="18" fill="currentColor" opacity="0.9" />
+    <rect x="40" y="8" width="3" height="18" fill="currentColor" opacity="0.9" />
+
+    <!-- Simular escaleras-->
+    <rect x="10" y="11" width="7" height="3" fill="currentColor" opacity="0.9" />
+    <rect x="10" y="17" width="7" height="3" fill="currentColor" opacity="0.9" />
+
+    <!-- Barandilla del mezzanine -->
+    <rect x="4" y="4" width="40" height="2" fill="currentColor" opacity="0.9" />
+
+</svg>
