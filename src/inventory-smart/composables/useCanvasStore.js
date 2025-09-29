@@ -1880,21 +1880,52 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!el) return
     const stage = typeof window !== 'undefined' ? window.__konvaStage : null
     if (!stage) return
+    // Invalidate cualquier animación previa (nueva sesión de enfoque)
+    if (focusElemento._raf) cancelAnimationFrame(focusElemento._raf)
+    focusElemento._sessionCounter = (focusElemento._sessionCounter || 0) + 1
+    const sessionId = focusElemento._sessionCounter
+    focusElemento._currentSession = sessionId
   const paddingPx = Number.isFinite(opts.paddingPx) ? opts.paddingPx : 40
   const fitRatio = Number.isFinite(opts.fitRatio) ? opts.fitRatio : 0.92
   const animate = opts.animate !== false
   const duration = Number.isFinite(opts.duration) ? opts.duration : 340
   const coarseSnapThreshold = Number.isFinite(opts.coarseSnapThreshold) ? opts.coarseSnapThreshold : 0.3 // diferencia relativa de escala para decidir snap
-    const exact = opts.exact === true
+  const exact = opts.exact === true
 
-    if (focusElemento._raf) cancelAnimationFrame(focusElemento._raf)
+  // Marcar si había otra animación en progreso y es otro elemento → forzar snap (sin animación) para evitar interferencia
+  const previousSessionInProgress = focusElemento._inProgress === true && focusElemento._lastTargetId && focusElemento._lastTargetId !== el.id
+  focusElemento._lastTargetId = el.id
+  // Flag de progreso
+  focusElemento._inProgress = true
 
+    // Flag para marcar interrupciones externas (zoom manual durante animación anterior)
+    focusElemento._interrupted = false
+
+    // Dimensiones canónicas por vista (evita tomar 'alto' como height en vista XY)
+    const vista = vistaActiva.value
     const getDrawWidth = (typeof window !== 'undefined' && window.__getDrawWidth) ? window.__getDrawWidth : (e) => e.width || 0
     const getDrawHeight = (typeof window !== 'undefined' && window.__getDrawHeight) ? window.__getDrawHeight : (e) => e.height || 0
-    const fallbackW = getDrawWidth(el) || el.width || (el?.dimensiones?.ancho ? el.dimensiones.ancho * CM_TO_PX : 0) || 1
-    const dimLargo = el?.dimensiones?.largo ? el.dimensiones.largo * CM_TO_PX : 0
-    const dimAlto = el?.dimensiones?.alto ? el.dimensiones.alto * CM_TO_PX : 0
-    const fallbackH = getDrawHeight(el) || el.height || Math.max(dimLargo, dimAlto) || 1
+    const hasDims = !!el?.dimensiones
+    const dimAnchoPx = hasDims && Number.isFinite(el.dimensiones.ancho) ? el.dimensiones.ancho * CM_TO_PX : 0
+    const dimLargoPx = hasDims && Number.isFinite(el.dimensiones.largo) ? el.dimensiones.largo * CM_TO_PX : 0
+    const dimAltoPx = hasDims && Number.isFinite(el.dimensiones.alto) ? el.dimensiones.alto * CM_TO_PX : 0
+    let fallbackW = 0, fallbackH = 0
+    if (hasDims) {
+      if (vista === 'XZ') {
+        fallbackW = dimAnchoPx || el.width || getDrawWidth(el) || 1
+        fallbackH = dimAltoPx || el.height || getDrawHeight(el) || 1
+      } else { // XY o default
+        fallbackW = dimAnchoPx || el.width || getDrawWidth(el) || 1
+        fallbackH = dimLargoPx || el.height || getDrawHeight(el) || 1
+      }
+    } else {
+      // Legacy sin dimensiones canónicas
+      fallbackW = getDrawWidth(el) || el.width || 1
+      fallbackH = getDrawHeight(el) || el.height || 1
+    }
+    // Salvaguarda mínima
+    if (!(fallbackW > 0)) fallbackW = 1
+    if (!(fallbackH > 0)) fallbackH = 1
     const fallbackX = el.x || 0
     const fallbackY = el.y || 0
 
@@ -1903,6 +1934,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     const prevState = focusElemento._last[el.id]
 
     const computeAndAnimate = (bbox, phase = 0) => {
+      if (focusElemento._currentSession !== sessionId) return // sesión obsoleta
       const viewportW = stage.width() || 1
       const viewportH = stage.height() || 1
       const usableW = Math.max(1, viewportW - paddingPx * 2)
@@ -1919,12 +1951,12 @@ export const useCanvasStore = defineStore('canvas', () => {
       const scaleDiffRel = Math.abs(targetScale - currentScale) / Math.max(currentScale, 0.0001)
       // Si cambio grande o usuario pidió no animar
       const shouldSnap = scaleDiffRel > coarseSnapThreshold
-      if (!animate || shouldSnap) {
+      const animateEffective = (!previousSessionInProgress && animate && !shouldSnap)
+      if (!animateEffective) {
         configurarZoom(targetScale)
         configurarPan(targetPanX, targetPanY)
         focusElemento._last[el.id] = { scale: targetScale, w: bbox.w, h: bbox.h }
-        // Programar verificación para ajustar si el bounding real difiere tras layout final
-        scheduleRefine(targetScale, targetPanX, targetPanY, bbox, phase)
+        scheduleRefine(sessionId, targetScale, targetPanX, targetPanY, bbox, phase)
         return
       }
       const startZoom = zoom.value
@@ -1938,19 +1970,21 @@ export const useCanvasStore = defineStore('canvas', () => {
         zoom.value = startZoom + (targetScale - startZoom) * k
         panX.value = startPanX + (targetPanX - startPanX) * k
         panY.value = startPanY + (targetPanY - startPanY) * k
+        if (focusElemento._currentSession !== sessionId) return // abortar animación obsoleta
         if (tt < 1) {
           focusElemento._raf = requestAnimationFrame(step)
         } else {
           saveZoomPanToHistory()
           focusElemento._last[el.id] = { scale: targetScale, w: bbox.w, h: bbox.h }
-          scheduleRefine(targetScale, targetPanX, targetPanY, bbox, phase)
+          scheduleRefine(sessionId, targetScale, targetPanX, targetPanY, bbox, phase)
         }
       }
       focusElemento._raf = requestAnimationFrame(step)
     }
 
-    const scheduleRefine = (appliedScale, appliedPanX, appliedPanY, appliedBBox, phase) => {
+    const scheduleRefine = (sid, appliedScale, appliedPanX, appliedPanY, appliedBBox, phase) => {
       const refine = () => {
+        if (focusElemento._currentSession !== sid) return // refinamiento viejo
         try {
           const node = stage.findOne(`#${el.id}`)
           if (!node || typeof node.getClientRect !== 'function') return
@@ -1995,6 +2029,7 @@ export const useCanvasStore = defineStore('canvas', () => {
               const step = (now) => {
                 const tt = Math.min(1, (now - startTime) / refineDur)
                 const k = ease(tt)
+                if (focusElemento._currentSession !== sid) return
                 zoom.value = startZoom + (idealScale - startZoom) * k
                 panX.value = startPanX + (newPanX - startPanX) * k
                 panY.value = startPanY + (newPanY - startPanY) * k
@@ -2008,89 +2043,48 @@ export const useCanvasStore = defineStore('canvas', () => {
               focusElemento._raf = requestAnimationFrame(step)
             }
           }
+          // Marcar finalización segura después de primer refinamiento (o no-op)
+          focusElemento._inProgress = false
         } catch { /* ignore refine errors */ }
       }
       // Dos frames después de aplicar para asegurar layout estable
-      requestAnimationFrame(() => requestAnimationFrame(refine))
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (focusElemento._currentSession !== sid) return
+        refine()
+      }))
     }
 
-    // Primera medición diferida para usar rect real antes de animar
+    // Medición simplificada: usar canonical dims como fallback inmediato y luego un refinamiento tras 1 frame
+    const canonicalW = vista === 'XZ' ? dimAnchoPx : dimAnchoPx
+    const canonicalH = vista === 'XZ' ? dimAltoPx : dimLargoPx
+    let bx = fallbackX
+    let by = fallbackY
+    let bw = (canonicalW > 0 ? canonicalW : fallbackW)
+    let bh = (canonicalH > 0 ? canonicalH : fallbackH)
+    // Evitar valores absurdos
+    if (!(bw > 0)) bw = 1
+    if (!(bh > 0)) bh = 1
+    // Programar refinamiento para capturar bounding real si difiere significativamente
     requestAnimationFrame(() => {
-      let bx = fallbackX, by = fallbackY, bw = fallbackW, bh = fallbackH
-      let haveReal = false
+      if (focusElemento._currentSession !== sessionId) return
       try {
         const node = stage.findOne(`#${el.id}`)
         if (node && typeof node.getClientRect === 'function') {
           const rect = node.getClientRect({ skipStroke: false, skipShadow: true })
-          const scaleNow = stage.scaleX ? (stage.scaleX() || 1) : 1
-          const stageX = stage.x ? (stage.x() || 0) : 0
-          const stageY = stage.y ? (stage.y() || 0) : 0
-          const rx = (rect.x - stageX) / scaleNow
-          const ry = (rect.y - stageY) / scaleNow
-          const rw = rect.width / scaleNow
-          const rh = rect.height / scaleNow
+          const sc = stage.scaleX ? (stage.scaleX() || 1) : 1
+          const sx = stage.x ? (stage.x() || 0) : 0
+          const sy = stage.y ? (stage.y() || 0) : 0
+          const rx = (rect.x - sx) / sc
+          const ry = (rect.y - sy) / sc
+          const rw = rect.width / sc
+          const rh = rect.height / sc
           if (Number.isFinite(rw) && rw > 0 && Number.isFinite(rh) && rh > 0) {
-            // Descarta si es absurdamente pequeño (<35% fallback) para evitar mid-group
-            const tooSmall = (rw < fallbackW * 0.35) || (rh < fallbackH * 0.35)
-            if (!tooSmall) {
-              bx = rx; by = ry; bw = rw; bh = rh; haveReal = true
-            }
+            const tooSmall = (rw < bw * 0.35) || (rh < bh * 0.35)
+            if (!tooSmall) { bx = rx; by = ry; bw = rw; bh = rh }
           }
         }
       } catch { /* ignore */ }
-      if (!haveReal) {
-        // Segundo frame para intentar rect real antes de animar
-        requestAnimationFrame(() => {
-          try {
-            const node2 = stage.findOne(`#${el.id}`)
-            if (node2 && typeof node2.getClientRect === 'function') {
-              const rect2 = node2.getClientRect({ skipStroke: false, skipShadow: true })
-              const sc = stage.scaleX ? (stage.scaleX() || 1) : 1
-              const sx = stage.x ? (stage.x() || 0) : 0
-              const sy = stage.y ? (stage.y() || 0) : 0
-              const rx2 = (rect2.x - sx) / sc
-              const ry2 = (rect2.y - sy) / sc
-              const rw2 = rect2.width / sc
-              const rh2 = rect2.height / sc
-              if (Number.isFinite(rw2) && rw2 > 0 && Number.isFinite(rh2) && rh2 > 0) {
-                const tooSmall2 = (rw2 < fallbackW * 0.35) || (rh2 < fallbackH * 0.35)
-                if (!tooSmall2) {
-                  bx = rx2; by = ry2; bw = rw2; bh = rh2
-                }
-              }
-            }
-          } catch { /* ignore second try */ }
-          if ((bw === fallbackW && bh === fallbackH) || bw < 2 || bh < 2) {
-            // Tercer frame (último intento) si seguimos solo con fallback o valores irrisorios
-            requestAnimationFrame(() => {
-              try {
-                const node3 = stage.findOne(`#${el.id}`)
-                if (node3 && typeof node3.getClientRect === 'function') {
-                  const rect3 = node3.getClientRect({ skipStroke: false, skipShadow: true })
-                  const sc3 = stage.scaleX ? (stage.scaleX() || 1) : 1
-                  const sx3 = stage.x ? (stage.x() || 0) : 0
-                  const sy3 = stage.y ? (stage.y() || 0) : 0
-                  const rx3 = (rect3.x - sx3) / sc3
-                  const ry3 = (rect3.y - sy3) / sc3
-                  const rw3 = rect3.width / sc3
-                  const rh3 = rect3.height / sc3
-                  if (Number.isFinite(rw3) && rw3 > 0 && Number.isFinite(rh3) && rh3 > 0) {
-                    const tooSmall3 = (rw3 < fallbackW * 0.35) || (rh3 < fallbackH * 0.35)
-                    if (!tooSmall3) {
-                      bx = rx3; by = ry3; bw = rw3; bh = rh3
-                    }
-                  }
-                }
-              } catch { /* ignore third try */ }
-              computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
-            })
-          } else {
-            computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
-          }
-        })
-      } else {
-        computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
-      }
+      computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
     })
   }
 
