@@ -113,31 +113,10 @@
       <!-- Separador visual -->
       <div class="w-px h-8 bg-gray-300 separador-visual"></div>
 
-      <!-- Acciones (Icono de Backups y Botón Guardar) -->
       <div class="flex items-center gap-3">
         <!-- -- -- -->
         <!-- ACCIONES PARA PRUEBAS -- NO BORRAR -- -->
         <!-- <UiTooltip
-          label="Ver historial completo"
-          position="bottom"
-          :delay="200"
-        >
-        <button
-          type="button"
-          class="inline-flex items-center gap-2 p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
-          @click="openHistorialModal"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </button>
-        </UiTooltip>
-        <UiTooltip
           label="Importar / Exportar Canvas"
           position="bottom"
           :delay="200"
@@ -156,21 +135,6 @@
             />
           </svg>
         </button>
-        </UiTooltip>
-        <UiTooltip label="Gestionar copias de seguridad" position="bottom" :delay="200">
-          <button
-            type="button"
-            class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-gray-500 text-gray-100 hover:text-white hover:bg-gray-600 rounded-lg transition-colors cursor-pointer"
-            @click="openBackupModal"
-          >
-            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-              <path
-                fill="currentColor"
-                d="M12 21q-3.15 0-5.575-1.912T3.275 14.2q-.1-.375.15-.687t.675-.363q.4-.05.725.15t.45.6q.6 2.25 2.475 3.675T12 19q2.925 0 4.963-2.037T19 12t-2.037-4.962T12 5q-1.725 0-3.225.8T6.25 8H8q.425 0 .713.288T9 9t-.288.713T8 10H4q-.425 0-.712-.288T3 9V5q0-.425.288-.712T4 4t.713.288T5 5v1.35q1.275-1.6 3.113-2.475T12 3q1.875 0 3.513.713t2.85 1.924t1.925 2.85T21 12t-.712 3.513t-1.925 2.85t-2.85 1.925T12 21m1-9.4l2.5 2.5q.275.275.275.7t-.275.7t-.7.275t-.7-.275l-2.8-2.8q-.15-.15-.225-.337T11 11.975V8q0-.425.288-.712T12 7t.713.288T13 8z"
-              />
-            </svg>
-            <span class="ml-2">Restaurar</span>
-          </button>
         </UiTooltip>-->
         <!-- -- -- -->
 
@@ -484,17 +448,12 @@
     </div>
   </teleport>
 
-  <!-- Modal de historial (historial de acciones interno) -->
-  <HistorialModal :is-open="showHistorialModal" @close="closeHistorialModal" />
-
   <!-- Modal de historial de cambios (diff) -->
   <ChangeHistoryModal :is-open="showChangeHistoryModal" @close="closeChangeHistoryModal" />
 
   <!-- Modal de importar/exportar -->
   <ImportExportModal :mostrar="showImportExportModal" @cerrar="closeImportExportModal" />
 
-  <!-- Modal de copias de seguridad -->
-  <BackupModal :mostrar="showBackupModal" :auto-save="autoSave" @cerrar="closeBackupModal" />
 </template>
 
 <script setup>
@@ -503,11 +462,8 @@ const emit = defineEmits(['configChanged'])
 
 import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
-import { useAutoSave } from '@/inventory-smart/composables/useAutoSave'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import HistorialModal from './HistorialModal.vue'
 import ImportExportModal from './ImportExportModal.vue'
-import BackupModal from './BackupModal.vue'
 import ChangeHistoryModal from './ChangeHistoryModal.vue'
 import {
   usePlantResizeGuard,
@@ -515,7 +471,7 @@ import {
 } from '@/inventory-smart/composables/usePlantResizeGuard'
 import { CM_TO_PX, MARGIN_CM, FACTOR_UTILIZACION } from '@/inventory-smart/utils/constants'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
-import { formatLengthCm, formatLengthsCm } from '../utils/units'
+import { formatLengthsCm } from '../utils/units'
 import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
 
 // Props
@@ -530,16 +486,9 @@ const props = defineProps({
 const canvasStore = useCanvasStore()
 const { showToast } = useToast()
 
-// Autosave
-const autoSave = useAutoSave(canvasStore)
-// Registrar instancia en el store para uso global (evita duplicar lógica de backups)
-canvasStore.setAutoSaveInstance?.(autoSave)
-
 // Estado local para modales
-const showHistorialModal = ref(false)
 const showChangeHistoryModal = ref(false)
 const showImportExportModal = ref(false)
-const showBackupModal = ref(false)
 const mostrarModalAgregar = ref(false)
 const mostrarModalEditar = ref(false)
 const mostrarConfirmacionEliminar = ref(false)
@@ -613,15 +562,6 @@ const elementosEnPlantaAEliminar = computed(() => {
   return canvasStore.elementosEnPlanta(plantaAEliminar.value.id).length
 })
 
-// Métodos
-const openHistorialModal = () => {
-  showHistorialModal.value = true
-}
-
-const closeHistorialModal = () => {
-  showHistorialModal.value = false
-}
-
 const openChangeHistoryModal = () => {
   showChangeHistoryModal.value = true
 }
@@ -638,18 +578,8 @@ const closeImportExportModal = () => {
   showImportExportModal.value = false
 }
 
-const openBackupModal = () => {
-  showBackupModal.value = true
-}
-
-const closeBackupModal = () => {
-  showBackupModal.value = false
-}
-
 const guardarCambios = async () => {
   try {
-    const wasEnabled = autoSave?.isEnabled?.value === true
-    autoSave?.stopAutoSave?.()
     // Capturar snapshot para historial de cambios ANTES de serializar
     try {
       const changeHistoryStore = useChangeHistoryStore()
@@ -665,7 +595,6 @@ const guardarCambios = async () => {
     }
 
     const configSerializada = canvasStore.serialize(true)
-    if (wasEnabled) autoSave?.startAutoSave?.()
     emit('configChanged', configSerializada)
     showToast('Cambios guardados correctamente', 'success')
   } catch (error) {

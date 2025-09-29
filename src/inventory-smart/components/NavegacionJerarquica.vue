@@ -27,7 +27,11 @@
               :class="{ active: index === canvasStore.breadcrumbs.length - 1 }"
               @click="navegarACrumb(crumb, index)"
             >
-              <span class="crumb-icon">{{ crumb.icono }}</span>
+              <IconRenderer
+                :icon="crumb.icono"
+                size="1.50rem"
+                class="crumb-icon"
+              />
               <span class="crumb-text">{{ crumb.nombre }}</span>
             </button>
           </UiTooltip>
@@ -94,13 +98,9 @@
           </span>
           <span v-else-if="canvasStore.estaEnElemento">
             {{ canvasStore.elementosVisibles.length }} niveles
-            <br />
-            <small>Interior de {{ elementoActual?.nombre }}</small>
           </span>
           <span v-else-if="canvasStore.estaEnContenedor">
             {{ canvasStore.elementosVisibles.length }} items (espacios + niveles)
-            <br />
-            <small>Interior de {{ elementoActual?.nombre }}</small>
           </span>
         </div>
       </div>
@@ -112,6 +112,7 @@
 import { computed } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import UiTooltip from './ui/UiTooltip.vue'
+import IconRenderer from './ui/IconRenderer.vue'
 
 // Composables
 const canvasStore = useCanvasStore()
@@ -188,7 +189,7 @@ const previousCrumb = computed(() => {
 .breadcrumb-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
   padding: 0.375rem 0.75rem;
   background: white;
   border: 1px solid #e5e7eb;
@@ -259,7 +260,7 @@ const previousCrumb = computed(() => {
 }
 
 .crumb-icon {
-  font-size: 1rem;
+  font-size: 1.75rem;
   line-height: 1;
 }
 
@@ -360,7 +361,7 @@ const previousCrumb = computed(() => {
   }
 
   .breadcrumb-item .crumb-icon {
-    font-size: 1.25rem;
+    font-size: 1.5rem;
   }
 }
 </style>

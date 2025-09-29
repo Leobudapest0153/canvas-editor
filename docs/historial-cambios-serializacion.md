@@ -167,14 +167,6 @@ Cuando se incluye el historial, el archivo JSON tendrá esta estructura adiciona
 - Información detallada en validación sobre el historial presente
 - Logging completo del proceso de exportación/importación
 
-## Casos de Uso
-
-1. **Backup Completo**: Exportar canvas con todo su historial para respaldo completo
-2. **Auditoría**: Mantener trazabilidad completa al transferir proyectos
-3. **Debugging**: Exportar estados problemáticos con su historial para análisis
-4. **Migración**: Transferir proyectos entre entornos manteniendo el historial
-5. **Colaboración**: Compartir proyectos con contexto completo de cambios
-
 ## Limitaciones
 
 - El historial puede aumentar significativamente el tamaño del archivo
