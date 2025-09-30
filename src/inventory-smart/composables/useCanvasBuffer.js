@@ -264,7 +264,7 @@ export const useCanvasBuffer = () => {
       delete newElement.plantaId
       delete newElement.padre
 
-      const finalElementId = canvasStore.agregarElemento(newElement, { preserveExistingCode: false, resetName: true, regenerateCode: true })
+      const finalElementId = canvasStore.agregarElemento(newElement, { preserveExistingCode: false, resetName: false, regenerateCode: true })
 
       if (finalElementId) {
         const nombreElemento = elemento.nombre || elemento.tipo
