@@ -6,6 +6,10 @@
     <!-- Navegación jerárquica -->
     <NavegacionJerarquica />
 
+    <div class="edit-mode-wrapper">
+      <EditModeToggle />
+    </div>
+
     <main class="app-main relative">
       <!-- Sidebar con tabs -->
       <div class="app-sidebar-left">
@@ -55,7 +59,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, provide } from 'vue'
+import { ref, onMounted, computed, watch, provide } from 'vue'
 import SidebarPanel from './components/SidebarPanel.vue'
 import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
@@ -63,6 +67,7 @@ import PropiedadesPanel from './components/PropiedadesPanel.vue'
 import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import ManagmentFloorRoomPropertiesModal from './components/modals/ManagmentFloorRoomPropertiesModal.vue'
+import EditModeToggle from './components/EditModeToggle.vue'
 import { useCanvasImportExport } from './composables/useCanvasImportExport'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
@@ -76,6 +81,8 @@ import { AUTOSAVE_CONFIG } from '@/inventory-smart/utils/constants'
 import ConfirmReplaceModal from '@/inventory-smart/components/modals/ConfirmReplaceModal.vue'
 import { useServicesStore } from './stores/services.js'
 import { useStatePersistence } from './composables/useStatePersistence'
+import { useEditorMode } from './composables/useEditorMode'
+import { useEditorShortcuts } from './composables/useEditorShortcuts'
 
 const props = defineProps({
   configCanvas: {
@@ -113,6 +120,8 @@ const { deleteSelected } = useDeleteElement()
 const { handlePaste: autoPaste } = useAutoPaste()
 const { showToast } = useToast()
 const servicesStore = useServicesStore()
+const { ensureEditable } = useEditorMode()
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 
 // ======= Gestión de Servicios Externos =======
 // Registrar servicios externos en la store cuando cambien las props
@@ -228,50 +237,11 @@ const handleConfigChanged = (configSerializada) => {
   }
 }
 
-// Atajos de teclado globales
-const handleKeydown = (e) => {
-  // Solo procesar si no estamos en un input
-  if (e.target.matches('input, textarea, select, [contenteditable]')) {
-    return
-  }
-
-  // Bloquear si hay texto seleccionado
-  if (window.getSelection().toString()) {
-    return
-  }
-
-  // Bloquear si hay drag global activo
-  if (typeof window !== 'undefined' && window.__dvCanvasDragActive) {
-    return
-  }
-
-  if (e.ctrlKey || e.metaKey) {
-    if (e.key === 'z' && !e.shiftKey) {
-      e.preventDefault()
-      undo()
-    } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
-      e.preventDefault()
-      redo()
-    } else if (e.key === 'c') {
-      e.preventDefault()
-      handleCopyToBuffer()
-    } else if (e.key === 'v') {
-      e.preventDefault()
-      triggerPaste()
-    }
-  } else if (e.key === 'Delete' || e.key === 'Backspace') {
-    // Supr o Retroceso -> eliminar seleccionado
-    const hasSelection = !!canvasStore.elementoSeleccionado
-    if (hasSelection) {
-      e.preventDefault()
-      // No es necesario await; el modal gestiona la interacción
-      deleteSelected({ withConfirm: true })
-    }
-  }
-}
-
 // Handlers para buffer
 const handleCopyToBuffer = () => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
   const elementoSeleccionado = canvasStore.elementoSeleccionado
   if (elementoSeleccionado) {
     buffer.copyToBuffer(elementoSeleccionado)
@@ -279,6 +249,9 @@ const handleCopyToBuffer = () => {
 }
 
 const triggerPaste = () => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
   try {
     const stage = canvasViewRef.value?.getStage?.()
     const viewportSize = canvasViewRef.value?.getStageSize?.() || null
@@ -327,6 +300,21 @@ const triggerPaste = () => {
     void autoPaste()
   }
 }
+
+useEditorShortcuts({
+  onUndo: () => undo(),
+  onRedo: () => redo(),
+  onCopy: () => handleCopyToBuffer(),
+  onPaste: () => triggerPaste(),
+  onDelete: () => {
+    if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+      return
+    }
+    if (!canvasStore.elementoSeleccionado) return
+    deleteSelected({ withConfirm: true })
+  },
+  onBlocked: () => showToast(VISUAL_MODE_MESSAGE, 'warning'),
+})
 
 // ======= Resolución de conflictos (Servidor vs Backups locales) =======
 // Helper: obtener timestamp (ms) desde una configuración serializada
@@ -388,19 +376,13 @@ const fmtDate = (iso) => {
 
 onMounted(() => {
   try {
-    window.addEventListener('keydown', handleKeydown)
 
     // Provide de la API de servicios externos para componentes hijos
     provide('externalServicesAPI', externalServicesAPI)
   } catch (error) {
-    window.removeEventListener('keydown', handleKeydown)
     showToast('Ha ocurrido un error al importar la configuración', 'error')
     console.error('Error al importar la configuración:', error)
   }
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
 })
 
 watch(
@@ -749,6 +731,12 @@ watch(
 }
 
 /* Cambios recientes */
+.edit-mode-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 1.5rem 0.75rem;
+}
+
 .elastic-badge {
   display: inline-flex;
   align-items: center;
