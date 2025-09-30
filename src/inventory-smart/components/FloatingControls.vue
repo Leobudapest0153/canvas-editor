@@ -1,14 +1,14 @@
 <template>
   <div ref="controlsRef" class="floating-controls" :style="{ right: `${floatingRight}px` }">
     <UiTooltip label="Deshacer (Ctrl+Z)" :delay="200" position="bottom">
-      <button @click="$emit('undo')" :disabled="!canUndo" class="floating-btn btn-undo">
+      <button @click="$emit('undo')" :disabled="!canUndo || shortcutsDisabled" class="floating-btn btn-undo">
         <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
         </svg>
       </button>
     </UiTooltip>
     <UiTooltip label="Rehacer (Ctrl+Y)" :delay="200" position="bottom">
-      <button @click="$emit('redo')" :disabled="!canRedo" class="floating-btn btn-redo">
+      <button @click="$emit('redo')" :disabled="!canRedo || shortcutsDisabled" class="floating-btn btn-redo">
         <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
         </svg>
@@ -40,8 +40,9 @@
   </div>
 </template>
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import UiTooltip from './ui/UiTooltip.vue'
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 
 const props = defineProps({
   safeRight: { type: Number, default: 20 },
@@ -51,6 +52,9 @@ const props = defineProps({
   canZoomOut: { type: Boolean, default: true },
   canFit: { type: Boolean, default: true }
 })
+
+const { canUseShortcuts } = useEditorMode()
+const shortcutsDisabled = computed(() => !canUseShortcuts.value)
 
 const floatingRight = ref(props.safeRight)
 const controlsRef = ref(null)
