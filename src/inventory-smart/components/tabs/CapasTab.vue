@@ -274,6 +274,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { TODAS_LAS_CATEGORIAS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
@@ -289,6 +290,7 @@ import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
 const { showToast } = useToast()
 // Composables
 const canvasStore = useCanvasStore()
+const { modoEdicion } = storeToRefs(canvasStore)
 
 const deleteElement = useDeleteElement();
 const { canMutateLayers } = useEditorMode()
@@ -395,6 +397,15 @@ const limpiarFiltros = () => {
   filtroNombre.value = '';
   canvasStore.limpiarSeleccion()
 }
+
+watch(modoEdicion, (isEditing) => {
+  if (isEditing) return
+  filtrosVisibles.value = false
+  modalVisible.value = false
+  textoNuevaEtiqueta.value = ''
+  limpiarFiltros()
+  canvasStore.actualizarIdsFiltrados(null)
+})
 
 const onDelete = async (id) => {
   if (!canMutateLayers.value) {
