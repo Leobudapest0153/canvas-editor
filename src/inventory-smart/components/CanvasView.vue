@@ -764,59 +764,27 @@ const isSnappingEnabled = ref(true)
 const viewport = useViewportStore()
 
 const getElementPixelDimensions = (elemento) => {
-  // Si ya tiene width/height en píxeles, usarlos solo si no tiene dimensiones en cm
-  // Esto es para compatibilidad con elementos legacy que solo tienen width/height
+  // Si ya tiene width/height en píxeles y no hay dimensiones en cm, usarlos tal cual (legacy)
   if (!elemento.dimensiones && elemento.width && elemento.height) {
-    // Para elementos legacy, aplicar orientación en vista XZ
-    if (canvasStore.vistaActiva === 'XZ') {
-      const orientacion = Number(elemento.orientacion || 0)
-      const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-      const useAncho = orientacionNormalizada === 0 || orientacionNormalizada === 180
-
-      return {
-        width: useAncho ? elemento.width : elemento.height,
-        height: elemento.height,
-      }
-    }
     return { width: elemento.width, height: elemento.height }
   }
 
-  // Priorizar dimensiones en cm y convertir según la vista
+  // Priorizar dimensiones en cm y convertir según la vista (sin considerar orientacion)
   if (elemento.dimensiones) {
     let widthCm, heightCm
 
     if (canvasStore.vistaActiva === 'XY') {
       // Vista aérea (XY): width = ancho, height = largo
-      widthCm =
-        elemento.dimensiones.ancho ||
-        (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
-      heightCm =
-        elemento.dimensiones.largo ||
-        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else if (canvasStore.vistaActiva === 'XZ') {
-      // Vista de frente (XZ): considerar orientación para el width
-      const orientacion = Number(elemento.orientacion || 0)
-      const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-      const useAncho = orientacionNormalizada === 0 || orientacionNormalizada === 180
-
-      // En XZ: orientación determina si width usa ancho o largo
-      widthCm = useAncho
-        ? elemento.dimensiones.ancho ||
-          (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
-        : elemento.dimensiones.largo ||
-          (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
-      // Height siempre es alto en XZ
-      heightCm =
-        elemento.dimensiones.alto ||
-        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      // Vista de frente (XZ): width = ancho, height = alto
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.alto || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else {
-      // Fallback a vista aérea (XY)
-      widthCm =
-        elemento.dimensiones.ancho ||
-        (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
-      heightCm =
-        elemento.dimensiones.largo ||
-        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      // Fallback a vista lateral (ZY): width = largo, height = alto
+      widthCm = elemento.dimensiones.largo || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.alto || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     }
 
     return {

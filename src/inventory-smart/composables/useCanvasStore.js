@@ -689,45 +689,28 @@ export const useCanvasStore = defineStore('canvas', () => {
     elementoSeleccionado.value = null
   }
 
-  const calcularCanvasAdaptativo = (elemento) => {
-    // Calcular tamaño del canvas basado en las dimensiones del elemento
+const calcularCanvasAdaptativo = (elemento) => {
+    // Calcular tamaño del canvas basado en las dimensiones del elemento (ignorando orientacion)
     let elementWidthPx, elementHeightPx
 
     if (elemento.dimensiones) {
-      // XY para cuartos/pisos/pasillos; XZ para elementos
+      // XY para pisos; XZ para elementos y cuartos
       if (['pisos'].includes(elemento.tipo)) {
-        elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
-        elementHeightPx = elemento.dimensiones.largo * CM_TO_PX
+        elementWidthPx = (Number(elemento.dimensiones.ancho) || 0) * CM_TO_PX
+        elementHeightPx = (Number(elemento.dimensiones.largo) || 0) * CM_TO_PX
       } else if (['elementos', 'cuartos'].includes(elemento.tipo)) {
-        // Vista XZ para elementos y cuartos - considerar orientación
-        const orientacion = Number(elemento.orientacion || 0)
-        const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-        const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
-
-        // En vista XZ: orientación determina qué usar como ancho
-        elementWidthPx = useAncho
-          ? elemento.dimensiones.ancho * CM_TO_PX
-          : elemento.dimensiones.largo * CM_TO_PX
-        elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
+        // En vista XZ para elementos y cuartos: width=ancho, height=alto
+        elementWidthPx = (Number(elemento.dimensiones.ancho) || 0) * CM_TO_PX
+        elementHeightPx = (Number(elemento.dimensiones.alto) || 0) * CM_TO_PX
       } else {
-        // Para otros tipos (pasillos)
-        elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
-        elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
+        // Otros tipos
+        elementWidthPx = (Number(elemento.dimensiones.ancho) || 0) * CM_TO_PX
+        elementHeightPx = (Number(elemento.dimensiones.alto) || 0) * CM_TO_PX
       }
     } else if (elemento.width && elemento.height) {
-      // Fallback a dimensiones legacy en píxeles
-      if (['elementos', 'cuartos'].includes(elemento.tipo)) {
-        // Para elementos y cuartos legacy, también aplicar orientación
-        const orientacion = Number(elemento.orientacion || 0)
-        const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-        const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
-
-        elementWidthPx = useAncho ? elemento.width : elemento.height
-        elementHeightPx = elemento.height // Altura siempre es height en legacy
-      } else {
-        elementWidthPx = elemento.width
-        elementHeightPx = elemento.height
-      }
+      // Fallback a dimensiones legacy en píxeles (no alterar por orientacion)
+      elementWidthPx = elemento.width
+      elementHeightPx = elemento.height
     } else {
       // Fallback final - tamaño mínimo para contenedores pequeños
       const defaultWidth = elemento.tipo === 'contenedores' ? 30 : 100 // contenedores más pequeños
