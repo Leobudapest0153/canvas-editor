@@ -1359,17 +1359,22 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // === FUNCIONES DE SERIALIZACIÓN ===
 
+  const buildSerializableState = () => ({
+    plantas: plantas.value.map(p => p?._custom?.value || p),
+    elementos: elementos.value.map(e => e?._custom?.value || e),
+    catalogos: catalogos.value,
+  })
+
   /**
    * Serializa el estado completo del canvas a JSON
    * @returns {string} JSON string con todo el estado
    */
   const serialize = (saveTimestamp = false) => {
+    const baseState = buildSerializableState()
     const state = {
-      plantas: plantas.value.map(p => p?._custom?.value || p),
-      elementos: elementos.value.map(e => e?._custom?.value || e),
+      ...baseState,
       templates: catalogStore.templates?.map?.(t => t?._custom?.value || t) || [],
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
-      catalogos: catalogos.value,
     }
     // Incluir historial de cambios si existe
     try {
@@ -1402,6 +1407,42 @@ export const useCanvasStore = defineStore('canvas', () => {
     } catch (e) {
       console.warn('No se pudo post-procesar JSON para plantillas', e)
       return jsonStr
+    }
+  }
+
+  /**
+   * Serializa el estado para el visor 3D sin métricas ni historial
+   * @param {Object} options
+   * @param {boolean} [options.includeMetrics=false]
+   * @param {boolean} [options.includeChangeHistory=false]
+   * @returns {Object|null} Snapshot serializado listo para usar en la escena 3D
+   */
+  const serializeForThreePreview = (options = {}) => {
+    const {
+      includeMetrics = false,
+      includeChangeHistory = false,
+      validateBeforeSerialize = true,
+    } = options
+
+    const state = buildSerializableState()
+
+    try {
+      const jsonStr = _serialize(state, {
+        validateBeforeSerialize,
+        includeMetrics,
+        includeChangeHistory,
+      })
+      const parsed = JSON.parse(jsonStr)
+      if (!includeMetrics && parsed?.meta) {
+        delete parsed.meta.metrics
+      }
+      if (!includeChangeHistory) {
+        delete parsed.changeHistory
+      }
+      return parsed
+    } catch (error) {
+      console.warn('No se pudo serializar el estado para visor 3D', error)
+      return null
     }
   }
 
@@ -2231,6 +2272,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // === FUNCIONES DE SERIALIZACIÓN ===
     serialize,
+    serializeForThreePreview,
     deserialize,
 
     // == Editor de planta
