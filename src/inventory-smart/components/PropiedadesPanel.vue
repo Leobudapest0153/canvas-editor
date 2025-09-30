@@ -5,7 +5,12 @@
     </div>
 
     <div v-if="elementoSeleccionado" class="flex-1 overflow-y-auto p-3">
-      <div class="space-y-4">
+      <fieldset
+        class="properties-fieldset"
+        :disabled="propertiesDisabled"
+        :title="propertiesDisabled ? VISUAL_MODE_MESSAGE : null"
+      >
+        <div class="space-y-4">
         <!-- Información general -->
         <details open class="bg-gray-50 rounded-lg p-4">
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">
@@ -473,7 +478,8 @@
             </div>
           </div>
         </details>
-      </div>
+        </div>
+      </fieldset>
     </div>
 
     <div v-if="elementoSeleccionado" class="p-4 border-t border-gray-200 bg-white">
@@ -527,10 +533,14 @@ import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { toPrecisionCm } from '../utils/fixedDimensions'
 import IdentifyEslModal from './modals/IdentifyEslModal.vue'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement';
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode';
 
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
 const { deleteAndCompact } = useDeleteElement();
+const { canEditProperties } = useEditorMode()
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
+const propertiesDisabled = computed(() => !canEditProperties.value)
 const confirmDialog = useConfirmDialog()
 const {
   validarPesoElemento,
@@ -1552,5 +1562,15 @@ onBeforeRouteLeave(async (to, from, next) => {
 </script>
 
 <style scoped>
+.properties-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.properties-fieldset[disabled] {
+  cursor: not-allowed;
+}
+
 /* No custom styles */
 </style>

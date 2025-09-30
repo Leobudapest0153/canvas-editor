@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div class="elementos-catalogo h-full flex flex-col bg-white border-r border-gray-200">
+  <div class="elementos-catalogo relative h-full flex flex-col bg-white border-r border-gray-200">
     <!-- Header del catálogo -->
     <div class="catalogo-header p-1 border-gray-200">
   <div class="relative px-4 mb-1" v-if="hayElementosEnTab">
@@ -107,7 +107,7 @@
         :delay="500"
       >
         <button
-          @click="mostrarModalAgregarEspacio = true"
+          @click="openAddModal" :disabled="catalogReadOnly"
           class="flex justify-center items-center flex-row px-2 py-1 cursor-pointer bg-primary hover:bg-primary-600 text-white rounded-xl text-xs"
         >
           <!-- icono de + -->
@@ -132,10 +132,13 @@
         <div
           v-for="elemento in elementosFiltrados"
           :key="elemento.id"
-          :draggable="true"
+          :draggable="canEditCanvas"
           @dragstart="iniciarArrastre(elemento, $event)"
           @dragend="finalizarArrastre"
-          class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]"
+          :class="[
+            'group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]',
+            catalogReadOnly ? 'catalog-item--disabled cursor-not-allowed hover:scale-100' : ''
+          ]"
           :style="{
             borderLeftColor:
               elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria),
@@ -272,6 +275,7 @@
 import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import {
@@ -313,7 +317,11 @@ const modo = computed(() => props.modo)
 
 // Stores
 const canvasStore = useCanvasStore()
+const { modoEdicion } = storeToRefs(canvasStore)
 const { showToast } = useToast();
+const { canEditCanvas, canMutateCatalog } = useEditorMode()
+const catalogReadOnly = computed(() => !canMutateCatalog.value)
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 const catalogStore = useCatalogStore()
 const { filteredCatalogItems, catalogContext, searchText, selectedCategory, items } =
   storeToRefs(catalogStore)
@@ -354,6 +362,13 @@ const handleClickOutside = (event) => {
   }
 }
 const mostrarModalAgregarEspacio = ref(false)
+const openAddModal = () => {
+  if (catalogReadOnly.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
+  mostrarModalAgregarEspacio.value = true
+}
 const editingItem = ref(null) // item que se edita
 const editingForm = ref(null) // formulario derivado del item
 const kebabMenu = ref({ visible: false, x: 0, y: 0, item: null })
@@ -499,6 +514,7 @@ watch(modo, (nuevo) => {
   }
 })
 
+
 const getTipoNombre = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
   return tipoInfo?.nombre || 'Desconocido'
@@ -553,6 +569,11 @@ const getCardDims = (item) => item?.dimensiones || { ancho: 0, largo: 0, alto: 0
 
 // Drag and Drop
 const iniciarArrastre = (elemento, event) => {
+  if (catalogReadOnly.value || !canEditCanvas.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    event.preventDefault()
+    return
+  }
   if (canvasStore.cambiosNoAplicados) {
     showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn');
     event.preventDefault()
@@ -643,6 +664,10 @@ watch(
 // --- Lógica del menú kebab y edición/eliminación ---
 const toggleKebab = (evt, item) => {
   evt.preventDefault()
+  if (catalogReadOnly.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
   if (isKebabRestricted(item)) return
   const isSame = kebabMenu.value.visible && kebabMenu.value.item?.id === item.id
   kebabMenu.value = isSame
@@ -655,6 +680,10 @@ const closeKebab = () => {
 }
 
 const startEdit = (item) => {
+  if (catalogReadOnly.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return closeKebab()
+  }
   if (!item) return closeKebab()
   const form = toFormFromCatalogItem(item)
   if (!form) return closeKebab()
@@ -671,6 +700,10 @@ const cancelEdit = () => {
 }
 
 const handleDeleteItem = async (item) => {
+  if (catalogReadOnly.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return closeKebab()
+  }
   if (!item) return closeKebab()
   const ok = await confirmDialog.confirm({
     title: 'Eliminar elemento',
@@ -682,6 +715,14 @@ const handleDeleteItem = async (item) => {
   removeCatalogItem(items.value, item.id)
   closeKebab()
 }
+
+watch(modoEdicion, (isEditing) => {
+  if (isEditing) return
+  filtrosVisibles.value = false
+  limpiarFiltros()
+  cancelEdit()
+  closeKebab()
+})
 
 // Cerrar kebab al hacer click fuera
 const onGlobalClickKebab = (e) => {
@@ -701,6 +742,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.catalog-item--disabled {
+  opacity: 0.6;
+}
+
 .unroll-enter-active,
 .unroll-leave-active {
   transition: all 0.3s ease-in-out;
