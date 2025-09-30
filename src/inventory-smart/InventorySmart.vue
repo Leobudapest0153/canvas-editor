@@ -1,7 +1,12 @@
 <template>
   <div id="inventory-smart">
     <!-- Panel de plantas -->
-  <PlantasPanel :author="author" @configChanged="handleConfigChanged" />
+  <PlantasPanel
+    :author="author"
+    @configChanged="handleConfigChanged"
+    @regresar="handleBack"
+    @showIndicators="handleShowIndicators"
+  />
 
     <!-- Navegación jerárquica -->
     <NavegacionJerarquica />
@@ -37,6 +42,14 @@
     <LoaderOverlay />
     <!-- Gestión de plantas -->
     <WorkspaceEditor />
+    <UnsavedChangesModal
+      :open="showUnsavedModal"
+      :changes="unsavedDiff.changes"
+      :summary="unsavedDiff.summary"
+      @close="showUnsavedModal = false"
+      @save="saveAndExit"
+      @continue="exitWithoutSaving"
+    />
 
     <!-- Gestión de pisos de cuartos desde las propiedades -->
     <ManagmentFloorRoomPropertiesModal/>
@@ -63,6 +76,10 @@ import ConfirmModal from './components/ConfirmModal.vue'
 import LoaderOverlay from './components/LoaderOverlay.vue'
 // removed autosave/backup constants
 import { useServicesStore } from './stores/services.js'
+import { useStatePersistence } from './composables/useStatePersistence'
+import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
+import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
+import UnsavedChangesModal from './components/UnsavedChangesModal.vue'
 
 const props = defineProps({
   configCanvas: {
@@ -91,7 +108,7 @@ const props = defineProps({
     }
   }
 })// Definir emits para comunicar cambios al componente padre
-const emit = defineEmits(['configUpdated'])
+const emit = defineEmits(['configUpdated', 'regresar', 'imprimirIndicadores'])
 
 const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
@@ -155,6 +172,45 @@ const handleConfigChanged = (configSerializada) => {
     console.error('Error al procesar la configuración actualizada:', error)
     showToast('Error al procesar la configuración actualizada', 'error')
   }
+}
+
+const handleShowIndicators = () => {
+  emit('imprimirIndicadores')
+}
+
+// Propagar evento regresar
+const changeHistoryStore = useChangeHistoryStore()
+const showUnsavedModal = ref(false)
+const unsavedDiff = ref({ changes: [], summary: { created:0, updated:0, deleted:0 } })
+
+const handleBack = () => {
+  try {
+    const state = { plantas: canvasStore.plantas, elementos: canvasStore.elementos }
+    const diff = changeHistoryStore.previewUnsavedChanges(state)
+    if (diff?.changes?.length) {
+      unsavedDiff.value = diff
+      showUnsavedModal.value = true
+      return
+    }
+    emit('regresar')
+  } catch (e) {
+    console.warn('No se pudo evaluar cambios antes de regresar', e)
+    emit('regresar')
+  }
+}
+
+const saveAndExit = () => {
+  try {
+    const json = canvasStore.serialize(true)
+    emit('configUpdated', json)
+  } catch (e) { console.warn('Error serializando antes de salir', e) }
+  showUnsavedModal.value = false
+  emit('regresar')
+}
+
+const exitWithoutSaving = () => {
+  showUnsavedModal.value = false
+  emit('regresar')
 }
 
 // Atajos de teclado globales
