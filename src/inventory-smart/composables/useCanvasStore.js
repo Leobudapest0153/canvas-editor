@@ -35,6 +35,8 @@ import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/
 import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
 import { exportCatalogItemsToDTO, importCatalogItemsFromDTO } from '@/inventory-smart/modules/catalog/catalogItems.serializer.js'
 
+const SIDEBAR_TAB_IDS = new Set(['elementos', 'capas', 'buffer'])
+
 export const useCanvasStore = defineStore('canvas', () => {
   const { showToast } = useToast()
   const { serialize: _serialize, deserialize: _deserialize, persist: _persist } = useStatePersistence()
@@ -143,6 +145,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const isDraggable = ref(true)
   const modoEdicion = ref(false)
+  const sidebarActiveTab = ref('elementos')
 
   const editorPermissions = computed(() => ({
     modo: modoEdicion.value ? 'edicion' : 'visualizacion',
@@ -2132,6 +2135,10 @@ export const useCanvasStore = defineStore('canvas', () => {
   const desactivarModoEdicion = () => setModoEdicion(false)
   const toggleModoEdicion = () => setModoEdicion(!modoEdicion.value)
 
+  const setSidebarActiveTab = (tabId) => {
+    sidebarActiveTab.value = SIDEBAR_TAB_IDS.has(tabId) ? tabId : 'elementos'
+  }
+
   // === INTEGRACIÓN CON AUTOSAVE ===
   // Instancia del autosave - se establece desde App.vue o el componente principal
   const autoSaveInstance = ref(null)
@@ -2202,6 +2209,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     gridSize,
     snapGridEps,
     modoEdicion,
+  sidebarActiveTab,
     editorPermissions,
     crearPlanta,
     plantaEnEdicion,
@@ -2256,6 +2264,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     activarModoEdicion,
     desactivarModoEdicion,
     toggleModoEdicion,
+  setSidebarActiveTab,
 
     // Actions - Plantas
     seleccionarPlanta,
