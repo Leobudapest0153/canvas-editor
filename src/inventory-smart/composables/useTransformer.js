@@ -6,6 +6,7 @@ import { circleInPolygon, isRectCompletelyInPolygon } from '@/inventory-smart/ut
 import { boundaryToAreaBounds } from '@/inventory-smart/utils/bounds'
 import { correctTransformValues } from '@/inventory-smart/utils/precision'
 import { toTransformerPrecision } from '../utils/fixedDimensions'
+import { useEditingCapabilities } from '@/inventory-smart/composables/useEditingCapabilities'
 
 /**
  * Composable para manejar la lógica de transformación de elementos en el canvas
@@ -34,6 +35,7 @@ export function useTransformer({
   const editingElementId = ref(null)
   const transformInitialState = new Map()
   const transformState = new Map()
+  const { editingCapabilities } = useEditingCapabilities()
 
   // Cleanup automático para prevenir memory leaks
   const cleanupStaleStates = () => {
@@ -57,7 +59,9 @@ export function useTransformer({
 
   // Computeds
   const isEditingSelected = computed(
-    () => editingElementId.value === canvasStore.elementoSeleccionado,
+    () =>
+      editingCapabilities.value.canTransformElements &&
+      editingElementId.value === canvasStore.elementoSeleccionado,
   )
 
   const selectedElementLocked = computed(() => {
@@ -212,6 +216,21 @@ export function useTransformer({
     }
   }
 
+  watch(
+    () => editingCapabilities.value.canTransformElements,
+    (enabled) => {
+      if (!enabled && editingElementId.value) {
+        try {
+          clearTransformVisualFeedback(editingElementId.value)
+        } catch (error) {
+          console.warn('[transform-clear-feedback] Error al limpiar feedback por modo visualización:', error)
+        }
+        editingElementId.value = null
+      }
+    },
+    { immediate: true },
+  )
+
   // Revertir transformación visual y en el store
   const revertTransform = (elementId, reason = '') => {
     const elemento = canvasStore.elementosVisibles.find((e) => e.id === elementId)
@@ -262,6 +281,7 @@ export function useTransformer({
 
   // Inicio de transformación - guardar estado inicial
   const handleTransformStart = (e, element) => {
+    if (!editingCapabilities.value.canTransformElements) return
     if (element?.restrictions && element.restrictions.include('drag')) return;
     isInteractingWithTransformer.value = true
     try {
@@ -314,6 +334,7 @@ export function useTransformer({
 
   // Durante transformación - feedback visual optimizado
   const handleTransformMove = (e, elementId) => {
+    if (!editingCapabilities.value.canTransformElements) return
     try {
       const node = e.target
       if (!node) {
@@ -370,6 +391,10 @@ export function useTransformer({
 
   // Fin de transformación - validación completa y persistencia
   const handleTransformEnd = (e, elementId) => {
+    if (!editingCapabilities.value.canTransformElements) {
+      isInteractingWithTransformer.value = false
+      return
+    }
     isInteractingWithTransformer.value = false
     try {
       const node = e.target
@@ -802,6 +827,10 @@ export function useTransformer({
 
   // Activar/desactivar edición del elemento seleccionado
   const toggleEditingMode = (elementId, dragModeActive) => {
+    if (!editingCapabilities.value.canTransformElements) {
+      editingElementId.value = null
+      return
+    }
     if (!dragModeActive) {
       editingElementId.value = null
     } else {

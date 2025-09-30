@@ -101,14 +101,20 @@
     <div class="pb-2 flex justify-center">
       <UiTooltip
         :label="
-          'Crea y guarda un nuevo ' + (modo === 'cuarto' ? 'cuarto' : 'espacio') + ' en el catálogo'
+          isViewOnly
+            ? viewOnlyTooltip
+            : 'Crea y guarda un nuevo ' + (modo === 'cuarto' ? 'cuarto' : 'espacio') + ' en el catálogo'
         "
         position="bottom"
         :delay="500"
       >
         <button
-          @click="mostrarModalAgregarEspacio = true"
-          class="flex justify-center items-center flex-row px-2 py-1 cursor-pointer bg-primary hover:bg-primary-600 text-white rounded-xl text-xs"
+          @click="openCreateModal"
+          :disabled="isViewOnly"
+          :class="[
+            'flex justify-center items-center flex-row px-2 py-1 bg-primary text-white rounded-xl text-xs transition',
+            isViewOnly ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-primary-600'
+          ]"
         >
           <!-- icono de + -->
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -300,6 +306,7 @@ import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
 import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
+import { useEditingCapabilities } from '@/inventory-smart/composables/useEditingCapabilities'
 
 // Props
 const props = defineProps({
@@ -318,6 +325,16 @@ const catalogStore = useCatalogStore()
 const { filteredCatalogItems, catalogContext, searchText, selectedCategory, items } =
   storeToRefs(catalogStore)
 const confirmDialog = useConfirmDialog()
+const { editingCapabilities, viewOnlyTooltip } = useEditingCapabilities()
+const isViewOnly = computed(() => editingCapabilities.value.isViewOnly)
+
+const assertEditable = () => {
+  if (isViewOnly.value) {
+    showToast(viewOnlyTooltip.value, 'info')
+    return false
+  }
+  return true
+}
 
 // Estado local
 const filtroTexto = searchText
@@ -357,6 +374,11 @@ const mostrarModalAgregarEspacio = ref(false)
 const editingItem = ref(null) // item que se edita
 const editingForm = ref(null) // formulario derivado del item
 const kebabMenu = ref({ visible: false, x: 0, y: 0, item: null })
+
+const openCreateModal = () => {
+  if (!assertEditable()) return
+  mostrarModalAgregarEspacio.value = true
+}
 
 // Formulario para nuevo elemento
 const nuevoElemento = ref({
@@ -454,6 +476,10 @@ watch(hayElementosEnTab, (val) => {
 })
 
 const onGuardarEspacio = (datosEspacio) => {
+  if (!assertEditable()) {
+    mostrarModalAgregarEspacio.value = false
+    return
+  }
   try {
     if (editingItem.value) {
       // Editar existente
@@ -643,6 +669,7 @@ watch(
 // --- Lógica del menú kebab y edición/eliminación ---
 const toggleKebab = (evt, item) => {
   evt.preventDefault()
+  if (!assertEditable()) return
   if (isKebabRestricted(item)) return
   const isSame = kebabMenu.value.visible && kebabMenu.value.item?.id === item.id
   kebabMenu.value = isSame
@@ -655,6 +682,7 @@ const closeKebab = () => {
 }
 
 const startEdit = (item) => {
+  if (!assertEditable()) return closeKebab()
   if (!item) return closeKebab()
   const form = toFormFromCatalogItem(item)
   if (!form) return closeKebab()
@@ -671,6 +699,7 @@ const cancelEdit = () => {
 }
 
 const handleDeleteItem = async (item) => {
+  if (!assertEditable()) return closeKebab()
   if (!item) return closeKebab()
   const ok = await confirmDialog.confirm({
     title: 'Eliminar elemento',

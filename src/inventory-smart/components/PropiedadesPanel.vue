@@ -1,5 +1,9 @@
 <template>
-  <div class="h-full flex flex-col bg-white border-l border-gray-200" data-properties-panel>
+  <div
+    ref="panelRef"
+    class="h-full flex flex-col bg-white border-l border-gray-200"
+    data-properties-panel
+  >
     <div class="p-4 border-b border-gray-200 flex items-center justify-between">
       <h2 class="text-lg font-semibold text-gray-800">Propiedades</h2>
     </div>
@@ -514,6 +518,7 @@ import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { toPrecisionCm } from '../utils/fixedDimensions'
 import IdentifyEslModal from './modals/IdentifyEslModal.vue'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement';
+import { useEditingCapabilities } from '@/inventory-smart/composables/useEditingCapabilities'
 
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
@@ -528,6 +533,10 @@ const {
 const { validarDimensiones } = useDimensionValidation()
 
 const catalogStore = useCatalogStore()
+const { editingCapabilities, viewOnlyTooltip } = useEditingCapabilities()
+
+const panelRef = ref(null)
+const isViewOnly = computed(() => editingCapabilities.value.isViewOnly)
 
 const elementoSeleccionado = computed(() => canvasStore.elementoSeleccionadoCompleto)
 
@@ -1463,6 +1472,7 @@ const guardarCodigoEsl = (payload) => {
 }
 
 const onKeydown = (e) => {
+  if (isViewOnly.value) return
   if ((e.ctrlKey || e.metaKey) && e.key === 's') {
     e.preventDefault()
     if (isDirty.value && !guardarDeshabilitado.value) {
@@ -1476,6 +1486,58 @@ const isElementRestricted = computed(() => {
    const restrictions = TIPOS_ENTIDAD.find(t => t.id === type)?.restrictions || [];
    return restrictions.includes('read-only-properties');
 })
+
+const syncViewModeControls = (viewOnly) => {
+  nextTick(() => {
+    const root = panelRef.value
+    if (!root) return
+    const controls = root.querySelectorAll('input, select, textarea, button')
+    controls.forEach((control) => {
+      if (viewOnly) {
+        if (!control.dataset.originalDisabled) {
+          control.dataset.originalDisabled = control.disabled ? 'true' : 'false'
+        }
+        if (!control.dataset.originalTitle) {
+          control.dataset.originalTitle = control.getAttribute('title') || ''
+        }
+        control.disabled = true
+        control.setAttribute('title', viewOnlyTooltip.value)
+      } else {
+        const prevDisabled = control.dataset.originalDisabled
+        if (prevDisabled === 'false') {
+          control.disabled = false
+        }
+        if (prevDisabled) delete control.dataset.originalDisabled
+
+        const prevTitle = control.dataset.originalTitle
+        if (typeof prevTitle === 'string') {
+          if (prevTitle) {
+            control.setAttribute('title', prevTitle)
+          } else {
+            control.removeAttribute('title')
+          }
+          delete control.dataset.originalTitle
+        }
+      }
+    })
+  })
+}
+
+watch(
+  () => isViewOnly.value,
+  (value) => {
+    syncViewModeControls(value)
+  },
+  { immediate: true, flush: 'post' },
+)
+
+watch(
+  () => canvasStore.elementoSeleccionado,
+  () => {
+    syncViewModeControls(isViewOnly.value)
+  },
+  { flush: 'post' },
+)
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)

@@ -193,11 +193,21 @@
             </UiTooltip>
             <UiTooltip
               position="left"
-              :label="elemento.visible === false ? 'Mostrar' : 'Ocultar'"
+              :label="
+                isViewOnly
+                  ? viewOnlyTooltip
+                  : elemento.visible === false
+                    ? 'Mostrar'
+                    : 'Ocultar'
+              "
             >
             <button
-              @click.stop="canvasStore.toggleElementoVisibilidad(elemento.id)"
-              class="p-0 text-gray-400 hover:text-gray-600 cursor-pointer"
+              @click.stop="toggleVisibility(elemento.id)"
+              :disabled="isViewOnly"
+              :class="[
+                'p-0 text-gray-400 transition',
+                isViewOnly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:text-gray-600'
+              ]"
             >
               <svg
                 v-if="elemento.visible !== false"
@@ -247,11 +257,15 @@
             </UiTooltip>
             <UiTooltip
               position="left"
-              label="Eliminar elemento"
+              :label="isViewOnly ? viewOnlyTooltip : 'Eliminar elemento'"
             >
             <button
               @click.stop="onDelete(elemento.id)"
-              class="p-0 text-gray-400 hover:text-red-700 cursor-pointer"
+              :disabled="isViewOnly"
+              :class="[
+                'p-0 text-gray-400 transition',
+                isViewOnly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:text-red-700'
+              ]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 1024 1024"><path fill="currentColor" d="M360 184h-8c4.4 0 8-3.6 8-8zh304v-8c0 4.4 3.6 8 8 8h-8v72h72v-80c0-35.3-28.7-64-64-64H352c-35.3 0-64 28.7-64 64v80h72zm504 72H160c-17.7 0-32 14.3-32 32v32c0 4.4 3.6 8 8 8h60.4l24.7 523c1.6 34.1 29.8 61 63.9 61h454c34.2 0 62.3-26.8 63.9-61l24.7-523H888c4.4 0 8-3.6 8-8v-32c0-17.7-14.3-32-32-32M731.3 840H292.7l-24.2-512h487z"/></svg>
             </button>
@@ -285,12 +299,23 @@ import { useToast } from '@/inventory-smart/composables/useToast'
 import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
 import SpaceOnWallIcon from '@/inventory-smart/icons/SpaceOnWallIcon.vue'
 import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
+import { useEditingCapabilities } from '@/inventory-smart/composables/useEditingCapabilities'
 const { showToast } = useToast()
 // Composables
 const canvasStore = useCanvasStore()
 
 const deleteElement = useDeleteElement();
 const confirmDialog = useConfirmDialog();
+const { editingCapabilities, viewOnlyTooltip } = useEditingCapabilities()
+const isViewOnly = computed(() => editingCapabilities.value.isViewOnly)
+
+const assertEditable = () => {
+  if (isViewOnly.value) {
+    showToast(viewOnlyTooltip.value, 'info')
+    return false
+  }
+  return true
+}
 
 // Estado local
 const filtroCategoria = ref('')
@@ -393,7 +418,13 @@ const limpiarFiltros = () => {
   canvasStore.limpiarSeleccion()
 }
 
+const toggleVisibility = (id) => {
+  if (!assertEditable()) return
+  canvasStore.toggleElementoVisibilidad(id)
+}
+
 const onDelete = async (id) => {
+  if (!assertEditable()) return
   if (!id) return
   if (canvasStore.cambiosNoAplicados) {
     showToast('No se pueden eliminar elementos con cambios pendientes de guardar', 'warn')
@@ -416,11 +447,13 @@ const onDelete = async (id) => {
 }
 
 const abrirModalCrearEtiqueta = (texto) => {
+  if (!assertEditable()) return
   textoNuevaEtiqueta.value = texto
   modalVisible.value = true
 }
 
 const guardarNuevaEtiqueta = (nuevaEtiqueta) => {
+  if (!assertEditable()) return
   canvasStore.agregarYSeleccionarEtiqueta(nuevaEtiqueta)
   modalVisible.value = false;
 }

@@ -6,6 +6,10 @@
     <!-- Navegación jerárquica -->
     <NavegacionJerarquica />
 
+    <div class="app-mode-toggle">
+      <ModoEdicionToggle />
+    </div>
+
     <main class="app-main relative">
       <!-- Sidebar con tabs -->
       <div class="app-sidebar-left">
@@ -55,7 +59,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, provide } from 'vue'
+import { ref, computed, watch, provide } from 'vue'
 import SidebarPanel from './components/SidebarPanel.vue'
 import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
@@ -76,6 +80,8 @@ import { AUTOSAVE_CONFIG } from '@/inventory-smart/utils/constants'
 import ConfirmReplaceModal from '@/inventory-smart/components/modals/ConfirmReplaceModal.vue'
 import { useServicesStore } from './stores/services.js'
 import { useStatePersistence } from './composables/useStatePersistence'
+import { useEditingShortcuts } from './composables/useEditingShortcuts'
+import ModoEdicionToggle from './components/ModoEdicionToggle.vue'
 
 const props = defineProps({
   configCanvas: {
@@ -149,6 +155,8 @@ const externalServicesAPI = {
   isServiceLoading: servicesStore.isServiceLoading,
   getServiceError: servicesStore.getServiceError
 }
+
+provide('externalServicesAPI', externalServicesAPI)
 
 const canvasViewRef = ref(null)
 
@@ -228,48 +236,6 @@ const handleConfigChanged = (configSerializada) => {
   }
 }
 
-// Atajos de teclado globales
-const handleKeydown = (e) => {
-  // Solo procesar si no estamos en un input
-  if (e.target.matches('input, textarea, select, [contenteditable]')) {
-    return
-  }
-
-  // Bloquear si hay texto seleccionado
-  if (window.getSelection().toString()) {
-    return
-  }
-
-  // Bloquear si hay drag global activo
-  if (typeof window !== 'undefined' && window.__dvCanvasDragActive) {
-    return
-  }
-
-  if (e.ctrlKey || e.metaKey) {
-    if (e.key === 'z' && !e.shiftKey) {
-      e.preventDefault()
-      undo()
-    } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
-      e.preventDefault()
-      redo()
-    } else if (e.key === 'c') {
-      e.preventDefault()
-      handleCopyToBuffer()
-    } else if (e.key === 'v') {
-      e.preventDefault()
-      triggerPaste()
-    }
-  } else if (e.key === 'Delete' || e.key === 'Backspace') {
-    // Supr o Retroceso -> eliminar seleccionado
-    const hasSelection = !!canvasStore.elementoSeleccionado
-    if (hasSelection) {
-      e.preventDefault()
-      // No es necesario await; el modal gestiona la interacción
-      deleteSelected({ withConfirm: true })
-    }
-  }
-}
-
 // Handlers para buffer
 const handleCopyToBuffer = () => {
   const elementoSeleccionado = canvasStore.elementoSeleccionado
@@ -277,6 +243,15 @@ const handleCopyToBuffer = () => {
     buffer.copyToBuffer(elementoSeleccionado)
   }
 }
+
+useEditingShortcuts({
+  onUndo: undo,
+  onRedo: redo,
+  onCopy: handleCopyToBuffer,
+  onPaste: triggerPaste,
+  onDelete: () => deleteSelected({ withConfirm: true }),
+  hasSelection: () => Boolean(canvasStore.elementoSeleccionado),
+})
 
 const triggerPaste = () => {
   try {
@@ -386,23 +361,6 @@ const fmtDate = (iso) => {
   }
 }
 
-onMounted(() => {
-  try {
-    window.addEventListener('keydown', handleKeydown)
-
-    // Provide de la API de servicios externos para componentes hijos
-    provide('externalServicesAPI', externalServicesAPI)
-  } catch (error) {
-    window.removeEventListener('keydown', handleKeydown)
-    showToast('Ha ocurrido un error al importar la configuración', 'error')
-    console.error('Error al importar la configuración:', error)
-  }
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
-})
-
 watch(
   () => props.configCanvas,
   async (newConfig, oldConfig) => {
@@ -473,6 +431,14 @@ watch(
 
 <style>
 @import 'tailwindcss';
+
+/* Cambios recientes */
+.app-mode-toggle {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.75rem 1.5rem;
+  gap: 0.75rem;
+}
 
 /* Ignorar warning de unknown at rule */
 @theme {
