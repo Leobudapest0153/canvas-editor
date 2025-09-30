@@ -30,6 +30,7 @@ import {
   errorsPlacement,
 } from '@/inventory-smart/validation/placementOrchestrator'
 import { proposeLevelChange, applyLevelChange } from '@/inventory-smart/composables/useLevelStacking'
+import { checkChildrenFit } from '@/inventory-smart/composables/useChildFitting'
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'
@@ -1869,6 +1870,32 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       cerrarCuartoNivelesPropiedades();
       return;
+    }
+
+    // Validación: asegurar que los hijos aún caben en el piso con las nuevas propiedades
+    try {
+      const pisoActual = elementos.value.find(e => e.id === id) || nivelAEditar.value
+      if (pisoActual && Array.isArray(pisoActual.hijos) && pisoActual.hijos.length > 0) {
+        const proposed = {
+          anchoCm: Number(nivelActualizado?.dimensiones?.ancho) || 0,
+          largoCm: Number(nivelActualizado?.dimensiones?.largo) || 0,
+          altoCm: Number(nivelActualizado?.dimensiones?.alto) || 0,
+          capacidadCarga: Number(nivelActualizado?.capacidadCarga) || 0,
+        }
+        const fit = checkChildrenFit(pisoActual, proposed, elementos.value)
+        if (!fit.ok) {
+          const parts = []
+          if (fit.minAnchoCm != null && proposed.anchoCm < fit.minAnchoCm) parts.push(`ancho mínimo ${(fit.minAnchoCm / 100).toFixed(2)}m`)
+          if (fit.minLargoCm != null && proposed.largoCm < fit.minLargoCm) parts.push(`largo mínimo ${(fit.minLargoCm / 100).toFixed(2)}m`)
+          if (fit.minAltoCm != null && proposed.altoCm < fit.minAltoCm) parts.push(`alto mínimo ${(fit.minAltoCm / 100).toFixed(2)}m`)
+          if (fit.minCapacidad != null && proposed.capacidadCarga < fit.minCapacidad) parts.push(`capacidad mínima ${Math.round(fit.minCapacidad)}kg`)
+          const detalle = parts.length ? ` Requisitos: ${parts.join(', ')}.` : ''
+          showToast(`No se puede aplicar: los elementos del piso no caben con las nuevas propiedades.${detalle}`, 'error')
+          return
+        }
+      }
+    } catch (e) {
+      console.warn('checkChildrenFit failed', e)
     }
 
     // 1) Proponer cambio (solo nos importa dimensiones aquí; alto es clave)
