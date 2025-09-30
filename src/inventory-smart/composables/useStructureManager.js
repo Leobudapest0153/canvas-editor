@@ -423,7 +423,7 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     if (!parentId) { delete base.plantaId; base.padre = null }
 
     let newId
-    if (!parentId) newId = canvasStore.agregarElemento(base, { preserveExistingCode: false, resetName: true, regenerateCode: true })
+    if (!parentId) newId = canvasStore.agregarElemento(base, { preserveExistingCode: false, resetName: false, regenerateCode: true })
     else newId = addChildDirect(canvasStore, base, parentId)
     if (!newId) return null
 
@@ -491,8 +491,7 @@ function addChildDirect(canvasStore, elemento, parentId) {
       else elemento.height = (dims.alto || 10) * 10
     }
 
-    // Generar codigo/nombre de forma unificada como si fuera nuevo (no preservar, resetear nombre)
-    assignCodigoNombre(elemento, canvasStore.elementos, { preserveExistingCode: false, resetName: true, regenerateCode: true })
+    assignCodigoNombre(elemento, canvasStore.elementos, { preserveExistingCode: false, resetName: false, regenerateCode: true })
 
     // Agregar a la lista de elementos
     canvasStore.elementos.push(elemento)

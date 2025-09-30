@@ -1821,14 +1821,13 @@ const createElementFromDrop = (data, dropEvent) => {
 
   let largoCmFinal = largoCm
   let finalHeightFinal = finalHeight
-
-  const isAisle = (elemento?.tipo || '').toLowerCase() === 'pasillos'
   const nuevoElemento = {
     id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
     tipo: elemento.tipo,
     categoria: elemento.categoria,
-    // Para pasillos NO establecer nombre por defecto; dejar que el store lo genere
-    ...(isAisle ? {} : { nombre: elemento.nombre || 'Nuevo elemento' }),
+    // Para pasillos: si vienen con nombre desde el catálogo, preservarlo;
+    // si no, dejar que el store genere el nombre por defecto.
+    nombre: elemento.nombre || 'Nuevo elemento',
     dimensiones: { ancho: anchoCm, largo: largoCmFinal, alto: altoCm },
     x: finalPosition.x,
     y: finalPosition.y,
