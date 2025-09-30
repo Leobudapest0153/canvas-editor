@@ -37,6 +37,14 @@
     <LoaderOverlay />
     <!-- Gestión de plantas -->
     <WorkspaceEditor />
+    <UnsavedChangesModal
+      :open="showUnsavedModal"
+      :changes="unsavedDiff.changes"
+      :summary="unsavedDiff.summary"
+      @close="showUnsavedModal = false"
+      @save="saveAndExit"
+      @continue="exitWithoutSaving"
+    />
 
     <!-- Modal de aviso: el servidor trae cambios más recientes; se descartarán locales -->
     <ConfirmReplaceModal
@@ -76,6 +84,9 @@ import { AUTOSAVE_CONFIG } from '@/inventory-smart/utils/constants'
 import ConfirmReplaceModal from '@/inventory-smart/components/modals/ConfirmReplaceModal.vue'
 import { useServicesStore } from './stores/services.js'
 import { useStatePersistence } from './composables/useStatePersistence'
+import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
+import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
+import UnsavedChangesModal from './components/UnsavedChangesModal.vue'
 
 const props = defineProps({
   configCanvas: {
@@ -229,12 +240,38 @@ const handleConfigChanged = (configSerializada) => {
 }
 
 // Propagar evento regresar
+const changeHistoryStore = useChangeHistoryStore()
+const showUnsavedModal = ref(false)
+const unsavedDiff = ref({ changes: [], summary: { created:0, updated:0, deleted:0 } })
+
 const handleBack = () => {
   try {
+    const state = { plantas: canvasStore.plantas, elementos: canvasStore.elementos }
+    const diff = changeHistoryStore.previewUnsavedChanges(state)
+    if (diff?.changes?.length) {
+      unsavedDiff.value = diff
+      showUnsavedModal.value = true
+      return
+    }
     emit('regresar')
   } catch (e) {
-    console.warn('No se pudo emitir evento regresar desde InventorySmart', e)
+    console.warn('No se pudo evaluar cambios antes de regresar', e)
+    emit('regresar')
   }
+}
+
+const saveAndExit = () => {
+  try {
+    const json = canvasStore.serialize(true)
+    emit('configUpdated', json)
+  } catch (e) { console.warn('Error serializando antes de salir', e) }
+  showUnsavedModal.value = false
+  emit('regresar')
+}
+
+const exitWithoutSaving = () => {
+  showUnsavedModal.value = false
+  emit('regresar')
 }
 
 // Atajos de teclado globales

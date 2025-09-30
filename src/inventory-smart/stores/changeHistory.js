@@ -9,7 +9,8 @@ const deepClone = (obj) => JSON.parse(JSON.stringify(obj || null))
 const FIELDS_PLANTA = ['nombre', 'descripcion', 'dimensiones', 'capacidadCargaSoportado']
 const FIELDS_ELEMENTO = [
   'nombre', 'categoria', 'dimensiones',
-  'alturaRespectoAlSuelo', 'orientacion', 'hijos', 'codigo', 'codigoEsl'
+  'alturaRespectoAlSuelo', 'orientacion', 'hijos', 'codigo', 'codigoEsl',
+  'x', 'y', 'posicion'
 ]
 
 const isEmptyish = (v) => {
@@ -132,6 +133,29 @@ export const useChangeHistoryStore = defineStore('changeHistory', () => {
     return entry
   }
 
+  // Previsualizar cambios actuales SIN alterar baseline ni entries.
+  // canvasState debe tener { plantas, elementos }.
+  const previewUnsavedChanges = (canvasState) => {
+    try {
+      const curr = getSnapshotFromState(canvasState || {})
+      const hasBaseline = (lastSnapshot.value?.plantas?.length || 0) || (lastSnapshot.value?.elementos?.length || 0)
+      const prev = hasBaseline ? lastSnapshot.value : { plantas: [], elementos: [] }
+      return computeDiff(prev, curr)
+    } catch {
+      return { changes: [], summary: { total: 0, created: 0, updated: 0, deleted: 0 } }
+    }
+  }
+
+  // Determina si existen cambios no guardados (diff no vacío vs baseline)
+  const isDirty = (canvasState) => {
+    try {
+      const { changes } = previewUnsavedChanges(canvasState)
+      return changes.length > 0
+    } catch {
+      return false
+    }
+  }
+
   const setEntries = (list) => {
     entries.value = Array.isArray(list) ? list : []
     // Recalcular nextId
@@ -185,5 +209,7 @@ export const useChangeHistoryStore = defineStore('changeHistory', () => {
     serialize,
     deserialize,
     getPaginated,
+    previewUnsavedChanges,
+    isDirty,
   }
 })
