@@ -503,6 +503,7 @@ const emit = defineEmits(['configChanged'])
 
 import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { useAutoSave } from '@/inventory-smart/composables/useAutoSave'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import HistorialModal from './HistorialModal.vue'
@@ -528,6 +529,7 @@ const props = defineProps({
 
 // Store
 const canvasStore = useCanvasStore()
+const { canEditCanvas } = useEditorMode()
 const { showToast } = useToast()
 
 // Autosave
