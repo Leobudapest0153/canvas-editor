@@ -142,6 +142,17 @@ export const useCanvasStore = defineStore('canvas', () => {
   const propuestaAlturasNiveles = ref(null);
 
   const isDraggable = ref(true)
+  const modoEdicion = ref(false)
+
+  const editorPermissions = computed(() => ({
+    modo: modoEdicion.value ? 'edicion' : 'visualizacion',
+    canvasInteractivo: modoEdicion.value,
+    propiedadesEditable: modoEdicion.value,
+    catalogoMutable: modoEdicion.value,
+    capasPersistentes: modoEdicion.value,
+    atajosActivos: modoEdicion.value,
+    menusEdicion: modoEdicion.value,
+  }))
 
   // === CATÁLOGOS DINÁMICOS (persistidos via useStatePersistence) ===
   const catalogos = ref({
@@ -821,6 +832,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         plantas: plantas.value,
         elementos: elementos.value,
         catalogos: catalogos.value,
+        modoEdicion: modoEdicion.value,
       }
       const data = _serialize(state)
       return _persist(data)
@@ -1425,6 +1437,9 @@ export const useCanvasStore = defineStore('canvas', () => {
       setCatalogos: (cats) => {
         setCatalogos(cats)
       },
+      setModoEdicion: (value) => {
+        setModoEdicion(value)
+      },
       setInitialNavigation: (plantaId, plantaNombre) => {
         // Establecer la primera planta como activa siempre
         plantaActiva.value = plantaId
@@ -1453,6 +1468,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
   const ok = _deserialize(jsonString, storeActions)
+
+    if (modoEdicion.value !== true) {
+      modoEdicion.value = false
+    }
 
     // Post-procesar: garantizar que todas las plantas y elementos tengan 'codigo'
     try {
@@ -2102,6 +2121,17 @@ export const useCanvasStore = defineStore('canvas', () => {
     isDraggable.value = !!mode
   }
 
+  const setModoEdicion = (value) => {
+    modoEdicion.value = value === true
+    if (!modoEdicion.value) {
+      isDraggable.value = false
+    }
+  }
+
+  const activarModoEdicion = () => setModoEdicion(true)
+  const desactivarModoEdicion = () => setModoEdicion(false)
+  const toggleModoEdicion = () => setModoEdicion(!modoEdicion.value)
+
   // === INTEGRACIÓN CON AUTOSAVE ===
   // Instancia del autosave - se establece desde App.vue o el componente principal
   const autoSaveInstance = ref(null)
@@ -2118,6 +2148,27 @@ export const useCanvasStore = defineStore('canvas', () => {
   const setCambiosNoAplicados = (value = false) => {
     cambiosNoAplicados.value = value;
   }
+
+  watch(
+    () => modoEdicion.value,
+    (activo) => {
+      if (!activo) {
+        isDraggable.value = false
+      }
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => modoEdicion.value,
+    () => {
+      try {
+        persist()
+      } catch (error) {
+        console.warn('No se pudo persistir el modo de edición', error)
+      }
+    },
+  )
 
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
   watch(
@@ -2150,6 +2201,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     panY,
     gridSize,
     snapGridEps,
+    modoEdicion,
+    editorPermissions,
     crearPlanta,
     plantaEnEdicion,
     etiquetas,
@@ -2199,6 +2252,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     configurarPan,
     setGridSize,
     setSnapGridEps,
+    setModoEdicion,
+    activarModoEdicion,
+    desactivarModoEdicion,
+    toggleModoEdicion,
 
     // Actions - Plantas
     seleccionarPlanta,
