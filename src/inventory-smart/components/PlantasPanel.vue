@@ -89,8 +89,13 @@
 
           <!-- Card para crear nueva planta -->
           <div
+            v-if="canvasStore.modoEdicion"
             class="relative m-2 flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 flex-shrink-0"
-            @click="canvasStore.abrirEditor()"
+            role="button"
+            tabindex="0"
+            @click.prevent="handleCrearNuevoPiso"
+            @keydown.enter.prevent="handleCrearNuevoPiso"
+            @keydown.space.prevent="handleCrearNuevoPiso"
           >
             <div class="flex items-center space-x-3">
               <div class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-primary">
@@ -538,8 +543,10 @@ const props = defineProps({
 
 // Store
 const canvasStore = useCanvasStore()
-const { canEditCanvas } = useEditorMode()
+const { ensureEditable } = useEditorMode()
 const { showToast } = useToast()
+
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 
 const modoEdicionTooltip = computed(() =>
   canvasStore.modoEdicion ? 'Finalizar edición' : 'Editar configuración'
@@ -695,6 +702,13 @@ const seleccionarPlanta = (plantaId) => {
 
 const contarElementosEnPlanta = (plantaId) => {
   return canvasStore.elementosEnPlanta(plantaId).length
+}
+
+const handleCrearNuevoPiso = () => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
+  canvasStore.abrirEditor()
 }
 
 // Métodos para el menú desplegable
