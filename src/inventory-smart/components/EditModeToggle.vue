@@ -1,22 +1,12 @@
 
 <template>
   <button
-    v-if="!isEditing"
     type="button"
-    class="edit-mode-toggle"
-    @click="setMode(true)"
-    title="Activar edición"
+    :class="buttonClasses"
+    @click="toggleMode"
+    :aria-pressed="isEditing"
   >
-    <span class="label">Editar configuración</span>
-  </button>
-  <button
-    v-else
-    type="button"
-    class="edit-mode-toggle is-active"
-    @click="setMode(false)"
-    title="Finalizar edición"
-  >
-    <span class="label">Finalizar</span>
+    <span>{{ label }}</span>
   </button>
 </template>
 
@@ -32,6 +22,15 @@ const { showToast } = useToast()
 
 const isEditing = computed(() => modoEdicion.value === true)
 
+const label = computed(() => (isEditing.value ? 'Finalizar' : 'Editar configuración'))
+
+const buttonClasses = computed(() => [
+  'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors cursor-pointer',
+  isEditing.value
+    ? 'bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500'
+    : 'bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray',
+])
+
 const setMode = (nextValue) => {
   const shouldEnable = Boolean(nextValue)
   canvasStore.setModoEdicion(shouldEnable)
@@ -40,32 +39,8 @@ const setMode = (nextValue) => {
     shouldEnable ? 'success' : 'info',
   )
 }
+
+const toggleMode = () => {
+  setMode(!isEditing.value)
+}
 </script>
-
-<style scoped>
-.edit-mode-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border-radius: 9999px;
-  border: 1px solid rgba(15, 23, 42, 0.15);
-  background: rgba(148, 163, 184, 0.15);
-  color: #0f172a;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.edit-mode-toggle:hover {
-  background: rgba(59, 130, 246, 0.15);
-}
-
-.edit-mode-toggle.is-active {
-  background: rgba(59, 130, 246, 0.2);
-  border-color: rgba(59, 130, 246, 0.4);
-  color: #1e3a8a;
-}
-</style>
