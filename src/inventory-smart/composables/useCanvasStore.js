@@ -1798,7 +1798,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     plantaEnEdicion.value = null
   }
 
-  const abrirCuartoNivelesPropiedades = (idElemento) => {
+  const abrirCuartoNivelesPropiedades = (idElemento, tipo) => {
     const elemento = elementos.value.find((e) => e.id === idElemento);
     if (!elemento) {
       console.error('Elemento no encontrado:', idElemento);
@@ -1807,7 +1807,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     // El elemento es un padre
     if (['elementos', 'cuartos'].includes(elemento.tipo)) {
       console.log('Vamos a editar un hijo guardando el id del padre:', idElemento);
-      nivelAEditar.value = { padre: idElemento }
+      nivelAEditar.value = { padre: idElemento, tipo }
     }
     // El elemento es un nivel hijo
     if (['pisos', 'contenedores'].includes(elemento.tipo)) {

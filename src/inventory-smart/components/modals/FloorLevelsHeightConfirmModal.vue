@@ -192,7 +192,7 @@ const fmtM = (cm) => {
 };
 const fmtKg = (kg) => {
   const v = Number(kg);
-  return Number.isFinite(v) ? Math.round(v) : '-';
+  return Number.isFinite(v) ? v.toFixed(2) : '-';
 };
 
 // Detección de cambios: pinta el valor destino si cambia
