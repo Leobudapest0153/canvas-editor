@@ -8,7 +8,7 @@
     <div
       class="relative z-10 bg-white shadow-2xl flex flex-col max-h-max py-3 px-5 w-[569px]">
       <div class="mb-4 flex items-center">
-        <h3 class="font-bold text-lg text-[#1C1E4D]">Piso</h3>
+        <h3 class="font-bold text-lg text-[#1C1E4D]">{{ title.title }}</h3>
         <UiTooltip
           label="Considera que al no definir dimensiones, estas se consideran como infinitas"
           position="bottom"
@@ -33,7 +33,7 @@
       </div>
       <div class="grid grid-cols-2 gap-x-6 gap-y-4 mb-7 w-full">
         <div class="col-span-2 flex flex-col gap-y-2">
-          <label class="font-normal text-medium text-[#111928]" for="codigo_piso">Código del piso</label>
+          <label class="font-normal text-medium text-[#111928]" for="codigo_piso">Código del {{ title.label }}</label>
           <input
             type="text"
             placeholder="01"
@@ -42,10 +42,10 @@
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4 disabled:bg-gray-100">
         </div>
         <div class="col-span-2 flex flex-col gap-y-2">
-          <label class="font-normal text-medium text-[#111928]" for="nombre_piso">Nombre del piso *</label>
+          <label class="font-normal text-medium text-[#111928]" for="nombre_piso">Nombre del {{ title.label }} *</label>
           <input
             type="text"
-            placeholder="piso bajo"
+            :placeholder="`${title.label} bajo`"
             v-model="formValue.nombre"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
@@ -317,6 +317,21 @@ const arraysEqual = (a, b) => {
   return a.every((value, index) => value === b[index]);
 };
 
+const title = computed(() => {
+  const type = canvasStore.nivelAEditar?.tipo;
+  if (type === 'contenedores') {
+    return {
+      title: 'Niveles',
+      label: 'nivel'
+    }
+  }
+  if (type === 'pisos') {
+    return {
+      title: 'Pisos',
+      label: 'piso'
+    }
+  }
+})
 const isAllSelected = computed(() =>
   formValue.value.tiposProductos.includes(ALL_OPTION)
 );

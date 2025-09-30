@@ -357,7 +357,7 @@
               {{ elementoSeleccionado.tipo == 'cuartos' ? 'Pisos' : 'Niveles' }}
               <button
                 :disabled="isSaving || isElementRestricted"
-                @click="canvasStore.abrirCuartoNivelesPropiedades(elementoSeleccionado.id)"
+                @click="canvasStore.abrirCuartoNivelesPropiedades(elementoSeleccionado.id, childrenType)"
                 class="bg-primary-700 text-white p-1 rounded-full cursor-pointer
                 disabled:bg-gray-400 disabled:cursor-not-allowed">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
@@ -588,6 +588,10 @@ const cargarDesdeStore = (el) =>
 const valorDimensionAnterior = ref({})
 const valorPesoAnterior = ref(0)
 const valorDiametroAnterior = ref(0)
+
+const childrenType = computed(() => {
+  return elementoSeleccionado.value.tipo == 'cuartos' ? 'pisos' : 'contenedores';
+})
 
 watch(
   () => elementoSeleccionado.value?.id,
