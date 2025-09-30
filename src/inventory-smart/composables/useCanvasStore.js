@@ -1385,6 +1385,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       templates: catalogStore.templates?.map?.(t => t?._custom?.value || t) || [],
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
       catalogos: catalogos.value,
+      modoEdicion: modoEdicion.value,
     }
     // Incluir historial de cambios si existe
     try {
