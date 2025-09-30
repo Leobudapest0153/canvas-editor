@@ -2371,42 +2371,71 @@ const fitToPlanta = () => {
 
     if (isInfinitePlant.value) {
       const dynamicMinZoom = target?.minZoom ?? getDynamicMinZoom()
-      const hasRenderableElements = Array.isArray(canvasStore.elementosVisibles)
-        ? canvasStore.elementosVisibles.some((el) => el?.visible !== false)
-        : false
+      const visibles = Array.isArray(canvasStore.elementosVisibles)
+        ? canvasStore.elementosVisibles.filter((el) => el?.visible !== false)
+        : []
 
-      if (!hasRenderableElements) {
+      if (visibles.length === 0) {
+        // Sin elementos: comportamiento previo pero centrando origen (0,0)
         const fallbackZoom = Math.min(
           MAX_ZOOM,
           Math.max(dynamicMinZoom, DEFAULT_INFINITE_INITIAL_ZOOM),
         )
         const centerX = stageSize.value.width / 2
         const centerY = stageSize.value.height / 2
-
         stage.scale({ x: fallbackZoom, y: fallbackZoom })
         stage.position({ x: centerX, y: centerY })
-
         canvasStore.configurarZoom(fallbackZoom, dynamicMinZoom)
         canvasStore.configurarPan(centerX, centerY)
-
         stage.batchDraw?.()
-
         target = {
           scale: fallbackZoom,
           minZoom: dynamicMinZoom,
           position: { x: centerX, y: centerY },
-          bbox: target?.bbox ?? null,
+          bbox: null,
           viewport: target?.viewport ?? null,
           margin: target?.margin ?? 40,
-          mode: 'infinite-fallback'
+          mode: 'infinite-empty'
         }
       } else {
-        canvasStore.configurarZoom(canvasStore.zoom, dynamicMinZoom)
+        // Calcular BBox de contenido visible
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        for (const el of visibles) {
+          const w = getDrawWidth(el) || 0
+          const h = getDrawHeight(el) || 0
+          const x = el.x || 0
+          const y = el.y || 0
+          minX = Math.min(minX, x)
+          minY = Math.min(minY, y)
+          maxX = Math.max(maxX, x + w)
+          maxY = Math.max(maxY, y + h)
+        }
+        if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY) || maxX <= minX || maxY <= minY) {
+          minX = 0; minY = 0; maxX = 100; maxY = 100
+        }
+        const contentW = Math.max(1, maxX - minX)
+        const contentH = Math.max(1, maxY - minY)
+        const margin = 40
+        const viewW = Math.max(16, stageSize.value.width - margin * 2)
+        const viewH = Math.max(16, stageSize.value.height - margin * 2)
+        let scale = Math.min(viewW / contentW, viewH / contentH)
+        if (!Number.isFinite(scale) || scale <= 0) scale = 1
+        scale = Math.min(MAX_ZOOM, Math.max(dynamicMinZoom, scale))
+        const offsetX = (stageSize.value.width - contentW * scale) / 2 - minX * scale
+        const offsetY = (stageSize.value.height - contentH * scale) / 2 - minY * scale
+        stage.scale({ x: scale, y: scale })
+        stage.position({ x: offsetX, y: offsetY })
+        canvasStore.configurarZoom(scale, dynamicMinZoom)
+        canvasStore.configurarPan(offsetX, offsetY)
+        stage.batchDraw?.()
         target = {
-          ...target,
-          scale: canvasStore.zoom,
+          scale,
           minZoom: dynamicMinZoom,
-          mode: target?.mode ?? 'content'
+          position: { x: offsetX, y: offsetY },
+          bbox: { x: minX, y: minY, width: contentW, height: contentH },
+          viewport: { width: stageSize.value.width, height: stageSize.value.height },
+          margin,
+          mode: 'infinite-content'
         }
       }
     }

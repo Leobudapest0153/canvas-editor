@@ -1,0 +1,8 @@
+<svg width="48" height="48" viewBox="0 0 48 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <g stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Warehouse outline -->
+    <path d="M24 2L8 8v21h8V18h16v11h8V8L24 2z"/>
+    <!-- Door/header line -->
+    <path d="M12 11h24"/>
+  </g>
+</svg>
