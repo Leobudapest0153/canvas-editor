@@ -688,6 +688,7 @@ import { useZoom } from '@/inventory-smart/composables/useZoom'
 import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
 import { toPrecisionCm } from '../utils/fixedDimensions'
 import { instantiateStructureOnCanvas } from '@/inventory-smart/composables/useStructureManager'
+import { useEditingCapabilities } from '@/inventory-smart/composables/useEditingCapabilities'
 
 // Espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -722,6 +723,7 @@ const {
   isLocked: ctxIsLocked,
   elementId: ctxElementId,
 } = ctx
+const { editingCapabilities } = useEditingCapabilities()
 const { deleteSelected } = useDeleteElement()
 const weightValidation = useWeightValidation()
 
@@ -2135,9 +2137,21 @@ const createElementFromTemplate = (data, dropEvent) => {
   instantiateStructureOnCanvas(canvasStore, payload, res.position)
 }
 
-// Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
-// Por defecto activado (true) para que el modo edición esté disponible al iniciar
-const dragModeGlobal = ref(true)
+// Modo arrastre global: sincronizado con el modo de edición global
+const dragModeGlobal = ref(editingCapabilities.value.canDragElements)
+
+watch(
+  () => editingCapabilities.value.canDragElements,
+  (enabled) => {
+    dragModeGlobal.value = enabled
+    if (!enabled) {
+      stageDragEnabled.value = true
+      editingElementId.value = null
+      clearGuides()
+    }
+  },
+  { immediate: true },
+)
 
 const isDragModeActive = computed(() => dragModeGlobal.value)
 
@@ -2163,6 +2177,7 @@ const toggleLockAndPreserveDrag = async (elementId) => {
   }
 }
 const toggleDragMode = () => {
+  if (!editingCapabilities.value.canDragElements) return
   // Alterna el modo arrastre global. Cuando se activa y hay un elemento seleccionado y no bloqueado,
   // se activa también la edición (transformer) para permitir cambiar dimensiones.
   dragModeGlobal.value = !dragModeGlobal.value
@@ -2186,6 +2201,7 @@ const toggleSnapping = () => {
 }
 
 const canDragElement = (elemento) => {
+  if (!editingCapabilities.value.canDragElements) return false
   // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
   // Y si no hay cambios sin aplicar de otro elemento
   const isNotCurrentElement = canvasStore.elementoSeleccionado != elemento.id

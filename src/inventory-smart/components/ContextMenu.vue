@@ -3,9 +3,9 @@
     <button
       class="ctx-item text-red-600 hover:bg-red-50"
       @click="onDelete"
-      :disabled="locked"
-      :aria-label="locked ? 'Elemento bloqueado — desbloquéalo para eliminar' : 'Eliminar (Supr)'"
-      :title="locked ? 'Elemento bloqueado — desbloquéalo para eliminar' : 'Eliminar (Supr)'"
+      :disabled="locked || viewOnly"
+      :aria-label="ariaLabel"
+      :title="tooltip"
     >
       Eliminar
     </button>
@@ -16,6 +16,7 @@
 import { computed } from 'vue'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { useEditingCapabilities } from '@/inventory-smart/composables/useEditingCapabilities'
 
 defineProps({
   visible: { type: Boolean, default: false },
@@ -26,14 +27,25 @@ defineProps({
 const emit = defineEmits(['close'])
 const { deleteSelected } = useDeleteElement()
 const store = useCanvasStore()
+const { editingCapabilities, viewOnlyTooltip } = useEditingCapabilities()
 
 const locked = computed(() => {
   const el = store.elementoSeleccionadoCompleto
   return !!(el && (el.bloqueado === true || el.locked === true))
 })
 
+const viewOnly = computed(() => editingCapabilities.value.isViewOnly)
+
+const ariaLabel = computed(() => {
+  if (locked.value) return 'Elemento bloqueado — desbloquéalo para eliminar'
+  if (viewOnly.value) return viewOnlyTooltip.value
+  return 'Eliminar (Supr)'
+})
+
+const tooltip = ariaLabel
+
 const onDelete = () => {
-  if (locked.value) return
+  if (locked.value || viewOnly.value) return
   deleteSelected({ withConfirm: true })
   emit('close')
 }

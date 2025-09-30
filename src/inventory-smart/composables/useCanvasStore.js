@@ -48,6 +48,25 @@ export const useCanvasStore = defineStore('canvas', () => {
   const historyInstance = ref(null)
 
   // Estado de plantas
+  const modoEdicion = ref(false)
+
+  const editingCapabilities = computed(() => {
+    const isEditing = modoEdicion.value === true
+    return {
+      isEditing,
+      isViewOnly: !isEditing,
+      canEditCanvas: isEditing,
+      canTransformElements: isEditing,
+      canDragElements: isEditing,
+      canEditProperties: isEditing,
+      canUseShortcuts: isEditing,
+      canPersistChanges: isEditing,
+      canUseContextMenus: isEditing,
+      canModifyCatalog: isEditing,
+      canManageLayers: isEditing,
+    }
+  })
+
   const plantas = ref([
     {
       id: 'planta_1',
@@ -1370,6 +1389,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       templates: catalogStore.templates?.map?.(t => t?._custom?.value || t) || [],
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
       catalogos: catalogos.value,
+      modoEdicion: modoEdicion.value === true,
     }
     // Incluir historial de cambios si existe
     try {
@@ -1449,7 +1469,10 @@ export const useCanvasStore = defineStore('canvas', () => {
         panY.value = 0
 
         // Canvas adaptativo se recalculará automáticamente por el watcher
-      }
+      },
+      setModoEdicion: (valor) => {
+        modoEdicion.value = valor === true
+      },
     }
 
   const ok = _deserialize(jsonString, storeActions)
@@ -2232,6 +2255,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     // === FUNCIONES DE SERIALIZACIÓN ===
     serialize,
     deserialize,
+    modoEdicion,
+    editingCapabilities,
+    setModoEdicion: (valor) => {
+      modoEdicion.value = valor === true
+    },
+    toggleModoEdicion: () => {
+      modoEdicion.value = !modoEdicion.value
+    },
 
     // == Editor de planta
     abrirEditor,

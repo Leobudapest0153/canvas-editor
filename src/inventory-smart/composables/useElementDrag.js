@@ -28,6 +28,7 @@ import {
   clampPointToPolygon,
 } from '@/inventory-smart/utils/polygonBounds'
 import { clampRectToRect } from '@/inventory-smart/utils/geometry'
+import { useEditingCapabilities } from '@/inventory-smart/composables/useEditingCapabilities'
 
 export function useElementDrag({
   canvasStore,
@@ -46,6 +47,7 @@ export function useElementDrag({
   setLiveConflictsThrottled,
   computeBoundary,
 }) {
+  const { editingCapabilities } = useEditingCapabilities()
   // Estado del drag
   const isElementDragging = ref(false)
   const stageDragEnabled = ref(true)
@@ -252,6 +254,11 @@ export function useElementDrag({
   }
 
   const startElementDrag = (elementId) => {
+    if (!editingCapabilities.value.canDragElements) {
+      isElementDragging.value = false
+      stageDragEnabled.value = false
+      return
+    }
     if (isElementLocked(elementId)) {
       // Si está bloqueado, no iniciar drag ni mover el layer
       isElementDragging.value = false
@@ -827,6 +834,15 @@ export function useElementDrag({
   }
 
   const onShapeDragStart = (e, el) => {
+    if (!editingCapabilities.value.canDragElements) {
+      try {
+        e?.target?.stopDrag?.()
+      } catch {
+        /* noop */
+      }
+      stageDragEnabled.value = false
+      return
+    }
     if (!canvasStore.estaEnPlanta) {
       const shape = e.target
       const parent =
@@ -856,6 +872,7 @@ export function useElementDrag({
   }
 
   const onShapeDragMove = (e, el) => {
+    if (!editingCapabilities.value.canDragElements) return
     const data = innerSessions.get(el.id)
     if (data) {
       const { session, parent } = data
@@ -922,6 +939,11 @@ export function useElementDrag({
   }
 
   const onShapeDragEnd = (e, el) => {
+    if (!editingCapabilities.value.canDragElements) {
+      stageDragEnabled.value = false
+      isElementDragging.value = false
+      return
+    }
     const data = innerSessions.get(el.id)
     if (data) {
       const { session, parent, initial } = data

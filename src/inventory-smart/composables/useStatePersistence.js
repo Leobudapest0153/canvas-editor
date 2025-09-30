@@ -49,6 +49,8 @@ export const useStatePersistence = () => {
         })
       },
 
+      modoEdicion: state.modoEdicion === true,
+
       // Catálogos dinámicos (pueden sobrescribir los defaults)
       catalogos: {
         tiposEspacio: state.catalogos?.tiposEspacio || DEFAULT_TIPOS_ESPACIO,
@@ -407,6 +409,15 @@ export const useStatePersistence = () => {
           tiposCuarto: DEFAULT_TIPOS_CUARTO,
           tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
         })
+      }
+
+      if (typeof storeActions.setModoEdicion === 'function') {
+        try {
+          storeActions.setModoEdicion(state.modoEdicion === true)
+        } catch (error) {
+          console.warn('No se pudo restaurar modoEdicion desde la configuración:', error)
+          storeActions.setModoEdicion(false)
+        }
       }
 
       // === RESTAURAR PLANTAS CON VALIDACIÓN INDIVIDUAL ===
