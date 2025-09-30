@@ -6,13 +6,12 @@
     <!-- Navegación jerárquica -->
     <NavegacionJerarquica />
 
-    <div class="edit-mode-wrapper">
-      <EditModeToggle />
-    </div>
-
     <main class="app-main relative">
       <!-- Sidebar con tabs -->
-      <div class="app-sidebar-left">
+      <div
+        class="app-sidebar-left"
+        v-if="canvasStore.modoEdicion"
+      >
         <SidebarPanel />
       </div>
 
@@ -67,7 +66,6 @@ import PropiedadesPanel from './components/PropiedadesPanel.vue'
 import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import ManagmentFloorRoomPropertiesModal from './components/modals/ManagmentFloorRoomPropertiesModal.vue'
-import EditModeToggle from './components/EditModeToggle.vue'
 import { useCanvasImportExport } from './composables/useCanvasImportExport'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
@@ -728,13 +726,6 @@ watch(
 /* No crear archivos nuevos; mantener consistencia con el resto del proyecto */
 .template-drag--invalid {
   outline: 2px dashed red;
-}
-
-/* Cambios recientes */
-.edit-mode-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 1.5rem 0.75rem;
 }
 
 .elastic-badge {
