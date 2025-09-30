@@ -183,6 +183,23 @@
             <span>Regresar</span>
           </button>
 
+        <!-- Botón Todos los indicadores -->
+        <UiTooltip label="Todos los indicadores" position="bottom" :delay="200">
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
+            @click="emitirIndicadores"
+          >
+            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M19 8h-1V3H6v5H5c-1.1 0-2 .9-2 2v5h3v4h12v-4h3v-5c0-1.1-.9-2-2-2zM8 5h8v3H8V5zm8 14H8v-4h8v4zm1-6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"
+              />
+            </svg>
+            <span class="ml-1">Todos los indicadores</span>
+          </button>
+        </UiTooltip>
+
         <!-- Botón Historial de cambios -->
         <UiTooltip label="Historial de cambios" position="bottom" :delay="200">
           <button
@@ -496,8 +513,8 @@
 </template>
 
 <script setup>
-// Definir emits (agregado 'regresar')
-const emit = defineEmits(['configChanged', 'regresar'])
+// Definir emits (agregado 'regresar' y 'showIndicators')
+const emit = defineEmits(['configChanged', 'regresar', 'showIndicators'])
 
 import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
@@ -614,6 +631,10 @@ const elementosEnPlantaAEliminar = computed(() => {
 // Métodos
 const openHistorialModal = () => {
   showHistorialModal.value = true
+}
+
+const emitirIndicadores = () => {
+  emit('showIndicators')
 }
 
 // Emitir acción de regresar para que el componente padre pueda manejar navegación/salida

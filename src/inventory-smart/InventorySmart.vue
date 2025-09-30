@@ -1,7 +1,12 @@
 <template>
   <div id="inventory-smart">
     <!-- Panel de plantas -->
-  <PlantasPanel :author="author" @configChanged="handleConfigChanged" @regresar="handleBack" />
+  <PlantasPanel
+    :author="author"
+    @configChanged="handleConfigChanged"
+    @regresar="handleBack"
+    @showIndicators="handleShowIndicators"
+  />
 
     <!-- Navegación jerárquica -->
     <NavegacionJerarquica />
@@ -115,7 +120,7 @@ const props = defineProps({
     }
   }
 })// Definir emits para comunicar cambios al componente padre
-const emit = defineEmits(['configUpdated', 'regresar'])
+const emit = defineEmits(['configUpdated', 'regresar', 'imprimirIndicadores'])
 
 const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
@@ -237,6 +242,10 @@ const handleConfigChanged = (configSerializada) => {
     console.error('Error al procesar la configuración actualizada:', error)
     showToast('Error al procesar la configuración actualizada', 'error')
   }
+}
+
+const handleShowIndicators = () => {
+  emit('imprimirIndicadores')
 }
 
 // Propagar evento regresar
