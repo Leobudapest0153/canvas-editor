@@ -1872,33 +1872,23 @@ export const useCanvasStore = defineStore('canvas', () => {
       return;
     }
 
-    // Validación: asegurar que los hijos aún caben en el piso con las nuevas propiedades
+    // Validación previa: calcular encaje de hijos (para usarlo si el cambio no requiere confirmación)
+    let preFit = null
     try {
       const pisoActual = elementos.value.find(e => e.id === id) || nivelAEditar.value
       if (pisoActual && Array.isArray(pisoActual.hijos) && pisoActual.hijos.length > 0) {
-        const proposed = {
-          anchoCm: Number(nivelActualizado?.dimensiones?.ancho) || 0,
-          largoCm: Number(nivelActualizado?.dimensiones?.largo) || 0,
-          altoCm: Number(nivelActualizado?.dimensiones?.alto) || 0,
-          capacidadCarga: Number(nivelActualizado?.capacidadCarga) || 0,
-        }
-        const fit = checkChildrenFit(pisoActual, proposed, elementos.value)
-        if (!fit.ok) {
-          const parts = []
-          if (fit.minAnchoCm != null && proposed.anchoCm < fit.minAnchoCm) parts.push(`ancho mínimo ${(fit.minAnchoCm / 100).toFixed(2)}m`)
-          if (fit.minLargoCm != null && proposed.largoCm < fit.minLargoCm) parts.push(`largo mínimo ${(fit.minLargoCm / 100).toFixed(2)}m`)
-          if (fit.minAltoCm != null && proposed.altoCm < fit.minAltoCm) parts.push(`alto mínimo ${(fit.minAltoCm / 100).toFixed(2)}m`)
-          if (fit.minCapacidad != null && proposed.capacidadCarga < fit.minCapacidad) parts.push(`capacidad mínima ${Math.round(fit.minCapacidad)}kg`)
-          const detalle = parts.length ? ` Requisitos: ${parts.join(', ')}.` : ''
-          showToast(`No se puede aplicar: los elementos del piso no caben con las nuevas propiedades.${detalle}`, 'error')
-          return
-        }
+        preFit = checkChildrenFit(pisoActual, {
+          anchoCm: Number(nivelActualizado?.dimensiones?.ancho),
+          largoCm: Number(nivelActualizado?.dimensiones?.largo),
+          altoCm: Number(nivelActualizado?.dimensiones?.alto),
+          capacidadCarga: Number(nivelActualizado?.capacidadCarga),
+        }, elementos.value)
       }
     } catch (e) {
-      console.warn('checkChildrenFit failed', e)
+      console.warn('checkChildrenFit pre calculation failed', e)
     }
 
-    // 1) Proponer cambio (solo nos importa dimensiones aquí; alto es clave)
+    // 1) Proponer cambio (alto/peso entre hermanos; incluye childFit en draft para el modal)
     const res = proposeLevelChange(elementos.value, id, nivelActualizado || {}, nivelAEditar.value.padre);
     if (res.status === 'error') {
       showToast(res.message || 'No se pudo aplicar el cambio', 'error');
@@ -1906,6 +1896,24 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     if (res.status === 'ok') {
+      // Si no requiere confirmación, validar que los hijos aún quepan y bloquear si no
+      if (preFit && preFit.ok === false) {
+        const parts = []
+        const proposed = {
+          anchoCm: Number(nivelActualizado?.dimensiones?.ancho),
+          largoCm: Number(nivelActualizado?.dimensiones?.largo),
+          altoCm: Number(nivelActualizado?.dimensiones?.alto),
+          capacidadCarga: Number(nivelActualizado?.capacidadCarga),
+        }
+        if (preFit.minAnchoCm != null && proposed.anchoCm < preFit.minAnchoCm) parts.push(`ancho mínimo ${(preFit.minAnchoCm / 100).toFixed(2)}m`)
+        if (preFit.minLargoCm != null && proposed.largoCm < preFit.minLargoCm) parts.push(`largo mínimo ${(preFit.minLargoCm / 100).toFixed(2)}m`)
+        if (preFit.minAltoCm != null && proposed.altoCm < preFit.minAltoCm) parts.push(`alto mínimo ${(preFit.minAltoCm / 100).toFixed(2)}m`)
+        if (preFit.minCapacidad != null && proposed.capacidadCarga < preFit.minCapacidad) parts.push(`capacidad mínima ${Math.round(preFit.minCapacidad)}kg`)
+        const detalle = parts.length ? ` Requisitos: ${parts.join(', ')}.` : ''
+        showToast(`No se puede aplicar: los elementos del piso no caben con las nuevas propiedades.${detalle}`, 'error')
+        return
+      }
+
       // 2) Aplicar directamente
       const ok = applyLevelChange(
         elementos.value,
@@ -1945,6 +1953,36 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Agregar padre si falta (caso nuevo nivel)
     if (!draft.padre && nivelAEditar.value?.padre) {
       draft.padre = nivelAEditar.value.padre;
+    }
+
+    // Si estrategia es 'clamp' o 'redistribute', ajustar automáticamente a los mínimos requeridos por los hijos
+    try {
+      if (draft?.childFit) {
+        const f = draft.childFit;
+        const tp = draft.targetPatch || {};
+        const dims = { ...(tp.dimensiones || {}) };
+
+        if (Number.isFinite(f.minAnchoCm)) {
+          const cur = Number(dims.ancho);
+          if (!Number.isFinite(cur) || cur < f.minAnchoCm) dims.ancho = f.minAnchoCm;
+        }
+        if (Number.isFinite(f.minLargoCm)) {
+          const cur = Number(dims.largo);
+          if (!Number.isFinite(cur) || cur < f.minLargoCm) dims.largo = f.minLargoCm;
+        }
+        if (Number.isFinite(f.minAltoCm)) {
+          const cur = Number(dims.alto);
+          if (!Number.isFinite(cur) || cur < f.minAltoCm) dims.alto = f.minAltoCm;
+        }
+        if (Number.isFinite(f.minCapacidad)) {
+          const cur = Number(tp.capacidadCarga);
+          if (!Number.isFinite(cur) || cur < f.minCapacidad) tp.capacidadCarga = f.minCapacidad;
+        }
+
+        draft.targetPatch = { ...tp, dimensiones: dims };
+      }
+    } catch (e) {
+      console.warn('auto adjust to child minimums failed', e);
     }
 
     const ok = applyLevelChange(

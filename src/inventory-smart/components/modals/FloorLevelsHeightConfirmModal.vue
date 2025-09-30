@@ -58,15 +58,16 @@
               Peso total: {{ pesoTotal }} kg / Máximo: {{ props.draft.roomWeightMax }} kg.
             </template>
           </div>
+
         </div>
 
-        <!-- Vista unificada por estrategia: Altura + Peso -->
+        <!-- Vista de ajustes -->
         <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <!-- Alturas (comparativo y resultado con estrategia) -->
-          <div class="border border-gray-300 rounded p-3">
+          <!-- Alturas (siempre mostrar si hay exceso de altura) -->
+          <div v-if="props.draft?.heightExceeded" class="border border-amber-300 bg-amber-50 rounded p-3">
             <div class="flex items-center justify-between mb-2">
-              <h4 class="font-semibold text-primary-800">Alturas</h4>
-              <span class="text-xs text-gray-500">
+              <h4 class="font-semibold text-amber-800">Alturas</h4>
+              <span class="text-xs text-amber-600">
                 Estrategia: {{ strategyLabel }}
               </span>
             </div>
@@ -76,7 +77,7 @@
                 v-for="id in props.draft?.nivelesOrden || []"
                 :key="id"
                 class="flex justify-between gap-2 px-1"
-                :class="{ 'bg-yellow-50 w-full py-1 font-semibold border-l-4 border-yellow-500': isTarget(id) }"
+                :class="{ 'bg-amber-100 w-full py-1 font-semibold border-l-4 border-amber-500': isTarget(id) }"
               >
                 <div class="truncate">{{ props.draft?.nombresPorId?.[id] || id }}</div>
                 <div class="text-right whitespace-nowrap">
@@ -89,16 +90,16 @@
               </div>
             </div>
 
-            <div class="mt-2 text-xs text-gray-500">
-              Resultado altura: {{ heightResultOk ? 'Cabe dentro del cuarto' : 'No cabe (ajusta estrategia o valores)' }}
+            <div class="mt-2 text-xs text-amber-700">
+              Ajuste automático para que cabe dentro del cuarto ({{ fmtM(props.draft?.roomHeightCm) }}m).
             </div>
           </div>
 
-          <!-- Pesos (comparativo y resultado con estrategia) -->
-          <div class="border border-gray-300 rounded p-3">
+          <!-- Pesos (siempre mostrar si hay exceso de peso) -->
+          <div v-if="props.draft?.weightExceeded" class="border border-red-300 bg-red-50 rounded p-3">
             <div class="flex items-center justify-between mb-2">
-              <h4 class="font-semibold text-primary-800">Pesos</h4>
-              <span class="text-xs text-gray-500">
+              <h4 class="font-semibold text-red-800">Pesos</h4>
+              <span class="text-xs text-red-600">
                 Estrategia: {{ strategyLabel }}
               </span>
             </div>
@@ -108,7 +109,7 @@
                 v-for="id in props.draft?.nivelesOrden || []"
                 :key="id"
                 class="flex justify-between gap-2 px-1"
-                :class="{ 'bg-yellow-50 w-full py-1 font-semibold border-l-4 border-yellow-500': isTarget(id) }"
+                :class="{ 'bg-red-100 w-full py-1 font-semibold border-l-4 border-red-500': isTarget(id) }"
               >
                 <div class="truncate">{{ props.draft?.nombresPorId?.[id] || id }}</div>
                 <div class="text-right whitespace-nowrap">
@@ -121,14 +122,94 @@
               </div>
             </div>
 
-            <div class="mt-2 text-xs text-gray-500">
+            <div class="mt-2 text-xs text-red-700">
               Resultado peso:
               <template v-if="props.draft?.roomWeightMax != null">
-                {{ weightResultOk ? 'Dentro del máximo permitido' : 'Excede el máximo' }}
+                {{ weightResultOk ? 'Dentro del máximo permitido' : 'Excede el máximo' }} ({{ fmtKg(props.draft?.roomWeightMax) }}kg).
               </template>
               <template v-else>
                 Sin límite configurado para el cuarto.
               </template>
+            </div>
+          </div>
+
+          <!-- Dimensiones (solo mostrar si hay ajustes necesarios) -->
+          <div v-if="hasDimensionChanges" class="border border-blue-300 bg-blue-50 rounded p-3">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="font-semibold text-blue-800">Dimensiones</h4>
+              <span class="text-xs text-blue-600">
+                Por elementos internos
+              </span>
+            </div>
+
+            <div class="space-y-1.5 text-sm">
+              <div v-if="isFiniteNumber(minAnchoCm) && proposedDimensions.ancho < minAnchoCm" class="flex justify-between gap-2 px-1">
+                <div class="truncate">Ancho mínimo</div>
+                <div class="text-right whitespace-nowrap">
+                  <span class="text-gray-500 mr-1">{{ fmtM(proposedDimensions.ancho) }}m</span>
+                  <span class="text-gray-400">→</span>
+                  <span class="ml-1 font-bold text-blue-700">
+                    {{ fmtM(minAnchoCm) }}m
+                  </span>
+                  <span v-if="widthBinder" class="ml-2 text-xs text-gray-400">({{ elLabel(widthBinder) }})</span>
+                </div>
+              </div>
+
+              <div v-if="isFiniteNumber(minLargoCm) && proposedDimensions.largo < minLargoCm" class="flex justify-between gap-2 px-1">
+                <div class="truncate">Largo mínimo</div>
+                <div class="text-right whitespace-nowrap">
+                  <span class="text-gray-500 mr-1">{{ fmtM(proposedDimensions.largo) }}m</span>
+                  <span class="text-gray-400">→</span>
+                  <span class="ml-1 font-bold text-blue-700">
+                    {{ fmtM(minLargoCm) }}m
+                  </span>
+                  <span v-if="lengthBinder" class="ml-2 text-xs text-gray-400">({{ elLabel(lengthBinder) }})</span>
+                </div>
+              </div>
+
+              <div v-if="isFiniteNumber(minAltoCm) && proposedDimensions.alto < minAltoCm" class="flex justify-between gap-2 px-1">
+                <div class="truncate">Alto mínimo</div>
+                <div class="text-right whitespace-nowrap">
+                  <span class="text-gray-500 mr-1">{{ fmtM(proposedDimensions.alto) }}m</span>
+                  <span class="text-gray-400">→</span>
+                  <span class="ml-1 font-bold text-blue-700">
+                    {{ fmtM(minAltoCm) }}m
+                  </span>
+                  <span v-if="heightBinder" class="ml-2 text-xs text-gray-400">({{ elLabel(heightBinder) }})</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-2 text-xs text-blue-700">
+              Ajuste automático para que los elementos internos sigan cabiendo.
+            </div>
+          </div>
+
+          <!-- Capacidades (siempre mostrar si hay childFit Y hay cambio de capacidad) -->
+          <div v-if="props.draft?.childFit && isFiniteNumber(minCapacidad) && proposedCapacity < minCapacidad" class="border border-green-300 bg-green-50 rounded p-3">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="font-semibold text-green-800">Capacidad</h4>
+              <span class="text-xs text-green-600">
+                Por elementos internos
+              </span>
+            </div>
+
+            <div class="space-y-1.5 text-sm">
+              <div class="flex justify-between gap-2 px-1">
+                <div class="truncate">Capacidad mínima</div>
+                <div class="text-right whitespace-nowrap">
+                  <span class="text-gray-500 mr-1">{{ fmtKg(proposedCapacity) }}kg</span>
+                  <span class="text-gray-400">→</span>
+                  <span class="ml-1 font-bold text-green-700">
+                    {{ fmtKg(minCapacidad) }}kg
+                  </span>
+                  <span v-if="capacityCount > 0" class="ml-2 text-xs text-gray-400">({{ capacityCount }} elementos)</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-2 text-xs text-green-700">
+              Ajuste automático para cubrir la capacidad de los elementos internos.
             </div>
           </div>
         </div>
@@ -185,6 +266,20 @@ watch(
   { immediate: true }
 );
 
+// Dimensiones y capacidad propuestas del nivel objetivo
+const proposedDimensions = computed(() => {
+  const patch = props.draft?.targetPatch?.dimensiones || {};
+  return {
+    ancho: Number(patch.ancho) || 0,
+    largo: Number(patch.largo) || 0,
+    alto: Number(patch.alto) || 0,
+  };
+});
+
+const proposedCapacity = computed(() => {
+  return Number(props.draft?.targetPatch?.capacidadCarga) || 0;
+});
+
 // Formateadores
 const fmtM = (cm) => {
   const v = Number(cm);
@@ -195,16 +290,48 @@ const fmtKg = (kg) => {
   return Number.isFinite(v) ? v.toFixed(2) : '-';
 };
 
-// Detección de cambios: pinta el valor destino si cambia
 const diffClass = (from, to, toSide = false) => {
-  const a = Number(from), b = Number(to);
-  if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) {
-    return toSide ? 'font-semibold' : '';
+  const vFrom = Number(from);
+  const vTo = Number(to);
+  if (!Number.isFinite(vFrom) || !Number.isFinite(vTo)) return '';
+
+  const changed = Math.abs(vFrom - vTo) > 1e-6; // Comparación con tolerancia
+  if (!changed) return '';
+
+  if (toSide) {
+    return vTo > vFrom ? 'text-green-600 font-bold' : 'text-red-600 font-bold';
   }
-  const directionClass = b > a ? 'text-primary-700' : 'text-rose-700';
-  const weight = toSide ? 'font-bold' : 'font-semibold';
-  return `${weight} ${directionClass}`;
+  return 'font-bold';
 };
+
+// Detectar si hay cambios para mostrar recuadros
+const hasHeightChanges = computed(() => {
+  if (!props.draft?.heightExceeded) return false;
+  const ids = props.draft?.nivelesOrden || [];
+  return ids.some(id => {
+    const current = Number(props.draft?.alturasActuales?.[id] || 0);
+    const proposed = Number(proposedHeights.value[id] || 0);
+    return Math.abs(current - proposed) > 1; // Cambio > 1cm
+  });
+});
+
+const hasWeightChanges = computed(() => {
+  if (!props.draft?.weightExceeded) return false;
+  const ids = props.draft?.nivelesOrden || [];
+  return ids.some(id => {
+    const current = Number(props.draft?.pesosActuales?.[id] || 0);
+    const proposed = Number(proposedWeights.value[id] || 0);
+    return Math.abs(current - proposed) > 0.1; // Cambio > 0.1kg
+  });
+});
+
+const hasDimensionChanges = computed(() => {
+  if (!props.draft?.childFit) return false;
+  const hasAnchoChange = isFiniteNumber(minAnchoCm.value) && proposedDimensions.value.ancho < minAnchoCm.value;
+  const hasLargoChange = isFiniteNumber(minLargoCm.value) && proposedDimensions.value.largo < minLargoCm.value;
+  const hasAltoChange = isFiniteNumber(minAltoCm.value) && proposedDimensions.value.alto < minAltoCm.value;
+  return hasAnchoChange || hasLargoChange || hasAltoChange;
+});
 
 // Flags y resúmenes de PESO basados en draft original
 const weightExceeded = computed(() => !!props.draft?.weightExceeded);
@@ -212,6 +339,27 @@ const weightExcess = computed(() => Math.max(0, Number(props.draft?.weightExcess
 const pesoTotal = computed(() => Math.round(Number(props.draft?.pesoTotal || 0)));
 
 // Propuestas por estrategia (unificadas)
+
+// Helpers para mínimos y etiquetado (deben estar a nivel superior)
+const isFiniteNumber = (v) => Number.isFinite(Number(v));
+const minAnchoCm = computed(() => props.draft?.childFit?.minAnchoCm);
+const minLargoCm = computed(() => props.draft?.childFit?.minLargoCm);
+const minAltoCm = computed(() => props.draft?.childFit?.minAltoCm);
+const minCapacidad = computed(() => props.draft?.childFit?.minCapacidad);
+const widthBinder = computed(() => props.draft?.childFit?.widthBoundById);
+const lengthBinder = computed(() => props.draft?.childFit?.lengthBoundById);
+const heightBinder = computed(() => props.draft?.childFit?.heightBoundById);
+const capacityCount = computed(() => Number(props.draft?.childFit?.capacityCount || 0));
+
+const elLabel = (id) => {
+  if (!id) return '';
+  const el = canvasStore.elementoPorId?.(id);
+  if (!el) return id;
+  const name = el.nombre || el.codigo || id;
+  const code = el.codigo && el.codigo !== name ? ` (${el.codigo})` : '';
+  return `${name}${code}`;
+};
+
 const proposedHeights = computed(() => {
   const ids = props.draft?.nivelesOrden || [];
   const map =
@@ -269,16 +417,8 @@ const weightResultOk = computed(() => {
 });
 
 const canConfirm = computed(() => {
-  // Debe resolver todos los excesos
+  // Debe resolver todos los excesos; ambas estrategias se autoajustan a los mínimos por hijos
   return heightResultOk.value && weightResultOk.value;
-});
-
-// Reglas de altura (solo para aviso visual en "Limitar altura" original)
-const invalidLevels = computed(() => {
-  // Conserva tu regla original: si 'Nuevo' queda <= 1 cm, marcar inválido
-  const clampAlturas = selectedStrategy.value === 'clamp' ? props.draft?.clamp?.alturas : null;
-  if (!clampAlturas) return false;
-  return Object.entries(clampAlturas).some(([id, altura]) => id == 'Nuevo' && (Number(altura) || 0) <= 1);
 });
 </script>
 

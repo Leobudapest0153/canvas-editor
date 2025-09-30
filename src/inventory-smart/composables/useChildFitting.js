@@ -28,8 +28,10 @@ export function checkChildrenFit(parent, proposed, elements) {
   if (hijos.length === 0) return { ok: true }
 
   // Requisitos mínimos por XY (en px)
-  let maxRightPx = 0
-  let maxBottomPx = 0
+  let maxRightPx = -Infinity
+  let maxBottomPx = -Infinity
+  let widthBoundById = null
+  let lengthBoundById = null
 
   for (const h of hijos) {
     const x = Number(h.x) || 0
@@ -40,51 +42,58 @@ export function checkChildrenFit(parent, proposed, elements) {
     const right = x + w
     const bottom = y + ht
 
-    if (right > maxRightPx) maxRightPx = right
-    if (bottom > maxBottomPx) maxBottomPx = bottom
+    if (right > maxRightPx) { maxRightPx = right; widthBoundById = h.id }
+    if (bottom > maxBottomPx) { maxBottomPx = bottom; lengthBoundById = h.id }
   }
 
-  // Requisitos mínimos en cm para el padre, considerando su anclaje en (parentX, parentY)
-  // Según definición para este flujo, usamos las coordenadas máximas absolutas
-  // como requisito mínimo (no restamos el offset del padre)
-  const minAnchoCm = Math.ceil(maxRightPx / CM_TO_PX)
-  const minLargoCm = Math.ceil(maxBottomPx / CM_TO_PX)
+  const minAnchoCm = Number.isFinite(maxRightPx) ? Math.ceil(maxRightPx / CM_TO_PX) : null
+  const minLargoCm = Number.isFinite(maxBottomPx) ? Math.ceil(maxBottomPx / CM_TO_PX) : null
 
   // Requisito mínimo en altura (cm)
-  const minAltoCm = hijos.reduce((acc, h) => {
-    const alto = Number(h?.dimensiones?.alto) || 0
-    return Math.max(acc, alto)
-  }, 0)
+  let minAltoCm = null
+  let heightBoundById = null
+  for (const h of hijos) {
+    const alto = Number(h?.dimensiones?.alto)
+    if (Number.isFinite(alto) && (minAltoCm == null || alto > minAltoCm)) {
+      minAltoCm = alto
+      heightBoundById = h.id
+    }
+  }
 
   // Requisito mínimo de capacidad (kg)
-  const minCapacidad = hijos.reduce((acc, h) => {
-    const c = Number(h?.capacidadCarga) || 0
-    return acc + c
-  }, 0)
+  let minCapacidad = null
+  let capacityCount = 0
+  for (const h of hijos) {
+    const c = Number(h?.capacidadCarga)
+    if (Number.isFinite(c)) {
+      minCapacidad = (minCapacidad || 0) + c
+      capacityCount += 1
+    }
+  }
 
   // Comparar contra propuestos
-  const anchoOk = !Number.isFinite(Number(proposed.anchoCm))
-    ? true
-    : Number(proposed.anchoCm) >= minAnchoCm
-  const largoOk = !Number.isFinite(Number(proposed.largoCm))
-    ? true
-    : Number(proposed.largoCm) >= minLargoCm
-  const altoOk = !Number.isFinite(Number(proposed.altoCm))
-    ? true
-    : Number(proposed.altoCm) >= minAltoCm
-  const capacidadOk = !Number.isFinite(Number(proposed.capacidadCarga))
-    ? true
-    : Number(proposed.capacidadCarga) >= minCapacidad
+  const pAncho = Number(proposed.anchoCm)
+  const pLargo = Number(proposed.largoCm)
+  const pAlto = Number(proposed.altoCm)
+  const pCap = Number(proposed.capacidadCarga)
+
+  const anchoOk = !Number.isFinite(pAncho) || !Number.isFinite(minAnchoCm) ? true : pAncho >= minAnchoCm
+  const largoOk = !Number.isFinite(pLargo) || !Number.isFinite(minLargoCm) ? true : pLargo >= minLargoCm
+  const altoOk = !Number.isFinite(pAlto) || !Number.isFinite(minAltoCm) ? true : pAlto >= minAltoCm
+  const capacidadOk = !Number.isFinite(pCap) || !Number.isFinite(minCapacidad) ? true : pCap >= minCapacidad
 
   const ok = anchoOk && largoOk && altoOk && capacidadOk
 
-  if (ok) return { ok: true }
+  if (ok) return {
+    ok: true,
+    minAnchoCm, minLargoCm, minAltoCm, minCapacidad,
+    widthBoundById, lengthBoundById, heightBoundById, capacityCount,
+  }
 
-  const out = { ok: false }
-  if (!anchoOk) out.minAnchoCm = minAnchoCm
-  if (!largoOk) out.minLargoCm = minLargoCm
-  if (!altoOk) out.minAltoCm = minAltoCm
-  if (!capacidadOk) out.minCapacidad = minCapacidad
-
+  const out = {
+    ok: false,
+    minAnchoCm, minLargoCm, minAltoCm, minCapacidad,
+    widthBoundById, lengthBoundById, heightBoundById, capacityCount,
+  }
   return out
 }
