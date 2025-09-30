@@ -317,6 +317,7 @@ const modo = computed(() => props.modo)
 
 // Stores
 const canvasStore = useCanvasStore()
+const { modoEdicion } = storeToRefs(canvasStore)
 const { showToast } = useToast();
 const { canEditCanvas, canMutateCatalog } = useEditorMode()
 const catalogReadOnly = computed(() => !canMutateCatalog.value)
@@ -512,6 +513,7 @@ watch(modo, (nuevo) => {
     ubicacionSeleccionada.value = ''
   }
 })
+
 
 const getTipoNombre = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
@@ -713,6 +715,14 @@ const handleDeleteItem = async (item) => {
   removeCatalogItem(items.value, item.id)
   closeKebab()
 }
+
+watch(modoEdicion, (isEditing) => {
+  if (isEditing) return
+  filtrosVisibles.value = false
+  limpiarFiltros()
+  cancelEdit()
+  closeKebab()
+})
 
 // Cerrar kebab al hacer click fuera
 const onGlobalClickKebab = (e) => {
