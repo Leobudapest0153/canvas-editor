@@ -185,6 +185,14 @@
           </button>
         </UiTooltip>
 
+        <!-- Toggle modo edición -->
+        <UiTooltip :label="modoEdicionTooltip" position="bottom" :delay="200">
+          <EditModeToggle
+            :aria-label="modoEdicionTooltip"
+            :title="modoEdicionTooltip"
+          />
+        </UiTooltip>
+
         <!-- Botón Historial de cambios -->
         <UiTooltip label="Historial de cambios" position="bottom" :delay="200">
           <button
@@ -510,6 +518,7 @@ import HistorialModal from './HistorialModal.vue'
 import ImportExportModal from './ImportExportModal.vue'
 import BackupModal from './BackupModal.vue'
 import ChangeHistoryModal from './ChangeHistoryModal.vue'
+import EditModeToggle from './EditModeToggle.vue'
 import {
   usePlantResizeGuard,
   pack as packShelf,
@@ -531,6 +540,10 @@ const props = defineProps({
 const canvasStore = useCanvasStore()
 const { canEditCanvas } = useEditorMode()
 const { showToast } = useToast()
+
+const modoEdicionTooltip = computed(() =>
+  canvasStore.modoEdicion ? 'Finalizar edición' : 'Editar configuración'
+)
 
 // Autosave
 const autoSave = useAutoSave(canvasStore)
