@@ -90,9 +90,14 @@ function redistributeProportionally(others, deficit, minCm = MIN_LEVEL_CM) {
     if (consumed <= 1e-6) break;
     remaining = Math.max(0, remaining - consumed);
   }
+  const cleanedResults = {};
+  for (const [id, value] of out.entries()) {
+    // Redondea a 4 decimales para eliminar errores de punto flotante
+    cleanedResults[id] = parseFloat(value.toFixed(4));
+  }
 
   return {
-    newHeightsById: Object.fromEntries(out),
+    newHeightsById: cleanedResults,
     leftover: remaining,
   };
 }
@@ -188,7 +193,7 @@ export function proposeLevelChange(elements, levelId, levelPatch, parentId) {
   }
 
   // 2) Peso
-  const MIN_WEIGHT_KG = 0;
+  const MIN_WEIGHT_KG = 0.1;
   const getWeight = (node) => Number(node?.capacidadCarga) || 0;
 
   const weightsCurrent = {};

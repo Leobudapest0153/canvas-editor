@@ -8,7 +8,7 @@
     <div
       class="relative z-10 bg-white shadow-2xl flex flex-col max-h-max py-3 px-5 w-[569px]">
       <div class="mb-4 flex items-center">
-        <h3 class="font-bold text-lg text-[#1C1E4D]">Piso</h3>
+        <h3 class="font-bold text-lg text-[#1C1E4D]">{{ title.title }}</h3>
         <UiTooltip
           label="Considera que al no definir dimensiones, estas se consideran como infinitas"
           position="bottom"
@@ -33,7 +33,7 @@
       </div>
       <div class="grid grid-cols-2 gap-x-6 gap-y-4 mb-7 w-full">
         <div class="col-span-2 flex flex-col gap-y-2">
-          <label class="font-normal text-medium text-[#111928]" for="codigo_piso">Código del piso</label>
+          <label class="font-normal text-medium text-[#111928]" for="codigo_piso">Código del {{ title.label }}</label>
           <input
             type="text"
             placeholder="01"
@@ -42,10 +42,10 @@
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4 disabled:bg-gray-100">
         </div>
         <div class="col-span-2 flex flex-col gap-y-2">
-          <label class="font-normal text-medium text-[#111928]" for="nombre_piso">Nombre del piso *</label>
+          <label class="font-normal text-medium text-[#111928]" for="nombre_piso">Nombre del {{ title.label }} *</label>
           <input
             type="text"
-            placeholder="piso bajo"
+            :placeholder="`${title.label} bajo`"
             v-model="formValue.nombre"
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4">
         </div>
@@ -245,6 +245,9 @@ import { ref, computed, onMounted, watch } from 'vue';
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore';
 import FloorLevelsHeightConfirmModal from '@/inventory-smart/components/modals/FloorLevelsHeightConfirmModal.vue'
+import { useToast } from '@/inventory-smart/composables/useToast'
+
+const { showToast } = useToast()
 
 const canvasStore = useCanvasStore();
 
@@ -303,7 +306,7 @@ const formValue = ref({
       ? (canvasStore.nivelAEditar.dimensiones.alto / 100).toFixed(2)
       : ''
   },
-  capacidadCarga: canvasStore.nivelAEditar?.pesoMaximo ?? '',
+  capacidadCarga: canvasStore.nivelAEditar?.capacidadCarga ?? '',
   tipoZona: canvasStore.nivelAEditar?.tipoZona ?? '',
   tiposProductos: normalizeTiposProductos(canvasStore.nivelAEditar?.tiposProductos ?? []),
   permiteFragiles: canvasStore.nivelAEditar?.permiteFragiles ?? false
@@ -314,6 +317,21 @@ const arraysEqual = (a, b) => {
   return a.every((value, index) => value === b[index]);
 };
 
+const title = computed(() => {
+  const type = canvasStore.nivelAEditar?.tipo;
+  if (type === 'contenedores') {
+    return {
+      title: 'Niveles',
+      label: 'nivel'
+    }
+  }
+  if (type === 'pisos') {
+    return {
+      title: 'Pisos',
+      label: 'piso'
+    }
+  }
+})
 const isAllSelected = computed(() =>
   formValue.value.tiposProductos.includes(ALL_OPTION)
 );
@@ -369,17 +387,73 @@ const handleClickOutside = (event) => {
 };
 
 const onSave = () => {
+  // --- INICIO DE VALIDACIONES ---
+
+  // 1. Encontrar el elemento padre (el cuarto) usando el ID garantizado en `nivelAEditar.padre`.
+  const padre = canvasStore.elementos.find(el => el.id === canvasStore.nivelAEditar.padre);
+
+  if (!padre) {
+    showToast('Error Crítico: No se pudo encontrar el cuarto padre para las validaciones.');
+    return;
+  }
+
+  // 2. Determinar si es una CREACIÓN o una EDICIÓN y obtener los hermanos.
+  const esEdicion = !!canvasStore.nivelAEditar.id;
+  let idHermanos;
+
+  if (esEdicion) {
+    // Si es EDICIÓN, los hermanos son todos los hijos del padre EXCEPTO el nivel actual.
+    idHermanos = padre.hijos.filter(id => id !== canvasStore.nivelAEditar.id);
+  } else {
+    // Si es CREACIÓN, TODOS los hijos actuales del padre son considerados "hermanos".
+    idHermanos = padre.hijos || [];
+  }
+
+  const hermanos = idHermanos.map(id => canvasStore.elementos.find(el => el.id === id)).filter(Boolean);
+
+  // Convertimos las dimensiones del formulario a las unidades correctas para comparar
+  const anchoFormularioCm = parseFloat(formValue.value.dimensiones.ancho) * 100;
+  const largoFormularioCm = parseFloat(formValue.value.dimensiones.largo) * 100;
+  const altoFormularioCm = parseFloat(formValue.value.dimensiones.alto) * 100;
+  const capacidadCargaFormulario = parseFloat(formValue.value.capacidadCarga);
+
+  // 3. Validar Ancho y Largo del nivel contra el cuarto padre
+  if (anchoFormularioCm > padre.dimensiones.ancho) {
+    showToast(`El ancho del nivel (${anchoFormularioCm / 100}m) no puede exceder el del cuarto (${padre.dimensiones.ancho / 100}m).`);
+    return;
+  }
+
+  if (largoFormularioCm > padre.dimensiones.largo) {
+    showToast(`El largo del nivel (${largoFormularioCm / 100}m) no puede exceder el del cuarto (${padre.dimensiones.largo / 100}m).`);
+    return;
+  }
+
+  // 4. Validar Alto del nivel
+  const minimoAltoRequeridoPorHermanosCm = hermanos.length * 10; // 0.1m (10cm) por cada hermano
+  const maximoAltoDisponibleCm = padre.dimensiones.alto - minimoAltoRequeridoPorHermanosCm;
+
+  if (altoFormularioCm > maximoAltoDisponibleCm) {
+    showToast(`La altura máxima permitida es ${maximoAltoDisponibleCm / 100}m para dejar espacio a los otros ${hermanos.length} niveles.`);
+    return;
+  }
+
+  // 5. Validar Capacidad de Carga
+  const minimaCapacidadRequeridaPorHermanos = hermanos.length * 0.1;
+  const maximaCapacidadDisponible = padre.capacidadCarga - minimaCapacidadRequeridaPorHermanos;
+
+  if (capacidadCargaFormulario > maximaCapacidadDisponible) {
+    showToast(`La capacidad de carga máxima permitida es ${maximaCapacidadDisponible.toFixed(2)}kg para no sobrecargar el cuarto.`);
+    return;
+  }
+
+  // --- FIN DE VALIDACIONES ---
+
+  // Si todo está correcto, se procede con el guardado.
   const data = Object.assign({}, formValue.value);
   data.dimensiones = {
-    ancho: formValue.value.dimensiones.ancho
-      ? Math.round(parseFloat(formValue.value.dimensiones.ancho) * 100)
-      : null,
-    largo: formValue.value.dimensiones.largo
-      ? Math.round(parseFloat(formValue.value.dimensiones.largo) * 100)
-      : null,
-    alto: formValue.value.dimensiones.alto
-      ? Math.round(parseFloat(formValue.value.dimensiones.alto) * 100)
-      : null
+    ancho: formValue.value.dimensiones.ancho ? Math.round(anchoFormularioCm) : null,
+    largo: formValue.value.dimensiones.largo ? Math.round(largoFormularioCm) : null,
+    alto: formValue.value.dimensiones.alto ? Math.round(altoFormularioCm) : null
   };
   canvasStore.guardarCuartoNivelesPropiedades(data, canvasStore.nivelAEditar?.id);
 }

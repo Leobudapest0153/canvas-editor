@@ -79,6 +79,19 @@
               </div>
             </div>
 
+            <div v-if="pasilloAsignadoNombre && !esPasillo">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Pasillo asignado</label>
+              <input
+                :value="pasilloAsignadoNombre"
+                type="text"
+                class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-600 cursor-not-allowed"
+                disabled
+              />
+              <p v-if="pasilloAsignado" class="text-xs text-gray-500 mt-1">
+                El nombre se sincroniza automáticamente según el pasillo relacionado.
+              </p>
+            </div>
+
             <!-- Orientación (oculta para pasillos y circulares) -->
             <div v-if="!esPasillo && !esCircular">
               <label class="block text-xs font-medium text-gray-600 mb-1">Orientación</label>
@@ -341,10 +354,10 @@
         >
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">
             <div class="flex justify-between items-center w-full -mt-6 pl-4">
-              Pisos
+              {{ elementoSeleccionado.tipo == 'cuartos' ? 'Pisos' : 'Niveles' }}
               <button
                 :disabled="isSaving || isElementRestricted"
-                @click="canvasStore.abrirCuartoNivelesPropiedades(elementoSeleccionado.id)"
+                @click="canvasStore.abrirCuartoNivelesPropiedades(elementoSeleccionado.id, childrenType)"
                 class="bg-primary-700 text-white p-1 rounded-full cursor-pointer
                 disabled:bg-gray-400 disabled:cursor-not-allowed">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
@@ -575,6 +588,10 @@ const cargarDesdeStore = (el) =>
 const valorDimensionAnterior = ref({})
 const valorPesoAnterior = ref(0)
 const valorDiametroAnterior = ref(0)
+
+const childrenType = computed(() => {
+  return elementoSeleccionado.value.tipo == 'cuartos' ? 'pisos' : 'contenedores';
+})
 
 watch(
   () => elementoSeleccionado.value?.id,
@@ -1237,6 +1254,26 @@ const ocultarAnchoLargo = computed(() => esCircular.value)
 const esPasillo = computed(
   () => (elementoSeleccionado.value?.tipo || '').toLowerCase() === 'pasillos',
 )
+
+// Reflejamos el pasillo calculado (pasilloId) en el panel para ayudar a depurar asignaciones.
+const pasilloAsignado = computed(() => {
+  if (!elementoSeleccionado.value || esPasillo.value) return null
+  const id = elementoSeleccionado.value.pasilloId
+  if (!id) return null
+  return canvasStore.elementoPorId(id) || null
+})
+
+// Mostramos un nombre amigable y dejamos un fallback determinista si el pasillo fue removido.
+const pasilloAsignadoNombre = computed(() => {
+  if (!elementoSeleccionado.value || esPasillo.value) return ''
+  const id = elementoSeleccionado.value.pasilloId
+  if (!id) return ''
+  const pasillo = pasilloAsignado.value
+  if (pasillo) {
+    return pasillo.nombre || pasillo.codigo || `Pasillo ${pasillo.id}`
+  }
+  return `Pasillo no disponible (ID: ${id})`
+})
 
 /**
  * Uso real del elemento

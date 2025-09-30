@@ -1,4 +1,6 @@
 /**
+ * !DEPRECATED: Se eliminó la lógica de copias de seguridad automáticas.
+ *
  * useAutoSave.js
  *
  * Composable para gestionar guardados automáticos del canvas.

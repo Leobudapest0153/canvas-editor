@@ -97,15 +97,6 @@ Alias de importación: el alias `@` apunta a `src/` (configurado en `vite.config
 - Tailwind CSS v4: el editor importa Tailwind desde `InventorySmart.vue` (`@import 'tailwindcss';`).
 - vue-konva: usado para el lienzo 2D.
 
-## Serialización y persistencia
-
-Constantes útiles en `src/inventory-smart/utils/constants.js`:
-
-- `SERIALIZE_CONFIG.STORAGE_KEY` — Clave por defecto para guardar la configuración.
-- `AUTOSAVE_CONFIG` — Intervalo, máximo de backups y clave de almacenamiento del autosave.
-
-El componente gestiona conflictos entre backups locales y configuraciones provenientes del servidor mostrando un aviso cuando la versión del servidor es más reciente.
-
 ## Atajos de teclado
 
 - Ctrl/Cmd + Z — Deshacer
