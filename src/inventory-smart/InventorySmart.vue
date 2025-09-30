@@ -13,7 +13,10 @@
 
     <main class="app-main relative">
       <!-- Sidebar con tabs -->
-      <div class="app-sidebar-left">
+      <div
+        class="app-sidebar-left"
+        v-if="canvasStore.modoEdicion"
+      >
         <SidebarPanel />
       </div>
 
@@ -57,7 +60,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, provide } from 'vue'
+import { ref, onMounted, computed, watch, provide } from 'vue'
 import SidebarPanel from './components/SidebarPanel.vue'
 import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
@@ -80,6 +83,8 @@ import { useStatePersistence } from './composables/useStatePersistence'
 import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import UnsavedChangesModal from './components/UnsavedChangesModal.vue'
+import { useEditorMode } from './composables/useEditorMode'
+import { useEditorShortcuts } from './composables/useEditorShortcuts'
 
 const props = defineProps({
   configCanvas: {
@@ -117,6 +122,8 @@ const { deleteSelected } = useDeleteElement()
 const { handlePaste: autoPaste } = useAutoPaste()
 const { showToast } = useToast()
 const servicesStore = useServicesStore()
+const { ensureEditable } = useEditorMode()
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 
 // ======= Gestión de Servicios Externos =======
 // Registrar servicios externos en la store cuando cambien las props
@@ -257,6 +264,9 @@ const handleKeydown = (e) => {
 
 // Handlers para buffer
 const handleCopyToBuffer = () => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
   const elementoSeleccionado = canvasStore.elementoSeleccionado
   if (elementoSeleccionado) {
     buffer.copyToBuffer(elementoSeleccionado)
@@ -264,6 +274,9 @@ const handleCopyToBuffer = () => {
 }
 
 const triggerPaste = () => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
   try {
     const stage = canvasViewRef.value?.getStage?.()
     const viewportSize = canvasViewRef.value?.getStageSize?.() || null
@@ -313,23 +326,32 @@ const triggerPaste = () => {
   }
 }
 
+useEditorShortcuts({
+  onUndo: () => undo(),
+  onRedo: () => redo(),
+  onCopy: () => handleCopyToBuffer(),
+  onPaste: () => triggerPaste(),
+  onDelete: () => {
+    if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+      return
+    }
+    if (!canvasStore.elementoSeleccionado) return
+    deleteSelected({ withConfirm: true })
+  },
+  onBlocked: () => showToast(VISUAL_MODE_MESSAGE, 'warning'),
+})
+
 // (Removed backup/restore/version comparison helpers)
 
 onMounted(() => {
   try {
-    window.addEventListener('keydown', handleKeydown)
 
     // Provide de la API de servicios externos para componentes hijos
     provide('externalServicesAPI', externalServicesAPI)
   } catch (error) {
-    window.removeEventListener('keydown', handleKeydown)
     showToast('Ha ocurrido un error al importar la configuración', 'error')
     console.error('Error al importar la configuración:', error)
   }
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
 })
 
 watch(
@@ -642,7 +664,6 @@ watch(
   outline: 2px dashed red;
 }
 
-/* Cambios recientes */
 .elastic-badge {
   display: inline-flex;
   align-items: center;

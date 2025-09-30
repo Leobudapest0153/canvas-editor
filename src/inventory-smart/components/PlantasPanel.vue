@@ -89,8 +89,13 @@
 
           <!-- Card para crear nueva planta -->
           <div
+            v-if="canvasStore.modoEdicion"
             class="relative m-2 flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 flex-shrink-0"
-            @click="canvasStore.abrirEditor()"
+            role="button"
+            tabindex="0"
+            @click.prevent="handleCrearNuevoPiso"
+            @keydown.enter.prevent="handleCrearNuevoPiso"
+            @keydown.space.prevent="handleCrearNuevoPiso"
           >
             <div class="flex items-center space-x-3">
               <div class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-primary">
@@ -162,6 +167,14 @@
             </svg>
             <span class="ml-1">Todos los indicadores</span>
           </button>
+        </UiTooltip>
+
+        <!-- Toggle modo edición -->
+        <UiTooltip :label="modoEdicionTooltip" position="bottom" :delay="200">
+          <EditModeToggle
+            :aria-label="modoEdicionTooltip"
+            :title="modoEdicionTooltip"
+          />
         </UiTooltip>
 
         <!-- Botón Historial de cambios -->
@@ -477,9 +490,12 @@ const emit = defineEmits(['configChanged', 'regresar', 'showIndicators'])
 
 import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
+import { useAutoSave } from '@/inventory-smart/composables/useAutoSave'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import ImportExportModal from './ImportExportModal.vue'
 import ChangeHistoryModal from './ChangeHistoryModal.vue'
+import EditModeToggle from './EditModeToggle.vue'
 import {
   usePlantResizeGuard,
   pack as packShelf,
@@ -499,7 +515,14 @@ const props = defineProps({
 
 // Store
 const canvasStore = useCanvasStore()
+const { ensureEditable } = useEditorMode()
 const { showToast } = useToast()
+
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
+
+const modoEdicionTooltip = computed(() =>
+  canvasStore.modoEdicion ? 'Finalizar edición' : 'Editar configuración'
+)
 
 // Estado local para modales
 const showChangeHistoryModal = ref(false)
@@ -639,6 +662,13 @@ const seleccionarPlanta = (plantaId) => {
 
 const contarElementosEnPlanta = (plantaId) => {
   return canvasStore.elementosEnPlanta(plantaId).length
+}
+
+const handleCrearNuevoPiso = () => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
+  canvasStore.abrirEditor()
 }
 
 // Métodos para el menú desplegable

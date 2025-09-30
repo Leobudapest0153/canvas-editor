@@ -16,6 +16,8 @@
 import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS } from "../utils/constants"
 
 export const useStatePersistence = () => {
+  let hasHydratedMode = false
+
   /**
    * Serializa el estado completo del canvas a JSON
    * @param {Object} state - Estado del store (plantas, elementos, etc.)
@@ -55,6 +57,8 @@ export const useStatePersistence = () => {
         tiposCuarto: state.catalogos?.tiposCuarto || DEFAULT_TIPOS_CUARTO,
         tiposProductoAdmitidos: state.catalogos?.tiposProductoAdmitidos || DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
       },
+
+      modoEdicion: state.modoEdicion === true,
 
       // Estado de plantas con todas sus propiedades
       plantas: state.plantas.map((planta) => {
@@ -385,6 +389,11 @@ export const useStatePersistence = () => {
 
       // === LIMPIEZA Y PREPARACIÓN ===
       storeActions.clearState()
+
+      if (!hasHydratedMode && typeof storeActions?.setModoEdicion === 'function') {
+        storeActions.setModoEdicion(state.modoEdicion === true)
+        hasHydratedMode = true
+      }
 
       // === RESTAURAR CATÁLOGOS ===
       if (state.catalogos) {
