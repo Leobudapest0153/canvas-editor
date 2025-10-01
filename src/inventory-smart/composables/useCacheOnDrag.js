@@ -19,23 +19,23 @@ export function useCacheOnDrag(refNode) {
   const onDragStart = () => {
     try {
       if (isPlantInfinite()) return
-      
+
       // Obtener dimensiones del nodo para ajustar el cache
       if (node && node.cache) {
         const width = typeof node.width === 'function' ? node.width() : (node.width || 0)
         const height = typeof node.height === 'function' ? node.height() : (node.height || 0)
         const area = width * height
-        
+
         // No aplicar cache en elementos muy grandes (>500k píxeles) para evitar problemas de renderizado
         // Esto típicamente ocurre con elementos >700x700 px
         const MAX_CACHE_AREA = 500000
-        
+
         if (area > MAX_CACHE_AREA) {
           // Para elementos grandes, simplemente no usar cache
           // El perf mode ya desactiva sombras y efectos pesados
           return
         }
-        
+
         // Para elementos medianos (100k-500k), usar pixelRatio reducido
         const MEDIUM_AREA_THRESHOLD = 100000
         if (area > MEDIUM_AREA_THRESHOLD) {
@@ -46,7 +46,7 @@ export function useCacheOnDrag(refNode) {
           node.cache()
         }
       }
-      
+
       node && node.draw && node.draw()
     } catch (err) {
       // Si falla el cache, continuar sin él
@@ -60,12 +60,12 @@ export function useCacheOnDrag(refNode) {
       if (node && node.clearCache) {
         node.clearCache()
       }
-      
+
       // Forzar redibujado para asegurar que el elemento se renderiza correctamente
       if (node && node.draw) {
         node.draw()
       }
-      
+
       // Si el nodo es un Group, también redibujar sus hijos
       if (node && node.getChildren && typeof node.getChildren === 'function') {
         const children = node.getChildren()
@@ -82,7 +82,7 @@ export function useCacheOnDrag(refNode) {
           }
         })
       }
-      
+
       // Obtener el layer padre y forzar un redibujado completo
       try {
         const layer = node?.getLayer?.()
