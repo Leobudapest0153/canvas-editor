@@ -89,8 +89,13 @@
 
           <!-- Card para crear nueva planta -->
           <div
+            v-if="canvasStore.modoEdicion"
             class="relative m-2 flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 flex-shrink-0"
-            @click="canvasStore.abrirEditor()"
+            role="button"
+            tabindex="0"
+            @click.prevent="handleCrearNuevoPiso"
+            @keydown.enter.prevent="handleCrearNuevoPiso"
+            @keydown.space.prevent="handleCrearNuevoPiso"
           >
             <div class="flex items-center space-x-3">
               <div class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-primary">
@@ -139,14 +144,37 @@
         <!-- -- -- -->
 
         <!-- Botón Regresar -->
-        <UiTooltip label="Salir del editor" position="bottom" :delay="200">
           <button
             type="button"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500 rounded-lg transition-colors cursor-pointer"
-            @click="() => (false)"
+            @click="onBack"
           >
             <span>Regresar</span>
           </button>
+
+        <!-- Botón Todos los indicadores -->
+        <UiTooltip label="Todos los indicadores" position="bottom" :delay="200">
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
+            @click="emitirIndicadores"
+          >
+            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <path
+                fill="currentColor"
+                d="M19 8h-1V3H6v5H5c-1.1 0-2 .9-2 2v5h3v4h12v-4h3v-5c0-1.1-.9-2-2-2zM8 5h8v3H8V5zm8 14H8v-4h8v4zm1-6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"
+              />
+            </svg>
+            <span class="ml-1">Todos los indicadores</span>
+          </button>
+        </UiTooltip>
+
+        <!-- Toggle modo edición -->
+        <UiTooltip :label="modoEdicionTooltip" position="bottom" :delay="200">
+          <EditModeToggle
+            :aria-label="modoEdicionTooltip"
+            :title="modoEdicionTooltip"
+          />
         </UiTooltip>
 
         <!-- Botón Historial de cambios -->
@@ -457,14 +485,17 @@
 </template>
 
 <script setup>
-// Definir emits
-const emit = defineEmits(['configChanged'])
+// Definir emits (agregado 'regresar' y 'showIndicators')
+const emit = defineEmits(['configChanged', 'regresar', 'showIndicators'])
 
 import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
+import { useAutoSave } from '@/inventory-smart/composables/useAutoSave'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import ImportExportModal from './ImportExportModal.vue'
 import ChangeHistoryModal from './ChangeHistoryModal.vue'
+import EditModeToggle from './EditModeToggle.vue'
 import {
   usePlantResizeGuard,
   pack as packShelf,
@@ -484,7 +515,14 @@ const props = defineProps({
 
 // Store
 const canvasStore = useCanvasStore()
+const { ensureEditable } = useEditorMode()
 const { showToast } = useToast()
+
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
+
+const modoEdicionTooltip = computed(() =>
+  canvasStore.modoEdicion ? 'Finalizar edición' : 'Editar configuración'
+)
 
 // Estado local para modales
 const showChangeHistoryModal = ref(false)
@@ -562,6 +600,21 @@ const elementosEnPlantaAEliminar = computed(() => {
   return canvasStore.elementosEnPlanta(plantaAEliminar.value.id).length
 })
 
+// Métodos
+const emitirIndicadores = () => {
+  emit('showIndicators')
+}
+
+// Emitir acción de regresar para que el componente padre pueda manejar navegación/salida
+const onBack = () => {
+  try {
+    emit('regresar')
+  } catch (e) {
+    console.warn('No se pudo emitir evento regresar', e)
+  }
+}
+
+
 const openChangeHistoryModal = () => {
   showChangeHistoryModal.value = true
 }
@@ -609,6 +662,13 @@ const seleccionarPlanta = (plantaId) => {
 
 const contarElementosEnPlanta = (plantaId) => {
   return canvasStore.elementosEnPlanta(plantaId).length
+}
+
+const handleCrearNuevoPiso = () => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
+  canvasStore.abrirEditor()
 }
 
 // Métodos para el menú desplegable

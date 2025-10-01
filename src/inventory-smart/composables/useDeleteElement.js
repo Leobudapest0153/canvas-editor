@@ -295,11 +295,20 @@ export function useDeleteElement() {
 
     // Confirmación siempre que se solicite
     if (withConfirm) {
-      const msg = descendants.size > 0
-        ? `Se eliminará también ${descendants.size} elemento(s) dentro`
-        : '¿Seguro que deseas eliminar este elemento?'
+      // Construir lista para modal descriptivo
+      const idsLista = [selectedId, ...Array.from(descendants)]
+      const elementosLista = idsLista
+        .map(id => store.elementoPorId(id))
+        .filter(Boolean)
+      const LIMIT = 12
+      const lines = elementosLista.slice(0, LIMIT).map(el => `• ${el.nombre || el.id}`)
+      const extra = elementosLista.length > LIMIT ? `\n… (+${elementosLista.length - LIMIT} más)` : ''
+      const cabecera = elementosLista.length > 1
+        ? `Se eliminarán los siguientes elementos:`
+        : 'Se eliminará el elemento:'
+      const msg = `${cabecera}\n\n${lines.join('\n')}${extra}\n\n¿Desea continuar?`
       const ok = await confirmDialog.confirm({
-        title: 'Eliminar elemento',
+        title: `Eliminar elemento${elementosLista.length > 1 ? 's' : ''}`,
         message: msg,
         confirmLabel: 'Eliminar',
         cancelLabel: 'Cancelar',

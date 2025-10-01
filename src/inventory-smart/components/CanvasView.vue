@@ -596,6 +596,7 @@
     />
 
     <FloatingToolbar
+      v-if="isEditMode"
       :is-element-selected="canvasStore.elementoSeleccionado ? true : false"
       :is-element-locked="selectedElementLocked"
       :is-snapping-enabled="isSnappingEnabled"
@@ -615,7 +616,7 @@
 
     <!-- Menú contextual -->
     <SpeedDialContext
-      v-if="ctxVisible"
+      v-if="ctxVisible && canUseContextMenus"
       :visible="ctxVisible"
       :x="ctxX"
       :y="ctxY"
@@ -670,6 +671,7 @@ import { getActiveBounds } from '@/inventory-smart/utils/activeBounds'
 import SpeedDialContext from '@/inventory-smart/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/inventory-smart/composables/useContextMenu'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement'
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
@@ -724,6 +726,18 @@ const {
 } = ctx
 const { deleteSelected } = useDeleteElement()
 const weightValidation = useWeightValidation()
+const { modoEdicion } = useEditorMode()
+const isEditMode = computed(() => modoEdicion.value === true)
+const canUseContextMenus = computed(() => isEditMode.value)
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
+
+const ensureCanvasEditable = () => {
+  if (!isEditMode.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return false
+  }
+  return true
+}
 
 const templateModalOpen = ref(false)
 const openTemplateModal = (elementId) => {
@@ -1475,6 +1489,10 @@ const handleDrop = (e) => {
   e.preventDefault()
   isDragOverCanvas.value = false
 
+  if (!ensureCanvasEditable()) {
+    return
+  }
+
   try {
     const dataText = e.dataTransfer.getData('application/json')
     if (!dataText) return
@@ -1821,14 +1839,13 @@ const createElementFromDrop = (data, dropEvent) => {
 
   let largoCmFinal = largoCm
   let finalHeightFinal = finalHeight
-
-  const isAisle = (elemento?.tipo || '').toLowerCase() === 'pasillos'
   const nuevoElemento = {
     id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
     tipo: elemento.tipo,
     categoria: elemento.categoria,
-    // Para pasillos NO establecer nombre por defecto; dejar que el store lo genere
-    ...(isAisle ? {} : { nombre: elemento.nombre || 'Nuevo elemento' }),
+    // Para pasillos: si vienen con nombre desde el catálogo, preservarlo;
+    // si no, dejar que el store genere el nombre por defecto.
+    nombre: elemento.nombre || 'Nuevo elemento',
     dimensiones: { ancho: anchoCm, largo: largoCmFinal, alto: altoCm },
     x: finalPosition.x,
     y: finalPosition.y,
@@ -2137,9 +2154,28 @@ const createElementFromTemplate = (data, dropEvent) => {
 
 // Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
 // Por defecto activado (true) para que el modo edición esté disponible al iniciar
-const dragModeGlobal = ref(true)
+const dragModeGlobal = ref(false)
 
 const isDragModeActive = computed(() => dragModeGlobal.value)
+
+watch(
+  () => isEditMode.value,
+  (enabled) => {
+    dragModeGlobal.value = enabled
+    canvasStore.setDraggableMode(enabled)
+    if (!enabled) {
+      editingElementId.value = null
+      ctxVisible.value = false
+    } else {
+      const sel = canvasStore.elementoSeleccionado
+      if (sel && !isElementLocked(sel)) {
+        editingElementId.value = sel
+        nextTick(setupTransformer)
+      }
+    }
+  },
+  { immediate: true },
+)
 
 // Limpiar modos si se bloquea el elemento
 watch(selectedElementLocked, (locked) => {
@@ -2155,6 +2191,9 @@ watch(selectedElementLocked, (locked) => {
 // Al hacer lock/unlock desde el UI, mantener el estado de modo global y solo cerrar
 // la edición si el elemento queda bloqueado.
 const toggleLockAndPreserveDrag = async (elementId) => {
+  if (!ensureCanvasEditable()) {
+    return
+  }
   if (!elementId) return
   toggleLockElement(elementId)
   await nextTick()
@@ -2163,9 +2202,13 @@ const toggleLockAndPreserveDrag = async (elementId) => {
   }
 }
 const toggleDragMode = () => {
+  if (!ensureCanvasEditable()) {
+    return
+  }
   // Alterna el modo arrastre global. Cuando se activa y hay un elemento seleccionado y no bloqueado,
   // se activa también la edición (transformer) para permitir cambiar dimensiones.
   dragModeGlobal.value = !dragModeGlobal.value
+  canvasStore.setDraggableMode(dragModeGlobal.value)
   if (!dragModeGlobal.value) {
     editingElementId.value = null
   } else {
@@ -2186,6 +2229,7 @@ const toggleSnapping = () => {
 }
 
 const canDragElement = (elemento) => {
+  if (!isEditMode.value) return false
   // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
   // Y si no hay cambios sin aplicar de otro elemento
   const isNotCurrentElement = canvasStore.elementoSeleccionado != elemento.id
@@ -2249,6 +2293,7 @@ const handleKeyDown = (e) => {
     editingElementId.value = null
     clearGuides()
   } else {
+    if (!isEditMode.value) return
     handleCanvasHotkeys(e, {
       dragMode: dragModeGlobal,
       toggleDragMode,
@@ -2491,6 +2536,7 @@ const getClientXY = (e) => {
 }
 
 const onShapeContextMenu = (evt, elemento) => {
+  if (!isEditMode.value) return
   if (elemento?.restrictions && elemento.restrictions.includes('right-click')) return
   try {
     ;(evt?.evt || evt)?.preventDefault?.()
@@ -2528,6 +2574,7 @@ const onShapePointerDown = (evt, elemento) => {
   // Long press (600ms) en mobile/puntero
   clearTimeout(longPressTimer)
   longPressTimer = setTimeout(() => {
+    if (!isEditMode.value) return
     if (!isElementDragging.value && lastPointerDown.elId) {
       ctx.openAt({ x: lastPointerDown.x, y: lastPointerDown.y, elementId: lastPointerDown.elId })
     }
@@ -2540,6 +2587,10 @@ const onShapePointerUp = () => {
 
 // Acción bloquear/desbloquear desde el menú contextual
 const toggleLock = async (id) => {
+  if (!ensureCanvasEditable()) {
+    ctx.close()
+    return
+  }
   if (!id) return
   toggleLockElement(id)
   ctx.close()
@@ -2547,6 +2598,10 @@ const toggleLock = async (id) => {
 
 // Acción eliminar desde el menú contextual
 const onDelete = async (id) => {
+  if (!ensureCanvasEditable()) {
+    ctx.close()
+    return
+  }
   if (!id) return
   const el =
     canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)

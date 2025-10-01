@@ -112,7 +112,8 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import ElementosTab from './tabs/ElementosTab.vue'
 import CapasTab from './tabs/CapasTab.vue'
 import BufferTab from './tabs/BufferTab.vue'
@@ -121,8 +122,15 @@ import UiTooltip from './ui/UiTooltip.vue'
 
 const canvasStore = useCanvasStore()
 
-// Estado del tab activo
-const activeTab = ref('elementos')
+const { sidebarActiveTab } = storeToRefs(canvasStore)
+
+const activeTab = computed({
+  get: () => sidebarActiveTab.value || 'elementos',
+  set: (value) => {
+    if (!value) return
+    canvasStore.setSidebarActiveTab(value)
+  },
+})
 
 // Configuración de los tabs
 const tabs = [

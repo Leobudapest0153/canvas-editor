@@ -16,7 +16,7 @@
       <h3 class="title">Historial</h3>
 
       <div class="actions">
-        <button @click="undo" :disabled="!canUndo" class="btn btn-undo" title="Deshacer (Ctrl+Z)">
+        <button @click="undo" :disabled="!canUndo || historyDisabled" class="btn btn-undo" title="Deshacer (Ctrl+Z)">
           <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
@@ -27,7 +27,7 @@
           </svg>
         </button>
 
-        <button @click="redo" :disabled="!canRedo" class="btn btn-redo" title="Rehacer (Ctrl+Y)">
+        <button @click="redo" :disabled="!canRedo || historyDisabled" class="btn btn-redo" title="Rehacer (Ctrl+Y)">
           <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
@@ -38,7 +38,7 @@
           </svg>
         </button>
 
-        <button @click="clearHistory" class="btn btn-clear" title="Limpiar historial">
+        <button @click="clearHistory" :disabled="historyDisabled" class="btn btn-clear" title="Limpiar historial">
           <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
@@ -94,6 +94,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 
 // Props
 const props = defineProps({
@@ -116,6 +117,9 @@ const {
   jumpToState,
 } = useCanvasWithHistory()
 
+const { canUseShortcuts } = useEditorMode()
+const historyDisabled = computed(() => !canUseShortcuts.value)
+
 // Computed
 const historySize = computed(() => history.historySize.value)
 const currentPosition = computed(() => history.currentPosition.value)
@@ -129,6 +133,7 @@ const formatTime = (timestamp) => {
 
 // Atajos de teclado
 const handleKeydown = (e) => {
+  if (!canUseShortcuts.value) return
   if (e.ctrlKey || e.metaKey) {
     if (e.key === 'z' && !e.shiftKey) {
       e.preventDefault()

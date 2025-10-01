@@ -21,7 +21,7 @@
         >
         <button
           v-if="hasItems"
-          @click="handleClearBuffer"
+          @click="handleClearBuffer" :disabled="!canEditCanvas"
           class="btn btn-clear"
         >
           <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,7 +68,7 @@
           v-for="item in bufferItems"
           :key="item.id"
           class="buffer-item"
-          :draggable="true"
+          :draggable="canEditCanvas"
           @dragstart="handleDragStart($event, item)"
           @dragend="handleDragEnd"
         >
@@ -110,7 +110,7 @@
             class="items-actions"
           >
             <button
-              @click="handleRemove(item.id)"
+              @click="handleRemove(item.id)" :disabled="!canEditCanvas"
               class="action-btn btn-remove"
             >
               <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -138,6 +138,7 @@
 import { ref, computed } from 'vue'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import { toPrecisionCm } from '@/inventory-smart/utils/fixedDimensions'
 import SpaceIcon from '@/inventory-smart/icons/SpaceIcon.vue'
@@ -147,6 +148,8 @@ import { useToast } from '@/inventory-smart/composables/useToast'
 
 // Composables
 const buffer = useCanvasBuffer()
+const { canEditCanvas } = useEditorMode()
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 const canvasStore = useCanvasStore()
 const { showToast } = useToast()
 
@@ -194,15 +197,28 @@ const getFullTimestamp = (item) => {
 
 // Handlers
 const handleClearBuffer = () => {
+  if (!canEditCanvas.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
   buffer.clearBuffer()
 }
 
 const handleRemove = (bufferItemId) => {
+  if (!canEditCanvas.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
   buffer.removeFromBuffer(bufferItemId)
 }
 
 // Drag & Drop
 const handleDragStart = (event, item) => {
+  if (!canEditCanvas.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    event.preventDefault()
+    return
+  }
   if (canvasStore.cambiosNoAplicados) {
     showToast('No puedes agregar nuevos elementos si hay cambios pendientes de guardar', 'warn');
     event.preventDefault()
