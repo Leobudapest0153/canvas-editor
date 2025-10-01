@@ -224,6 +224,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const etiquetasSeleccionadas = ref([])
 
   const elementoSeleccionado = ref(null)
+  const elementosSeleccionadosMultiple = ref([]) // Array de IDs para selección múltiple
   const cambiosNoAplicados = ref(false);
 
   // === NAVEGACIÓN JERÁRQUICA (se declara antes de vistaActiva para evitar ReferenceError) ===
@@ -804,11 +805,44 @@ const calcularCanvasAdaptativo = (elemento) => {
   // Actions
   const seleccionarElemento = (id) => {
     elementoSeleccionado.value = id
+    // Limpiar selección múltiple al seleccionar un solo elemento
+    elementosSeleccionadosMultiple.value = []
     // Forzar catálogo de 'elementos' al abrir detalle si estaba en 'plantillas'
     if (id && catalogStore.selectedCatalog === 'plantillas') {
       catalogStore.setSelectedCatalog('elementos')
     }
   }
+
+  // Selección múltiple: establecer array de IDs seleccionados
+  const seleccionarElementosMultiple = (ids) => {
+    if (!Array.isArray(ids)) {
+      console.warn('seleccionarElementosMultiple requiere un array de IDs')
+      return
+    }
+    elementosSeleccionadosMultiple.value = [...ids]
+    // Si hay múltiples, limpiar selección individual
+    if (ids.length > 0) {
+      elementoSeleccionado.value = null
+    }
+  }
+
+  // Limpiar selección de elementos (individual y múltiple)
+  const limpiarSeleccionElementos = () => {
+    elementoSeleccionado.value = null
+    elementosSeleccionadosMultiple.value = []
+  }
+
+  // Computed: obtener todos los elementos seleccionados (individual + múltiple)
+  const todosLosElementosSeleccionados = computed(() => {
+    const seleccionados = []
+    if (elementoSeleccionado.value) {
+      seleccionados.push(elementoSeleccionado.value)
+    }
+    if (elementosSeleccionadosMultiple.value.length > 0) {
+      seleccionados.push(...elementosSeleccionadosMultiple.value)
+    }
+    return [...new Set(seleccionados)] // Eliminar duplicados
+  })
 
   const actualizarPosicion = (id, x, y, saveHistory = false, description = null) => {
     const elemento = elementos.value.find((el) => el.id === id)
@@ -2675,6 +2709,8 @@ const calcularCanvasAdaptativo = (elemento) => {
     plantas,
     plantaActiva,
     elementoSeleccionado,
+    elementosSeleccionadosMultiple,
+    todosLosElementosSeleccionados,
     vistaActiva,
     zoom,
     panX,
@@ -2726,6 +2762,8 @@ const calcularCanvasAdaptativo = (elemento) => {
 
     // Actions - Canvas
     seleccionarElemento,
+    seleccionarElementosMultiple,
+    limpiarSeleccionElementos,
     setCambiosNoAplicados,
     actualizarPosicion,
     actualizarElemento,
