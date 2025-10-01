@@ -323,6 +323,20 @@ export function useDeleteElement() {
     const okCascade = deleteCascade([selectedId])
     if (!okCascade) return false
 
+    if (selected?.tipo === 'pisos') {
+      const ctx = store.contextoNavegacion
+      if (ctx?.tipo === 'pisos' && ctx?.id === selectedId) {
+        const parentId = selected.padre || null
+        if (typeof store.navegarAlPadre === 'function') {
+          store.navegarAlPadre()
+        }
+        const sibling = store.elementos.find((el) => el.tipo === 'pisos' && el.padre === parentId)
+        if (sibling && typeof store.navegarAElemento === 'function') {
+          store.navegarAElemento(sibling.id)
+        }
+      }
+    }
+
     // Snackbar con deshacer (5s) - versión reactiva
     try {
       if (typeof window !== 'undefined') {
