@@ -5,6 +5,8 @@
       :externalServices="externalServices"
       :author="{ name: 'David Deras', id: '123' }"
       @configUpdated="handleConfigUpdated"
+      @back="handleBack"
+      @printIdentifiers="handlePrintIdentifiers"
     />
   </div>
 </template>
@@ -98,6 +100,16 @@ const handleConfigUpdated = (nuevaConfig) => {
   } catch (error) {
     console.error('Error al manejar la configuración actualizada:', error)
   }
+}
+
+const handleBack = () => {
+  // Aquí se manejaría la navegación de regreso en la aplicación real
+  console.log('Navegando de regreso')
+}
+
+const handlePrintIdentifiers = () => {
+  // Aquí se manejaría la acción de imprimir identificadores en la aplicación real
+  console.log('Imprimiendo identificadores')
 }
 
 onMounted(() => {
