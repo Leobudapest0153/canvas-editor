@@ -657,7 +657,7 @@ import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWit
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
 import RulersOverlay from '@/inventory-smart/components/RulersOverlay.vue'
-import { detectConflictsFor, throttle } from '@/inventory-smart/utils/collision'
+import { detectConflictsFor, throttle, computeMTD } from '@/inventory-smart/utils/collision'
 import { snapToGrid, nudgePlace } from '@/inventory-smart/utils/geometry'
 import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
@@ -710,6 +710,10 @@ const backgroundLayerRef = ref(null)
 const overlaysLayerRef = ref(null)
 const indicatorsLayerRef = ref(null)
 const lastFitTarget = ref(null)
+
+// Estado de contacto y último pos para dragBound en plantas (memoria por elemento)
+const boundContactState = new Map()
+const boundLastWorldPos = new Map()
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -1418,21 +1422,117 @@ const toStageCoords = (pos) => {
 // Drag bound para cada elemento y forma (clamp mínimo al contorno)
 const dragBoundForElement = (pos, elemento) => {
   try {
-    if (isInfinitePlant.value) {
-      return pos
-    }
     const lp = toLayerCoords(pos)
     const boundary = computeBoundary()
     const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
-    const w = w_cm * CM_TO_PX
-    const h = h_cm * CM_TO_PX
+    let w = Math.max(1, w_cm * CM_TO_PX)
+    let h = Math.max(1, h_cm * CM_TO_PX)
 
-    // Obtener posición previa para movimiento suave
-    const lastPos = dragLastValidPositions.value.get(elemento.id)
+    // Convertir a top-left world candidate
+    let candX = lp.x
+    let candY = lp.y
 
-    const c = clampInsideArea(lp.x, lp.y, w, h, boundary, elemento, true, lastPos)
-    return toStageCoords(c)
-  } catch {
+    // Clamp de borde sólo si el modo NO es elástico (en plantas finitas)
+    const clampMode = boundary?.mode || 'fixed'
+    const boundaryType = boundary?.type || 'rect'
+    if (clampMode !== 'elastic') {
+      const lastPos = dragLastValidPositions.value.get(elemento.id)
+      const c = clampInsideArea(candX, candY, w, h, boundary, elemento, true, lastPos)
+      candX = c.x
+      candY = c.y
+    }
+
+    // Preparar vecinos (suelo–suelo) y forma para colisión
+    const movingForma = (elemento.forma || 'rectangular')
+    const moving = movingForma === 'circular'
+      ? { ...elemento, x: candX, y: candY, width: Math.min(w, h), height: Math.min(w, h), forma: 'circular' }
+      : { ...elemento, x: candX, y: candY, width: w, height: h, forma: 'rectangular' }
+
+    const neighbors = canvasStore.elementosVisibles.filter(
+      (e) => e && e.id !== elemento.id && (e.ubicacion || 'suelo') === 'suelo' && (moving.ubicacion || 'suelo') === 'suelo',
+    )
+
+    // Detectar bloqueantes con narrow-phase (círculos con tangencia permitida)
+    const conflicts = detectConflictsFor(moving, neighbors)
+    const blocking = conflicts.filter((c) => c && c.bloqueante)
+
+    if (blocking.length === 0) {
+      // No hay bloqueantes: limpiar contacto y persistir última pos
+      boundContactState.delete(elemento.id)
+      boundLastWorldPos.set(elemento.id, { x: candX, y: candY })
+      return toStageCoords({ x: candX, y: candY })
+    }
+
+    // Calcular eje dominante por velocidad instantánea (según último bound)
+    const prev = boundLastWorldPos.get(elemento.id) || dragLastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+    const vx = candX - (prev.x || 0)
+    const vy = candY - (prev.y || 0)
+    const dominantAxis = Math.abs(vx) >= Math.abs(vy) ? 'x' : 'y'
+
+    // Elegir obstáculo estable (contacto previo si sigue presente; si no, mayor profundidad MTD)
+    const lastContact = boundContactState.get(elemento.id) || { id: null, axis: dominantAxis }
+    let targetId = null
+    let axis = lastContact.axis || dominantAxis
+    const idsInBlocking = new Set(blocking.map((b) => (b.aId === elemento.id ? b.bId : b.aId)))
+    if (lastContact.id && idsInBlocking.has(lastContact.id)) {
+      targetId = lastContact.id
+    } else {
+      let bestDepth = -1
+      for (const b of blocking) {
+        const otherId = b.aId === elemento.id ? b.bId : b.aId
+        const other = neighbors.find((n) => n.id === otherId)
+        if (!other) continue
+        const { dx, dy } = computeMTD(candX, candY, w, h, other.x, other.y, other.width, other.height)
+        const depth = Math.abs(dx) + Math.abs(dy)
+        if (depth > bestDepth) {
+          bestDepth = depth
+          targetId = otherId
+        }
+      }
+    }
+
+    const target = neighbors.find((n) => n.id === targetId)
+    if (!target) {
+      boundLastWorldPos.set(elemento.id, { x: candX, y: candY })
+      return toStageCoords({ x: candX, y: candY })
+    }
+
+    // MTD contra obstáculo seleccionado (usar AABB; detectConflictsFor ya descartó tangencias)
+    let { dx, dy } = computeMTD(candX, candY, w, h, target.x, target.y, target.width, target.height)
+
+    // Proyección a eje para efecto deslizante
+    if (axis === 'x') dy = 0
+    else dx = 0
+
+    let nx = candX + dx
+    let ny = candY + dy
+
+    // Re-clamp si el contorno es fijo/polígono
+    if (clampMode !== 'elastic') {
+      if (boundaryType === 'rect') {
+        const rect = { x: boundary.minX || 0, y: boundary.minY || 0, W: boundary.W || layerConfig.value.width, H: boundary.H || layerConfig.value.height }
+        // clampRectToRect a través de clampInsideArea con boundary rect
+        const c2 = clampInsideArea(nx, ny, w, h, { ...boundary, type: 'rect', mode: clampMode }, elemento)
+        nx = c2.x; ny = c2.y
+      } else if (boundaryType === 'polygon') {
+        if (movingForma === 'circular') {
+          const r = Math.min(w, h) / 2
+          const temp = clampInsideArea(nx, ny, w, h, boundary, elemento, true, prev)
+          nx = temp.x; ny = temp.y
+        } else {
+          const temp = clampInsideArea(nx, ny, w, h, boundary, elemento)
+          nx = temp.x; ny = temp.y
+        }
+      }
+    }
+
+    // Guardar memoria de contacto y última pos
+    boundContactState.set(elemento.id, { id: targetId, axis })
+    boundLastWorldPos.set(elemento.id, { x: nx, y: ny })
+
+    return toStageCoords({ x: nx, y: ny })
+  } catch (err) {
+    // En caso de error, no bloquear el drag; retornar pos original
     return pos
   }
 }

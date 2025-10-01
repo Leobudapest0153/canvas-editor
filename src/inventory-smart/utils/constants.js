@@ -120,7 +120,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 400,
       alto: 250,
     },
-    capacidadCarga: 500,
+    capacidadCarga: 1500,
     ubicacion: 'suelo',
     descripcion: 'Cuarto especial',
     icono: 'home',

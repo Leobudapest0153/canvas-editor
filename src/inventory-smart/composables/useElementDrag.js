@@ -10,7 +10,7 @@ import { enablePerfMode } from '@/inventory-smart/composables/usePerfMode'
 import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { applyEdgeConstraint } from '@/inventory-smart/utils/edgeConstraint'
 import { resetEdgeState } from '@/inventory-smart/composables/useEdgeState'
-import { finalizePlacement } from '@/inventory-smart/utils/finalizeDrag'
+import { finalizePlacement, solveFinalPlacement } from '@/inventory-smart/utils/finalizeDrag'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
 import { GRID_SIZE, CM_TO_PX } from '@/inventory-smart/utils/constants'
@@ -60,6 +60,8 @@ export function useElementDrag({
   const rafControllers = new Map()
   const perfContexts = new Map()
   const innerSessions = new Map()
+  // Estado de contacto por elemento para deslizamiento (como en sesiones internas)
+  const contactState = new Map()
   const throttle2 = throttleEveryNFrames(2)
 
   // Schedule drawing
@@ -78,16 +80,16 @@ export function useElementDrag({
     })
   }
 
-  // Resolver posición contra obstáculos bloqueantes (suelo–suelo) usando MTD AABB
+  // Resolver posición contra obstáculos bloqueantes (suelo–suelo) con memoria de contacto y proyección a eje (efecto deslizante)
   const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
+    // Vecinos visibles del contexto actual
     const all = canvasStore.elementosVisibles
     const w = elemento.width
     const h = elemento.height
     let x = candidateX
     let y = candidateY
 
-    // Iterar para resolver múltiples colisiones respetando contorno
-    const MAX_ITERS = 3
+    // (0) Bounds activos
     const boundary = computeBoundary() || {}
     const areaBounds = boundaryToAreaBounds(boundary, {
       minX: 0,
@@ -105,26 +107,22 @@ export function useElementDrag({
     const rectWidth = boundaryType === 'rect' ? Math.max(0, (areaBounds.maxX ?? rectMinX) - rectMinX) : Infinity
     const rectHeight = boundaryType === 'rect' ? Math.max(0, (areaBounds.maxY ?? rectMinY) - rectMinY) : Infinity
 
-    // Paso (1): clamp al área primero
+    // (1) Clamp inicial a área
     if (clampToBoundary && boundaryType === 'rect') {
       const c = clampRectToRect(x - rectMinX, y - rectMinY, w, h, rectWidth, rectHeight)
       x = c.x + rectMinX
       y = c.y + rectMinY
     } else if (clampToBoundary && boundaryType === 'polygon') {
-      // Para elementos circulares, usar clamp circular con posición previa para movimiento suave
       if (elemento.forma === 'circular') {
         const radius = Math.min(w, h) / 2
         const centerX = x + radius
         const centerY = y + radius
-
-        // Obtener posición previa para movimiento suave
         const lastPos = lastValidPositions.value.get(elemento.id)
         const previousCenter = lastPos ? { x: lastPos.x + radius, y: lastPos.y + radius } : null
-
         const clampedCenter = clampCircleToPolygonSmooth(
           { x: centerX, y: centerY, radius },
           boundary.inset,
-          previousCenter
+          previousCenter,
         )
         x = clampedCenter.x - radius
         y = clampedCenter.y - radius
@@ -135,52 +133,62 @@ export function useElementDrag({
       }
     }
 
+    // (2) Iterar: detectar bloqueantes y resolver solo contra suelo–suelo con proyección a eje
+    const MAX_ITERS = 6
+    const lastVel = lastVelocityMap.value.get(elemento.id) || { x: 0, y: 0 }
+    const dominantAxis = Math.abs(lastVel.x || 0) >= Math.abs(lastVel.y || 0) ? 'x' : 'y'
+
     for (let iter = 0; iter < MAX_ITERS; iter++) {
+      // Filtrar vecinos relevantes (suelo–suelo)
       const moving = { ...elemento, x, y }
-      const conflicts = detectConflictsFor(moving, all)
-      const blocking = conflicts.filter((c) => c.bloqueante)
-      if (blocking.length === 0) break
+      const neighbors = all.filter((e) => e && e.id !== elemento.id && (e.ubicacion || 'suelo') === 'suelo' && (moving.ubicacion || 'suelo') === 'suelo')
 
-      // (3) MTD agregado sobre AABB
-      let accDx = 0
-      let accDy = 0
-      for (const c of blocking) {
-        const otherId = c.aId === elemento.id ? c.bId : c.aId
-        const other = all.find((el) => el.id === otherId)
-        if (!other) continue
-        const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height)
-        accDx += dx
-        accDy += dy
+      // Detectar conflictos bloqueantes usando narrow-phase (círculos con tangencia permitida)
+      const conflicts = detectConflictsFor(moving, neighbors)
+      const blocking = conflicts.filter((c) => c && c.bloqueante)
+      if (blocking.length === 0) {
+        // Liberar memoria de contacto si existía
+        contactState.delete(elemento.id)
+        break
       }
 
-      // Ignorar correcciones muy pequeñas (ruido/rounding) SOLO en vista frontal (XZ)
-      if (canvasStore.vistaActiva === 'XZ') {
-        const MIN_NUDGE_PX = 0.5
-        if (Math.abs(accDx) < MIN_NUDGE_PX && Math.abs(accDy) < MIN_NUDGE_PX) break
-        if (Math.abs(accDx) < MIN_NUDGE_PX) accDx = 0
-        if (Math.abs(accDy) < MIN_NUDGE_PX) accDy = 0
+      // Elegir obstáculo: priorizar contacto previo si sigue en conflicto; si no, usar el de mayor profundidad MTD
+      const lastContact = contactState.get(elemento.id) || { id: null, axis: null }
+      let targetId = null
+      let axis = lastContact.axis || dominantAxis
+      const idsInBlocking = new Set(blocking.map((b) => (b.aId === elemento.id ? b.bId : b.aId)))
+      if (lastContact.id && idsInBlocking.has(lastContact.id)) {
+        targetId = lastContact.id
+      } else {
+        let bestDepth = -1
+        for (const b of blocking) {
+          const otherId = b.aId === elemento.id ? b.bId : b.aId
+          const other = neighbors.find((n) => n.id === otherId)
+          if (!other) continue
+          const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height)
+          const depth = Math.abs(dx) + Math.abs(dy)
+          if (depth > bestDepth) {
+            bestDepth = depth
+            targetId = otherId
+          }
+        }
       }
 
-      // Proyección del MTD contra el contorno rectangular
-      if (clampToBoundary && boundaryType === 'rect') {
-        const proj = projectMTDAgainstBoundary(
-          x - rectMinX,
-          y - rectMinY,
-          accDx,
-          accDy,
-          w,
-          h,
-          rectWidth,
-          rectHeight,
-        )
-        accDx = proj.dx
-        accDy = proj.dy
-      }
+      const target = neighbors.find((n) => n.id === targetId) || null
+      if (!target) break
 
-      // Aplicar MTD y volver a clavar al área
-      x += accDx
-      y += accDy
+      // Calcular MTD contra obstáculo seleccionado
+      let { dx, dy } = computeMTD(x, y, w, h, target.x, target.y, target.width, target.height)
 
+      // Proyección a eje para efecto deslizante
+      if (axis === 'x') dy = 0
+      else dx = 0
+
+      // Aplicar traslación
+      x += dx
+      y += dy
+
+      // Clamp contra contorno
       if (clampToBoundary && boundaryType === 'rect') {
         const c2 = clampRectToRect(x - rectMinX, y - rectMinY, w, h, rectWidth, rectHeight)
         x = c2.x + rectMinX
@@ -190,18 +198,15 @@ export function useElementDrag({
           const radius = Math.min(w, h) / 2
           const centerX = x + radius
           const centerY = y + radius
-
-          // Obtener posición previa para movimiento suave
-          const lastPos = lastValidPositions.value.get(elemento.id)
-          const previousCenter = lastPos ? { x: lastPos.x + radius, y: lastPos.y + radius } : null
-
-          const clampedCenter = clampCircleToPolygonSmooth(
+          const lastPos2 = lastValidPositions.value.get(elemento.id)
+          const prevC = lastPos2 ? { x: lastPos2.x + radius, y: lastPos2.y + radius } : null
+          const clampedCenter2 = clampCircleToPolygonSmooth(
             { x: centerX, y: centerY, radius },
             boundary.inset,
-            previousCenter
+            prevC,
           )
-          x = clampedCenter.x - radius
-          y = clampedCenter.y - radius
+          x = clampedCenter2.x - radius
+          y = clampedCenter2.y - radius
         } else {
           const c2 = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
           x = c2.x
@@ -209,13 +214,18 @@ export function useElementDrag({
         }
       }
 
-      // Si la corrección fue nula o insignificante, detener
-      if (Math.abs(accDx) < 1e-6 && Math.abs(accDy) < 1e-6) break
+      // Actualizar memoria de contacto
+      contactState.set(elemento.id, { id: targetId, axis })
+
+      // Si la corrección fue mínima, terminar para evitar jitter
+      if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) break
     }
 
-    // Validaciones finales: si aún hay colisión bloqueante o quedó fuera, volver a última válida
+    // (3) Validaciones finales y corrección de fuera de área
     const movingEnd = { ...elemento, x, y }
-    const endConf = detectConflictsFor(movingEnd, all).filter((c) => c.bloqueante)
+    const neighborsFinal = all.filter((e) => e && e.id !== elemento.id && (e.ubicacion || 'suelo') === 'suelo' && (movingEnd.ubicacion || 'suelo') === 'suelo')
+    const endConf = detectConflictsFor(movingEnd, neighborsFinal).filter((c) => c.bloqueante)
+
     const outsideArea =
       clampToBoundary &&
       (boundaryType === 'rect'
@@ -229,12 +239,12 @@ export function useElementDrag({
       x = cp.x - w / 2
       y = cp.y - h / 2
     }
+
     if (endConf.length > 0 || outsideArea) {
       const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
       return { x: prev.x, y: prev.y, fellBack: true }
     }
 
-    // No hacer snap aquí para no cuantizar el arrastre
     return { x, y, fellBack: false }
   }
 
@@ -849,6 +859,8 @@ export function useElementDrag({
         /* ignore */
       }
     }
+    // Limpiar memoria de contacto del elemento al finalizar
+    contactState.delete(elementId)
     rafControllers.delete(elementId)
     const perf = perfContexts.get(elementId)
     try {
