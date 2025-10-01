@@ -51,13 +51,16 @@
                   {{ contarElementosEnPlanta(planta.id) }} elementos
                 </p>
                 <p class="text-xs text-gray-400 m-0 font-medium">
+                  <span v-if="planta.isInfinite">-</span>
+                  <span v-else>
                   {{
                     formatLengthsCm([
-                      planta.dimensiones?.ancho || 0,
-                      planta.dimensiones?.largo || 0,
-                      planta.dimensiones?.alto || 0,
+                    planta.dimensiones?.ancho || 0,
+                    planta.dimensiones?.largo || 0,
+                    planta.dimensiones?.alto || 0,
                     ])
                   }}
+                  </span>
                 </p>
               </div>
             </div>
