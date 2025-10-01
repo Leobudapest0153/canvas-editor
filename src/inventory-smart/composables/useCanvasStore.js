@@ -1244,7 +1244,10 @@ const calcularCanvasAdaptativo = (elemento) => {
 
   const runPlacementValidators = (element, candidate) => {
     const planta = plantaPorId.value(plantaActiva.value)
-    const ctx = { alturaBodega: planta?.dimensiones?.alto }
+    const ctx = {
+      alturaBodega: planta?.dimensiones?.alto,
+      isInfinite: planta?.isInfinite === true
+    }
     const neighbors = elementosVisibles.value.filter((n) => n.id !== element?.id)
     const checks = [
       (el, cand) => validateWallZBaseRequired(el, cand, ctx),

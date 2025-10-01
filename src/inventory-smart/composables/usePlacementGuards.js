@@ -30,7 +30,8 @@ export function usePlacementGuards({ useTopeClamp = true } = {}) {
       planta?.dimensiones?.alto ??
       planta?.altura ??
       null
-    return { alturaBodega }
+    const isInfinite = planta?.isInfinite === true
+    return { alturaBodega, isInfinite }
   }
 
   const dragState = new Map()
