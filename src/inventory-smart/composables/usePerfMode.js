@@ -12,10 +12,15 @@ export function enablePerfMode(layer, opts = {}) {
     shapeBlurEnabled: shape?.getAttr ? shape.getAttr('blurEnabled') : undefined,
     shapeStrokeWidth: shape?.getAttr ? shape.getAttr('strokeWidth') : undefined,
     shapeStrokeScaleEnabled: shape?.getAttr ? shape.getAttr('strokeScaleEnabled') : undefined,
+    shapeFill: shape?.getAttr ? shape.getAttr('fill') : undefined,
+    shapeOpacity: shape?.getAttr ? shape.getAttr('opacity') : undefined,
+    childrenAttrs: [] // Almacenar atributos de los hijos
   }
+
   try {
     // Konva 9+: optimizar solo el dibujo, no tocar listening para no afectar dragBound
     layer.perfectDrawEnabled && layer.perfectDrawEnabled(false)
+
     if (shape && shape.setAttrs) {
       shape.setAttrs({
         shadowEnabled: false,
@@ -23,6 +28,32 @@ export function enablePerfMode(layer, opts = {}) {
         blurEnabled: false,
         strokeScaleEnabled: false,
         strokeWidth: 1,
+      })
+    }
+
+    // Si el shape es un grupo, también optimizar sus hijos
+    if (shape && shape.getChildren && typeof shape.getChildren === 'function') {
+      const children = shape.getChildren()
+      children.forEach((child) => {
+        if (child && child.getAttr && child.setAttrs) {
+          // Guardar estado original de cada hijo
+          const childPrev = {
+            shadowEnabled: child.getAttr('shadowEnabled'),
+            shadowBlur: child.getAttr('shadowBlur'),
+            blurEnabled: child.getAttr('blurEnabled'),
+            fill: child.getAttr('fill'),
+            opacity: child.getAttr('opacity')
+          }
+          prev.childrenAttrs.push({ child, attrs: childPrev })
+
+          // Aplicar optimizaciones manteniendo el fill y opacity
+          child.setAttrs({
+            shadowEnabled: false,
+            shadowBlur: 0,
+            blurEnabled: false,
+            // Mantener fill y opacity para que el color no se pierda
+          })
+        }
       })
     }
   } catch (_) { /* ignore */ }
@@ -50,7 +81,24 @@ export function disablePerfMode(layer, ctx = {}) {
       if (prev.shapeBlurEnabled !== undefined) attrs.blurEnabled = prev.shapeBlurEnabled
       if (prev.shapeStrokeScaleEnabled !== undefined) attrs.strokeScaleEnabled = prev.shapeStrokeScaleEnabled
       if (prev.shapeStrokeWidth !== undefined) attrs.strokeWidth = prev.shapeStrokeWidth
+      if (prev.shapeFill !== undefined) attrs.fill = prev.shapeFill
+      if (prev.shapeOpacity !== undefined) attrs.opacity = prev.shapeOpacity
       shape.setAttrs(attrs)
+    }
+
+    // Restaurar atributos de los hijos
+    if (prev.childrenAttrs && Array.isArray(prev.childrenAttrs)) {
+      prev.childrenAttrs.forEach(({ child, attrs }) => {
+        if (child && child.setAttrs && attrs) {
+          const restoreAttrs = {}
+          if (attrs.shadowEnabled !== undefined) restoreAttrs.shadowEnabled = attrs.shadowEnabled
+          if (attrs.shadowBlur !== undefined) restoreAttrs.shadowBlur = attrs.shadowBlur
+          if (attrs.blurEnabled !== undefined) restoreAttrs.blurEnabled = attrs.blurEnabled
+          if (attrs.fill !== undefined) restoreAttrs.fill = attrs.fill
+          if (attrs.opacity !== undefined) restoreAttrs.opacity = attrs.opacity
+          child.setAttrs(restoreAttrs)
+        }
+      })
     }
   } catch (_) { /* ignore */ }
 }
