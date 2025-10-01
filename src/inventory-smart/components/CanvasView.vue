@@ -1971,7 +1971,7 @@ const getElementShadow = (elemento) => {
       offsetY: 0,
     }
   }
-  
+
   // Resaltar elementos en selección múltiple
   const isMultiSelected = canvasStore.elementosSeleccionadosMultiple?.includes(elemento.id)
   if (isMultiSelected) {
@@ -1983,7 +1983,7 @@ const getElementShadow = (elemento) => {
       offsetY: 0,
     }
   }
-  
+
   // Sombra por defecto
   return {
     color: 'black',
@@ -2392,25 +2392,25 @@ const handleGlobalClick = (e) => {
 const handleKeyDown = (e) => {
   if (!e) return
   const key = e.key.toLowerCase()
-  
+
   // Manejar tecla Delete/Suprimir
   if (key === 'delete' || key === 'supr' || key === 'del') {
     // No procesar si estamos en un input
     if (e.target instanceof Element && e.target.matches('input, textarea, select, [contenteditable]')) {
       return
     }
-    
+
     // Si hay selección (individual o múltiple), eliminar
-    const hasSelection = canvasStore.elementoSeleccionado || 
+    const hasSelection = canvasStore.elementoSeleccionado ||
                          (canvasStore.elementosSeleccionadosMultiple?.length > 0)
-    
+
     if (hasSelection && isEditMode.value) {
       e.preventDefault()
       deleteSelected({ withConfirm: true })
     }
     return
   }
-  
+
   if (key === 'escape' || key === 'esc') {
     // Cancelar marquesina si está activa
     if (isMarqueeActive.value) {
