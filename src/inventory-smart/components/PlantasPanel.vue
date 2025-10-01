@@ -148,6 +148,7 @@
 
         <!-- Botón Regresar -->
           <button
+            v-if="!canvasStore.modoConfigurarEsl"
             type="button"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500 rounded-lg transition-colors cursor-pointer"
             @click="onBack"
@@ -156,7 +157,7 @@
           </button>
 
         <!-- Botón Todos los identificadores -->
-        <UiTooltip label="Todos los identificadores" position="bottom" :delay="200">
+        <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Todos los identificadores" position="bottom" :delay="200">
           <button
             type="button"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
@@ -172,8 +173,56 @@
           </button>
         </UiTooltip>
 
+        <!-- Botón Configurar ESL (modo visualización) -->
+        <UiTooltip
+          v-if="!canvasStore.modoEdicion || canvasStore.modoConfigurarEsl"
+          :label="eslModeTooltip"
+          position="bottom"
+          :delay="200"
+        >
+          <button
+            type="button"
+            :class="eslButtonClasses"
+            @click="toggleEslMode"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 5v6a2 2 0 00.586 1.414l7 7a2 2 0 002.828 0l4-4a2 2 0 000-2.828l-7-7A2 2 0 0011 5H5z"
+              />
+            </svg>
+            <span>{{ eslButtonLabel }}</span>
+          </button>
+        </UiTooltip>
+
+        <!-- Botón Configurar ESL (modo visualización) -->
+        <UiTooltip
+          v-if="!canvasStore.modoEdicion || canvasStore.modoConfigurarEsl"
+          :label="eslModeTooltip"
+          position="bottom"
+          :delay="200"
+        >
+          <button
+            type="button"
+            :class="eslButtonClasses"
+            @click="toggleEslMode"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 5v6a2 2 0 00.586 1.414l7 7a2 2 0 002.828 0l4-4a2 2 0 000-2.828l-7-7A2 2 0 0011 5H5z"
+              />
+            </svg>
+            <span>{{ eslButtonLabel }}</span>
+          </button>
+        </UiTooltip>
+
         <!-- Toggle modo edición -->
-        <UiTooltip :label="modoEdicionTooltip" position="bottom" :delay="200">
+        <UiTooltip v-if="!canvasStore.modoConfigurarEsl" :label="modoEdicionTooltip" position="bottom" :delay="200">
           <EditModeToggle
             :aria-label="modoEdicionTooltip"
             :title="modoEdicionTooltip"
@@ -181,7 +230,7 @@
         </UiTooltip>
 
         <!-- Botón Historial de cambios -->
-        <UiTooltip label="Historial de cambios" position="bottom" :delay="200">
+        <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Historial de cambios" position="bottom" :delay="200">
           <button
             type="button"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
@@ -198,7 +247,7 @@
         </UiTooltip>
 
         <!-- Botón Guardar Cambios -->
-        <UiTooltip label="Guardar cambios actuales" position="bottom" :delay="200">
+        <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Guardar cambios actuales" position="bottom" :delay="200">
           <button
             type="button"
             class="inline-flex items-center gap-2 px-4 py-2 bg-success hover:bg-success-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
@@ -525,6 +574,21 @@ const modoEdicionTooltip = computed(() =>
   canvasStore.modoEdicion ? 'Finalizar edición' : 'Editar configuración'
 )
 
+const eslModeTooltip = computed(() =>
+  canvasStore.modoConfigurarEsl ? 'Finalizar configuración de ESL' : 'Configurar ESL'
+)
+
+const eslButtonLabel = computed(() =>
+  canvasStore.modoConfigurarEsl ? 'Salir de Configurar ESL' : 'Configurar ESL'
+)
+
+const eslButtonClasses = computed(() => [
+  'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors cursor-pointer',
+  canvasStore.modoConfigurarEsl
+    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+    : 'bg-gray text-white hover:bg-ice-blue-300 hover:text-white',
+])
+
 // Estado local para modales
 const showChangeHistoryModal = ref(false)
 const showImportExportModal = ref(false)
@@ -604,6 +668,10 @@ const elementosEnPlantaAEliminar = computed(() => {
 // Métodos
 const emitirIdentificadores = () => {
   emit('showIdentifiers')
+}
+
+const toggleEslMode = () => {
+  canvasStore.toggleModoConfigurarEsl()
 }
 
 // Emitir acción de regresar para que el componente padre pueda manejar navegación/salida
@@ -1055,5 +1123,9 @@ const vClickOutside = {
   .plantas-scroll-container {
     max-width: calc(100vw - 260px);
   }
+}
+
+.bg-gray {
+  background-color: #8899A8;
 }
 </style>

@@ -331,6 +331,10 @@ const title = computed(() => {
       label: 'piso'
     }
   }
+  return {
+    title: 'Propiedades',
+    label: 'elemento'
+  }
 })
 const isAllSelected = computed(() =>
   formValue.value.tiposProductos.includes(ALL_OPTION)
@@ -412,9 +416,9 @@ const onSave = () => {
   const hermanos = idHermanos.map(id => canvasStore.elementos.find(el => el.id === id)).filter(Boolean);
 
   // Convertimos las dimensiones del formulario a las unidades correctas para comparar
-  const anchoFormularioCm = parseFloat(formValue.value.dimensiones.ancho) * 100;
-  const largoFormularioCm = parseFloat(formValue.value.dimensiones.largo) * 100;
-  const altoFormularioCm = parseFloat(formValue.value.dimensiones.alto) * 100;
+  const anchoFormularioCm = Math.round(parseFloat(formValue.value.dimensiones.ancho) * 100);
+  const largoFormularioCm = Math.round(parseFloat(formValue.value.dimensiones.largo) * 100);
+  const altoFormularioCm = Math.round(parseFloat(formValue.value.dimensiones.alto) * 100);
   const capacidadCargaFormulario = parseFloat(formValue.value.capacidadCarga);
 
   // 3. Validar Ancho y Largo del nivel contra el cuarto padre
@@ -431,7 +435,6 @@ const onSave = () => {
   // 4. Validar Alto del nivel
   const minimoAltoRequeridoPorHermanosCm = hermanos.length * 10; // 0.1m (10cm) por cada hermano
   const maximoAltoDisponibleCm = padre.dimensiones.alto - minimoAltoRequeridoPorHermanosCm;
-
   if (altoFormularioCm > maximoAltoDisponibleCm) {
     showToast(`La altura máxima permitida es ${maximoAltoDisponibleCm / 100}m para dejar espacio a los otros ${hermanos.length} niveles.`);
     return;

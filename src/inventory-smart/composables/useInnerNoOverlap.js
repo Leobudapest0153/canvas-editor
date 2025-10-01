@@ -2,28 +2,29 @@ import { mapDimsByView } from '@/inventory-smart/utils/innerViewDims'
 import { toLocal, toWorld } from '@/inventory-smart/utils/innerLocalCoords'
 import { clampRectToBounds, overlap } from '@/inventory-smart/utils/innerAABB'
 import { CM_TO_PX, GRID_SIZE } from '@/inventory-smart/utils/constants'
-export function makeInnerSession({ parentEl, movingEl, siblings, vista }) {
+export function makeInnerSession({ parentEl, movingEl, siblings, vista, CM_TO_PX: cmToPxOverride }) {
+  const cmToPx = Number.isFinite(cmToPxOverride) && cmToPxOverride > 0 ? cmToPxOverride : CM_TO_PX
   const { wCm, hCm } = mapDimsByView(parentEl, vista)
   const bounds = {
     minX: 0,
     minY: 0,
-    maxX: Math.max(1, wCm * CM_TO_PX),
-    maxY: Math.max(1, hCm * CM_TO_PX),
+    maxX: Math.max(1, wCm * cmToPx),
+    maxY: Math.max(1, hCm * cmToPx),
   }
   parentEl.__wPx = bounds.maxX
   parentEl.__hPx = bounds.maxY
   const mSizeCm = mapDimsByView(movingEl, vista)
   const mSize = {
-    w: Math.max(1, mSizeCm.wCm * CM_TO_PX),
-    h: Math.max(1, mSizeCm.hCm * CM_TO_PX),
+    w: Math.max(1, mSizeCm.wCm * cmToPx),
+    h: Math.max(1, mSizeCm.hCm * cmToPx),
   }
   const sibRects = siblings
     .filter((s) => s && s.id !== movingEl.id)
     .map((s) => {
       const szCm = mapDimsByView(s, vista)
       const sz = {
-        w: Math.max(1, szCm.wCm * CM_TO_PX),
-        h: Math.max(1, szCm.hCm * CM_TO_PX),
+        w: Math.max(1, szCm.wCm * cmToPx),
+        h: Math.max(1, szCm.hCm * cmToPx),
       }
       const pl = toLocal(s.posicion || { x: 0, y: 0 }, parentEl)
       return { x: pl.x, y: pl.y, w: sz.w, h: sz.h, id: s.id }

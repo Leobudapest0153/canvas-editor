@@ -1,5 +1,6 @@
 import { CM_TO_PX } from '@/inventory-smart/utils/constants';
 import { buildChildFromDraft } from '@/inventory-smart/composables/useStructureManager';
+import { checkChildrenFit } from '@/inventory-smart/composables/useChildFitting';
 
 // Altura mínima por nivel en cm
 const MIN_LEVEL_CM = 1;
@@ -186,6 +187,34 @@ export function proposeLevelChange(elements, levelId, levelPatch, parentId) {
 
   const newDims = levelPatch?.dimensiones || {};
 
+  // 0) Restricciones por hijos del piso (ancho/largo/alto/capacidad)
+  // Solo aplica cuando se edita un nivel existente y dicho nivel tiene hijos (piso con elementos)
+  let childFit = null;
+  if (!isCreation) {
+    const targetLevel = byId(levelId);
+    if (targetLevel && Array.isArray(targetLevel.hijos) && targetLevel.hijos.length > 0) {
+      const proposedForFit = {
+        anchoCm: Number(newDims?.ancho),
+        largoCm: Number(newDims?.largo),
+        altoCm: Number(newDims?.alto),
+        capacidadCarga: Number(levelPatch?.capacidadCarga),
+      };
+      const fit = checkChildrenFit(targetLevel, proposedForFit, elements);
+      childFit = {
+        ok: !!fit.ok,
+        minAnchoCm: fit.minAnchoCm,
+        minLargoCm: fit.minLargoCm,
+        minAltoCm: fit.minAltoCm,
+        minCapacidad: fit.minCapacidad,
+        widthBoundById: fit.widthBoundById,
+        lengthBoundById: fit.lengthBoundById,
+        heightBoundById: fit.heightBoundById,
+        capacityCount: fit.capacityCount,
+        proposed: proposedForFit,
+      };
+    }
+  }
+
   // 1) Validar footprint (ancho/largo)
   const footprintCheck = validateFootprintWithinRoom(newDims, level, room);
   if (!footprintCheck.ok) {
@@ -272,6 +301,9 @@ export function proposeLevelChange(elements, levelId, levelPatch, parentId) {
     pesosActuales: { ...weightsCurrent },
     pesosPropuestos,
     pesoTotal: W_total,
+
+    // Límites por elementos del piso (si aplica)
+    childFit,
 
     // Propuestas de peso
     weightClamp,

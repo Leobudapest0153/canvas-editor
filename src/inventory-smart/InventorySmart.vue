@@ -49,18 +49,24 @@
       :open="showUnsavedModal"
       :changes="unsavedDiff.changes"
       :summary="unsavedDiff.summary"
-      @close="showUnsavedModal = false"
+      @close="handleDismissUnsavedModal"
       @save="saveAndExit"
       @continue="exitWithoutSaving"
     />
 
     <!-- Gestión de pisos de cuartos desde las propiedades -->
     <ManagmentFloorRoomPropertiesModal/>
+
+    <IdentifyEslModal
+      v-if="isIdentifyEslModalOpen"
+      @close="handleIdentifyEslClose"
+      @save="handleIdentifyEslSave"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, provide } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, provide } from 'vue'
 import SidebarPanel from './components/SidebarPanel.vue'
 import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
@@ -68,6 +74,7 @@ import PropiedadesPanel from './components/PropiedadesPanel.vue'
 import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import ManagmentFloorRoomPropertiesModal from './components/modals/ManagmentFloorRoomPropertiesModal.vue'
+import IdentifyEslModal from './components/modals/IdentifyEslModal.vue'
 import { useCanvasImportExport } from './composables/useCanvasImportExport'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
@@ -185,21 +192,48 @@ const handleShowIdentifiers = () => {
   emit('printIdentifiers')
 }
 
+const elementoEslActual = computed(() => {
+  const targetId = canvasStore.elementoEslObjetivo
+  if (!targetId) return null
+  return canvasStore.elementoPorId(targetId)
+})
+
+const isIdentifyEslModalOpen = computed(() => canvasStore.modoConfigurarEsl && !!canvasStore.elementoEslObjetivo)
+
+const handleIdentifyEslSave = ({ codigoEsl }) => {
+  if (!canvasStore.elementoEslObjetivo) return
+  const success = canvasStore.guardarCodigoEslElemento(canvasStore.elementoEslObjetivo, codigoEsl)
+  if (success) {
+    const target = elementoEslActual.value
+    const descriptor = target?.nombre || target?.codigo || target?.id || 'elemento'
+    showToast(`Código ESL configurado para ${descriptor}`, 'success')
+  } else {
+    showToast('No se pudo actualizar el código ESL', 'error')
+  }
+}
+
+const handleIdentifyEslClose = () => {
+  canvasStore.finalizarConfiguracionEsl()
+}
+
 // Propagar evento regresar
 const changeHistoryStore = useChangeHistoryStore()
 const showUnsavedModal = ref(false)
 const unsavedDiff = ref({ changes: [], summary: { created:0, updated:0, deleted:0 } })
+const pendingExitReason = ref(null)
+const bypassBeforeUnloadOnce = ref(false)
 
-const handleBack = () => {
+const getCurrentCanvasState = () => ({ plantas: canvasStore.plantas, elementos: canvasStore.elementos })
+
+const requestUnsavedConfirmation = (reason) => {
   try {
-    const state = { plantas: canvasStore.plantas, elementos: canvasStore.elementos }
-    const diff = changeHistoryStore.previewUnsavedChanges(state)
+    const diff = changeHistoryStore.previewUnsavedChanges(getCurrentCanvasState())
     if (diff?.changes?.length) {
+      pendingExitReason.value = reason
       unsavedDiff.value = diff
       showUnsavedModal.value = true
-      return
+      return true
     }
-    emit('back')
   } catch (e) {
     console.warn('No se pudo evaluar cambios antes de regresar', e)
     emit('back')
@@ -207,17 +241,87 @@ const handleBack = () => {
 }
 
 const saveAndExit = () => {
+  const reason = pendingExitReason.value
   try {
     const json = canvasStore.serialize(true)
     emit('configUpdated', json)
-  } catch (e) { console.warn('Error serializando antes de salir', e) }
+  } catch (e) {
+    console.warn('Error serializando antes de salir', e)
+  }
   showUnsavedModal.value = false
-  emit('back')
+  pendingExitReason.value = null
+
+  if (reason === 'back') {
+    emit('back')
+  } else if (reason === 'unload') {
+    continueUnloadFlow()
+  }
 }
 
 const exitWithoutSaving = () => {
+  const reason = pendingExitReason.value
   showUnsavedModal.value = false
-  emit('back')
+  pendingExitReason.value = null
+
+  if (reason === 'back') {
+    emit('back')
+  } else if (reason === 'unload') {
+    continueUnloadFlow()
+  }
+}
+
+const handleBeforeUnload = (event) => {
+  if (bypassBeforeUnloadOnce.value) {
+    bypassBeforeUnloadOnce.value = false
+    return
+  }
+  const shouldBlock = requestUnsavedConfirmation('unload')
+  if (!shouldBlock) return
+  const warningMessage = 'Tienes cambios sin guardar. ¿Seguro que deseas salir sin guardar?'
+  event.preventDefault()
+  event.returnValue = warningMessage
+}
+
+// Atajos de teclado globales
+const handleKeydown = (e) => {
+  // Solo procesar si no estamos en un input
+  if (e.target.matches('input, textarea, select, [contenteditable]')) {
+    return
+  }
+
+  // Bloquear si hay texto seleccionado
+  if (window.getSelection().toString()) {
+    return
+  }
+
+  // Bloquear si hay drag global activo
+  if (typeof window !== 'undefined' && window.__dvCanvasDragActive) {
+    return
+  }
+
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === 'z' && !e.shiftKey) {
+      e.preventDefault()
+      undo()
+    } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+      e.preventDefault()
+      redo()
+    } else if (e.key === 'c') {
+      e.preventDefault()
+      handleCopyToBuffer()
+    } else if (e.key === 'v') {
+      e.preventDefault()
+      triggerPaste()
+    }
+  } else if (e.key === 'Delete' || e.key === 'Backspace') {
+    // Supr o Retroceso -> eliminar seleccionado
+    const hasSelection = !!canvasStore.elementoSeleccionado
+    if (hasSelection) {
+      e.preventDefault()
+      // No es necesario await; el modal gestiona la interacción
+      deleteSelected({ withConfirm: true })
+    }
+  }
 }
 
 // Handlers para buffer
@@ -301,10 +405,24 @@ useEditorShortcuts({
 
 onMounted(() => {
   try {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', handleBeforeUnload)
+    }
+
+    // Provide de la API de servicios externos para componentes hijos
     provide('externalServicesAPI', externalServicesAPI)
   } catch (error) {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
     showToast('Ha ocurrido un error al importar la configuración', 'error')
     console.error('Error al importar la configuración:', error)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('beforeunload', handleBeforeUnload)
   }
 })
 

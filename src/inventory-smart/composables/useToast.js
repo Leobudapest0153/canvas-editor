@@ -3,10 +3,22 @@
  * Composable para consumir el servicio global de toasts.
  */
 
-import { getToastApi } from '@/inventory-smart/plugins/toast'
+import { getCurrentInstance, inject } from 'vue'
+import { getToastApi, ToastSymbol, __setToastApiForTests } from '@/inventory-smart/plugins/toast'
 
 export function useToast() {
   let toastApi = getToastApi()
+
+  if (!toastApi) {
+    toastApi = inject?.(ToastSymbol, null) || null
+    if (!toastApi) {
+      const vm = getCurrentInstance()
+      toastApi = vm?.appContext?.provides?.[ToastSymbol] || null
+    }
+    if (toastApi && typeof __setToastApiForTests === 'function') {
+      __setToastApiForTests(toastApi)
+    }
+  }
 
   const showToast = (message, type = 'error', options = {}) => {
     if (!toastApi || typeof toastApi.show !== 'function') {

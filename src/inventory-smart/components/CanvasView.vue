@@ -19,6 +19,7 @@
       'drag-over': isDragOverCanvas,
       'cursor-grab': !dragModeGlobal,
       'infinite-floor': isInfinitePlant,
+      'esl-mode': canvasStore.modoConfigurarEsl,
     }"
     @drop="handleDrop"
     @dragover="handleDragOver"
@@ -201,6 +202,7 @@
             <v-rect
               v-if="getOrientationBarRect(elemento)"
               :config="getOrientationBarRect(elemento)"
+              @click="() => handleOrientationBarClick(elemento)"
             />
             <!-- Etiqueta centrada del elemento (rectangular) -->
             <v-text :config="computeLabelProps(elemento)" />
@@ -731,7 +733,7 @@ const {
 const { deleteSelected } = useDeleteElement()
 const weightValidation = useWeightValidation()
 const { modoEdicion } = useEditorMode()
-const isEditMode = computed(() => modoEdicion.value === true)
+const isEditMode = computed(() => modoEdicion.value === true && !['cuartos', 'elementos'].includes(canvasStore.contextoActual.tipo))
 const canUseContextMenus = computed(() => isEditMode.value)
 const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 
@@ -1335,6 +1337,10 @@ const handleStageMouseDown = (e) => {
 }
 
 const handleStageClick = (e) => {
+  if (canvasStore.modoConfigurarEsl && e.target === e.target.getStage()) {
+    canvasStore.finalizarConfiguracionEsl()
+    return
+  }
   // Deseleccionar elemento si click en área vacía
   if (e.target === e.target.getStage() && !canvasStore.cambiosNoAplicados && !canvasStore.nivelAEditar) {
     canvasStore.seleccionarElemento(null)
@@ -1358,6 +1364,12 @@ const handleStageClick = (e) => {
 
 // === FUNCIONES DE ELEMENTOS ===
 const selectElement = (element) => {
+  if (canvasStore.modoConfigurarEsl) {
+    if (element?.id) {
+      canvasStore.iniciarConfiguracionEsl(element.id)
+    }
+    return
+  }
   if (element?.restrictions && element?.restrictions.includes('open-properties')) return
   const isNotCurrentElement = canvasStore.elementoSeleccionado !== element.id
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado && isNotCurrentElement) {
@@ -1373,6 +1385,12 @@ const selectElement = (element) => {
   } else {
     editingElementId.value = null
   }
+}
+
+const handleOrientationBarClick = (elemento) => {
+  if (!canvasStore.modoConfigurarEsl) return
+  if (!elemento?.id) return
+  canvasStore.iniciarConfiguracionEsl(elemento.id)
 }
 
 const handleElementDoubleClick = (evt, elemento) => {
@@ -1596,6 +1614,7 @@ const {
   onShapeDragMove,
   onShapeDragEnd,
   registerDraggableRef,
+  innerSessions,
 } = useElementDrag({
   canvasStore,
   stageRef,
@@ -1981,10 +2000,13 @@ const getOrientationBarRect = (elemento) => {
     // Barra pegada al borde (sin margen), grosor escalado por zoom
     const margin = 0
     const thick = Math.max(2, 4 / (canvasStore.zoom || 1))
-    const color = '#fdfd43'
+    const eslModeActive = canvasStore.modoConfigurarEsl
+    const hasCodigo = typeof elemento.codigoEsl === 'string' && elemento.codigoEsl.trim().length > 0
+    const color = eslModeActive ? (hasCodigo ? '#16a34a' : '#dc2626') : '#fdfd43'
+    const listening = eslModeActive
     if (o === 180) {
       const width = Math.max(1, w - 2 * margin)
-      return { x: margin, y: 0, width, height: thick, fill: color, listening: false, opacity: 0.95 }
+      return { x: margin, y: 0, width, height: thick, fill: color, listening, opacity: 0.95, name: 'orientation-bar' }
     }
     if (o === 0) {
       const width = Math.max(1, w - 2 * margin)
@@ -1994,8 +2016,9 @@ const getOrientationBarRect = (elemento) => {
         width,
         height: thick,
         fill: color,
-        listening: false,
+        listening,
         opacity: 0.95,
+        name: 'orientation-bar',
       }
 
     }
@@ -2007,13 +2030,14 @@ const getOrientationBarRect = (elemento) => {
         width: thick,
         height,
         fill: color,
-        listening: false,
+        listening,
         opacity: 0.95,
+        name: 'orientation-bar',
       }
     }
     // 270
     const height = Math.max(1, h - 2 * margin)
-    return { x: 0, y: margin, width: thick, height, fill: color, listening: false, opacity: 0.95 }
+    return { x: 0, y: margin, width: thick, height, fill: color, listening, opacity: 0.95, name: 'orientation-bar' }
   } catch {
     return null
   }
@@ -2230,7 +2254,9 @@ watch(
   () => isEditMode.value,
   (enabled) => {
     dragModeGlobal.value = enabled
-    canvasStore.setDraggableMode(enabled)
+    if (typeof canvasStore.setDraggableMode === 'function') {
+      canvasStore.setDraggableMode(enabled)
+    }
     if (!enabled) {
       editingElementId.value = null
       ctxVisible.value = false
@@ -2276,7 +2302,9 @@ const toggleDragMode = () => {
   // Alterna el modo arrastre global. Cuando se activa y hay un elemento seleccionado y no bloqueado,
   // se activa también la edición (transformer) para permitir cambiar dimensiones.
   dragModeGlobal.value = !dragModeGlobal.value
-  canvasStore.setDraggableMode(dragModeGlobal.value)
+  if (typeof canvasStore.setDraggableMode === 'function') {
+    canvasStore.setDraggableMode(dragModeGlobal.value)
+  }
   if (!dragModeGlobal.value) {
     editingElementId.value = null
   } else {
@@ -2734,6 +2762,14 @@ defineExpose({
   background: #eff6ff;
   border-color: #3b82f6;
   box-shadow: inset 0 0 0 2px #3b82f6;
+}
+
+.canvas-container.esl-mode {
+  cursor: pointer;
+}
+
+.canvas-container.esl-mode :deep(.konvajs-content) {
+  cursor: pointer !important;
 }
 
 .canvas-info {
