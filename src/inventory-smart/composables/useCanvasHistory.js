@@ -21,6 +21,7 @@ const historyStack = ref([])
 const currentIndex = ref(-1)
 const maxHistorySize = ref(10) // Máximo 10 estados en el historial
 const isUndoRedoOperation = ref(false)
+const historyApiCache = new WeakMap()
 
 // Sistema de logging para debugging
 const historyEvents = reactive({
@@ -31,6 +32,9 @@ const historyEvents = reactive({
 
 export const useCanvasHistory = () => {
   const canvasStore = useCanvasStore()
+  if (historyApiCache.has(canvasStore)) {
+    return historyApiCache.get(canvasStore)
+  }
 
   // Computed properties
   const canUndo = computed(() => currentIndex.value > 0)
@@ -142,7 +146,7 @@ export const useCanvasHistory = () => {
   /**
    * Restaurar un snapshot del estado con manejo mejorado de errores
    */
-  const restoreSnapshot = async (snapshot) => {
+  const restoreSnapshot = (snapshot) => {
     isUndoRedoOperation.value = true
 
     try {
@@ -237,7 +241,7 @@ export const useCanvasHistory = () => {
   /**
    * Deshacer la última acción con manejo mejorado de errores
    */
-  const undo = async () => {
+  const undo = () => {
     if (!canUndo.value) {
       console.warn('No hay acciones para deshacer')
       return false
@@ -249,10 +253,10 @@ export const useCanvasHistory = () => {
 
       // Aplicar cambios según el tipo de snapshot
       if (snapshot.type === 'full') {
-        await restoreSnapshot(snapshot)
+        restoreSnapshot(snapshot)
       } else if (snapshot.changes) {
         // Para cambios incrementales, necesitamos aplicar en reversa
-        await applyIncrementalChanges(snapshot.changes.map(change => ({
+        applyIncrementalChanges(snapshot.changes.map(change => ({
           ...change,
           newValue: change.oldValue,
           oldValue: change.newValue
@@ -286,7 +290,7 @@ export const useCanvasHistory = () => {
   /**
    * Rehacer la siguiente acción con manejo mejorado de errores
    */
-  const redo = async () => {
+  const redo = () => {
     if (!canRedo.value) {
       console.warn('No hay acciones para rehacer')
       return false
@@ -298,9 +302,9 @@ export const useCanvasHistory = () => {
 
       // Aplicar cambios según el tipo de snapshot
       if (snapshot.type === 'full') {
-        await restoreSnapshot(snapshot)
+        restoreSnapshot(snapshot)
       } else if (snapshot.changes) {
-        await applyIncrementalChanges(snapshot.changes)
+        applyIncrementalChanges(snapshot.changes)
       }
 
       // Actualizar eventos
@@ -469,7 +473,7 @@ export const useCanvasHistory = () => {
     return true
   }
 
-  return {
+  const historyApi = {
     // Estado
     isUndoRedoOperation: computed(() => isUndoRedoOperation.value),
 
@@ -497,4 +501,7 @@ export const useCanvasHistory = () => {
     restoreSnapshot,
     applyIncrementalChanges,
   }
+
+  historyApiCache.set(canvasStore, historyApi)
+  return historyApi
 }
