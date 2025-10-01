@@ -1,24 +1,13 @@
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
 import { setPlantInfiniteFlag } from '@/inventory-smart/utils/polygonBounds'
 
-// Map physical dimensions (cm) to width/height depending on active view and orientation
-// dims: {ancho, largo, alto}, element: elemento con orientación
-export function mapDimsByView(dims = {}, view = 'XY', element = null) {
+// Map physical dimensions (cm) to width/height depending only on active view (ignore orientation)
+// dims: {ancho, largo, alto}
+export function mapDimsByView(dims = {}, view = 'XY') {
   const { ancho = 0, largo = 0, alto = 0 } = dims
 
   if (view === 'XZ') {
-    // Front view: considerar orientación del elemento
-    if (element && element.orientacion !== undefined) {
-      const orientacion = Number(element.orientacion || 0)
-      const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-      const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
-
-      return {
-        widthCm: useAncho ? ancho : largo,
-        heightCm: alto
-      }
-    }
-    // Sin orientación: usar lógica original
+    // Front view: width -> ancho, height -> alto (independiente de orientacion)
     return { widthCm: ancho, heightCm: alto }
   }
   if (view === 'ZY') {

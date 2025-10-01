@@ -659,7 +659,10 @@ import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWit
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
 import RulersOverlay from '@/inventory-smart/components/RulersOverlay.vue'
-import { detectConflictsFor, throttle } from '@/inventory-smart/utils/collision'
+import { detectConflictsFor, throttle, computeMTD } from '@/inventory-smart/utils/collision'
+import { boundaryToAreaBounds } from '@/inventory-smart/utils/bounds'
+import { solveDragPosition } from '@/inventory-smart/utils/placementSolver'
+import { resolveCoplanarNeighbors } from '@/inventory-smart/validation/placementOrchestrator'
 import { snapToGrid, nudgePlace } from '@/inventory-smart/utils/geometry'
 import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
@@ -712,6 +715,10 @@ const backgroundLayerRef = ref(null)
 const overlaysLayerRef = ref(null)
 const indicatorsLayerRef = ref(null)
 const lastFitTarget = ref(null)
+
+// Estado de contacto y último pos para dragBound en plantas (memoria por elemento)
+const boundContactState = new Map()
+const boundLastWorldPos = new Map()
 
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
@@ -766,59 +773,27 @@ const isSnappingEnabled = ref(true)
 const viewport = useViewportStore()
 
 const getElementPixelDimensions = (elemento) => {
-  // Si ya tiene width/height en píxeles, usarlos solo si no tiene dimensiones en cm
-  // Esto es para compatibilidad con elementos legacy que solo tienen width/height
+  // Si ya tiene width/height en píxeles y no hay dimensiones en cm, usarlos tal cual (legacy)
   if (!elemento.dimensiones && elemento.width && elemento.height) {
-    // Para elementos legacy, aplicar orientación en vista XZ
-    if (canvasStore.vistaActiva === 'XZ') {
-      const orientacion = Number(elemento.orientacion || 0)
-      const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-      const useAncho = orientacionNormalizada === 0 || orientacionNormalizada === 180
-
-      return {
-        width: useAncho ? elemento.width : elemento.height,
-        height: elemento.height,
-      }
-    }
     return { width: elemento.width, height: elemento.height }
   }
 
-  // Priorizar dimensiones en cm y convertir según la vista
+  // Priorizar dimensiones en cm y convertir según la vista (sin considerar orientacion)
   if (elemento.dimensiones) {
     let widthCm, heightCm
 
     if (canvasStore.vistaActiva === 'XY') {
       // Vista aérea (XY): width = ancho, height = largo
-      widthCm =
-        elemento.dimensiones.ancho ||
-        (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
-      heightCm =
-        elemento.dimensiones.largo ||
-        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else if (canvasStore.vistaActiva === 'XZ') {
-      // Vista de frente (XZ): considerar orientación para el width
-      const orientacion = Number(elemento.orientacion || 0)
-      const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-      const useAncho = orientacionNormalizada === 0 || orientacionNormalizada === 180
-
-      // En XZ: orientación determina si width usa ancho o largo
-      widthCm = useAncho
-        ? elemento.dimensiones.ancho ||
-          (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
-        : elemento.dimensiones.largo ||
-          (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
-      // Height siempre es alto en XZ
-      heightCm =
-        elemento.dimensiones.alto ||
-        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      // Vista de frente (XZ): width = ancho, height = alto
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.alto || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else {
-      // Fallback a vista aérea (XY)
-      widthCm =
-        elemento.dimensiones.ancho ||
-        (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
-      heightCm =
-        elemento.dimensiones.largo ||
-        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      // Fallback a vista lateral (ZY): width = largo, height = alto
+      widthCm = elemento.dimensiones.largo || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.alto || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     }
 
     return {
@@ -1468,21 +1443,45 @@ const toStageCoords = (pos) => {
 // Drag bound para cada elemento y forma (clamp mínimo al contorno)
 const dragBoundForElement = (pos, elemento) => {
   try {
-    if (isInfinitePlant.value) {
-      return pos
-    }
     const lp = toLayerCoords(pos)
     const boundary = computeBoundary()
+    const areaBounds = boundaryToAreaBounds(boundary, {
+      minX: 0,
+      minY: 0,
+      maxX: layerConfig.value.width,
+      maxY: layerConfig.value.height,
+      mode: boundary?.mode || 'fixed',
+      polygon: boundary?.type === 'polygon' ? boundary.points : null,
+    })
+
     const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
-    const w = w_cm * CM_TO_PX
-    const h = h_cm * CM_TO_PX
+    const w = Math.max(1, w_cm * CM_TO_PX)
+    const h = Math.max(1, h_cm * CM_TO_PX)
 
-    // Obtener posición previa para movimiento suave
-    const lastPos = dragLastValidPositions.value.get(elemento.id)
+    const lastPos = boundLastWorldPos.get(elemento.id) || dragLastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+    const lastVel = { x: lp.x - (lastPos.x || 0), y: lp.y - (lastPos.y || 0) }
 
-    const c = clampInsideArea(lp.x, lp.y, w, h, boundary, elemento, true, lastPos)
-    return toStageCoords(c)
-  } catch {
+    const moving = elemento.forma === 'circular'
+      ? { ...elemento, width: Math.min(w, h), height: Math.min(w, h), forma: 'circular' }
+      : { ...elemento, width: w, height: h, forma: elemento.forma || 'rectangular' }
+
+    const candidates = canvasStore.elementosVisibles.filter((e) => e && e.id !== elemento.id)
+    const coplanar = resolveCoplanarNeighbors({ ...moving }, candidates)
+    const neighbors = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'suelo' && (moving.ubicacion || 'suelo') === 'suelo')
+
+    const solved = solveDragPosition({
+      candidate: { x: lp.x, y: lp.y },
+      movingEl: moving,
+      neighbors,
+      areaBounds,
+      lastValidPos: lastPos,
+      lastVelocity: lastVel,
+      maxIters: 6,
+    })
+
+    boundLastWorldPos.set(elemento.id, { x: solved.x, y: solved.y })
+    return toStageCoords({ x: solved.x, y: solved.y })
+  } catch (err) {
     return pos
   }
 }

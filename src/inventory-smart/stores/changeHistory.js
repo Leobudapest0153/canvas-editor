@@ -32,9 +32,10 @@ const deepEqual = (a, b) => {
   return na === nb
 }
 
-const diffFields = (before, after, fields) => {
+const diffFields = (before, after, fields, excludeFields = []) => {
   const changes = []
-  for (const key of fields) {
+  const fieldsToCheck = fields.filter(field => !excludeFields.includes(field))
+  for (const key of fieldsToCheck) {
     const a = before?.[key]
     const b = after?.[key]
     // Si ambos lados son "vacíos", omitir
@@ -57,7 +58,7 @@ export const useChangeHistoryStore = defineStore('changeHistory', () => {
     elementos: (state?.elementos || []).map((e) => ({ id: e.id, nombre: e.nombre, plantaId: e.plantaId, ...deepClone(e) })),
   })
 
-  const computeDiff = (prev, curr) => {
+  const computeDiff = (prev, curr, excludeElementFields = []) => {
     const changes = []
 
     // Mapas por id
@@ -85,10 +86,10 @@ export const useChangeHistoryStore = defineStore('changeHistory', () => {
     // Elementos creados/actualizados/eliminados
     for (const [id, e] of currElems.entries()) {
       if (!prevElems.has(id)) {
-        changes.push({ entityType: e.tipo, op: 'create', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields: diffFields(null, e, FIELDS_ELEMENTO) })
+        changes.push({ entityType: e.tipo, op: 'create', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields: diffFields(null, e, FIELDS_ELEMENTO, excludeElementFields) })
       } else {
         const before = prevElems.get(id)
-        const fields = diffFields(before, e, FIELDS_ELEMENTO)
+        const fields = diffFields(before, e, FIELDS_ELEMENTO, excludeElementFields)
         if (fields.length) changes.push({ entityType: e.tipo, op: 'update', id, code: e.codigo, name: e.nombre, plantaId: e.plantaId, fields })
       }
     }
@@ -108,10 +109,10 @@ export const useChangeHistoryStore = defineStore('changeHistory', () => {
     return { changes, summary }
   }
 
-  const recordSave = (canvasState, author) => {
+  const recordSave = (canvasState, author, excludeElementFields = ['x', 'y', 'posicion']) => {
     const curr = getSnapshotFromState(canvasState)
     const prev = lastSnapshot.value?.plantas?.length || lastSnapshot.value?.elementos?.length ? lastSnapshot.value : { plantas: [], elementos: [] }
-    const { changes, summary } = computeDiff(prev, curr)
+    const { changes, summary } = computeDiff(prev, curr, excludeElementFields)
     const ts = new Date().toISOString()
 
     if (changes.length === 0) {
@@ -140,7 +141,7 @@ export const useChangeHistoryStore = defineStore('changeHistory', () => {
       const curr = getSnapshotFromState(canvasState || {})
       const hasBaseline = (lastSnapshot.value?.plantas?.length || 0) || (lastSnapshot.value?.elementos?.length || 0)
       const prev = hasBaseline ? lastSnapshot.value : { plantas: [], elementos: [] }
-      return computeDiff(prev, curr)
+      return computeDiff(prev, curr, []) // Incluir todos los campos en la previsualización
     } catch {
       return { changes: [], summary: { total: 0, created: 0, updated: 0, deleted: 0 } }
     }

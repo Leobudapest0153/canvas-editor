@@ -4,8 +4,8 @@
   <PlantasPanel
     :author="author"
     @configChanged="handleConfigChanged"
-    @regresar="handleBack"
-    @showIndicators="handleShowIndicators"
+    @back="handleBack"
+    @showIdentifiers="handleShowIdentifiers"
   />
 
     <!-- Navegación jerárquica -->
@@ -120,7 +120,7 @@ const props = defineProps({
     }
   }
 })// Definir emits para comunicar cambios al componente padre
-const emit = defineEmits(['configUpdated', 'regresar', 'imprimirIndicadores'])
+const emit = defineEmits(['configUpdated', 'back', 'printIdentifiers'])
 
 const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
@@ -188,8 +188,8 @@ const handleConfigChanged = (configSerializada) => {
   }
 }
 
-const handleShowIndicators = () => {
-  emit('imprimirIndicadores')
+const handleShowIdentifiers = () => {
+  emit('printIdentifiers')
 }
 
 const elementoEslActual = computed(() => {
@@ -242,7 +242,7 @@ const requestUnsavedConfirmation = (reason) => {
 
 const handleBack = () => {
   if (requestUnsavedConfirmation('back')) return
-  emit('regresar')
+  emit('back')
 }
 
 const handleDismissUnsavedModal = () => {
@@ -270,7 +270,7 @@ const saveAndExit = () => {
   pendingExitReason.value = null
 
   if (reason === 'back') {
-    emit('regresar')
+    emit('back')
   } else if (reason === 'unload') {
     continueUnloadFlow()
   }
@@ -282,7 +282,7 @@ const exitWithoutSaving = () => {
   pendingExitReason.value = null
 
   if (reason === 'back') {
-    emit('regresar')
+    emit('back')
   } else if (reason === 'unload') {
     continueUnloadFlow()
   }
@@ -298,48 +298,6 @@ const handleBeforeUnload = (event) => {
   const warningMessage = 'Tienes cambios sin guardar. ¿Seguro que deseas salir sin guardar?'
   event.preventDefault()
   event.returnValue = warningMessage
-}
-
-// Atajos de teclado globales
-const handleKeydown = (e) => {
-  // Solo procesar si no estamos en un input
-  if (e.target.matches('input, textarea, select, [contenteditable]')) {
-    return
-  }
-
-  // Bloquear si hay texto seleccionado
-  if (window.getSelection().toString()) {
-    return
-  }
-
-  // Bloquear si hay drag global activo
-  if (typeof window !== 'undefined' && window.__dvCanvasDragActive) {
-    return
-  }
-
-  if (e.ctrlKey || e.metaKey) {
-    if (e.key === 'z' && !e.shiftKey) {
-      e.preventDefault()
-      undo()
-    } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
-      e.preventDefault()
-      redo()
-    } else if (e.key === 'c') {
-      e.preventDefault()
-      handleCopyToBuffer()
-    } else if (e.key === 'v') {
-      e.preventDefault()
-      triggerPaste()
-    }
-  } else if (e.key === 'Delete' || e.key === 'Backspace') {
-    // Supr o Retroceso -> eliminar seleccionado
-    const hasSelection = !!canvasStore.elementoSeleccionado
-    if (hasSelection) {
-      e.preventDefault()
-      // No es necesario await; el modal gestiona la interacción
-      deleteSelected({ withConfirm: true })
-    }
-  }
 }
 
 // Handlers para buffer
