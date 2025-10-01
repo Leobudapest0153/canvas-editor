@@ -1239,9 +1239,22 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (index > -1) {
       plantas.value.splice(index, 1)
 
-      // Si se elimina la planta activa, cambiar a la primera disponible
-      if (plantaActiva.value === plantaId && plantas.value.length > 0) {
-        plantaActiva.value = plantas.value[0].id
+      const contextRootId = contextoNavegacion.value.path?.[0]?.id
+      const contextMatches =
+        contextoNavegacion.value.tipo === 'plantas' && contextoNavegacion.value.id === plantaId
+
+      if (plantaActiva.value === plantaId || contextMatches || contextRootId === plantaId) {
+        if (plantas.value.length > 0) {
+          const nextId = plantas.value[0].id
+          seleccionarPlanta(nextId)
+        } else {
+          plantaActiva.value = null
+          contextoNavegacion.value = {
+            tipo: 'plantas',
+            id: null,
+            path: [],
+          }
+        }
       }
     }
   }
