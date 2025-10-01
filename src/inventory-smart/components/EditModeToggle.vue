@@ -41,6 +41,10 @@ const setMode = (nextValue) => {
 }
 
 const toggleMode = () => {
+  if (canvasStore.cambiosNoAplicados) {
+  showToast('No se puede finalizar si existen cambios pendientes', 'warn');
+  return;
+  }
   setMode(!isEditing.value)
 }
 </script>

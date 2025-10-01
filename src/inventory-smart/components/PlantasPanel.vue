@@ -677,6 +677,10 @@ const closeImportExportModal = () => {
 
 const guardarCambios = async () => {
   try {
+    if (canvasStore.cambiosNoAplicados) {
+      showToast('No puedes guardar si hay cambios pendientes de guardar', 'warn');
+      return;
+    }
     // Capturar snapshot para historial de cambios ANTES de serializar
     try {
       const changeHistoryStore = useChangeHistoryStore()
@@ -701,6 +705,10 @@ const guardarCambios = async () => {
 }
 
 const seleccionarPlanta = (plantaId) => {
+  if (canvasStore.cambiosNoAplicados) {
+    showToast("Cambios pendientes de guardar, no es posible el cambio de planta");
+    return;
+  }
   canvasStore.navegarAPlanta(plantaId)
 }
 
