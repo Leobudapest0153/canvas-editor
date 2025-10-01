@@ -261,8 +261,15 @@ export function useTransformer({
   }
 
   // Inicio de transformación - guardar estado inicial
-  const handleTransformStart = (e, element) => {
-    if (element?.restrictions && element.restrictions.include('drag')) return;
+  const handleTransformStart = (e, elementId) => {
+    // Respetar restricciones de la entidad (no permitir transformar si tiene 'drag' restringido)
+    try {
+      const elementObj = canvasStore.elementosVisibles.find((el) => el.id === elementId)
+      if (elementObj?.restrictions && Array.isArray(elementObj.restrictions)) {
+        if (elementObj.restrictions.includes('drag')) return
+      }
+    } catch { /* ignore */ }
+
     isInteractingWithTransformer.value = true
     try {
       const node = e.target
@@ -275,13 +282,13 @@ export function useTransformer({
       const width = node.width() * node.scaleX()
       const height = node.height() * node.scaleY()
       const state = { x, y, width, height, rotation: node.rotation?.() || 0 }
-      transformInitialState.set(element.id, state)
+      transformInitialState.set(elementId, state)
 
       // Mostrar guías de snapping al iniciar transform si está habilitado
       if (isSnappingEnabled?.value && typeof performSnap === 'function') {
         try {
-          const elemento = canvasStore.elementosVisibles.find((e) => e.id === element.id)
-          const neighbors = canvasStore.elementosVisibles.filter((el) => el.id !== element.id)
+          const elemento = canvasStore.elementosVisibles.find((e) => e.id === elementId)
+          const neighbors = canvasStore.elementosVisibles.filter((el) => el.id !== elementId)
           const pageBounds = layerConfig?.value
             ? { width: layerConfig.value.width, height: layerConfig.value.height }
             : null
@@ -665,8 +672,19 @@ export function useTransformer({
       }
 
       // VALIDACIÓN 3: Placement validation (colisiones, área) - usar valores corregidos
-      // Usar neighbors del snapshot para evitar cambios durante la validación
-      const neighbors = Array.from(elementosSnapshot.values()).filter((e) => e.id !== elementId)
+      // Selección de vecinos: en plantas infinitas usar todos los elementos de la planta; si no, snapshot visibles
+      let neighbors = []
+      try {
+        const isInfiniteFloor = canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true
+        const plantaId = canvasStore.plantaActivaData?.id
+        if (isInfiniteFloor && plantaId && typeof canvasStore.elementosEnPlanta === 'function') {
+          neighbors = (canvasStore.elementosEnPlanta(plantaId) || []).filter((e) => e && e.id !== elementId)
+        } else {
+          neighbors = Array.from(elementosSnapshot.values()).filter((e) => e.id !== elementId)
+        }
+      } catch {
+        neighbors = Array.from(elementosSnapshot.values()).filter((e) => e.id !== elementId)
+      }
       const elementoParaValidacion =
         elementoSnapshot?.forma === 'circular'
           ? {

@@ -543,12 +543,34 @@ export function useElementDrag({
           let candY = shape.y()
 
           // Vecinos bloqueantes (suelo–suelo)
-          const neighbors = canvasStore.elementosVisibles.filter(
-            (e) =>
-              e.id !== elementId &&
-              (e.ubicacion || 'suelo') === 'suelo' &&
-              (elementoActual.ubicacion || 'suelo') === 'suelo',
-          )
+          let neighbors = []
+          try {
+            const isInfiniteFloor = canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true
+            const plantaId = canvasStore.plantaActivaData?.id
+            if (isInfiniteFloor && plantaId && typeof canvasStore.elementosEnPlanta === 'function') {
+              neighbors = (canvasStore.elementosEnPlanta(plantaId) || []).filter(
+                (e) =>
+                  e &&
+                  e.id !== elementId &&
+                  (e.ubicacion || 'suelo') === 'suelo' &&
+                  (elementoActual.ubicacion || 'suelo') === 'suelo',
+              )
+            } else {
+              neighbors = canvasStore.elementosVisibles.filter(
+                (e) =>
+                  e.id !== elementId &&
+                  (e.ubicacion || 'suelo') === 'suelo' &&
+                  (elementoActual.ubicacion || 'suelo') === 'suelo',
+              )
+            }
+          } catch {
+            neighbors = canvasStore.elementosVisibles.filter(
+              (e) =>
+                e.id !== elementId &&
+                (e.ubicacion || 'suelo') === 'suelo' &&
+                (elementoActual.ubicacion || 'suelo') === 'suelo',
+            )
+          }
 
           // strokePxEstable: usar el stroke normal del elemento (no la selección). Por defecto 1px
           const strokePx = 1
@@ -741,15 +763,26 @@ export function useElementDrag({
           polygon: boundary?.type === 'polygon' ? boundary.points : null,
           mode: boundary?.mode || 'fixed',
         })
-        const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
-        const isValidNow = isPlacementValid({
-          pos: { x: finalX, y: finalY },
-          movingEl: storeEl,
-          neighbors,
-          areaBounds,
-          CM_TO_PX,
-          epsPx: 0.5,
-        })
+          let neighbors = []
+          try {
+            const isInfiniteFloor = canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true
+            const plantaId = canvasStore.plantaActivaData?.id
+            if (isInfiniteFloor && plantaId && typeof canvasStore.elementosEnPlanta === 'function') {
+              neighbors = (canvasStore.elementosEnPlanta(plantaId) || []).filter((e) => e && e.id !== elementId)
+            } else {
+              neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
+            }
+          } catch {
+            neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
+          }
+          const isValidNow = isPlacementValid({
+            pos: { x: finalX, y: finalY },
+            movingEl: storeEl,
+            neighbors,
+            areaBounds,
+            CM_TO_PX,
+            epsPx: 0.5,
+          })
 
         if (isValidNow) {
           const guardRes = onDragEndGuard(storeEl, { x: finalX, y: finalY })
