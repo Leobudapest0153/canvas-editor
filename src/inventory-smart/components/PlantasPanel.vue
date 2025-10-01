@@ -560,7 +560,7 @@ const eslButtonClasses = computed(() => [
   'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors cursor-pointer',
   canvasStore.modoConfigurarEsl
     ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-    : 'bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500',
+    : 'bg-gray text-white hover:bg-ice-blue-300 hover:text-white',
 ])
 
 // Estado local para modales
@@ -1097,5 +1097,9 @@ const vClickOutside = {
   .plantas-scroll-container {
     max-width: calc(100vw - 260px);
   }
+}
+
+.bg-gray {
+  background-color: #8899A8;
 }
 </style>
