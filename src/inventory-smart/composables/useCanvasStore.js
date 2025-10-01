@@ -268,6 +268,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const isDraggable = ref(true)
   const modoEdicion = ref(false)
+  const modoConfigurarEsl = ref(false)
+  const elementoEslObjetivo = ref(null)
   const sidebarActiveTab = ref('elementos')
 
   const editorPermissions = computed(() => ({
@@ -2391,8 +2393,42 @@ export const useCanvasStore = defineStore('canvas', () => {
     isDraggable.value = !!mode
   }
 
+  const setModoConfigurarEsl = (value, { silent = false } = {}) => {
+    const next = value === true
+    if (modoConfigurarEsl.value === next) return
+
+    if (next && modoEdicion.value) {
+      modoEdicion.value = false
+      isDraggable.value = false
+    }
+
+    modoConfigurarEsl.value = next
+
+    if (!next) {
+      elementoEslObjetivo.value = null
+      if (!silent) {
+        showToast('Modo Configurar ESL desactivado', 'info')
+      }
+      return
+    }
+
+    setDraggableMode(false)
+    if (!silent) {
+      showToast('Modo Configurar ESL activo: haz clic en un elemento para asignar su ESL', 'info')
+    }
+  }
+
+  const activarModoConfigurarEsl = (options) => setModoConfigurarEsl(true, options)
+  const desactivarModoConfigurarEsl = (options) => setModoConfigurarEsl(false, options)
+  const toggleModoConfigurarEsl = (options) => setModoConfigurarEsl(!modoConfigurarEsl.value, options)
+
   const setModoEdicion = (value) => {
-    modoEdicion.value = value === true
+    const next = value === true
+    // Si se activa el modo edición, desactivar configuración de ESL
+    if (next && modoConfigurarEsl.value) {
+      setModoConfigurarEsl(false, { silent: true })
+    }
+    modoEdicion.value = next
     if (!modoEdicion.value) {
       isDraggable.value = false
     }
@@ -2401,6 +2437,34 @@ export const useCanvasStore = defineStore('canvas', () => {
   const activarModoEdicion = () => setModoEdicion(true)
   const desactivarModoEdicion = () => setModoEdicion(false)
   const toggleModoEdicion = () => setModoEdicion(!modoEdicion.value)
+
+  const iniciarConfiguracionEsl = (elementoId) => {
+    if (!modoConfigurarEsl.value) return false
+    if (!elementoId) return false
+    const existe = elementos.value.find((el) => el?.id === elementoId)
+    if (!existe) return false
+    elementoEslObjetivo.value = elementoId
+    return true
+  }
+
+  const finalizarConfiguracionEsl = () => {
+    elementoEslObjetivo.value = null
+  }
+
+  const guardarCodigoEslElemento = (elementoId, codigoEsl) => {
+    const elemento = elementos.value.find((el) => el?.id === elementoId)
+    if (!elemento) return false
+
+    const trimmed = typeof codigoEsl === 'string' ? codigoEsl.trim() : ''
+    const success = actualizarElementoSinValidacion(elementoId, { codigoEsl: trimmed })
+    if (!success) return false
+
+    setCambiosNoAplicados(true)
+    const descriptor = elemento.nombre || elemento.codigo || elementoId
+    const accion = trimmed ? 'asignado' : 'limpiado'
+    saveToHistory(`Código ESL ${accion}: ${descriptor}`)
+    return true
+  }
 
   const setSidebarActiveTab = (tabId) => {
     sidebarActiveTab.value = SIDEBAR_TAB_IDS.has(tabId) ? tabId : 'elementos'
@@ -2557,6 +2621,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   auraOpacity,
     isDraggable,
     cambiosNoAplicados,
+    modoConfigurarEsl,
+    elementoEslObjetivo,
   // Catálogos dinámicos
   catalogos,
   setCatalogos,
@@ -2600,6 +2666,13 @@ export const useCanvasStore = defineStore('canvas', () => {
     activarModoEdicion,
     desactivarModoEdicion,
     toggleModoEdicion,
+    setModoConfigurarEsl,
+    activarModoConfigurarEsl,
+    desactivarModoConfigurarEsl,
+    toggleModoConfigurarEsl,
+    iniciarConfiguracionEsl,
+    finalizarConfiguracionEsl,
+    guardarCodigoEslElemento,
   setSidebarActiveTab,
 
     // Actions - Plantas
