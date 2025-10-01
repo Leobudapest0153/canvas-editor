@@ -1343,6 +1343,9 @@ const alturaPlanta = computed(
 )
 const advertenciaAltura = computed(() => {
   if (!esEstructura.value) return null
+  // No validar altura en plantas infinitas
+  const plantaActiva = canvasStore.plantaPorId(canvasStore.plantaActiva)
+  if (plantaActiva?.isInfinite === true) return null
   const max = alturaPlanta.value
   const actual = edited.value?.dimensiones?.alto || 0
   return actual > max
@@ -1457,6 +1460,9 @@ const validarDiametro = () => {
 }
 
 const maxAlturaSobreSuelo = computed(() => {
+  // No validar en plantas infinitas
+  const plantaActiva = canvasStore.plantaPorId(canvasStore.plantaActiva)
+  if (plantaActiva?.isInfinite === true) return Infinity
   const techo = Number(alturaPlanta.value) || 0
   const alto = Number(edited.value?.dimensiones?.alto || 0)
   return Math.max(0, techo - alto)
@@ -1466,6 +1472,9 @@ const advertenciaZBase = computed(() => {
   if (!estaUbicadoEnPared.value) return null
   const z = Number(edited.value?.alturaSobreSueloCm)
   if (!Number.isFinite(z) || z < 0) return 'La altura sobre suelo debe ser mayor o igual a 0 cm'
+  // No validar límites en plantas infinitas
+  const plantaActiva = canvasStore.plantaPorId(canvasStore.plantaActiva)
+  if (plantaActiva?.isInfinite === true) return null
   const max = maxAlturaSobreSuelo.value
   return z > max ? `La altura sobre el suelo no debe superar ${max} cm` : null
 })
@@ -1478,6 +1487,9 @@ const validarAlturaSobreSuelo = () => {
     edited.value.alturaSobreSueloCm = snapshotOriginal.value.alturaSobreSueloCm
     return
   }
+  // No validar límites en plantas infinitas
+  const plantaActiva = canvasStore.plantaPorId(canvasStore.plantaActiva)
+  if (plantaActiva?.isInfinite === true) return
   const max = maxAlturaSobreSuelo.value
   if (z > max) {
     showWarning(`La altura sobre el suelo no debe superar ${max} cm`)
