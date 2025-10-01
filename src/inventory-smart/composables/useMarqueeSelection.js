@@ -1,6 +1,6 @@
 /**
  * useMarqueeSelection
- * 
+ *
  * Composable que implementa la selección múltiple mediante arrastre de marquesina.
  * Permite seleccionar varios elementos dibujando un rectángulo de selección,
  * similar al comportamiento del escritorio de Windows.
@@ -47,9 +47,9 @@ export function useMarqueeSelection({ canvasStore, stageRef }) {
    */
   const updateMarquee = (stagePos) => {
     if (!isMarqueeActive.value) return
-    
+
     marqueeEnd.value = { x: stagePos.x, y: stagePos.y }
-    
+
     // Calcular elementos que intersectan con la marquesina
     const rect = marqueeRect.value
     const newSelection = new Set()
@@ -72,7 +72,7 @@ export function useMarqueeSelection({ canvasStore, stageRef }) {
     // Si hay elementos seleccionados, aplicar la selección múltiple
     if (selectedElementIds.value.size > 0) {
       const idsArray = Array.from(selectedElementIds.value)
-      
+
       // Usar el nuevo método de selección múltiple
       if (typeof canvasStore.seleccionarElementosMultiple === 'function') {
         canvasStore.seleccionarElementosMultiple(idsArray)
@@ -131,7 +131,7 @@ export function useMarqueeSelection({ canvasStore, stageRef }) {
 
     const transform = stage.getAbsoluteTransform().copy()
     transform.invert()
-    
+
     return transform.point(stagePoint)
   }
 
@@ -140,7 +140,7 @@ export function useMarqueeSelection({ canvasStore, stageRef }) {
     isMarqueeActive,
     marqueeRect,
     selectedElementIds,
-    
+
     // Métodos
     startMarquee,
     updateMarquee,
