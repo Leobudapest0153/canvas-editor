@@ -145,6 +145,7 @@
 
         <!-- Botón Regresar -->
           <button
+            v-if="!canvasStore.modoConfigurarEsl"
             type="button"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500 rounded-lg transition-colors cursor-pointer"
             @click="onBack"
@@ -153,7 +154,7 @@
           </button>
 
         <!-- Botón Todos los indicadores -->
-        <UiTooltip label="Todos los indicadores" position="bottom" :delay="200">
+        <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Todos los indicadores" position="bottom" :delay="200">
           <button
             type="button"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
@@ -171,7 +172,7 @@
 
         <!-- Botón Configurar ESL (modo visualización) -->
         <UiTooltip
-          v-if="!canvasStore.modoEdicion"
+          v-if="!canvasStore.modoEdicion || canvasStore.modoConfigurarEsl"
           :label="eslModeTooltip"
           position="bottom"
           :delay="200"
@@ -194,7 +195,7 @@
         </UiTooltip>
 
         <!-- Toggle modo edición -->
-        <UiTooltip :label="modoEdicionTooltip" position="bottom" :delay="200">
+        <UiTooltip v-if="!canvasStore.modoConfigurarEsl" :label="modoEdicionTooltip" position="bottom" :delay="200">
           <EditModeToggle
             :aria-label="modoEdicionTooltip"
             :title="modoEdicionTooltip"
@@ -202,7 +203,7 @@
         </UiTooltip>
 
         <!-- Botón Historial de cambios -->
-        <UiTooltip label="Historial de cambios" position="bottom" :delay="200">
+        <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Historial de cambios" position="bottom" :delay="200">
           <button
             type="button"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
@@ -219,7 +220,7 @@
         </UiTooltip>
 
         <!-- Botón Guardar Cambios -->
-        <UiTooltip label="Guardar cambios actuales" position="bottom" :delay="200">
+        <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Guardar cambios actuales" position="bottom" :delay="200">
           <button
             type="button"
             class="inline-flex items-center gap-2 px-4 py-2 bg-success hover:bg-success-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
