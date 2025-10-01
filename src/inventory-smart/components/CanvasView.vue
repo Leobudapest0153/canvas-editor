@@ -2630,8 +2630,13 @@ const onDelete = async (id) => {
     return
   }
   if (!id) return
-  const el =
-    canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
+
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('Guarda los cambios antes de eliminar elementos', 'warn');
+    return;
+  }
+
+  const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id);
   if (el && (el.bloqueado === true || el.locked === true)) {
     showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
     ctx.close()
