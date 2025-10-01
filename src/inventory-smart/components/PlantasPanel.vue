@@ -51,16 +51,15 @@
                   {{ contarElementosEnPlanta(planta.id) }} elementos
                 </p>
                 <p class="text-xs text-gray-400 m-0 font-medium">
-                  <span v-if="planta.isInfinite">-</span>
-                  <span v-else>
                   {{
-                    formatLengthsCm([
-                    planta.dimensiones?.ancho || 0,
-                    planta.dimensiones?.largo || 0,
-                    planta.dimensiones?.alto || 0,
+                    planta.isInfinite
+                      ? '-'
+                      : formatLengthsCm([
+                      planta.dimensiones?.ancho || 0,
+                      planta.dimensiones?.largo || 0,
+                      planta.dimensiones?.alto || 0,
                     ])
                   }}
-                  </span>
                 </p>
               </div>
             </div>
@@ -170,30 +169,6 @@
               />
             </svg>
             <span class="ml-1">Todos los identificadores</span>
-          </button>
-        </UiTooltip>
-
-        <!-- Botón Configurar ESL (modo visualización) -->
-        <UiTooltip
-          v-if="!canvasStore.modoEdicion || canvasStore.modoConfigurarEsl"
-          :label="eslModeTooltip"
-          position="bottom"
-          :delay="200"
-        >
-          <button
-            type="button"
-            :class="eslButtonClasses"
-            @click="toggleEslMode"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M5 5v6a2 2 0 00.586 1.414l7 7a2 2 0 002.828 0l4-4a2 2 0 000-2.828l-7-7A2 2 0 0011 5H5z"
-              />
-            </svg>
-            <span>{{ eslButtonLabel }}</span>
           </button>
         </UiTooltip>
 
@@ -537,11 +512,13 @@
 </template>
 
 <script setup>
-const emit = defineEmits(['configChanged', 'regresar', 'showIdentifiers'])
+// Definir emits (agregado 'back' y 'showIdentifiers')
+const emit = defineEmits(['configChanged', 'back', 'showIdentifiers'])
 
 import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
+import { useAutoSave } from '@/inventory-smart/composables/useAutoSave'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import ImportExportModal from './ImportExportModal.vue'
 import ChangeHistoryModal from './ChangeHistoryModal.vue'
@@ -677,7 +654,7 @@ const toggleEslMode = () => {
 // Emitir acción de regresar para que el componente padre pueda manejar navegación/salida
 const onBack = () => {
   try {
-    emit('regresar')
+    emit('back')
   } catch (e) {
     console.warn('No se pudo emitir evento regresar', e)
   }
