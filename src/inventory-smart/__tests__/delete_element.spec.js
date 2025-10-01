@@ -5,7 +5,7 @@ import { useCanvasHistory } from '@/inventory-smart/composables/useCanvasHistory
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { config } from '@vue/test-utils'
-import { ToastSymbol } from '@/inventory-smart/plugins/toast'
+import { ToastSymbol, __setToastApiForTests } from '@/inventory-smart/plugins/toast'
 
 const addElement = (store, el) => {
   store.elementos.push({
@@ -30,8 +30,9 @@ describe('deleteSelected', () => {
     vi.unstubAllGlobals()
     if (typeof window !== 'undefined') window.__dvCanvasDragActive = false
     // Reiniciar mock de toasts en cada test
-    const toastMock = { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 }
-    config.global.provide = { ...(config.global.provide || {}), [ToastSymbol]: toastMock }
+  const toastMock = { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 }
+  config.global.provide = { ...(config.global.provide || {}), [ToastSymbol]: toastMock }
+  __setToastApiForTests(toastMock)
   })
 
   it('(a) elimina elemento simple y empuja snapshot', async () => {

@@ -56,6 +56,12 @@
 
     <!-- Gestión de pisos de cuartos desde las propiedades -->
     <ManagmentFloorRoomPropertiesModal/>
+
+    <IdentifyEslModal
+      v-if="isIdentifyEslModalOpen"
+      @close="handleIdentifyEslClose"
+      @save="handleIdentifyEslSave"
+    />
   </div>
 </template>
 
@@ -68,6 +74,7 @@ import PropiedadesPanel from './components/PropiedadesPanel.vue'
 import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import ManagmentFloorRoomPropertiesModal from './components/modals/ManagmentFloorRoomPropertiesModal.vue'
+import IdentifyEslModal from './components/modals/IdentifyEslModal.vue'
 import { useCanvasImportExport } from './composables/useCanvasImportExport'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
@@ -183,6 +190,30 @@ const handleConfigChanged = (configSerializada) => {
 
 const handleShowIndicators = () => {
   emit('imprimirIndicadores')
+}
+
+const elementoEslActual = computed(() => {
+  const targetId = canvasStore.elementoEslObjetivo
+  if (!targetId) return null
+  return canvasStore.elementoPorId(targetId)
+})
+
+const isIdentifyEslModalOpen = computed(() => canvasStore.modoConfigurarEsl && !!canvasStore.elementoEslObjetivo)
+
+const handleIdentifyEslSave = ({ codigoEsl }) => {
+  if (!canvasStore.elementoEslObjetivo) return
+  const success = canvasStore.guardarCodigoEslElemento(canvasStore.elementoEslObjetivo, codigoEsl)
+  if (success) {
+    const target = elementoEslActual.value
+    const descriptor = target?.nombre || target?.codigo || target?.id || 'elemento'
+    showToast(`Código ESL configurado para ${descriptor}`, 'success')
+  } else {
+    showToast('No se pudo actualizar el código ESL', 'error')
+  }
+}
+
+const handleIdentifyEslClose = () => {
+  canvasStore.finalizarConfiguracionEsl()
 }
 
 // Propagar evento regresar

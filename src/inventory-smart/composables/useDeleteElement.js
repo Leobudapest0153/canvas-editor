@@ -10,13 +10,12 @@ import { useCanvasBuffer } from './useCanvasBuffer'
 import { useConfirmDialog } from './useConfirmDialog'
 import { useToast } from './useToast'
 
-const { showInfo } = useToast()
-
 export function useDeleteElement() {
   const store = useCanvasStore()
   const history = useCanvasHistory()
   const buffer = useCanvasBuffer()
   const confirmDialog = useConfirmDialog()
+  const { showInfo } = useToast()
 
   const collectDescendants = (rootId, accSet) => {
     const el = store.elementoPorId(rootId)
@@ -120,12 +119,7 @@ export function useDeleteElement() {
     for (const id of idsABorrar) {
       const el = idToEl.get(id)
       if (isLocked(el)) {
-        confirmDialog.confirm({
-          title: 'Acción no permitida',
-          message: 'No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero.',
-          confirmLabel: 'Entendido',
-          cancelLabel: 'Cerrar',
-        })
+        showInfo('No se puede eliminar porque hay elemento(s) bloqueado(s). Desbloquéelos primero.')
         return false
       }
     }
@@ -172,8 +166,8 @@ export function useDeleteElement() {
         for (const it of items.slice()) if (idsABorrar.has(it.originalId)) buffer.removeFromBuffer(it.id)
       } catch (e) { void e }
 
-      // Un solo snapshot
-      history.pushState('Eliminar en cascada')
+    // Un solo snapshot
+    history.pushState('Eliminar en cascada')
     } finally {
       // Rehabilitar pintado y hacer un único batchDraw explícito si existe
       if (typeof window !== 'undefined') {
@@ -223,12 +217,7 @@ export function useDeleteElement() {
 
     // Bloqueo: impedir borrar elementos bloqueados (selección)
     if (isLocked(selected)) {
-      await confirmDialog.confirm({
-        title: 'Acción no permitida',
-        message: 'No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero.',
-        confirmLabel: 'Entendido',
-        cancelLabel: 'Cerrar',
-      })
+      showInfo('No se puede eliminar porque el elemento está bloqueado. Desbloquéelo primero.')
       return false
     }
 
@@ -238,6 +227,17 @@ export function useDeleteElement() {
 
     // Referencias bloqueantes (buffer y vínculos)
     const idsToAffect = new Set([selectedId, ...descendants])
+
+    const hasLockedDescendants = Array.from(idsToAffect).some((id) => {
+      if (id === selectedId) return false
+      const el = store.elementoPorId(id)
+      return isLocked(el)
+    })
+    if (hasLockedDescendants) {
+      showInfo('No se puede eliminar porque hay elemento(s) bloqueado(s) dentro. Desbloquéelos primero.')
+      return false
+    }
+
     const refs = findBlockingReferences(idsToAffect)
     if (refs.length > 0) {
       const K = refs.length
@@ -306,7 +306,10 @@ export function useDeleteElement() {
       const cabecera = elementosLista.length > 1
         ? `Se eliminarán los siguientes elementos:`
         : 'Se eliminará el elemento:'
-      const msg = `${cabecera}\n\n${lines.join('\n')}${extra}\n\n¿Desea continuar?`
+      const descLine = descendants.size > 0
+        ? `Se eliminará también ${descendants.size} elemento(s) dentro.\n\n`
+        : ''
+      const msg = `${descLine}${cabecera}\n\n${lines.join('\n')}${extra}\n\n¿Desea continuar?`
       const ok = await confirmDialog.confirm({
         title: `Eliminar elemento${elementosLista.length > 1 ? 's' : ''}`,
         message: msg,
@@ -333,7 +336,7 @@ export function useDeleteElement() {
 
         // Crear el toast inicial
         toastId = showInfo(generarMensaje(), {
-          timeout: 6000, // Un poco más que nuestra cuenta regresiva
+          timeout: 5000,
           onDismiss: () => {
             toastCerrado = true
             if (interval) {

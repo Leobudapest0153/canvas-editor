@@ -32,14 +32,17 @@ if (typeof globalThis !== 'undefined') {
 }
 
 // Proveer mock de servicio de toasts por defecto para pruebas
-import { ToastSymbol } from '@/inventory-smart/plugins/toast'
+import { ToastSymbol, __setToastApiForTests } from '@/inventory-smart/plugins/toast'
+const toastMock = {
+  toasts: { value: [] },
+  show: vi.fn(),
+  remove: vi.fn(),
+  clearAll: vi.fn(),
+  maxToasts: 5,
+}
 config.global.provide = {
   ...(config.global.provide || {}),
-  [ToastSymbol]: {
-    toasts: { value: [] },
-    show: vi.fn(),
-    remove: vi.fn(),
-    clearAll: vi.fn(),
-    maxToasts: 5,
-  },
+  [ToastSymbol]: toastMock,
 }
+
+__setToastApiForTests(toastMock)

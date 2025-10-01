@@ -975,6 +975,7 @@ export function useElementDrag({
     stageDragEnabled,
     dragStartPositions,
     lastValidPositions,
+    innerSessions,
 
     // Methods
     startElementDrag,

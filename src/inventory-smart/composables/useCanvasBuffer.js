@@ -35,13 +35,14 @@ export const useCanvasBuffer = () => {
    */
   const createBufferItem = (elemento, sourceInfo = {}) => {
     const currentTimestamp = Date.now()
+    const originalId = sourceInfo.originalElementId || elemento.id
 
     // Limpiar datos de uso antes de guardar en el buffer
     const elementoLimpio = limpiarDatosUso(elemento, canvasStore.elementoPorId)
 
     return {
       id: `buffer_${currentTimestamp}_${Math.random().toString(36).substr(2, 9)}`,
-      originalId: elemento.id,
+      originalId,
       elemento: JSON.parse(JSON.stringify(elementoLimpio)), // Deep clone del elemento limpio
       sourceInfo: {
         plantaId: elemento.plantaId || canvasStore.plantaActiva,
@@ -141,6 +142,7 @@ export const useCanvasBuffer = () => {
       isStructure: true, // Marca que es una estructura completa
       childrenCount: elemento.hijos ? elemento.hijos.length : 0,
       allElements: cleanedAllElementsMap, // Guardar todos los elementos (sin datos de uso)
+      originalElementId: elemento.id,
     }
 
     const success = addToBuffer(clonedStructure.rootElement, sourceInfo)
