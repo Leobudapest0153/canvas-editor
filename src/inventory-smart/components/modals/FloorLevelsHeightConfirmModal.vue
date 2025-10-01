@@ -8,7 +8,6 @@
     <div
       class="relative z-10 bg-white shadow-2xl flex flex-col w-full max-w-[820px] max-h-[90vh] rounded"
     >
-      <!-- Header -->
       <div class="px-4 sm:px-6 pt-4">
         <h3 class="font-bold text-lg text-[#1C1E4D]">
           Confirmar ajustes
@@ -18,7 +17,6 @@
         </p>
       </div>
 
-      <!-- Selector de estrategia -->
       <div class="px-4 sm:px-6 mt-3">
         <div class="inline-flex rounded border border-gray-300 overflow-hidden">
           <button
@@ -36,11 +34,16 @@
             Forzar
           </button>
         </div>
+
+        <div
+          v-if="selectedStrategy === 'clamp' && clampHasNoEffect"
+          class="mt-3 text-sm text-orange-800 bg-orange-50 border border-orange-200 rounded px-3 py-2"
+        >
+          La estrategia <b>Limitar</b> no producirá cambios. Es posible que el nivel que editas ya esté en su altura/peso mínimo y no haya espacio para reducir otros niveles. Prueba con <b>Forzar</b>.
+        </div>
       </div>
 
-      <!-- Body scrollable -->
       <div class="px-4 sm:px-6 pb-4 mt-3 overflow-y-auto">
-        <!-- Resumen de problemas -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div v-if="props.draft?.deficitCm" class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
             Altura excedida: falta {{ props.draft.deficitCm }} cm.
@@ -58,12 +61,9 @@
               Peso total: {{ pesoTotal }} kg / Máximo: {{ props.draft.roomWeightMax }} kg.
             </template>
           </div>
-
         </div>
 
-        <!-- Vista de ajustes -->
         <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <!-- Alturas (siempre mostrar si hay exceso de altura) -->
           <div v-if="props.draft?.heightExceeded" class="border border-amber-300 bg-amber-50 rounded p-3">
             <div class="flex items-center justify-between mb-2">
               <h4 class="font-semibold text-amber-800">Alturas</h4>
@@ -95,7 +95,6 @@
             </div>
           </div>
 
-          <!-- Pesos (siempre mostrar si hay exceso de peso) -->
           <div v-if="props.draft?.weightExceeded" class="border border-red-300 bg-red-50 rounded p-3">
             <div class="flex items-center justify-between mb-2">
               <h4 class="font-semibold text-red-800">Pesos</h4>
@@ -133,7 +132,6 @@
             </div>
           </div>
 
-          <!-- Dimensiones (solo mostrar si hay ajustes necesarios) -->
           <div v-if="hasDimensionChanges" class="border border-blue-300 bg-blue-50 rounded p-3">
             <div class="flex items-center justify-between mb-2">
               <h4 class="font-semibold text-blue-800">Dimensiones</h4>
@@ -185,7 +183,6 @@
             </div>
           </div>
 
-          <!-- Capacidades (siempre mostrar si hay childFit Y hay cambio de capacidad) -->
           <div v-if="props.draft?.childFit && isFiniteNumber(minCapacidad) && proposedCapacity < minCapacidad" class="border border-green-300 bg-green-50 rounded p-3">
             <div class="flex items-center justify-between mb-2">
               <h4 class="font-semibold text-green-800">Capacidad</h4>
@@ -215,7 +212,6 @@
         </div>
       </div>
 
-      <!-- Footer sticky -->
       <div class="mt-auto px-4 sm:px-6 py-3 border-t border-gray-200 bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
         <div class="text-xs text-gray-500 flex-1 sm:flex-none">
           Estrategía seleccionada: <b>{{ strategyLabel }}</b>
@@ -290,6 +286,7 @@ const fmtKg = (kg) => {
   return Number.isFinite(v) ? v.toFixed(2) : '-';
 };
 
+// Detección de cambios: pinta el valor destino si cambia
 const diffClass = (from, to, toSide = false) => {
   const vFrom = Number(from);
   const vTo = Number(to);
@@ -414,6 +411,42 @@ const weightResultOk = computed(() => {
   const maxW = Number(props.draft?.roomWeightMax || 0);
   if (!Number.isFinite(maxW) || maxW <= 0) return true;
   return totalW <= maxW + 1e-6;
+});
+
+// NUEVO: Helper para comparar mapas de valores
+const areMapsEqual = (map1, map2, ids, tolerance = 1e-6) => {
+  if (!map1 || !map2) return map1 === map2; // Casos nulos
+  for (const id of ids) {
+    if (Math.abs((map1[id] || 0) - (map2[id] || 0)) > tolerance) {
+      return false;
+    }
+  }
+  return true;
+};
+
+// NUEVO: Detectar si la estrategia clamp no tuvo efecto
+const clampHasNoEffect = computed(() => {
+  const draft = props.draft;
+  if (!draft || (!draft.heightExceeded && !draft.weightExceeded)) {
+    return false; // No hay problema que resolver
+  }
+
+  const ids = draft.nivelesOrden || [];
+
+  // Si hay exceso de altura, verificar si clamp cambió algo
+  let heightsUnchanged = true;
+  if (draft.heightExceeded) {
+    heightsUnchanged = areMapsEqual(draft.alturasActuales, draft.clamp?.alturas, ids, 1); // Tolerancia 1cm
+  }
+
+  // Si hay exceso de peso, verificar si clamp cambió algo
+  let weightsUnchanged = true;
+  if (draft.weightExceeded) {
+    weightsUnchanged = areMapsEqual(draft.pesosActuales, draft.weightClamp, ids, 0.1); // Tolerancia 0.1kg
+  }
+
+  // Si ninguna de las dos ramas aplicables tuvo cambios, entonces no hay efecto
+  return heightsUnchanged && weightsUnchanged;
 });
 
 const canConfirm = computed(() => {

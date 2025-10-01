@@ -1894,6 +1894,15 @@ export const useCanvasStore = defineStore('canvas', () => {
       showToast(res.message || 'No se pudo aplicar el cambio', 'error');
       return;
     }
+    if (res.status === 'ok' && preFit && preFit.ok === false) {
+       console.log('Hermanos OK, pero hijos no caben. Promoviendo a needs_confirmation.');
+
+       res.status = 'needs_confirmation';
+
+       if (res.draft) {
+         res.draft.childFitError = preFit; // `preFit` contiene { ok: false, minAnchoCm, ... }
+       }
+    }
 
     if (res.status === 'ok') {
       // Si no requiere confirmación, validar que los hijos aún quepan y bloquear si no
