@@ -155,12 +155,12 @@
             <span>Regresar</span>
           </button>
 
-        <!-- Botón Todos los indicadores -->
-        <UiTooltip label="Todos los indicadores" position="bottom" :delay="200">
+        <!-- Botón Todos los identificadores -->
+        <UiTooltip label="Todos los identificadores" position="bottom" :delay="200">
           <button
             type="button"
             class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
-            @click="emitirIndicadores"
+            @click="emitirIdentificadores"
           >
             <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
               <path
@@ -168,7 +168,7 @@
                 d="M19 8h-1V3H6v5H5c-1.1 0-2 .9-2 2v5h3v4h12v-4h3v-5c0-1.1-.9-2-2-2zM8 5h8v3H8V5zm8 14H8v-4h8v4zm1-6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"
               />
             </svg>
-            <span class="ml-1">Todos los indicadores</span>
+            <span class="ml-1">Todos los identificadores</span>
           </button>
         </UiTooltip>
 
@@ -488,13 +488,11 @@
 </template>
 
 <script setup>
-// Definir emits (agregado 'regresar' y 'showIndicators')
-const emit = defineEmits(['configChanged', 'regresar', 'showIndicators'])
+const emit = defineEmits(['configChanged', 'regresar', 'showIdentifiers'])
 
 import { ref, computed, nextTick } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
-import { useAutoSave } from '@/inventory-smart/composables/useAutoSave'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import ImportExportModal from './ImportExportModal.vue'
 import ChangeHistoryModal from './ChangeHistoryModal.vue'
@@ -604,8 +602,8 @@ const elementosEnPlantaAEliminar = computed(() => {
 })
 
 // Métodos
-const emitirIndicadores = () => {
-  emit('showIndicators')
+const emitirIdentificadores = () => {
+  emit('showIdentifiers')
 }
 
 // Emitir acción de regresar para que el componente padre pueda manejar navegación/salida
