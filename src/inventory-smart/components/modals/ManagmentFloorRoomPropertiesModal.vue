@@ -331,6 +331,10 @@ const title = computed(() => {
       label: 'piso'
     }
   }
+  return {
+    title: 'Propiedades',
+    label: 'elemento'
+  }
 })
 const isAllSelected = computed(() =>
   formValue.value.tiposProductos.includes(ALL_OPTION)
