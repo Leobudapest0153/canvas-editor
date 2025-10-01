@@ -185,11 +185,103 @@ export function useDeleteElement() {
     return true
   }
 
+  /**
+   * Elimina múltiples elementos seleccionados
+   */
+  const deleteMultipleSelected = async (ids, { withConfirm = true } = {}) => {
+    if (!Array.isArray(ids) || ids.length === 0) return false
+
+    const elements = ids.map(id => store.elementoPorId(id)).filter(Boolean)
+    if (elements.length === 0) return false
+
+    // Verificar elementos protegidos
+    const protectedEls = elements.filter(el => isProtected(el))
+    if (protectedEls.length > 0) {
+      await confirmDialog.confirm({
+        title: 'Acción no permitida',
+        message: `${protectedEls.length} elemento(s) están protegidos y no pueden eliminarse.`,
+        confirmLabel: 'Entendido',
+        cancelLabel: 'Cerrar',
+      })
+      return false
+    }
+
+    // Verificar elementos bloqueados
+    const lockedEls = elements.filter(el => isLocked(el))
+    if (lockedEls.length > 0) {
+      showInfo(`${lockedEls.length} elemento(s) están bloqueados. Desbloquéelos primero.`)
+      return false
+    }
+
+    // Confirmación
+    if (withConfirm) {
+      const LIMIT = 12
+      const lines = elements.slice(0, LIMIT).map(el => `• ${el.nombre || el.id}`)
+      const extra = elements.length > LIMIT ? `\n… (+${elements.length - LIMIT} más)` : ''
+      const msg = `Se eliminarán ${elements.length} elemento(s):\n\n${lines.join('\n')}${extra}\n\n¿Desea continuar?`
+      const ok = await confirmDialog.confirm({
+        title: 'Eliminar múltiples elementos',
+        message: msg,
+        confirmLabel: 'Eliminar',
+        cancelLabel: 'Cancelar',
+      })
+      if (!ok) return false
+    }
+
+    // Eliminar en cascada todos los IDs
+    const okCascade = deleteCascade(ids)
+    if (!okCascade) return false
+
+    // Limpiar selección múltiple
+    if (typeof store.limpiarSeleccionElementos === 'function') {
+      store.limpiarSeleccionElementos()
+    }
+
+    // Toast con deshacer
+    try {
+      if (typeof window !== 'undefined') {
+        let tiempo = 5
+        let interval
+        let toastCerrado = false
+        const generarMensaje = () => `${elements.length} elemento(s) eliminados — Deshacer (${tiempo}s)`
+        showInfo(generarMensaje(), {
+          timeout: 6000,
+          onDismiss: () => {
+            toastCerrado = true
+            if (interval) { clearInterval(interval); interval = null }
+          },
+          cta: {
+            label: 'Deshacer',
+            onClick: () => {
+              toastCerrado = true
+              if (interval) { clearInterval(interval); interval = null }
+              try { history.undo() } catch (err) { void err }
+            },
+          },
+        })
+        interval = setInterval(() => {
+          if (toastCerrado) { clearInterval(interval); interval = null; return }
+          tiempo--
+          if (tiempo <= 0) { clearInterval(interval); interval = null; return }
+        }, 1000)
+      }
+    } catch (e) { void e }
+
+    return true
+  }
+
   const deleteSelected = async ({ withConfirm = true } = {}) => {
     // No eliminar si hay drag global activo
     if (typeof window !== 'undefined' && window.__dvCanvasDragActive) return false
 
-    const selectedId = store.elementoSeleccionado
+    // Manejar selección múltiple
+    const multipleIds = store.elementosSeleccionadosMultiple || []
+    if (multipleIds.length > 1) {
+      return await deleteMultipleSelected(multipleIds, { withConfirm })
+    }
+
+    // Lógica original para elemento individual
+    const selectedId = multipleIds.length === 1 ? multipleIds[0] : store.elementoSeleccionado
     if (!selectedId) return false
 
     const selected = store.elementoPorId(selectedId)
