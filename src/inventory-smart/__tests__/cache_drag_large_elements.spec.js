@@ -59,7 +59,7 @@ describe('Cache durante arrastre con elementos grandes', () => {
     const dragStartHandler = mockNode.on.mock.calls.find(
       (call) => call[0] === 'dragstart.cache'
     )?.[1]
-    
+
     if (dragStartHandler) {
       dragStartHandler()
       expect(mockNode.cache).toHaveBeenCalledTimes(1)
@@ -78,7 +78,7 @@ describe('Cache durante arrastre con elementos grandes', () => {
     const dragStartHandler = mockNode.on.mock.calls.find(
       (call) => call[0] === 'dragstart.cache'
     )?.[1]
-    
+
     if (dragStartHandler) {
       dragStartHandler()
       expect(mockNode.cache).toHaveBeenCalledTimes(1)
@@ -97,7 +97,7 @@ describe('Cache durante arrastre con elementos grandes', () => {
     const dragStartHandler = mockNode.on.mock.calls.find(
       (call) => call[0] === 'dragstart.cache'
     )?.[1]
-    
+
     if (dragStartHandler) {
       dragStartHandler()
       expect(mockNode.cache).not.toHaveBeenCalled() // NO debe cachear elementos grandes
@@ -111,7 +111,7 @@ describe('Cache durante arrastre con elementos grandes', () => {
     const dragEndHandler = mockNode.on.mock.calls.find(
       (call) => call[0] === 'dragend.cache'
     )?.[1]
-    
+
     if (dragEndHandler) {
       dragEndHandler()
       expect(mockNode.clearCache).toHaveBeenCalledTimes(1)
@@ -201,7 +201,7 @@ describe('Cache durante arrastre con elementos grandes', () => {
     const dragStartHandler = mockNode.on.mock.calls.find(
       (call) => call[0] === 'dragstart.cache'
     )?.[1]
-    
+
     // No debe lanzar error
     expect(() => {
       if (dragStartHandler) {
@@ -224,7 +224,7 @@ describe('Cache durante arrastre con elementos grandes', () => {
     const dragEndHandler = mockNode.on.mock.calls.find(
       (call) => call[0] === 'dragend.cache'
     )?.[1]
-    
+
     if (dragEndHandler) {
       dragEndHandler()
       expect(mockNode.clearCache).toHaveBeenCalledTimes(1)
