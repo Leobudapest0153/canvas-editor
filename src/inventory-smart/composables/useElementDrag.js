@@ -11,6 +11,8 @@ import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { applyEdgeConstraint } from '@/inventory-smart/utils/edgeConstraint'
 import { resetEdgeState } from '@/inventory-smart/composables/useEdgeState'
 import { finalizePlacement, solveFinalPlacement } from '@/inventory-smart/utils/finalizeDrag'
+import { solveDragPosition } from '@/inventory-smart/utils/placementSolver'
+import { resolveCoplanarNeighbors } from '@/inventory-smart/validation/placementOrchestrator'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
 import { GRID_SIZE, CM_TO_PX } from '@/inventory-smart/utils/constants'
@@ -80,16 +82,9 @@ export function useElementDrag({
     })
   }
 
-  // Resolver posición contra obstáculos bloqueantes (suelo–suelo) con memoria de contacto y proyección a eje (efecto deslizante)
+  // Resolver posición con solver compartido (deslizante por eje, multi-vecino), respetando polígono/infinito
   const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
-    // Vecinos visibles del contexto actual
     const all = canvasStore.elementosVisibles
-    const w = elemento.width
-    const h = elemento.height
-    let x = candidateX
-    let y = candidateY
-
-    // (0) Bounds activos
     const boundary = computeBoundary() || {}
     const areaBounds = boundaryToAreaBounds(boundary, {
       minX: 0,
@@ -99,153 +94,32 @@ export function useElementDrag({
       mode: boundary?.mode || 'fixed',
       polygon: boundary?.type === 'polygon' ? boundary.points : null,
     })
-    const boundaryMode = areaBounds.mode ?? 'fixed'
-    const clampToBoundary = boundaryMode !== 'elastic'
-    const boundaryType = boundary.type
-    const rectMinX = areaBounds.minX ?? 0
-    const rectMinY = areaBounds.minY ?? 0
-    const rectWidth = boundaryType === 'rect' ? Math.max(0, (areaBounds.maxX ?? rectMinX) - rectMinX) : Infinity
-    const rectHeight = boundaryType === 'rect' ? Math.max(0, (areaBounds.maxY ?? rectMinY) - rectMinY) : Infinity
 
-    // (1) Clamp inicial a área
-    if (clampToBoundary && boundaryType === 'rect') {
-      const c = clampRectToRect(x - rectMinX, y - rectMinY, w, h, rectWidth, rectHeight)
-      x = c.x + rectMinX
-      y = c.y + rectMinY
-    } else if (clampToBoundary && boundaryType === 'polygon') {
-      if (elemento.forma === 'circular') {
-        const radius = Math.min(w, h) / 2
-        const centerX = x + radius
-        const centerY = y + radius
-        const lastPos = lastValidPositions.value.get(elemento.id)
-        const previousCenter = lastPos ? { x: lastPos.x + radius, y: lastPos.y + radius } : null
-        const clampedCenter = clampCircleToPolygonSmooth(
-          { x: centerX, y: centerY, radius },
-          boundary.inset,
-          previousCenter,
-        )
-        x = clampedCenter.x - radius
-        y = clampedCenter.y - radius
-      } else {
-        const c = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
-        x = c.x
-        y = c.y
-      }
-    }
+    // Vecinos candidatos (excluir self)
+    const candidates = all.filter((e) => e && e.id !== elemento.id)
+    // Vecinos coplanares (misma ubic y misma capa Z con tolerancia)
+    const coplanar = resolveCoplanarNeighbors({ ...elemento }, candidates)
+    // Limitar a suelo–suelo para efectos de bloqueo horizontal
+    const neighbors = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'suelo' && (elemento.ubicacion || 'suelo') === 'suelo')
 
-    // (2) Iterar: detectar bloqueantes y resolver solo contra suelo–suelo con proyección a eje
-    const MAX_ITERS = 6
+    const lastPos = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
     const lastVel = lastVelocityMap.value.get(elemento.id) || { x: 0, y: 0 }
-    const dominantAxis = Math.abs(lastVel.x || 0) >= Math.abs(lastVel.y || 0) ? 'x' : 'y'
 
-    for (let iter = 0; iter < MAX_ITERS; iter++) {
-      // Filtrar vecinos relevantes (suelo–suelo)
-      const moving = { ...elemento, x, y }
-      const neighbors = all.filter((e) => e && e.id !== elemento.id && (e.ubicacion || 'suelo') === 'suelo' && (moving.ubicacion || 'suelo') === 'suelo')
+    const moving = elemento.forma === 'circular'
+      ? { ...elemento, width: Math.min(elemento.width, elemento.height), height: Math.min(elemento.width, elemento.height), forma: 'circular' }
+      : { ...elemento, forma: elemento.forma || 'rectangular' }
 
-      // Detectar conflictos bloqueantes usando narrow-phase (círculos con tangencia permitida)
-      const conflicts = detectConflictsFor(moving, neighbors)
-      const blocking = conflicts.filter((c) => c && c.bloqueante)
-      if (blocking.length === 0) {
-        // Liberar memoria de contacto si existía
-        contactState.delete(elemento.id)
-        break
-      }
+    const solved = solveDragPosition({
+      candidate: { x: candidateX, y: candidateY },
+      movingEl: moving,
+      neighbors,
+      areaBounds,
+      lastValidPos: lastPos,
+      lastVelocity: lastVel,
+      maxIters: 6,
+    })
 
-      // Elegir obstáculo: priorizar contacto previo si sigue en conflicto; si no, usar el de mayor profundidad MTD
-      const lastContact = contactState.get(elemento.id) || { id: null, axis: null }
-      let targetId = null
-      let axis = lastContact.axis || dominantAxis
-      const idsInBlocking = new Set(blocking.map((b) => (b.aId === elemento.id ? b.bId : b.aId)))
-      if (lastContact.id && idsInBlocking.has(lastContact.id)) {
-        targetId = lastContact.id
-      } else {
-        let bestDepth = -1
-        for (const b of blocking) {
-          const otherId = b.aId === elemento.id ? b.bId : b.aId
-          const other = neighbors.find((n) => n.id === otherId)
-          if (!other) continue
-          const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height)
-          const depth = Math.abs(dx) + Math.abs(dy)
-          if (depth > bestDepth) {
-            bestDepth = depth
-            targetId = otherId
-          }
-        }
-      }
-
-      const target = neighbors.find((n) => n.id === targetId) || null
-      if (!target) break
-
-      // Calcular MTD contra obstáculo seleccionado
-      let { dx, dy } = computeMTD(x, y, w, h, target.x, target.y, target.width, target.height)
-
-      // Proyección a eje para efecto deslizante
-      if (axis === 'x') dy = 0
-      else dx = 0
-
-      // Aplicar traslación
-      x += dx
-      y += dy
-
-      // Clamp contra contorno
-      if (clampToBoundary && boundaryType === 'rect') {
-        const c2 = clampRectToRect(x - rectMinX, y - rectMinY, w, h, rectWidth, rectHeight)
-        x = c2.x + rectMinX
-        y = c2.y + rectMinY
-      } else if (clampToBoundary && boundaryType === 'polygon') {
-        if (elemento.forma === 'circular') {
-          const radius = Math.min(w, h) / 2
-          const centerX = x + radius
-          const centerY = y + radius
-          const lastPos2 = lastValidPositions.value.get(elemento.id)
-          const prevC = lastPos2 ? { x: lastPos2.x + radius, y: lastPos2.y + radius } : null
-          const clampedCenter2 = clampCircleToPolygonSmooth(
-            { x: centerX, y: centerY, radius },
-            boundary.inset,
-            prevC,
-          )
-          x = clampedCenter2.x - radius
-          y = clampedCenter2.y - radius
-        } else {
-          const c2 = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
-          x = c2.x
-          y = c2.y
-        }
-      }
-
-      // Actualizar memoria de contacto
-      contactState.set(elemento.id, { id: targetId, axis })
-
-      // Si la corrección fue mínima, terminar para evitar jitter
-      if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) break
-    }
-
-    // (3) Validaciones finales y corrección de fuera de área
-    const movingEnd = { ...elemento, x, y }
-    const neighborsFinal = all.filter((e) => e && e.id !== elemento.id && (e.ubicacion || 'suelo') === 'suelo' && (movingEnd.ubicacion || 'suelo') === 'suelo')
-    const endConf = detectConflictsFor(movingEnd, neighborsFinal).filter((c) => c.bloqueante)
-
-    const outsideArea =
-      clampToBoundary &&
-      (boundaryType === 'rect'
-        ? x < rectMinX - 1e-6 ||
-          y < rectMinY - 1e-6 ||
-          x + w > rectMinX + rectWidth + 1e-6 ||
-          y + h > rectMinY + rectHeight + 1e-6
-        : !pointInPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.points))
-    if (outsideArea) {
-      const cp = clampPointToPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.inset)
-      x = cp.x - w / 2
-      y = cp.y - h / 2
-    }
-
-    if (endConf.length > 0 || outsideArea) {
-      const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
-      return { x: prev.x, y: prev.y, fellBack: true }
-    }
-
-    return { x, y, fellBack: false }
+    return { x: solved.x, y: solved.y, fellBack: solved.fellBack }
   }
 
   // Map of template refs for draggable nodes, keyed by element id
