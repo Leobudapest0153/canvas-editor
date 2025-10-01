@@ -106,6 +106,11 @@ export const useCanvasBuffer = () => {
       return false
     }
 
+    if (['cuartos', 'elementos'].includes(canvasStore.contextoActual.tipo)) {
+      showToast('No puede copiar elementos desde este contexto', 'warn');
+      return;
+    }
+
     // Clonar la estructura completa
     const clonedStructure = serializeElementForTemplate(elementoId)
     if (!clonedStructure) {
