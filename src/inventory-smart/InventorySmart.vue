@@ -49,7 +49,7 @@
       :open="showUnsavedModal"
       :changes="unsavedDiff.changes"
       :summary="unsavedDiff.summary"
-      @close="showUnsavedModal = false"
+      @close="handleDismissUnsavedModal"
       @save="saveAndExit"
       @continue="exitWithoutSaving"
     />
@@ -66,7 +66,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, provide } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, provide } from 'vue'
 import SidebarPanel from './components/SidebarPanel.vue'
 import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
@@ -220,35 +220,84 @@ const handleIdentifyEslClose = () => {
 const changeHistoryStore = useChangeHistoryStore()
 const showUnsavedModal = ref(false)
 const unsavedDiff = ref({ changes: [], summary: { created:0, updated:0, deleted:0 } })
+const pendingExitReason = ref(null)
+const bypassBeforeUnloadOnce = ref(false)
 
-const handleBack = () => {
+const getCurrentCanvasState = () => ({ plantas: canvasStore.plantas, elementos: canvasStore.elementos })
+
+const requestUnsavedConfirmation = (reason) => {
   try {
-    const state = { plantas: canvasStore.plantas, elementos: canvasStore.elementos }
-    const diff = changeHistoryStore.previewUnsavedChanges(state)
+    const diff = changeHistoryStore.previewUnsavedChanges(getCurrentCanvasState())
     if (diff?.changes?.length) {
+      pendingExitReason.value = reason
       unsavedDiff.value = diff
       showUnsavedModal.value = true
-      return
+      return true
     }
-    emit('regresar')
   } catch (e) {
-    console.warn('No se pudo evaluar cambios antes de regresar', e)
-    emit('regresar')
+    console.warn('No se pudo evaluar cambios pendientes', e)
   }
+  return false
+}
+
+const handleBack = () => {
+  if (requestUnsavedConfirmation('back')) return
+  emit('regresar')
+}
+
+const handleDismissUnsavedModal = () => {
+  showUnsavedModal.value = false
+  pendingExitReason.value = null
+}
+
+const continueUnloadFlow = () => {
+  if (typeof window === 'undefined') return
+  bypassBeforeUnloadOnce.value = true
+  window.setTimeout(() => {
+    window.location.reload()
+  }, 50)
 }
 
 const saveAndExit = () => {
+  const reason = pendingExitReason.value
   try {
     const json = canvasStore.serialize(true)
     emit('configUpdated', json)
-  } catch (e) { console.warn('Error serializando antes de salir', e) }
+  } catch (e) {
+    console.warn('Error serializando antes de salir', e)
+  }
   showUnsavedModal.value = false
-  emit('regresar')
+  pendingExitReason.value = null
+
+  if (reason === 'back') {
+    emit('regresar')
+  } else if (reason === 'unload') {
+    continueUnloadFlow()
+  }
 }
 
 const exitWithoutSaving = () => {
+  const reason = pendingExitReason.value
   showUnsavedModal.value = false
-  emit('regresar')
+  pendingExitReason.value = null
+
+  if (reason === 'back') {
+    emit('regresar')
+  } else if (reason === 'unload') {
+    continueUnloadFlow()
+  }
+}
+
+const handleBeforeUnload = (event) => {
+  if (bypassBeforeUnloadOnce.value) {
+    bypassBeforeUnloadOnce.value = false
+    return
+  }
+  const shouldBlock = requestUnsavedConfirmation('unload')
+  if (!shouldBlock) return
+  const warningMessage = 'Tienes cambios sin guardar. ¿Seguro que deseas salir sin guardar?'
+  event.preventDefault()
+  event.returnValue = warningMessage
 }
 
 // Atajos de teclado globales
@@ -376,12 +425,24 @@ useEditorShortcuts({
 
 onMounted(() => {
   try {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', handleBeforeUnload)
+    }
 
     // Provide de la API de servicios externos para componentes hijos
     provide('externalServicesAPI', externalServicesAPI)
   } catch (error) {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
     showToast('Ha ocurrido un error al importar la configuración', 'error')
     console.error('Error al importar la configuración:', error)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('beforeunload', handleBeforeUnload)
   }
 })
 
