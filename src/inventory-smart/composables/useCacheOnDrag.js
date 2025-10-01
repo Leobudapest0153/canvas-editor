@@ -19,19 +19,82 @@ export function useCacheOnDrag(refNode) {
   const onDragStart = () => {
     try {
       if (isPlantInfinite()) return
-      node && node.cache && node.cache()
+      
+      // Obtener dimensiones del nodo para ajustar el cache
+      if (node && node.cache) {
+        const width = typeof node.width === 'function' ? node.width() : (node.width || 0)
+        const height = typeof node.height === 'function' ? node.height() : (node.height || 0)
+        const area = width * height
+        
+        // No aplicar cache en elementos muy grandes (>500k píxeles) para evitar problemas de renderizado
+        // Esto típicamente ocurre con elementos >700x700 px
+        const MAX_CACHE_AREA = 500000
+        
+        if (area > MAX_CACHE_AREA) {
+          // Para elementos grandes, simplemente no usar cache
+          // El perf mode ya desactiva sombras y efectos pesados
+          return
+        }
+        
+        // Para elementos medianos (100k-500k), usar pixelRatio reducido
+        const MEDIUM_AREA_THRESHOLD = 100000
+        if (area > MEDIUM_AREA_THRESHOLD) {
+          // Usar pixelRatio reducido para elementos medianos
+          node.cache({ pixelRatio: 1 })
+        } else {
+          // Elementos pequeños usan cache normal
+          node.cache()
+        }
+      }
+      
       node && node.draw && node.draw()
-    } catch {
-      // ignore
+    } catch (err) {
+      // Si falla el cache, continuar sin él
+      console.warn('Cache falló durante dragstart, continuando sin cache:', err)
     }
   }
 
   const onDragEnd = () => {
     try {
-      node && node.clearCache && node.clearCache()
-      node && node.draw && node.draw()
-    } catch {
-      // ignore
+      // Limpiar cache siempre, incluso si no se aplicó (para evitar estados inconsistentes)
+      if (node && node.clearCache) {
+        node.clearCache()
+      }
+      
+      // Forzar redibujado para asegurar que el elemento se renderiza correctamente
+      if (node && node.draw) {
+        node.draw()
+      }
+      
+      // Si el nodo es un Group, también redibujar sus hijos
+      if (node && node.getChildren && typeof node.getChildren === 'function') {
+        const children = node.getChildren()
+        children.forEach((child) => {
+          try {
+            if (child && child.clearCache) {
+              child.clearCache()
+            }
+            if (child && child.draw) {
+              child.draw()
+            }
+          } catch (err) {
+            // Ignorar errores individuales de hijos
+          }
+        })
+      }
+      
+      // Obtener el layer padre y forzar un redibujado completo
+      try {
+        const layer = node?.getLayer?.()
+        if (layer) {
+          layer.clearCache?.()
+          layer.batchDraw?.()
+        }
+      } catch (err) {
+        // Ignorar si no se puede obtener el layer
+      }
+    } catch (err) {
+      console.warn('Error al limpiar cache en dragend:', err)
     }
   }
 
