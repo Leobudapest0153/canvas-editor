@@ -727,7 +727,7 @@ const {
 const { deleteSelected } = useDeleteElement()
 const weightValidation = useWeightValidation()
 const { modoEdicion } = useEditorMode()
-const isEditMode = computed(() => modoEdicion.value === true)
+const isEditMode = computed(() => modoEdicion.value === true && !['cuartos', 'elementos'].includes(canvasStore.contextoActual.tipo))
 const canUseContextMenus = computed(() => isEditMode.value)
 const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 
