@@ -824,6 +824,25 @@ export function useElementDrag({
       console.warn('Error al restaurar el contexto de rendimiento del elemento:', elementId)
     }
     perfContexts.delete(elementId)
+
+    // Forzar un redibujado completo del layer para asegurar que todos los elementos se renderizan correctamente
+    // Esto es especialmente importante cuando hay elementos grandes que pueden haber usado cache
+    try {
+      const layer = layerRef.value?.getNode?.()
+      if (layer) {
+        await nextTick()
+        // Limpiar cache del layer completo y redibujar
+        layer.clearCache?.()
+        layer.batchDraw?.()
+        // Segundo frame para asegurar que el navegador ha procesado el cambio
+        await new Promise((r) => requestAnimationFrame(() => {
+          layer.batchDraw?.()
+          r()
+        }))
+      }
+    } catch (err) {
+      console.warn('Error al forzar redibujado completo del layer:', err)
+    }
   }
 
   const onShapeDragStart = (e, el) => {
