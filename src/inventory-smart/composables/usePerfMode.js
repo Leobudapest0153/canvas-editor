@@ -16,11 +16,11 @@ export function enablePerfMode(layer, opts = {}) {
     shapeOpacity: shape?.getAttr ? shape.getAttr('opacity') : undefined,
     childrenAttrs: [] // Almacenar atributos de los hijos
   }
-  
+
   try {
     // Konva 9+: optimizar solo el dibujo, no tocar listening para no afectar dragBound
     layer.perfectDrawEnabled && layer.perfectDrawEnabled(false)
-    
+
     if (shape && shape.setAttrs) {
       shape.setAttrs({
         shadowEnabled: false,
@@ -30,7 +30,7 @@ export function enablePerfMode(layer, opts = {}) {
         strokeWidth: 1,
       })
     }
-    
+
     // Si el shape es un grupo, también optimizar sus hijos
     if (shape && shape.getChildren && typeof shape.getChildren === 'function') {
       const children = shape.getChildren()
@@ -45,7 +45,7 @@ export function enablePerfMode(layer, opts = {}) {
             opacity: child.getAttr('opacity')
           }
           prev.childrenAttrs.push({ child, attrs: childPrev })
-          
+
           // Aplicar optimizaciones manteniendo el fill y opacity
           child.setAttrs({
             shadowEnabled: false,
@@ -85,7 +85,7 @@ export function disablePerfMode(layer, ctx = {}) {
       if (prev.shapeOpacity !== undefined) attrs.opacity = prev.shapeOpacity
       shape.setAttrs(attrs)
     }
-    
+
     // Restaurar atributos de los hijos
     if (prev.childrenAttrs && Array.isArray(prev.childrenAttrs)) {
       prev.childrenAttrs.forEach(({ child, attrs }) => {
