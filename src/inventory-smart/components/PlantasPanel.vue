@@ -169,6 +169,30 @@
           </button>
         </UiTooltip>
 
+        <!-- Botón Configurar ESL (modo visualización) -->
+        <UiTooltip
+          v-if="!canvasStore.modoEdicion"
+          :label="eslModeTooltip"
+          position="bottom"
+          :delay="200"
+        >
+          <button
+            type="button"
+            :class="eslButtonClasses"
+            @click="toggleEslMode"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 5v6a2 2 0 00.586 1.414l7 7a2 2 0 002.828 0l4-4a2 2 0 000-2.828l-7-7A2 2 0 0011 5H5z"
+              />
+            </svg>
+            <span>{{ eslButtonLabel }}</span>
+          </button>
+        </UiTooltip>
+
         <!-- Toggle modo edición -->
         <UiTooltip :label="modoEdicionTooltip" position="bottom" :delay="200">
           <EditModeToggle
@@ -524,6 +548,21 @@ const modoEdicionTooltip = computed(() =>
   canvasStore.modoEdicion ? 'Finalizar edición' : 'Editar configuración'
 )
 
+const eslModeTooltip = computed(() =>
+  canvasStore.modoConfigurarEsl ? 'Finalizar configuración de ESL' : 'Configurar ESL'
+)
+
+const eslButtonLabel = computed(() =>
+  canvasStore.modoConfigurarEsl ? 'Salir de Configurar ESL' : 'Configurar ESL'
+)
+
+const eslButtonClasses = computed(() => [
+  'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors cursor-pointer',
+  canvasStore.modoConfigurarEsl
+    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+    : 'bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500',
+])
+
 // Estado local para modales
 const showChangeHistoryModal = ref(false)
 const showImportExportModal = ref(false)
@@ -603,6 +642,10 @@ const elementosEnPlantaAEliminar = computed(() => {
 // Métodos
 const emitirIndicadores = () => {
   emit('showIndicators')
+}
+
+const toggleEslMode = () => {
+  canvasStore.toggleModoConfigurarEsl()
 }
 
 // Emitir acción de regresar para que el componente padre pueda manejar navegación/salida
