@@ -53,12 +53,14 @@
               </div> -->
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-                <input
-                  :value="getCategoriaDisplay(elementoSeleccionado.categoria)"
-                  type="text"
-                  disabled
-                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed capitalize"
-                />
+                <select
+                  v-model="edited.categoria"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm capitalize"
+                >
+                  <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                    {{ cat.nombre }}
+                  </option>
+                </select>
               </div>
             </div>
 
@@ -519,7 +521,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
-import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO } from '@/inventory-smart/utils/constants'
 import { deepClone, deepEqual, makePatch } from '@/inventory-smart/utils/object'
 import { useToast } from '@/inventory-smart/composables/useToast.js'
 import ContainerProductsList from './ContainerProductsList.vue'
@@ -594,6 +596,7 @@ const cargarDesdeStore = (el) =>
     tags: Array.isArray(el.etiquetas) ? [...el.etiquetas] : [],
     // Propiedad ESL
     codigoEsl: el.codigoEsl || '',
+    categoria: el.categoria
   })// Estado para trackear valores previos y evitar validaciones innecesarias
 const valorDimensionAnterior = ref({})
 const valorPesoAnterior = ref(0)
@@ -609,6 +612,7 @@ watch(
     if (id) {
       snapshotOriginal.value = cargarDesdeStore(elementoSeleccionado.value)
       edited.value = deepClone(snapshotOriginal.value)
+      console.log(edited.value)
 
       // Inicializar valores anteriores para evitar validaciones innecesarias al cargar
       valorDimensionAnterior.value = {
@@ -1197,6 +1201,17 @@ const validarPeso = () => {
 const getTipoNombre = (tipo) => {
   return TIPOS_ENTIDAD.find((t) => t.id === tipo)?.nombre || tipo
 }
+
+const categories = computed(() => {
+ console.log(elementoSeleccionado.value)
+  if (elementoSeleccionado.value.tipo === 'cuartos') {
+    return DEFAULT_TIPOS_CUARTO;
+  }
+  if (elementoSeleccionado.value.tipo === 'elementos') {
+    return DEFAULT_TIPOS_ESPACIO;
+  }
+  return [];
+});
 
 const getTipoNombrePadre = () => {
   const { padreId, padreType } = padreContext.value

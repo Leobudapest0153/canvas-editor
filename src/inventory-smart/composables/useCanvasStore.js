@@ -67,6 +67,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       capacidadCargaSoportado: 5000, // kg
       // Nuevo flag para plantas elásticas (por defecto false)
       isInfinite: false,
+      forma: 'rectangle', // Plantilla por defecto
       poligono: [
         {
           x: 0,
