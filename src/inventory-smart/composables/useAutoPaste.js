@@ -69,8 +69,48 @@ export function useAutoPaste() {
    * considerando las dimensiones apropiadas según la vista activa y polígonos
    */
   const createOccupancyGrid = (areaBounds, neighbors, gridResolution = 10) => {
-    const gridWidth = Math.ceil((areaBounds.maxX - areaBounds.minX) / gridResolution)
-    const gridHeight = Math.ceil((areaBounds.maxY - areaBounds.minY) / gridResolution)
+    // 🛡️ VALIDACIÓN DE SEGURIDAD: Evitar valores inválidos que causen bucles infinitos
+    if (!areaBounds ||
+        !Number.isFinite(areaBounds.minX) ||
+        !Number.isFinite(areaBounds.maxX) ||
+        !Number.isFinite(areaBounds.minY) ||
+        !Number.isFinite(areaBounds.maxY)) {
+      console.error('❌ areaBounds inválido en createOccupancyGrid:', areaBounds)
+      return {
+        grid: [[false]],
+        gridWidth: 1,
+        gridHeight: 1,
+        gridResolution: 10,
+        areaBounds: { minX: 0, maxX: 100, minY: 0, maxY: 100 }
+      }
+    }
+
+    const areaWidth = areaBounds.maxX - areaBounds.minX
+    const areaHeight = areaBounds.maxY - areaBounds.minY
+
+    // 🛡️ VALIDACIÓN: Área debe ser positiva y razonable (máximo 100,000px)
+    if (areaWidth <= 0 || areaHeight <= 0 || areaWidth > 100000 || areaHeight > 100000) {
+      console.error('❌ Dimensiones de área inválidas:', { areaWidth, areaHeight })
+      return {
+        grid: [[false]],
+        gridWidth: 1,
+        gridHeight: 1,
+        gridResolution: 10,
+        areaBounds
+      }
+    }
+
+    const gridWidth = Math.ceil(areaWidth / gridResolution)
+    const gridHeight = Math.ceil(areaHeight / gridResolution)
+
+    // 🛡️ VALIDACIÓN: Grid no debe exceder 1000x1000 (1 millón de celdas)
+    const MAX_GRID_CELLS = 1000000
+    if (gridWidth * gridHeight > MAX_GRID_CELLS) {
+      console.error('❌ Grid demasiado grande:', { gridWidth, gridHeight, total: gridWidth * gridHeight })
+      // Aumentar gridResolution para reducir tamaño del grid
+      const newResolution = Math.ceil(Math.sqrt((areaWidth * areaHeight) / MAX_GRID_CELLS))
+      return createOccupancyGrid(areaBounds, neighbors, newResolution)
+    }
 
     // Inicializar matriz con false (libre)
     const grid = Array(gridHeight).fill(null).map(() => Array(gridWidth).fill(false))
@@ -150,23 +190,33 @@ export function useAutoPaste() {
     if (elemento.dimensiones) {
       if (vistaActiva === 'XY') {
         // Vista desde arriba: ancho=X, largo=Y
-        return {
-          width: (elemento.dimensiones.ancho || 0) * CM_TO_PX,
-          height: (elemento.dimensiones.largo || 0) * CM_TO_PX
+        const width = (elemento.dimensiones.ancho || 0) * CM_TO_PX
+        const height = (elemento.dimensiones.largo || 0) * CM_TO_PX
+
+        // 🛡️ VALIDACIÓN: Dimensiones deben ser finitas y positivas
+        if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+          return { width, height }
         }
       } else if (vistaActiva === 'XZ') {
         // Vista frontal: ancho=X, alto=Y
-        return {
-          width: (elemento.dimensiones.ancho || 0) * CM_TO_PX,
-          height: (elemento.dimensiones.alto || 0) * CM_TO_PX
+        const width = (elemento.dimensiones.ancho || 0) * CM_TO_PX
+        const height = (elemento.dimensiones.alto || 0) * CM_TO_PX
+
+        // 🛡️ VALIDACIÓN: Dimensiones deben ser finitas y positivas
+        if (Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0) {
+          return { width, height }
         }
       }
     }
 
     // Fallback a width/height si no hay dimensiones
+    const width = elemento.width || 50 // Default mínimo de 50px
+    const height = elemento.height || 50
+
+    // 🛡️ VALIDACIÓN FINAL: Siempre retornar valores válidos
     return {
-      width: elemento.width || 0,
-      height: elemento.height || 0
+      width: Number.isFinite(width) && width > 0 ? width : 50,
+      height: Number.isFinite(height) && height > 0 ? height : 50
     }
   }
 
@@ -442,13 +492,37 @@ export function useAutoPaste() {
    * considerando la vista activa y las dimensiones apropiadas
    */
   const findAvailableSpace = (elemento, areaBounds, startPosition = null) => {
+    // 🛡️ VALIDACIÓN DE SEGURIDAD: Verificar areaBounds antes de procesar
+    if (!areaBounds ||
+        !Number.isFinite(areaBounds.minX) ||
+        !Number.isFinite(areaBounds.maxX) ||
+        !Number.isFinite(areaBounds.minY) ||
+        !Number.isFinite(areaBounds.maxY)) {
+      console.error('❌ areaBounds inválido en findAvailableSpace:', areaBounds)
+      return { found: false }
+    }
+
     // Obtener dimensiones del elemento según la vista activa
     const elementDimensions = getElementDimensions(elemento)
     const elementWidth = elementDimensions.width
     const elementHeight = elementDimensions.height
 
+    // 🛡️ VALIDACIÓN: Element dimensions deben ser válidas
+    if (!Number.isFinite(elementWidth) || !Number.isFinite(elementHeight) ||
+        elementWidth <= 0 || elementHeight <= 0) {
+      console.error('❌ Dimensiones de elemento inválidas:', { elementWidth, elementHeight })
+      return { found: false }
+    }
+
     const areaWidth = areaBounds.maxX - areaBounds.minX
     const areaHeight = areaBounds.maxY - areaBounds.minY
+
+    // 🛡️ VALIDACIÓN: Área debe tener dimensiones válidas
+    if (!Number.isFinite(areaWidth) || !Number.isFinite(areaHeight) ||
+        areaWidth <= 0 || areaHeight <= 0) {
+      console.error('❌ Dimensiones de área inválidas:', { areaWidth, areaHeight })
+      return { found: false }
+    }
 
     // Verificar que el elemento pueda caber en el área
     if (elementWidth > areaWidth || elementHeight > areaHeight) {
@@ -655,10 +729,29 @@ export function useAutoPaste() {
     const MAX_ITERATIONS = 5000 // Límite de seguridad
     let iterations = 0
 
+    // 🛡️ VALIDACIÓN: Verificar que smallGridSize no sea 0 o negativo
+    if (!Number.isFinite(smallGridSize) || smallGridSize <= 0) {
+      console.error('❌ smallGridSize inválido:', smallGridSize)
+      return { found: false }
+    }
+
     for (let y = areaBounds.minY; y <= areaBounds.maxY - elementHeight; y += smallGridSize) {
+      // 🛡️ VALIDACIÓN: Prevenir bucles infinitos si y no incrementa
+      if (!Number.isFinite(y)) {
+        console.error('❌ Valor y inválido en búsqueda exhaustiva:', y)
+        return { found: false }
+      }
+
       for (let x = areaBounds.minX; x <= areaBounds.maxX - elementWidth; x += smallGridSize) {
+        // 🛡️ VALIDACIÓN: Prevenir bucles infinitos si x no incrementa
+        if (!Number.isFinite(x)) {
+          console.error('❌ Valor x inválido en búsqueda exhaustiva:', x)
+          return { found: false }
+        }
+
         iterations++
         if (iterations > MAX_ITERATIONS) {
+          console.warn(`⚠️ Búsqueda exhaustiva cancelada después de ${MAX_ITERATIONS} iteraciones`)
           return { found: false }
         }
 
