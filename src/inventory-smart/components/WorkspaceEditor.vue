@@ -1000,10 +1000,24 @@ function validateElementsHeight(newY_cm) {
   return { ok: true }
 }
 
-function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, fit: true }) {
+function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, fit: true, changedDimension: null }) {
   const oldW_cm = rectW.value
   const oldL_cm = rectL.value
+  const oldY_cm = rectY.value
   if (!oldW_cm || !oldL_cm) return { ok: false, message: '' }
+
+  // 🔍 ESTRATEGIA: Si solo cambió la altura, NO tocar el polígono
+  if (opts.changedDimension === 'height' && newW_cm === oldW_cm && newL_cm === oldL_cm) {
+    // Validar solo la altura contra los elementos
+    const heightCheck = validateElementsHeight(newY_cm)
+    if (!heightCheck.ok) return heightCheck
+
+    if (opts.apply) {
+      rectY.value = newY_cm
+      notice.value = ''
+    }
+    return { ok: true }
+  }
 
   const newWorldWidth = newW_cm * PIXELS_PER_CM
   const newWorldLength = newL_cm * PIXELS_PER_CM
@@ -1015,12 +1029,21 @@ function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, f
   const polyLengthPx = Math.max(1, (polyBBox?.maxY ?? baseY) - baseY)
 
   let nextPolygon
-  if (local.shape === 'circle') {
+
+  // 🎯 Si el usuario modificó manualmente el polígono, SIEMPRE escalar (no regenerar)
+  if (isManuallyEdited.value && local.polygon.length >= 3 && polyBBox) {
+    // Escalar proporcionalmente los vértices existentes sin importar la plantilla
+    nextPolygon = local.polygon.map((pt) => ({
+      x: Math.round(baseX + (polyWidthPx ? ((pt.x - polyBBox.minX) / polyWidthPx) * newWorldWidth : 0)),
+      y: Math.round(baseY + (polyLengthPx ? ((pt.y - polyBBox.minY) / polyLengthPx) * newWorldLength : 0)),
+    }))
+  } else if (local.shape === 'circle') {
     const circlePoints = applyCircle(newW_cm, newL_cm)
     nextPolygon = circlePoints.map((pt) => ({ x: pt.x + baseX, y: pt.y + baseY }))
   } else if (local.shape === 'rectangle') {
     nextPolygon = buildRectPolygon(newWorldWidth, newWorldLength, baseX, baseY)
   } else {
+    // Fallback: polígono sin plantilla definida
     const current = Array.isArray(local.polygon) ? local.polygon : []
     if (current.length >= 3 && polyBBox) {
       nextPolygon = current.map((pt) => ({
@@ -1054,8 +1077,8 @@ function tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, opts = { apply: true, f
   return { ok: true }
 }
 
-// --- WATCH CORREGIDO ---
-watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY]) => {
+// --- WATCH MEJORADO: Detectar qué dimensión cambió ---
+watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY], [oldW, oldL, oldY]) => {
   if (isLoadingData.value || skipDimensionWatcher) return
 
   clearTimeout(dimensionChangeDebounce)
@@ -1071,11 +1094,21 @@ watch([localRectWMeters, localRectLMeters, localRectYMeters], ([newW, newL, newY
     return
   }
 
+  // 🎯 Detectar qué dimensión cambió
+  let changedDimension = null
+  if (oldY !== undefined && newY !== oldY && newW === oldW && newL === oldL) {
+    changedDimension = 'height'
+  } else if (oldW !== undefined && newW !== oldW) {
+    changedDimension = 'width'
+  } else if (oldL !== undefined && newL !== oldL) {
+    changedDimension = 'length'
+  }
+
   dimensionChangeDebounce = setTimeout(() => {
     const newW_cm = (Number(localRectWMeters.value) || 0) * 100
     const newL_cm = (Number(localRectLMeters.value) || 0) * 100
     const newY_cm = (Number(localRectYMeters.value) || 0) * 100
-    const res = tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, { apply: true, fit: true })
+    const res = tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, { apply: true, fit: true, changedDimension })
     if (!res.ok) {
       errors.dimensions = true
       notice.value = res.message || ''
@@ -1108,7 +1141,7 @@ function onSave() {
     const newW_cm = (Number(localRectWMeters.value) || 0) * 100
     const newL_cm = (Number(localRectLMeters.value) || 0) * 100
     const newY_cm = (Number(localRectYMeters.value) || 0) * 100
-    const res = tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, { apply: true, fit: false })
+    const res = tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, { apply: true, fit: false, changedDimension: null })
     if (!res.ok) {
       notice.value = res.message
       showToast('Por favor corrige los errores antes de guardar.', 'error')
