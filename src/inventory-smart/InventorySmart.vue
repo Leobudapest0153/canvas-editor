@@ -120,7 +120,7 @@ const props = defineProps({
     }
   }
 })// Definir emits para comunicar cambios al componente padre
-const emit = defineEmits(['configUpdated', 'back', 'imprimirIdentificadores', 'imprimirIdentificador'])
+const emit = defineEmits(['configUpdated', 'back', 'printIdentifiers', 'printIdentifier'])
 
 const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
@@ -189,11 +189,11 @@ const handleConfigChanged = (configSerializada) => {
 }
 
 const handleShowIdentifiers = (value) => {
-  emit('imprimirIdentificadores', value)
+  emit('printIdentifiers', value)
 }
 
 const handleShowIdentifier = (value) => {
-  emit('imprimirIdentificador', value)
+  emit('printIdentifier', value)
 }
 
 const elementoEslActual = computed(() => {
