@@ -3,6 +3,7 @@
     <InventorySmart
       :configCanvas="initialConfig"
       :predefinedElements="ELEMENTOS_PREDEFINIDOS"
+      :supportedProductTypes="tiposProductoAdmitidos"
       :externalServices="externalServices"
       :author="{ name: 'David Deras', id: '123' }"
       @configUpdated="handleConfigUpdated"
@@ -18,6 +19,16 @@ import { onMounted, ref } from 'vue'
 import InventorySmart from '@/inventory-smart/InventorySmart.vue'
 import { SERIALIZE_CONFIG } from '../inventory-smart/utils/constants'
 import { ELEMENTOS_PREDEFINIDOS } from '../inventory-smart/utils/constants'
+
+// Catálogo de tipos de producto admitidos (datos de ejemplo)
+const tiposProductoAdmitidos = ref([
+  { id: 'secos', nombre: 'Productos secos' },
+  { id: 'refrigerados', nombre: 'Refrigerados' },
+  { id: 'congelados', nombre: 'Congelados' },
+  { id: 'fragiles', nombre: 'Frágiles' },
+  { id: 'peligrosos', nombre: 'Peligrosos' },
+  { id: 'voluminosos', nombre: 'Voluminosos' },
+])
 
 // Estado inicial de la configuración del canvas
 const initialConfig = ref(null)

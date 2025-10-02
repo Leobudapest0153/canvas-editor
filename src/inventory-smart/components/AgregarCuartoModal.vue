@@ -633,7 +633,7 @@
                           </div>
                           <ul class="p-2 space-y-1">
                             <li
-                              v-for="opt in catalogos.tiposProductoAdmitidos"
+                              v-for="opt in tiposProductoAdmitidos"
                               :key="opt.id"
                               class="px-2 py-1 rounded hover:bg-gray-50"
                             >
@@ -773,10 +773,10 @@ const setDropdownRef = (id, el) => {
 
 // Catálogos dinámicos desde el store
 const canvasStore = useCanvasStore()
-const { catalogos } = storeToRefs(canvasStore)
+const { catalogos, tiposProductoAdmitidos } = storeToRefs(canvasStore)
 
 const mapaTiposProducto = computed(() => Object.fromEntries(
-  (catalogos.value.tiposProductoAdmitidos || []).map((t) => [t.id, t.nombre])
+  (tiposProductoAdmitidos.value || []).map((t) => [t.id, t.nombre])
 ))
 
 const handleClickOutside = (e) => {
@@ -814,7 +814,7 @@ onBeforeUnmount(() => {
 })
 
 // Helpers locales desde catálogos dinámicos
-const TIPOS_PRODUCTO_ADMITIDOS_LOCAL = computed(() => catalogos.value.tiposProductoAdmitidos || [])
+const TIPOS_PRODUCTO_ADMITIDOS_LOCAL = computed(() => tiposProductoAdmitidos.value || [])
 const TIPOS_CUARTO_LOCAL = computed(() => catalogos.value.tiposCuarto || [])
 const TIPOS_ESPACIO_LOCAL = computed(() => catalogos.value.tiposEspacio || [])
 
@@ -826,7 +826,7 @@ const toggleTipoProducto = (pisoNivel, id) => {
 }
 
 const seleccionarTodosTipos = (pisoNivel) => {
-  pisoNivel.tiposProductos = (catalogos.value.tiposProductoAdmitidos || []).map((t) => t.id)
+  pisoNivel.tiposProductos = (tiposProductoAdmitidos.value || []).map((t) => t.id)
 }
 
 const limpiarTipos = (pisoNivel) => {
