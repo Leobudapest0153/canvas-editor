@@ -470,7 +470,8 @@
       <UiTooltip label="Editar planta" position="right">
         <button
           @click="editarPlanta(menuAbiertoPlanta)"
-          class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-all border-none bg-transparent cursor-pointer"
+          :disabled="!canvasStore.modoEdicion"
+          class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all border-none bg-transparent cursor-pointer"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -486,7 +487,7 @@
       <UiTooltip label="Eliminar planta" position="right">
         <button
           @click="confirmarEliminarPlantaMenu(menuAbiertoPlanta)"
-          :disabled="canvasStore.plantas.length <= 1"
+          :disabled="!canvasStore.modoEdicion || canvasStore.plantas.length <= 1"
           class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all border-none bg-transparent cursor-pointer"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -782,6 +783,9 @@ const cerrarMenuPlanta = () => {
 }
 
 const editarPlanta = (plantaId) => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
   const planta = canvasStore.plantaPorId(plantaId)
   if (planta) {
     canvasStore.abrirEditor(planta.id)
@@ -806,6 +810,9 @@ const editarPlanta = (plantaId) => {
 }
 
 const confirmarEliminarPlantaMenu = (plantaId) => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
   const planta = canvasStore.plantaPorId(plantaId)
   if (planta) {
     plantaAEliminar.value = planta
