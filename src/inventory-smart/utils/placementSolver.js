@@ -66,7 +66,8 @@ function dominantAxisFromVelocity(vx, vy) {
 export function solveDragPosition({
   candidate,
   movingEl,
-  neighbors = [],
+  hardNeighbors = [],
+  softNeighbors = [],
   areaBounds,
   lastValidPos = null,
   lastVelocity = { x: 0, y: 0 },
@@ -82,12 +83,13 @@ export function solveDragPosition({
   // Clamp inicial
   let { x, y } = clampToArea(candidate.x, candidate.y, aw, ah, movingEl, areaBounds, lastValidPos)
 
-  const getBlocking = (xx, yy) => {
+  const getConflicts = (xx, yy) => {
     const test = isCirc
       ? { ...movingEl, x: xx, y: yy, width: aw, height: ah, forma: 'circular' }
       : { ...movingEl, x: xx, y: yy, width: aw, height: ah, forma: 'rectangular' }
-    const conf = detectConflictsFor(test, neighbors)
-    return conf.filter((c) => c && c.bloqueante)
+    const hard = detectConflictsFor(test, hardNeighbors).filter((c) => c && c.bloqueante)
+    const soft = detectConflictsFor(test, softNeighbors).filter((c) => c && !c.bloqueante && c.xyOverlap)
+    return { hard, soft }
   }
 
   const doClamp = (xx, yy) => clampToArea(xx, yy, aw, ah, movingEl, areaBounds, lastValidPos)
@@ -97,34 +99,42 @@ export function solveDragPosition({
   const axis2 = axis1 === 'x' ? 'y' : 'x'
   const tryAxis = (axis, iters = 4) => {
     for (let i = 0; i < iters; i++) {
-      const blocking = getBlocking(x, y)
-      if (blocking.length === 0) return true
+      const { hard, soft } = getConflicts(x, y)
+      if (hard.length === 0 && soft.length === 0) return true
       let moved = false
-      for (const b of blocking) {
-        const otherId = b.aId === movingEl.id ? b.bId : b.aId
-        const other = neighbors.find((n) => n.id === otherId)
-        if (!other) continue
-        let { dx, dy } = computeMTD(x, y, aw, ah, other.x, other.y, other.width, other.height)
-        if (axis === 'x') dy = 0
-        else dx = 0
-        if (Math.abs(dx) > 1e-6 || Math.abs(dy) > 1e-6) {
-          x += dx
-          y += dy
-          const cl = doClamp(x, y)
-          x = cl.x
-          y = cl.y
-          moved = true
+      const applyFor = (confList, pool) => {
+        for (const b of confList) {
+          const otherId = b.aId === movingEl.id ? b.bId : b.aId
+          const other = pool.find((n) => n.id === otherId)
+          if (!other) continue
+          let { dx, dy } = computeMTD(x, y, aw, ah, other.x, other.y, other.width, other.height)
+          if (axis === 'x') dy = 0
+          else dx = 0
+          if (Math.abs(dx) > 1e-6 || Math.abs(dy) > 1e-6) {
+            x += dx
+            y += dy
+            const cl = doClamp(x, y)
+            x = cl.x
+            y = cl.y
+            moved = true
+          }
         }
       }
-      if (!moved) return getBlocking(x, y).length === 0
+      applyFor(hard, hardNeighbors)
+      applyFor(soft, softNeighbors)
+      if (!moved) {
+        const { hard: h2 } = getConflicts(x, y)
+        return h2.length === 0
+      }
     }
-    return getBlocking(x, y).length === 0
+    const { hard: h3 } = getConflicts(x, y)
+    return h3.length === 0
   }
 
   let ok = tryAxis(axis1, Math.ceil(maxIters / 2))
   if (!ok) ok = tryAxis(axis2, Math.floor(maxIters / 2))
 
-  const rest = getBlocking(x, y)
+  const { hard: rest } = getConflicts(x, y)
   if (rest.length > 0 || !insidePolyOrRect(x, y, aw, ah, areaBounds)) {
     // Fallback a última válida si queda bloqueo o se salió
     if (lastValidPos) return { x: lastValidPos.x, y: lastValidPos.y, fellBack: true }

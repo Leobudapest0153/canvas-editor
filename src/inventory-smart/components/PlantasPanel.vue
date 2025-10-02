@@ -15,7 +15,7 @@
 
 <template>
   <div class="bg-white border-b border-gray-200 px-4 py-2 shadow-sm">
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-3">
       <!-- Contenedor de plantas y botón agregar - alineado a la izquierda -->
       <div class="flex items-center gap-3 plantas-container">
         <!-- Contenedor de plantas scrolleable -->
@@ -168,7 +168,7 @@
                 d="M19 8h-1V3H6v5H5c-1.1 0-2 .9-2 2v5h3v4h12v-4h3v-5c0-1.1-.9-2-2-2zM8 5h8v3H8V5zm8 14H8v-4h8v4zm1-6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"
               />
             </svg>
-            <span class="ml-1">Todos los identificadores</span>
+            <span class="ml-0 keep-all text-nowrap">Todos los identificadores</span>
           </button>
         </UiTooltip>
 
@@ -217,7 +217,7 @@
                 d="M12 21q-3.15 0-5.575-1.912T3.275 14.2q-.1-.375.15-.687t.675-.363q.4-.05.725.15t.45.6q.6 2.25 2.475 3.675T12 19q2.925 0 4.963-2.037T19 12t-2.037-4.962T12 5q-1.725 0-3.225.8T6.25 8H8q.425 0 .713.288T9 9t-.288.713T8 10H4q-.425 0-.712-.288T3 9V5q0-.425.288-.712T4 4t.713.288T5 5v1.35q1.275-1.6 3.113-2.475T12 3q1.875 0 3.513.713t2.85 1.924t1.925 2.85T21 12t-.712 3.513t-1.925 2.85t-2.85 1.925T12 21m1-9.4l2.5 2.5q.275.275.275.7t-.275.7t-.7.275t-.7-.275l-2.8-2.8q-.15-.15-.225-.337T11 11.975V8q0-.425.288-.712T12 7t.713.288T13 8z"
               />
             </svg>
-            <span class="ml-2">Historial</span>
+            <span class="ml-0">Historial</span>
           </button>
         </UiTooltip>
 
@@ -236,7 +236,7 @@
                 d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
               />
             </svg>
-            <span>Guardar Cambios</span>
+            <span class="text-nowrap">Guardar Cambios</span>
           </button>
         </UiTooltip>
       </div>
@@ -470,7 +470,8 @@
       <UiTooltip label="Editar planta" position="right">
         <button
           @click="editarPlanta(menuAbiertoPlanta)"
-          class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-all border-none bg-transparent cursor-pointer"
+          :disabled="!canvasStore.modoEdicion"
+          class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all border-none bg-transparent cursor-pointer"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -486,7 +487,7 @@
       <UiTooltip label="Eliminar planta" position="right">
         <button
           @click="confirmarEliminarPlantaMenu(menuAbiertoPlanta)"
-          :disabled="canvasStore.plantas.length <= 1"
+          :disabled="!canvasStore.modoEdicion || canvasStore.plantas.length <= 1"
           class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all border-none bg-transparent cursor-pointer"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -782,6 +783,9 @@ const cerrarMenuPlanta = () => {
 }
 
 const editarPlanta = (plantaId) => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
   const planta = canvasStore.plantaPorId(plantaId)
   if (planta) {
     canvasStore.abrirEditor(planta.id)
@@ -806,6 +810,9 @@ const editarPlanta = (plantaId) => {
 }
 
 const confirmarEliminarPlantaMenu = (plantaId) => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
   const planta = canvasStore.plantaPorId(plantaId)
   if (planta) {
     plantaAEliminar.value = planta

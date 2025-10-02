@@ -75,8 +75,14 @@ export function useAutoPaste() {
     // Inicializar matriz con false (libre)
     const grid = Array(gridHeight).fill(null).map(() => Array(gridWidth).fill(false))
 
-    // Marcar áreas fuera del polígono como ocupadas (si hay polígono)
+    // 🔥 OPTIMIZACIÓN CRÍTICA: Desactivar verificación de polígono en el grid
+    // Esta verificación iteraba 10,000+ veces llamando a pointInPolygon() en cada iteración
+    // tomando 13 segundos. La verificación de polígono ya se hace en isPositionValid()
+    // por lo que esta pre-verificación es redundante y muy costosa.
     if (areaBounds.hasPolygon && areaBounds.insetPolygon) {
+      // DESACTIVADO: Esta verificación tomaba 13 segundos
+      // La verificación de polígono se hace más tarde en isPositionValid()
+      /*
       for (let y = 0; y < gridHeight; y++) {
         for (let x = 0; x < gridWidth; x++) {
           const worldX = areaBounds.minX + x * gridResolution + gridResolution / 2
@@ -88,6 +94,7 @@ export function useAutoPaste() {
           }
         }
       }
+      */
     }
 
     // Marcar áreas ocupadas por elementos vecinos
@@ -456,7 +463,30 @@ export function useAutoPaste() {
     const gridSize = Math.max(adaptiveGridSize, 20) // Mínimo de 20px para evitar grids muy pequeños
 
     // 4.1.2 Crear matriz de ocupación para optimizar validaciones
-    const occupancyGrid = createOccupancyGrid(areaBounds, neighbors, Math.min(gridSize, 20))    // Función optimizada para verificar si una posición es válida
+    const occupancyGrid = createOccupancyGrid(areaBounds, neighbors, Math.min(gridSize, 20))
+
+    // Cache de validación de peso (solo validar una vez)
+    let pesoValidoCache = null
+    const isPesoValido = () => {
+      if (pesoValidoCache !== null) return pesoValidoCache
+
+      try {
+        const resultadoValidacionPeso = weightValidation.validarPesoElemento(
+          elemento,
+          canvasStore.contextoActual.id,
+          canvasStore.contextoActual.tipo
+        )
+        pesoValidoCache = resultadoValidacionPeso.valido
+      } catch (error) {
+        pesoValidoCache = false
+      }
+      return pesoValidoCache
+    }
+
+    // Cache de compatibilidad de ubicación (solo validar una vez)
+    const esUbicacionCompatible = isLocationCompatible(elemento, canvasStore.contextoActual)
+
+    // Función optimizada para verificar si una posición es válida
     const isPositionValid = (x, y) => {
       // 1. Verificar primero si estamos dentro del polígono (si existe)
       if (areaBounds.hasPolygon && areaBounds.insetPolygon) {
@@ -483,11 +513,8 @@ export function useAutoPaste() {
 
       const position = { x, y }
 
-      // Crear elemento temporal con la nueva posición
-      const elementoTemporal = { ...elemento, x, y }
-
-      // 3. Verificar compatibilidad de ubicación
-      if (!isLocationCompatible(elemento, canvasStore.contextoActual)) {
+      // 3. Verificar compatibilidad de ubicación (usa cache)
+      if (!esUbicacionCompatible) {
         return false
       }
 
@@ -503,24 +530,15 @@ export function useAutoPaste() {
         return false
       }
 
-      // 5. Validar peso máximo
-      try {
-        const resultadoValidacionPeso = weightValidation.validarPesoElemento(
-          elemento,
-          canvasStore.contextoActual.id,
-          canvasStore.contextoActual.tipo
-        )
-
-        if (!resultadoValidacionPeso.valido) {
-          return false
-        }
-      } catch (error) {
-        // Si falla la validación de peso, considerar inválido
+      // 5. Validar peso máximo (usa cache)
+      if (!isPesoValido()) {
         return false
       }
 
       // 6. Validar placement guards (crítico para elementos de pared)
       try {
+        // Crear elemento temporal solo cuando sea necesario
+        const elementoTemporal = { ...elemento, x, y }
         const guardResult = placementGuards.onDragMoveGuard(elementoTemporal, position)
 
         if (guardResult && !guardResult.valid) {
@@ -631,10 +649,19 @@ export function useAutoPaste() {
       }
     }
 
-    // Si no encuentra espacio en espiral, intentar búsqueda exhaustiva con grid adaptativo
-    const smallGridSize = Math.max(10, adaptiveGridSize / 2) // Grid más fino pero aún adaptativo
+    // 🔥 OPTIMIZACIÓN CRÍTICA: Incrementar grid size mínimo de 10px a 40px
+    // y limitar iteraciones máximas para evitar bloqueos de 13 segundos
+    const smallGridSize = Math.max(40, adaptiveGridSize / 2) // Era 10, ahora 40
+    const MAX_ITERATIONS = 5000 // Límite de seguridad
+    let iterations = 0
+
     for (let y = areaBounds.minY; y <= areaBounds.maxY - elementHeight; y += smallGridSize) {
       for (let x = areaBounds.minX; x <= areaBounds.maxX - elementWidth; x += smallGridSize) {
+        iterations++
+        if (iterations > MAX_ITERATIONS) {
+          return { found: false }
+        }
+
         if (isPositionValid(x, y)) {
           return {
             found: true,
@@ -726,8 +753,8 @@ export function useAutoPaste() {
         return false
       }
 
-      // Pequeño delay para que la UI se actualice
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Micro delay para que el loader se muestre (optimizado de 100ms a 10ms)
+      await new Promise(resolve => setTimeout(resolve, 10))
 
       // Obtener límites del área actual
       const areaBounds = getAreaBounds({

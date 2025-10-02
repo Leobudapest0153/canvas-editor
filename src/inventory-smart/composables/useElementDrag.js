@@ -12,7 +12,8 @@ import { applyEdgeConstraint } from '@/inventory-smart/utils/edgeConstraint'
 import { resetEdgeState } from '@/inventory-smart/composables/useEdgeState'
 import { finalizePlacement, solveFinalPlacement } from '@/inventory-smart/utils/finalizeDrag'
 import { solveDragPosition } from '@/inventory-smart/utils/placementSolver'
-import { resolveCoplanarNeighbors } from '@/inventory-smart/validation/placementOrchestrator'
+import { resolveCoplanarNeighbors, rangesOverlap, PLACEMENT_TOLERANCES } from '@/inventory-smart/validation/placementOrchestrator'
+import { resolveVerticalProps } from '@/inventory-smart/validation/fieldResolvers'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
 import { GRID_SIZE, CM_TO_PX } from '@/inventory-smart/utils/constants'
@@ -97,10 +98,28 @@ export function useElementDrag({
 
     // Vecinos candidatos (excluir self)
     const candidates = all.filter((e) => e && e.id !== elemento.id)
-    // Vecinos coplanares (misma ubic y misma capa Z con tolerancia)
+    // Coplanares (misma ubic y misma capa Z)
     const coplanar = resolveCoplanarNeighbors({ ...elemento }, candidates)
-    // Limitar a suelo–suelo para efectos de bloqueo horizontal
-    const neighbors = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'suelo' && (elemento.ubicacion || 'suelo') === 'suelo')
+    const hardNeighbors = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'suelo' && (elemento.ubicacion || 'suelo') === 'suelo')
+
+    // Soft neighbors para efecto deslizante:
+    // - pared–pared: coplanares en pared
+    const softWalls = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'pared' && (elemento.ubicacion || 'suelo') === 'pared')
+    // - suelo–pared con solape vertical (Z)
+    const softCross = candidates.filter((n) => {
+      const ua = (elemento.ubicacion || 'suelo').toLowerCase()
+      const ub = (n.ubicacion || 'suelo').toLowerCase()
+      if ((ua === 'suelo' && ub === 'pared') || (ua === 'pared' && ub === 'suelo')) {
+        const a = resolveVerticalProps(elemento, {})
+        const b = resolveVerticalProps(n, {})
+        if (!Number.isFinite(a.zBaseCm) || !Number.isFinite(a.altoCm) || !Number.isFinite(b.zBaseCm) || !Number.isFinite(b.altoCm)) return false
+        const a0 = a.zBaseCm, a1 = a.zBaseCm + a.altoCm
+        const b0 = b.zBaseCm, b1 = b.zBaseCm + b.altoCm
+        return rangesOverlap(a0, a1, b0, b1, PLACEMENT_TOLERANCES.Z_LAYER)
+      }
+      return false
+    })
+    const softNeighbors = [...softWalls, ...softCross]
 
     const lastPos = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
     const lastVel = lastVelocityMap.value.get(elemento.id) || { x: 0, y: 0 }
@@ -112,7 +131,8 @@ export function useElementDrag({
     const solved = solveDragPosition({
       candidate: { x: candidateX, y: candidateY },
       movingEl: moving,
-      neighbors,
+      hardNeighbors,
+      softNeighbors,
       areaBounds,
       lastValidPos: lastPos,
       lastVelocity: lastVel,
