@@ -17,6 +17,7 @@ import { useWeightValidation } from './useWeightValidation'
 import { buildStructureFromCanvasElement, instantiateStructureOnCanvas } from '@/inventory-smart/composables/useStructureManager'
 import { limpiarDatosUso, limpiarDatosUsoEstructura } from '@/inventory-smart/composables/useSimulateProducts'
 import { useToast } from './useToast'
+import { fastDeepClone, cloneCanvasElement, cleanUsageDataInPlace } from '@/inventory-smart/utils/fastClone'
 
 // Estado global del buffer (singleton)
 const bufferItems = ref([])
@@ -37,13 +38,14 @@ export const useCanvasBuffer = () => {
     const currentTimestamp = Date.now()
     const originalId = sourceInfo.originalElementId || elemento.id
 
-    // Limpiar datos de uso antes de guardar en el buffer
-    const elementoLimpio = limpiarDatosUso(elemento, canvasStore.elementoPorId)
+    // Limpiar datos de uso antes de guardar en el buffer (optimizado)
+    const elementoLimpio = cloneCanvasElement(elemento)
+    cleanUsageDataInPlace(elementoLimpio)
 
     return {
       id: `buffer_${currentTimestamp}_${Math.random().toString(36).substr(2, 9)}`,
       originalId,
-      elemento: JSON.parse(JSON.stringify(elementoLimpio)), // Deep clone del elemento limpio
+      elemento: elementoLimpio, // Ya está clonado, no necesita JSON.parse(JSON.stringify())
       sourceInfo: {
         plantaId: elemento.plantaId || canvasStore.plantaActiva,
         position: { x: elemento.x, y: elemento.y },
@@ -119,17 +121,21 @@ export const useCanvasBuffer = () => {
     }
 
     // Limpiar datos de uso de todos los elementos de la estructura antes de guardarla en el buffer
+    // Optimizado: hacer limpieza in-place en lugar de clonar
     let cleanedAllElementsMap = clonedStructure.allElements
     try {
-      const cleaned = limpiarDatosUsoEstructura({ elements: Array.from(clonedStructure.allElements.values()) })
-      cleanedAllElementsMap = new Map(cleaned.elements.map(e => [e.id, e]))
+      // Optimización: limpiar in-place es mucho más rápido
+      const elementsArray = Array.from(clonedStructure.allElements.values())
+      for (let i = 0; i < elementsArray.length; i++) {
+        cleanUsageDataInPlace(elementsArray[i])
+      }
+      cleanedAllElementsMap = new Map(elementsArray.map(e => [e.id, e]))
     } catch (e) {
       // Fallback defensivo: eliminar "uso" a mano si algo falla
       cleanedAllElementsMap = new Map(
         Array.from(clonedStructure.allElements.values()).map(e => {
-          const c = { ...e }
-          delete c.uso
-          return [c.id, c]
+          delete e.uso
+          return [e.id, e]
         })
       )
     }
@@ -219,14 +225,19 @@ export const useCanvasBuffer = () => {
 
     // Verificar si es una estructura con elementos hijos
     if (sourceInfo.isStructure && sourceInfo.allElements) {
+      // Optimizado: usar cloneCanvasElement en lugar de JSON.parse(JSON.stringify())
+      const elements = Array.from(sourceInfo.allElements.values())
+      const clonedElements = new Array(elements.length)
+
+      for (let i = 0; i < elements.length; i++) {
+        const cloned = cloneCanvasElement(elements[i])
+        cleanUsageDataInPlace(cloned)
+        clonedElements[i] = cloned
+      }
+
       const payload = {
         rootId: elemento.id,
-        // Asegurar que no se cuelen datos de uso en pegados antiguos guardados sin limpiar
-        elements: Array.from(sourceInfo.allElements.values()).map(e => {
-          const copy = { ...JSON.parse(JSON.stringify(e)) }
-          delete copy.uso
-          return copy
-        }),
+        elements: clonedElements,
       }
       const rootElementId = instantiateStructureOnCanvas(canvasStore, payload, position)
       if (rootElementId) {

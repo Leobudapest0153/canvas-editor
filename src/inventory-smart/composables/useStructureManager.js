@@ -8,6 +8,7 @@
  */
 
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { cloneCanvasElement } from '@/inventory-smart/utils/fastClone'
 import { generateCodigo, generateNombre } from '@/inventory-smart/utils/codeNameGenerator.js'
 import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
 
@@ -304,11 +305,16 @@ export function removeCatalogItem(itemsArray, id) {
  * Requiere el canvasStore para realizar la inserción (evitamos import directo para no circular).
  */
 export function instantiateStructureOnCanvas(canvasStore, payload, position) {
+  console.time('⏱️ instantiate: total')
   if (!canvasStore || !payload?.rootId || !Array.isArray(payload.elements)) return false
 
-  // Mapear elementos por id
+  console.time('⏱️ instantiate: mapear elementos')
+  // Mapear elementos por id (optimizado: usar cloneCanvasElement)
   const allElementsMap = new Map()
-  for (const el of payload.elements) allElementsMap.set(el.id, JSON.parse(JSON.stringify(el)))
+  for (const el of payload.elements) {
+    allElementsMap.set(el.id, cloneCanvasElement(el))
+  }
+  console.timeEnd('⏱️ instantiate: mapear elementos')
 
   // Regenerar IDs únicos (similar a useCanvasBuffer)
   const newIdMap = new Map()
@@ -423,7 +429,7 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     if (!parentId) { delete base.plantaId; base.padre = null }
 
     let newId
-    if (!parentId) newId = canvasStore.agregarElemento(base, { preserveExistingCode: false, resetName: false, regenerateCode: true })
+    if (!parentId) newId = canvasStore.agregarElemento(base, { preserveExistingCode: false, resetName: false, regenerateCode: true, saveHistory: false, skipReorder: true })
     else newId = addChildDirect(canvasStore, base, parentId)
     if (!newId) return null
 
@@ -463,7 +469,29 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     return newId
   }
 
-  return pasteRecursive(root, position, null)
+  const rootId = pasteRecursive(root, position, null)
+
+  // Reordenar una sola vez al final (en lugar de N veces durante el proceso)
+  if (rootId && canvasStore.reorderVisibleByHeightForContext) {
+    try {
+      const ctxTipo = canvasStore.contextoNavegacion?.value?.tipo || canvasStore.contextoNavegacion?.tipo
+      const ctxId = canvasStore.contextoNavegacion?.value?.id || canvasStore.contextoNavegacion?.id
+      if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+        canvasStore.reorderVisibleByHeightForContext(ctxTipo, ctxId)
+      }
+    } catch (e) { /* noop */ }
+  }
+
+  // Guardar en historial una sola vez al final con toda la estructura
+  if (rootId && canvasStore.saveToHistory) {
+    const elementCount = payload.elements.length
+    const mensaje = elementCount > 1
+      ? `Estructura pegada (${elementCount} elementos)`
+      : `Elemento "${root.nombre || root.tipo}" pegado`
+    canvasStore.saveToHistory(mensaje)
+  }
+
+  return rootId
 }
 
 // Inserción directa como hijo sin depender del contexto
@@ -560,14 +588,14 @@ export function buildStructureFromCanvasElement(canvasStore, elementoId, { offse
     counter++
 
     // Para plantillas: mantener coordenadas tal cual para preservar estructura
-    const cloned = {
-      ...JSON.parse(JSON.stringify(elem)),
-      id: newId,
-      x: (elem.x || 0) + offsetX,
-      y: (elem.y || 0) + offsetY,
-      padre: parentNewId,
-      hijos: [],
-    }
+    // Optimizado: usar cloneCanvasElement en lugar de JSON.parse(JSON.stringify())
+    const cloned = cloneCanvasElement(elem)
+    cloned.id = newId
+    cloned.x = (elem.x || 0) + offsetX
+    cloned.y = (elem.y || 0) + offsetY
+    cloned.padre = parentNewId
+    cloned.hijos = []
+
     if (level === 0) { delete cloned.plantaId; cloned.padre = null }
     all.set(newId, cloned)
     if (Array.isArray(elem.hijos) && elem.hijos.length) {

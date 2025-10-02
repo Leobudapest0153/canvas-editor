@@ -1302,6 +1302,7 @@ const calcularCanvasAdaptativo = (elemento) => {
 
   // Actions para elementos
   const agregarElemento = (nuevoElemento, opts = {}) => {
+    const { saveHistory = true, skipReorder = false } = opts  // Permitir desactivar guardado de historial y reordenamiento
     const ubic = (
       nuevoElemento.ubicacion ||
       nuevoElemento.ubic ||
@@ -1480,17 +1481,22 @@ const calcularCanvasAdaptativo = (elemento) => {
       applyPasilloAssignments(ctx, { elementIds: [nuevoElemento.id] })
     }
 
-    // Guardar estado en historial
-    saveToHistory(`Elemento agregado: ${nuevoElemento.nombre || nuevoElemento.tipo}`)
+    // Guardar estado en historial (solo si está habilitado)
+    if (saveHistory) {
+      saveToHistory(`Elemento agregado: ${nuevoElemento.nombre || nuevoElemento.tipo}`)
+    }
 
     // Reordenar elementos visibles según altura si el contexto actual es plantas o elementos
-    try {
-      const ctxTipo = contextoNavegacion.value?.tipo
-      const ctxId = contextoNavegacion.value?.id
-      if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
-        reorderVisibleByHeightForContext(ctxTipo, ctxId)
-      }
-    } catch (e) { /* noop */ }
+    // (Solo si no está desactivado explícitamente para operaciones en lote)
+    if (!skipReorder) {
+      try {
+        const ctxTipo = contextoNavegacion.value?.tipo
+        const ctxId = contextoNavegacion.value?.id
+        if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+          reorderVisibleByHeightForContext(ctxTipo, ctxId)
+        }
+      } catch (e) { /* noop */ }
+    }
 
     return nuevoElemento.id
   }
@@ -2816,6 +2822,9 @@ const calcularCanvasAdaptativo = (elemento) => {
     // === INTEGRACIÓN CON AUTOSAVE ===
     setAutoSaveInstance,
     autoSaveInstance,
+
+    // === UTILIDADES INTERNAS (expuestas para optimización) ===
+    reorderVisibleByHeightForContext,
 
     // === FUNCIONES DE SERIALIZACIÓN ===
     serialize,
