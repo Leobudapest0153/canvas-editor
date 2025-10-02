@@ -2284,7 +2284,7 @@ const calcularCanvasAdaptativo = (elemento) => {
    * Enfoca (zoom + pan) el elemento indicado haciendo que quepa dentro del viewport
    * con un padding visual y animación opcional.
    * @param {string} elementoId
-   * @param {{paddingPx?:number, fitRatio?:number, animate?:boolean, duration?:number}} opts
+   * @param {{paddingPx?:number, fitRatio?:number, animate?:boolean, duration?:number, offsetRight?:number}} opts
    */
   const focusElemento = (elementoId, opts = {}) => {
     const el = elementoPorId.value(elementoId)
@@ -2302,6 +2302,7 @@ const calcularCanvasAdaptativo = (elemento) => {
   const duration = Number.isFinite(opts.duration) ? opts.duration : 340
   const coarseSnapThreshold = Number.isFinite(opts.coarseSnapThreshold) ? opts.coarseSnapThreshold : 0.3 // diferencia relativa de escala para decidir snap
   const exact = opts.exact === true
+  const offsetRight = Number.isFinite(opts.offsetRight) ? opts.offsetRight : 0
 
   // Marcar si había otra animación en progreso y es otro elemento → forzar snap (sin animación) para evitar interferencia
   const previousSessionInProgress = focusElemento._inProgress === true && focusElemento._lastTargetId && focusElemento._lastTargetId !== el.id
@@ -2348,7 +2349,9 @@ const calcularCanvasAdaptativo = (elemento) => {
       if (focusElemento._currentSession !== sessionId) return // sesión obsoleta
       const viewportW = stage.width() || 1
       const viewportH = stage.height() || 1
-      const usableW = Math.max(1, viewportW - paddingPx * 2)
+      // Considerar el offset del panel de propiedades para calcular el espacio útil
+      const effectiveViewportW = Math.max(1, viewportW - offsetRight)
+      const usableW = Math.max(1, effectiveViewportW - paddingPx * 2)
       const usableH = Math.max(1, viewportH - paddingPx * 2)
       let targetScale = Math.min(usableW / bbox.w, usableH / bbox.h)
       if (!exact) targetScale *= fitRatio
@@ -2356,8 +2359,11 @@ const calcularCanvasAdaptativo = (elemento) => {
       targetScale = Math.max(0.05, Math.min(5, targetScale))
       const cx = bbox.x + bbox.w / 2
       const cy = bbox.y + bbox.h / 2
-      const targetPanX = (viewportW / 2) - cx * targetScale
-      const targetPanY = (viewportH / 2) - cy * targetScale
+      // Centrar en el espacio visible (desplazado a la izquierda si hay panel)
+      const centerX = (effectiveViewportW / 2)
+      const centerY = (viewportH / 2)
+      const targetPanX = centerX - cx * targetScale
+      const targetPanY = centerY - cy * targetScale
       const currentScale = zoom.value || 1
       const scaleDiffRel = Math.abs(targetScale - currentScale) / Math.max(currentScale, 0.0001)
       // Si cambio grande o usuario pidió no animar
@@ -2411,7 +2417,9 @@ const calcularCanvasAdaptativo = (elemento) => {
           // Recalcular objetivo con bounding real
           const viewportW = stage.width() || 1
             const viewportH = stage.height() || 1
-            const usableW = Math.max(1, viewportW - paddingPx * 2)
+            // Considerar el offset del panel de propiedades
+            const effectiveViewportW = Math.max(1, viewportW - offsetRight)
+            const usableW = Math.max(1, effectiveViewportW - paddingPx * 2)
             const usableH = Math.max(1, viewportH - paddingPx * 2)
             let idealScale = Math.min(usableW / rw, usableH / rh)
             if (!exact) idealScale *= fitRatio
@@ -2421,8 +2429,11 @@ const calcularCanvasAdaptativo = (elemento) => {
           if (diff > 0.08 && phase < 2) {
             const cx = rx + rw / 2
             const cy = ry + rh / 2
-            const newPanX = (viewportW / 2) - cx * idealScale
-            const newPanY = (viewportH / 2) - cy * idealScale
+            // Centrar en el espacio visible (desplazado a la izquierda si hay panel)
+            const centerX = (effectiveViewportW / 2)
+            const centerY = (viewportH / 2)
+            const newPanX = centerX - cx * idealScale
+            const newPanY = centerY - cy * idealScale
             // Si la corrección es muy grande, aplicar snap; si es moderada, animación breve
             const large = diff > 0.35
             if (large) {
