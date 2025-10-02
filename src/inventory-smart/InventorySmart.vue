@@ -114,6 +114,20 @@ const props = defineProps({
       )
     }
   },
+  supportedProductTypes: {
+    type: Array,
+    default: () => null,
+    validator: (value) => {
+      if (value === null) return true
+      if (!Array.isArray(value)) return false
+      return value.every(item =>
+        item &&
+        typeof item === 'object' &&
+        typeof item.id === 'string' &&
+        typeof item.nombre === 'string'
+      )
+    }
+  },
   author: {
     type: Object,
     default: () => null,
@@ -433,6 +447,19 @@ watch(
     } catch (error) {
       console.error('Error al configurar elementos predefinidos:', error)
       showToast('Error al configurar elementos predefinidos', 'error')
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => props.supportedProductTypes,
+  (newTipos) => {
+    try {
+      canvasStore.setTiposProductoAdmitidos(newTipos)
+    } catch (error) {
+      console.error('Error al configurar tipos de producto admitidos:', error)
+      showToast('Error al configurar tipos de producto admitidos', 'error')
     }
   },
   { immediate: true }

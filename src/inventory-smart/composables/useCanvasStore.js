@@ -289,25 +289,30 @@ export const useCanvasStore = defineStore('canvas', () => {
   const catalogos = ref({
     tiposEspacio: DEFAULT_TIPOS_ESPACIO,
     tiposCuarto: DEFAULT_TIPOS_CUARTO,
-    tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
   })
+
+  const tiposProductoAdmitidos = ref(DEFAULT_TIPOS_PRODUCTO_ADMITIDOS)
 
   const setCatalogos = (cats) => {
     try {
       const safe = {
         tiposEspacio: Array.isArray(cats?.tiposEspacio) ? cats.tiposEspacio : DEFAULT_TIPOS_ESPACIO,
         tiposCuarto: Array.isArray(cats?.tiposCuarto) ? cats.tiposCuarto : DEFAULT_TIPOS_CUARTO,
-        tiposProductoAdmitidos: Array.isArray(cats?.tiposProductoAdmitidos)
-          ? cats.tiposProductoAdmitidos
-          : DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
       }
       catalogos.value = safe
     } catch {
       catalogos.value = {
         tiposEspacio: DEFAULT_TIPOS_ESPACIO,
         tiposCuarto: DEFAULT_TIPOS_CUARTO,
-        tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
       }
+    }
+  }
+
+  const setTiposProductoAdmitidos = (tipos) => {
+    try {
+      tiposProductoAdmitidos.value = Array.isArray(tipos) ? tipos : DEFAULT_TIPOS_PRODUCTO_ADMITIDOS
+    } catch {
+      tiposProductoAdmitidos.value = DEFAULT_TIPOS_PRODUCTO_ADMITIDOS
     }
   }
   // Configuración de grilla y snap
@@ -2776,15 +2781,17 @@ const calcularCanvasAdaptativo = (elemento) => {
     etiquetasSeleccionadas,
     elementoDestacadoId,
     idsElementosFiltrados,
-  elementoAura,
-  auraOpacity,
+    elementoAura,
+    auraOpacity,
     isDraggable,
     cambiosNoAplicados,
     modoConfigurarEsl,
     elementoEslObjetivo,
-  // Catálogos dinámicos
-  catalogos,
-  setCatalogos,
+    // Catálogos dinámicos
+    catalogos,
+    setCatalogos,
+    tiposProductoAdmitidos,
+    setTiposProductoAdmitidos,
     gestionPisosPropiedadesModal,
     nivelAEditar,
 
@@ -2834,7 +2841,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     iniciarConfiguracionEsl,
     finalizarConfiguracionEsl,
     guardarCodigoEslElemento,
-  setSidebarActiveTab,
+    setSidebarActiveTab,
 
     // Actions - Plantas
     seleccionarPlanta,
@@ -2844,7 +2851,7 @@ const calcularCanvasAdaptativo = (elemento) => {
 
     // Actions - Elementos
     agregarElemento,
-  agregarElementoSinValidacion,
+    agregarElementoSinValidacion,
     eliminarElemento,
     toggleElementoVisibilidad,
 
@@ -2893,7 +2900,7 @@ const calcularCanvasAdaptativo = (elemento) => {
 
     // == Destacar
     destacarElemento,
-  focusElemento,
+    focusElemento,
     actualizarIdsFiltrados,
 
     setDraggableMode,
