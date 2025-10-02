@@ -1377,10 +1377,29 @@ const advertenciaAltura = computed(() => {
   // No validar altura en plantas infinitas
   const plantaActiva = canvasStore.plantaPorId(canvasStore.plantaActiva)
   if (plantaActiva?.isInfinite === true) return null
-  const max = alturaPlanta.value
+
   const actual = edited.value?.dimensiones?.alto || 0
-  return actual > max
-    ? `La altura no debe superar ${max} cm (debido a la altura de planta o un elemento situado encima)`
+
+  // Obtener la altura máxima permitida considerando tanto la planta como el padre
+  let maxAltura = alturaPlanta.value
+  let razonLimite = 'la altura de planta'
+
+  // Si el elemento tiene un padre contenedor, validar contra la altura del padre
+  const { padreId, padreType } = padreContext.value
+  if (padreId && padreType !== 'plantas') {
+    const padre = canvasStore.elementoPorId(padreId)
+    if (padre && padre.dimensiones && padre.dimensiones.alto) {
+      const alturaPadre = Number(padre.dimensiones.alto)
+      if (alturaPadre < maxAltura) {
+        maxAltura = alturaPadre
+        const nombrePadre = padre.nombre || padre.codigo || getTipoNombre(padre.tipo)
+        razonLimite = `la altura del ${getTipoNombre(padre.tipo)} "${nombrePadre}"`
+      }
+    }
+  }
+
+  return actual > maxAltura
+    ? `La altura no debe superar ${maxAltura} cm (debido a su ubicación)`
     : null
 })
 
@@ -1494,7 +1513,19 @@ const maxAlturaSobreSuelo = computed(() => {
   // No validar en plantas infinitas
   const plantaActiva = canvasStore.plantaPorId(canvasStore.plantaActiva)
   if (plantaActiva?.isInfinite === true) return Infinity
-  const techo = Number(alturaPlanta.value) || 0
+
+  let techo = Number(alturaPlanta.value) || 0
+
+  // Si el elemento tiene un padre contenedor, usar la menor altura entre planta y padre
+  const { padreId, padreType } = padreContext.value
+  if (padreId && padreType !== 'plantas') {
+    const padre = canvasStore.elementoPorId(padreId)
+    if (padre && padre.dimensiones && padre.dimensiones.alto) {
+      const alturaPadre = Number(padre.dimensiones.alto)
+      techo = Math.min(techo, alturaPadre)
+    }
+  }
+
   const alto = Number(edited.value?.dimensiones?.alto || 0)
   return Math.max(0, techo - alto)
 })
@@ -1507,7 +1538,28 @@ const advertenciaZBase = computed(() => {
   const plantaActiva = canvasStore.plantaPorId(canvasStore.plantaActiva)
   if (plantaActiva?.isInfinite === true) return null
   const max = maxAlturaSobreSuelo.value
-  return z > max ? `La altura sobre el suelo no debe superar ${max} cm` : null
+
+  if (z > max) {
+    // Determinar cuál es el limitante (planta o padre)
+    const { padreId, padreType } = padreContext.value
+    let mensaje = `La altura sobre el suelo no debe superar ${max} cm`
+
+    if (padreId && padreType !== 'plantas') {
+      const padre = canvasStore.elementoPorId(padreId)
+      if (padre && padre.dimensiones && padre.dimensiones.alto) {
+        const alturaPadre = Number(padre.dimensiones.alto)
+        const alturaPlantaVal = Number(alturaPlanta.value) || 0
+        if (alturaPadre < alturaPlantaVal) {
+          const nombrePadre = padre.nombre || padre.codigo || getTipoNombre(padre.tipo)
+          mensaje += ` (debido a la altura del ${getTipoNombre(padre.tipo)} "${nombrePadre}")`
+        }
+      }
+    }
+
+    return mensaje
+  }
+
+  return null
 })
 
 const validarAlturaSobreSuelo = () => {
