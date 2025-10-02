@@ -41,53 +41,15 @@
           <div class="p-4 space-y-3">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide">
-                Nombre de elemento
+                Buscar por nombre, código y ESL
               </label>
               <input
                 v-model="filtroNombre"
                 @keyup.enter="() => filtrosVisibles = false"
                 class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
-                placeholder="Nombre del elemento..."
+                placeholder="Buscar..."
               />
             </div>
-            <!-- Filtro por tipo (internamente manejado como categoría) -->
-            <div>
-              <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide"
-                >Tipo:</label
-              >
-              <select
-                v-model="filtroCategoria"
-                class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
-              >
-                <option value="">Todos los tipos</option>
-                <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
-                  {{ categoria.nombre }}
-                </option>
-              </select>
-            </div>
-
-            <!-- Filtro por ubicación -->
-            <div>
-              <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide"
-                >Ubicación:</label
-              >
-              <select
-                v-model="filtroUbicacion"
-                class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
-              >
-                <option value="">Todas las ubicaciones</option>
-                <option value="suelo">Suelo</option>
-                <option value="pared">Pared</option>
-              </select>
-            </div>
-
-            <!-- FILTRO DE ETIQUETAS -->
-            <TagFilter
-              :selected-ids="canvasStore.etiquetasSeleccionadas"
-              @add="canvasStore.seleccionarEtiqueta"
-              @remove="canvasStore.deseleccionarEtiqueta"
-              @create="abrirModalCrearEtiqueta"
-            />
 
             <!-- Botón para limpiar filtros -->
             <UiTooltip
@@ -298,10 +260,8 @@ const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 const confirmDialog = useConfirmDialog();
 
 // Estado local
-const filtroCategoria = ref('')
-const filtroUbicacion = ref('')
 const filtrosVisibles = ref(false)
-const filtroNombre = ref('');
+const filtroNombre = ref('')
 const modalVisible = ref(false)
 const textoNuevaEtiqueta = ref('')
 
@@ -348,29 +308,14 @@ const elementosFiltrados = computed(() => {
     (a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0)
   )
 
+  // Filtro por texto (nombre, código o código ESL)
   if (filtroNombre.value) {
-    elementos = elementos.filter((elemento) => elemento.nombre.toLowerCase().includes(filtroNombre.value.toLowerCase()));
-  }
-
-  if (filtroCategoria.value) {
-    elementos = elementos.filter((elemento) => elemento.categoria === filtroCategoria.value)
-  }
-
-  if (filtroUbicacion.value) {
+    const q = String(filtroNombre.value).toLowerCase()
     elementos = elementos.filter((elemento) => {
-      // Asumimos que la propiedad 'ubicacion' está en la raíz del objeto limpio
-      return elemento.ubicacion === filtroUbicacion.value
-    })
-  }
-
-  if (canvasStore.etiquetasSeleccionadas.length > 0) {
-    elementos = elementos.filter((elemento) => {
-      if (!elemento.etiquetas || !Array.isArray(elemento.etiquetas)) {
-        return false
-      }
-      return canvasStore.etiquetasSeleccionadas.every((tagId) =>
-        elemento.etiquetas.includes(tagId)
-      )
+      const nombre = String(elemento.nombre || '').toLowerCase()
+      const codigo = String(elemento.codigo || '').toLowerCase()
+      const codigoESL = String(elemento.codigoESL || '').toLowerCase()
+      return nombre.includes(q) || codigo.includes(q) || codigoESL.includes(q)
     })
   }
 
@@ -378,12 +323,7 @@ const elementosFiltrados = computed(() => {
 })
 
 const hayFiltrosActivos = computed(() => {
-  return !!(
-    filtroCategoria.value ||
-    filtroUbicacion.value ||
-    filtroNombre.value ||
-    canvasStore.etiquetasSeleccionadas.length > 0
-  )
+  return !!(filtroNombre.value)
 })
 
 // Métodos
@@ -392,10 +332,7 @@ const toggleFiltros = () => {
 }
 
 const limpiarFiltros = () => {
-  filtroCategoria.value = ''
-  filtroUbicacion.value = ''
-  filtroNombre.value = '';
-  canvasStore.limpiarSeleccion()
+  filtroNombre.value = ''
 }
 
 watch(modoEdicion, (isEditing) => {

@@ -116,33 +116,13 @@
             <div v-if="filtrosVisibles" class="absolute top-full left-0 w-full bg-gray-50 shadow-lg z-10" ref="filtrosPanelRef">
               <div class="p-3 grid grid-cols-1 gap-3">
                 <div>
-                  <label class="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Buscar por nombre</label>
                   <input
                     v-model="filtroNombre"
                     @keyup.enter="() => (filtrosVisibles = false)"
-                    placeholder="Nombre..."
+                    placeholder="Buscar..."
                     class="w-full px-3 py-2 border rounded-md text-sm"
                   />
-                </div>
-
-                <div>
-                  <label class="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
-                  <select v-model="filtroCategoria" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
-                    <option value="">Todos</option>
-                    <option v-for="c in categoriasPlantillas" :key="c.id" :value="c.id">
-                      {{ c.nombre }}
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
-                  <select v-model="filtroUbicacion" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
-                    <option value="">Todas</option>
-                    <option v-for="u in ubicacionesPlantillas" :key="u.id" :value="u.id">
-                      {{ u.nombre }}
-                    </option>
-                  </select>
                 </div>
                 <div class="pt-1">
                   <button v-if="hayFiltrosActivos" @click="limpiarFiltros" class="px-3 py-2 bg-gray-100 rounded-md text-xs">Limpiar filtros</button>
@@ -317,19 +297,13 @@ const ctxMenu = ref({ visible: false, x: 0, y: 0, template: null })
 
 // --- Filtros (patrón tomado de CapasTab.vue)
 const filtrosVisibles = ref(false)
-const filtroCategoria = ref('')
-const filtroUbicacion = ref('')
 const filtrosBotonRef = ref(null)
 const filtrosPanelRef = ref(null)
 // Reutilizamos searchText del store para el filtro por nombre
 const filtroNombre = searchText
 
 const hayFiltrosActivos = computed(() => {
-  return !!(
-    filtroCategoria.value ||
-    filtroUbicacion.value ||
-    (filtroNombre && filtroNombre.value)
-  )
+  return !!((filtroNombre && filtroNombre.value))
 })
 
 const toggleFiltros = () => {
@@ -337,8 +311,6 @@ const toggleFiltros = () => {
 }
 
 const limpiarFiltros = () => {
-  filtroCategoria.value = ''
-  filtroUbicacion.value = ''
   if (filtroNombre) filtroNombre.value = ''
 }
 
@@ -448,33 +420,22 @@ watch(isPlantaContext, (enPlanta) => {
 // Resultado de búsqueda global (texto) sobre plantillas
 const filteredTemplates = computed(() => catalogStore.searchTemplates(searchText.value))
 
-// Computed local para filtrar plantillas por nombre/categoría/ubicación (patrón CapasTab)
+// Computed local para filtrar plantillas por nombre/código/ESL (patrón CapasTab)
 const plantillasFiltradas = computed(() => {
-  // Lista visible = búsqueda global (si hay) + filtros locales (nombre/categoría/ubicación)
+  // Lista visible = búsqueda global (si hay) + filtros locales (nombre/código/ESL)
   const base = Array.isArray(filteredTemplates.value) ? filteredTemplates.value.slice() : []
   let out = base
 
+  // Filtro por texto (nombre, código o código ESL)
   if (filtroNombre && filtroNombre.value) {
     const q = String(filtroNombre.value).toLowerCase()
     out = out.filter((tpl) => {
       const nombre = String(tpl.name || '').toLowerCase()
-      const desc = String(tpl.notes || '').toLowerCase()
-      return nombre.includes(q) || desc.includes(q)
-    })
-  }
-
-  if (filtroCategoria.value) {
-    out = out.filter((tpl) => {
-      // Intentamos derivar la categoría de la raíz de la plantilla
+      // Intentamos derivar código y codigoESL de la raíz de la plantilla
       const root = (tpl.payload?.elements || []).find((e) => e.id === tpl.payload?.rootId) || (tpl.payload?.elements || [])[0] || {}
-      return root.categoria === filtroCategoria.value
-    })
-  }
-
-  if (filtroUbicacion.value) {
-    out = out.filter((tpl) => {
-      const root = (tpl.payload?.elements || []).find((e) => e.id === tpl.payload?.rootId) || (tpl.payload?.elements || [])[0] || {}
-      return (root.ubicacion || tpl.meta?.location || '').toLowerCase() === String(filtroUbicacion.value).toLowerCase()
+      const codigo = String(root.codigo || '').toLowerCase()
+      const codigoESL = String(root.codigoESL || '').toLowerCase()
+      return nombre.includes(q) || codigo.includes(q) || codigoESL.includes(q)
     })
   }
 
