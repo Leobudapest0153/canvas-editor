@@ -612,7 +612,6 @@ watch(
     if (id) {
       snapshotOriginal.value = cargarDesdeStore(elementoSeleccionado.value)
       edited.value = deepClone(snapshotOriginal.value)
-      console.log(edited.value)
 
       // Inicializar valores anteriores para evitar validaciones innecesarias al cargar
       valorDimensionAnterior.value = {
@@ -1203,7 +1202,6 @@ const getTipoNombre = (tipo) => {
 }
 
 const categories = computed(() => {
- console.log(elementoSeleccionado.value)
   if (elementoSeleccionado.value.tipo === 'cuartos') {
     return DEFAULT_TIPOS_CUARTO;
   }
