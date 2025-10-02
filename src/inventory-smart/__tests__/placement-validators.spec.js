@@ -87,19 +87,24 @@ describe('validateZStacking', () => {
   }
 
   it('fails when Z intervals overlap and XY overlaps', () => {
-    const res = validateZStacking(baseEl, {}, [neighbor])
+    const res = validateZStacking(baseEl, {}, [neighbor], {}, {})
     expect(res).toEqual({ valid: false, code: 'Z_STACK_CONFLICT', offenderId: 'B' })
   })
 
   it('passes when Z intervals just touch', () => {
     const n = { ...neighbor, zBase: 100 }
-    const res = validateZStacking(baseEl, {}, [n])
+    const res = validateZStacking(baseEl, {}, [n], {}, {})
     expect(res.valid).toBe(true)
   })
 
   it('passes when XY does not overlap', () => {
     const n = { ...neighbor, x: 100 }
-    const res = validateZStacking(baseEl, {}, [n])
+    const res = validateZStacking(baseEl, {}, [n], {}, {})
+    expect(res.valid).toBe(true)
+  })
+
+  it('skips validation when plant is infinite', () => {
+    const res = validateZStacking(baseEl, {}, [neighbor], {}, { isInfinite: true })
     expect(res.valid).toBe(true)
   })
 })

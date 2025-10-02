@@ -108,8 +108,12 @@ export function validateZStacking(
   element = {},
   candidate = {},
   neighbors = [],
-  options = {}
+  options = {},
+  ctx = {}
 ) {
+  // Omitir validación si la planta es infinita
+  if (ctx.isInfinite === true) return { valid: true }
+
   // Usar tolerancia relajada si es una transformación
   const Z_EPS = options.isTransforming
     ? PLACEMENT_TOLERANCES.Z_STACKING * 5 // 5x más tolerante durante transformaciones
