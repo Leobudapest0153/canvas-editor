@@ -1287,7 +1287,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     const checks = [
       (el, cand) => validateWallZBaseRequired(el, cand, ctx),
       (el, cand) => validateHeightWithinWarehouse(el, cand, ctx),
-      (el, cand) => validateZStacking(el, cand, neighbors),
+      (el, cand) => validateZStacking(el, cand, neighbors, {}, ctx),
     ]
     for (const v of checks) {
       const res = v(element, candidate)
