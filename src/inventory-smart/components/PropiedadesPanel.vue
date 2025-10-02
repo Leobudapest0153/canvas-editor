@@ -534,7 +534,7 @@
 
 <script setup>
 // Definir emits
-const emit = defineEmits(['imprimirIdentificador'])
+const emit = defineEmits(['showIdentifier'])
 
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
@@ -1621,7 +1621,7 @@ const isElementRestricted = computed(() => {
 
 // Función para emitir evento de identificador
 const emitirIdentificador = () => {
-  emit('imprimirIdentificador', elementoSeleccionado.value);
+  emit('showIdentifier', elementoSeleccionado.value);
 }
 
 onMounted(() => {

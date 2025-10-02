@@ -7,6 +7,7 @@
       @configUpdated="handleConfigUpdated"
       @back="handleBack"
       @printIdentifiers="handlePrintIdentifiers"
+      @printIdentifier="handlePrintIdentifier"
     />
   </div>
 </template>
@@ -110,6 +111,10 @@ const handleBack = () => {
 const handlePrintIdentifiers = () => {
   // Aquí se manejaría la acción de imprimir identificadores en la aplicación real
   console.log('Imprimiendo identificadores')
+}
+
+const handlePrintIdentifier = (value) => {
+  console.log('Imprimiendo identificador:', value)
 }
 
 onMounted(() => {
