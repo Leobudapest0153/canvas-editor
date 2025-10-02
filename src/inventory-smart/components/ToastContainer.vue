@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="toasts">
     <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type" role="alert" :data-toast-id="t.id">
       <span class="msg">{{ t.message }}</span>
@@ -29,12 +29,16 @@ function handleCta(t) {
 <style scoped>
 .toasts {
   position: fixed;
-  right: 16px;
-  top: 16px;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 5.5rem);
+  transform: translateX(-50%);
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 12px;
+  width: min(90vw, 420px);
   z-index: 1100;
+  pointer-events: none;
 }
 .toast {
   display: flex;
@@ -46,6 +50,8 @@ function handleCta(t) {
   color: #fff;
   border-radius: 8px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  pointer-events: auto;
 }
 .toast.info {
   background: #1f2937;
@@ -80,4 +86,17 @@ function handleCta(t) {
   font-size: 16px;
   cursor: pointer;
 }
+@media (max-width: 640px) {
+  .toasts {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+    width: calc(100vw - 32px);
+  }
+}
+@media (max-height: 720px) {
+  .toasts {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+  }
+}
 </style>
+
+
