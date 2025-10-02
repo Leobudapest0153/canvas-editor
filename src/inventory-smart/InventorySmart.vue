@@ -92,11 +92,27 @@ import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog
 import UnsavedChangesModal from './components/UnsavedChangesModal.vue'
 import { useEditorMode } from './composables/useEditorMode'
 import { useEditorShortcuts } from './composables/useEditorShortcuts'
+import { useCatalogStore } from './stores/catalog'
 
 const props = defineProps({
   configCanvas: {
     type: [String, null],
     default: () => '',
+  },
+  predefinedElements: {
+    type: Array,
+    default: () => null,
+    validator: (value) => {
+      if (value === null) return true
+      if (!Array.isArray(value)) return false
+      return value.every(item =>
+        item &&
+        typeof item === 'object' &&
+        typeof item.id === 'string' &&
+        typeof item.nombre === 'string' &&
+        typeof item.tipo === 'string'
+      )
+    }
   },
   author: {
     type: Object,
@@ -131,6 +147,7 @@ const { showToast } = useToast()
 const servicesStore = useServicesStore()
 const { ensureEditable } = useEditorMode()
 const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
+const catalogStore = useCatalogStore()
 
 // ======= Gestión de Servicios Externos =======
 // Registrar servicios externos en la store cuando cambien las props
@@ -409,35 +426,16 @@ onUnmounted(() => {
 })
 
 watch(
-  () => props.configCanvas,
-  async (newConfig, oldConfig) => {
+  () => props.predefinedElements,
+  (newElements) => {
     try {
-      // Si no se provee una configuracion inicial
-      if (!newConfig) {
-        const mensaje = oldConfig ? null : 'Iniciando área de trabajo'
-        if (mensaje) showToast(mensaje, 'info' )
-        const plantaInicial = canvasStore.plantas.find((p) => p.activa) || canvasStore.plantas[0]
-        if (plantaInicial) {
-          canvasStore.navegarAPlanta(plantaInicial.id)
-        }
-        return
-      }
-
-      // Validar la prop y aplicar directamente la configuración del servidor
-      const isValid = validarJSON(newConfig)
-      if (!isValid) {
-        showToast('La configuración importada no es válida', 'error')
-        return
-      }
-
-      const mensaje = oldConfig ? null : 'Iniciando área de trabajo'
-      if (mensaje) showToast(mensaje, 'info' )
-      canvasStore.deserialize(newConfig)
+      catalogStore.setPredefinedElements(newElements)
     } catch (error) {
-      showToast('Ha ocurrido un error al importar la configuración', 'error')
-      console.error('Error al importar la configuración:', error)
+      console.error('Error al configurar elementos predefinidos:', error)
+      showToast('Error al configurar elementos predefinidos', 'error')
     }
   },
+  { immediate: true }
 )
 </script>
 

@@ -2,6 +2,7 @@
   <div id="app">
     <InventorySmart
       :configCanvas="initialConfig"
+      :predefinedElements="ELEMENTOS_PREDEFINIDOS"
       :externalServices="externalServices"
       :author="{ name: 'David Deras', id: '123' }"
       @configUpdated="handleConfigUpdated"
@@ -16,6 +17,7 @@
 import { onMounted, ref } from 'vue'
 import InventorySmart from '@/inventory-smart/InventorySmart.vue'
 import { SERIALIZE_CONFIG } from '../inventory-smart/utils/constants'
+import { ELEMENTOS_PREDEFINIDOS } from '../inventory-smart/utils/constants'
 
 // Estado inicial de la configuración del canvas
 const initialConfig = ref(null)
@@ -91,7 +93,6 @@ const externalServices = ref([createContainerProductsService()])
 const handleConfigUpdated = (nuevaConfig) => {
   try {
     // Actualizar la referencia local de la configuración
-
     currentConfig.value = nuevaConfig
     // DEV: Guardar en localStorage para simular persistencia
     localStorage.setItem(SERIALIZE_CONFIG.STORAGE_KEY, nuevaConfig)
