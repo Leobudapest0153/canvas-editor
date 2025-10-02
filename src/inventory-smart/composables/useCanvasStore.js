@@ -538,11 +538,8 @@ export const useCanvasStore = defineStore('canvas', () => {
       return
     }
 
-    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    // Limpiar timer de zoom/pan
     clearZoomPanDebounce()
-    if (historyInstance.value) {
-      historyInstance.value.clearHistory()
-    }
 
     // Actualizar contexto de navegación
     let nuevoPath = [...contextoNavegacion.value.path]
@@ -569,6 +566,14 @@ export const useCanvasStore = defineStore('canvas', () => {
       path: nuevoPath,
     }
 
+    // Limpiar historial de undo/redo al cambiar de contexto
+    if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+      historyInstance.value.clearHistoryOnContextChange(
+        { tipo: elemento.tipo, id: elementoId },
+        `Navegación a ${elemento.nombre || elemento.tipo}`
+      )
+    }
+
     // Calcular tamaño del canvas según el elemento
     calcularCanvasAdaptativo(elemento)
 
@@ -582,11 +587,8 @@ export const useCanvasStore = defineStore('canvas', () => {
       return
     }
 
-    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    // Limpiar timer de zoom/pan
     clearZoomPanDebounce()
-    if (historyInstance.value) {
-      historyInstance.value.clearHistory()
-    }
 
     // Remover último elemento del path
     const nuevoPath = [...contextoNavegacion.value.path]
@@ -602,6 +604,15 @@ export const useCanvasStore = defineStore('canvas', () => {
         path: nuevoPath,
       }
 
+      // Limpiar historial de undo/redo al cambiar de contexto
+      if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+        const planta = plantaPorId.value(ultimoElemento.id)
+        historyInstance.value.clearHistoryOnContextChange(
+          { tipo: 'plantas', id: ultimoElemento.id },
+          `Navegación a planta ${planta?.nombre || ultimoElemento.id}`
+        )
+      }
+
       // Calcular canvas adaptativo para la planta
       const planta = plantaPorId.value(ultimoElemento.id)
       calcularCanvasAdaptativoPlanta(planta)
@@ -611,6 +622,15 @@ export const useCanvasStore = defineStore('canvas', () => {
         tipo: ultimoElemento.tipo,
         id: ultimoElemento.id,
         path: nuevoPath,
+      }
+
+      // Limpiar historial de undo/redo al cambiar de contexto
+      if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+        const elementoPadre = elementoPorId.value(ultimoElemento.id)
+        historyInstance.value.clearHistoryOnContextChange(
+          { tipo: ultimoElemento.tipo, id: ultimoElemento.id },
+          `Navegación a ${elementoPadre?.nombre || ultimoElemento.tipo}`
+        )
       }
 
       const elementoPadre = elementoPorId.value(ultimoElemento.id)
@@ -631,16 +651,29 @@ export const useCanvasStore = defineStore('canvas', () => {
   const navegarAContexto = (tipo, id, path) => {
     if (!path || !Array.isArray(path) || path.length === 0) return
 
-    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    // Limpiar timer de zoom/pan
     clearZoomPanDebounce()
-    if (historyInstance.value) {
-      historyInstance.value.clearHistory()
-    }
 
     contextoNavegacion.value = {
       tipo: tipo,
       id: id,
       path: path,
+    }
+
+    // Limpiar historial de undo/redo al cambiar de contexto
+    if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+      let nombreContexto = tipo
+      if (tipo === 'plantas') {
+        const planta = plantaPorId.value(id)
+        nombreContexto = planta?.nombre || tipo
+      } else {
+        const elemento = elementoPorId.value(id)
+        nombreContexto = elemento?.nombre || tipo
+      }
+      historyInstance.value.clearHistoryOnContextChange(
+        { tipo, id },
+        `Navegación a ${nombreContexto}`
+      )
     }
 
     // Actualizar canvas adaptativo según el nuevo contexto
@@ -664,11 +697,8 @@ export const useCanvasStore = defineStore('canvas', () => {
       return
     }
 
-    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    // Limpiar timer de zoom/pan
     clearZoomPanDebounce()
-    if (historyInstance.value) {
-      historyInstance.value.clearHistory()
-    }
 
     // Reset a vista de planta
     contextoNavegacion.value = {
@@ -681,6 +711,14 @@ export const useCanvasStore = defineStore('canvas', () => {
           nombre: planta.nombre,
         },
       ],
+    }
+
+    // Limpiar historial de undo/redo al cambiar de contexto
+    if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+      historyInstance.value.clearHistoryOnContextChange(
+        { tipo: 'plantas', id: plantaId },
+        `Navegación a planta ${planta.nombre}`
+      )
     }
 
     // Actualizar planta activa
@@ -1133,11 +1171,8 @@ const calcularCanvasAdaptativo = (elemento) => {
 
   // Actions para plantas
   const seleccionarPlanta = (plantaId) => {
-    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    // Limpiar timer de zoom/pan
     clearZoomPanDebounce()
-    if (historyInstance.value) {
-      historyInstance.value.clearHistory()
-    }
 
     plantaActiva.value = plantaId
     // Deseleccionar elemento al cambiar de planta
@@ -1156,6 +1191,14 @@ const calcularCanvasAdaptativo = (elemento) => {
             nombre: planta.nombre,
           },
         ],
+      }
+
+      // Limpiar historial de undo/redo al cambiar de planta
+      if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+        historyInstance.value.clearHistoryOnContextChange(
+          { tipo: 'plantas', id: plantaId },
+          `Selección de planta: ${planta.nombre}`
+        )
       }
 
       // Calcular canvas adaptativo para la planta seleccionada
