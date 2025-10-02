@@ -53,7 +53,8 @@ export function buildStructureFromForm(form) {
       ? { alturaRespectoAlSuelo: Math.round(Number(datosGenerales.alturaRespectoAlSuelo) * 100) }
       : {}),
     // Metadata que indica que al instanciar debe regenerar pisos
-    meta: { tienePisosGenerados: true },
+    // fromForm indica que viene directamente del formulario (no de plantilla guardada)
+    meta: { tienePisosGenerados: true, fromForm: true },
     // Calcular width/height directamente para evitar problemas de serialización
     width: dimsCm.ancho * CM_TO_PX,
     height: dimsCm.largo * CM_TO_PX, // cuartos/espacios usan vista XY (largo->height)
@@ -96,8 +97,8 @@ export function buildStructureFromForm(form) {
       props: { catalogVisible: false },
       // Metadatos diferentes según tipo
       meta: esEspacio
-        ? { esNivelInterno: true, indiceNivel: idx + 1 }
-        : { esPisoInterno: true, indicePiso: idx + 1 },
+        ? { esNivelInterno: true, indiceNivel: idx + 1, fromForm: true }
+        : { esPisoInterno: true, indicePiso: idx + 1, fromForm: true },
     })
     root.hijos.push(childId)
   })
@@ -151,6 +152,8 @@ export function toCatalogItemFromStructure({
       tienePisosGenerados: !!(root?.meta?.tienePisosGenerados || structure.meta?.childrenCount > 0),
       childrenCount: structure.meta?.childrenCount ?? (Array.isArray(root?.hijos) ? root.hijos.length : 0),
       source: kind,
+      // Limpiar fromForm al crear entrada de catálogo (ya no viene directamente del formulario)
+      fromForm: false,
     },
     tags,
   }
@@ -443,21 +446,20 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     // Regenerar solo si:
     // 1. Es root con pisos/niveles generados automáticamente
     // 2. Tiene pisos/niveles como hijos
-    // 3. Los pisos/niveles parecen venir del formulario (posiciones básicas) NO de plantilla (posiciones complejas)
-    const shouldRegenerate = isRootWithFloors && hasFloorChildren && childFloors.every((f, idx) => {
-      // Si no tiene posición definida, es del formulario
-      if (!(Number.isFinite(f?.x) && Number.isFinite(f?.y))) return true
-
-      // Si tiene posición básica de formulario (x=0, y secuencial), es del formulario
-      const hasBasicPosition = f.x === 0 && f.y === (idx * 50)
-
-      // Si tiene posición compleja/no básica, es de plantilla -> NO regenerar
-      return hasBasicPosition
-    })
+    // 3. Los pisos/niveles vienen directamente del formulario (no de plantilla guardada)
+    //
+    // DETECCIÓN MEJORADA: Usar metadatos explícitos en lugar de heurística de posiciones
+    // - Si base.meta.fromForm === true → viene directamente del formulario, regenerar
+    // - Si base.meta.fromForm === false o undefined → viene de plantilla/catálogo, NO regenerar
+    // - Fallback: si los hijos tienen fromForm === true en sus metadatos, regenerar
+    const isFromForm = base.meta?.fromForm === true || childFloors.some((f) => f.meta?.fromForm === true)
+    const shouldRegenerate = isRootWithFloors && hasFloorChildren && isFromForm
 
     if (shouldRegenerate) {
+      console.log('Regenerando pisos/niveles internos para', base.tipo || base.categoria, newId)
       regenerateFloors(canvasStore, elem, newMap, newId, base.dimensiones)
     } else if (hasChildren) {
+      console.log('Pegando hijos de', base.tipo || base.categoria, newId)
       for (const hid of elem.hijos) {
         const child = newMap.get(hid)
         if (!child) continue
@@ -595,6 +597,11 @@ export function buildStructureFromCanvasElement(canvasStore, elementoId, { offse
     cloned.y = (elem.y || 0) + offsetY
     cloned.padre = parentNewId
     cloned.hijos = []
+    
+    // Limpiar flag fromForm: al serializar desde canvas, ya no es "directo del formulario"
+    if (cloned.meta && cloned.meta.fromForm !== undefined) {
+      cloned.meta = { ...cloned.meta, fromForm: false }
+    }
 
     if (level === 0) { delete cloned.plantaId; cloned.padre = null }
     all.set(newId, cloned)
