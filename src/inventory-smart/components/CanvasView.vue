@@ -31,6 +31,8 @@
       :config="stageConfig"
       @wheel="handleWheel"
       @mousedown="handleStageMouseDown"
+      @mousemove="handleStageMouseMove"
+      @mouseup="handleStageMouseUp"
       @click="handleStageClick"
     >
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
@@ -547,6 +549,22 @@
           :zoom="canvasStore.zoom"
         />
 
+        <!-- Rectángulo de selección múltiple (marquesina) -->
+        <v-rect
+          v-if="isMarqueeActive"
+          :config="{
+            x: marqueeRect.x,
+            y: marqueeRect.y,
+            width: marqueeRect.width,
+            height: marqueeRect.height,
+            stroke: '#3b82f6',
+            strokeWidth: 2 / canvasStore.zoom,
+            fill: 'rgba(59, 130, 246, 0.1)',
+            dash: [4 / canvasStore.zoom, 4 / canvasStore.zoom],
+            listening: false,
+          }"
+        />
+
         <v-transformer
           v-if="
             isEditingSelected &&
@@ -690,6 +708,7 @@ import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useTransformer } from '@/inventory-smart/composables/useTransformer'
 import { useElementDrag } from '@/inventory-smart/composables/useElementDrag'
+import { useMarqueeSelection } from '@/inventory-smart/composables/useMarqueeSelection'
 import TemplateSaveModal from '@/inventory-smart/components/TemplateSaveModal.vue'
 import CanvasInfo from '@/inventory-smart/components/CanvasInfo.vue'
 import { useZoom } from '@/inventory-smart/composables/useZoom'
@@ -764,6 +783,18 @@ const { activeGuides: snapGuides, isSnapping, performSnap, clearGuides } = useOb
 
 // Estado para controlar si el snapping está habilitado
 const isSnappingEnabled = ref(true)
+
+// Selección múltiple con marquesina
+const {
+  isMarqueeActive,
+  marqueeRect,
+  selectedElementIds,
+  startMarquee,
+  updateMarquee,
+  endMarquee,
+  cancelMarquee,
+  stageToLayerCoords,
+} = useMarqueeSelection({ canvasStore, stageRef })
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -1328,15 +1359,56 @@ onUnmounted(() => {
 
 // === FUNCIONES DE CANVAS/STAGE ===
 const handleStageMouseDown = (e) => {
-  // Si el click es en el stage (no en un elemento), habilitar arrastre del canvas
-  // Solo si NO hay elemento seleccionado bloqueado
-  const seleccionado = canvasStore.elementoSeleccionado
+  // Si el click es en el stage (no en un elemento)
   if (e.target === e.target.getStage()) {
+    const seleccionado = canvasStore.elementoSeleccionado
+
+    // Si hay cambios pendientes o modo ESL, no permitir marquesina
+    if (canvasStore.cambiosNoAplicados || canvasStore.modoConfigurarEsl) {
+      if (seleccionado && isElementLocked(seleccionado)) {
+        stageDragEnabled.value = false
+        return
+      }
+      stageDragEnabled.value = true
+      return
+    }
+
+    // Si se presiona Shift, iniciar selección por marquesina
+    if (e.evt.shiftKey) {
+      const stage = stageRef.value?.getNode?.()
+      const pointer = stage?.getPointerPosition?.()
+      if (pointer) {
+        const layerPos = stageToLayerCoords(pointer)
+        startMarquee(layerPos)
+        stageDragEnabled.value = false // Deshabilitar drag del stage mientras se dibuja marquesina
+      }
+      return
+    }
+
+    // Comportamiento normal: habilitar arrastre del canvas si no hay bloqueo
     if (seleccionado && isElementLocked(seleccionado)) {
       stageDragEnabled.value = false
       return
     }
     stageDragEnabled.value = true
+  }
+}
+
+const handleStageMouseMove = (e) => {
+  if (!isMarqueeActive.value) return
+
+  const stage = stageRef.value?.getNode?.()
+  const pointer = stage?.getPointerPosition?.()
+  if (pointer) {
+    const layerPos = stageToLayerCoords(pointer)
+    updateMarquee(layerPos)
+  }
+}
+
+const handleStageMouseUp = () => {
+  if (isMarqueeActive.value) {
+    endMarquee()
+    stageDragEnabled.value = true // Rehabilitar drag del stage
   }
 }
 
@@ -1906,16 +1978,29 @@ const createElementFromDrop = (data, dropEvent) => {
 }
 
 const getElementShadow = (elemento) => {
+  // Resaltar elemento destacado
   if (canvasStore.elementoDestacadoId === elemento.id) {
     return {
       color: elemento.color,
-      // Un valor base muy grande para el resplandor
       blur: 120,
-      opacity: 1, // Opacidad máxima para un color sólido
+      opacity: 1,
       offsetX: 0,
       offsetY: 0,
     }
   }
+
+  // Resaltar elementos en selección múltiple
+  const isMultiSelected = canvasStore.elementosSeleccionadosMultiple?.includes(elemento.id)
+  if (isMultiSelected) {
+    return {
+      color: '#3b82f6', // Azul para indicar selección múltiple
+      blur: 20,
+      opacity: 0.8,
+      offsetX: 0,
+      offsetY: 0,
+    }
+  }
+
   // Sombra por defecto
   return {
     color: 'black',
@@ -2324,7 +2409,33 @@ const handleGlobalClick = (e) => {
 const handleKeyDown = (e) => {
   if (!e) return
   const key = e.key.toLowerCase()
+
+  // Manejar tecla Delete/Suprimir
+  if (key === 'delete' || key === 'supr' || key === 'del') {
+    // No procesar si estamos en un input
+    if (e.target instanceof Element && e.target.matches('input, textarea, select, [contenteditable]')) {
+      return
+    }
+
+    // Si hay selección (individual o múltiple), eliminar
+    const hasSelection = canvasStore.elementoSeleccionado ||
+                         (canvasStore.elementosSeleccionadosMultiple?.length > 0)
+
+    if (hasSelection && isEditMode.value) {
+      e.preventDefault()
+      deleteSelected({ withConfirm: true })
+    }
+    return
+  }
+
   if (key === 'escape' || key === 'esc') {
+    // Cancelar marquesina si está activa
+    if (isMarqueeActive.value) {
+      cancelMarquee()
+      stageDragEnabled.value = true
+      return
+    }
+
     if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
       showToast('Tienes cambios pendientes de guardar', 'warn')
       return
@@ -2647,8 +2758,13 @@ const onDelete = async (id) => {
     return
   }
   if (!id) return
-  const el =
-    canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
+
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('Guarda los cambios antes de eliminar elementos', 'warn');
+    return;
+  }
+
+  const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id);
   if (el && (el.bloqueado === true || el.locked === true)) {
     showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
     ctx.close()

@@ -727,8 +727,8 @@ watch(
       local.id = planta.id
       local.name = planta.nombre
       local.polygon = planta.poligono
-  // Si la planta era infinita, podría venir sin forma definida. Usar 'rectangle' como default válido.
-  local.shape = planta.forma ?? (planta.isInfinite ? 'rectangle' : 'none')
+      // Asegurar que siempre se asigne una plantilla válida por defecto
+      local.shape = planta.forma || 'rectangle' // Si no tiene forma, usar 'rectangle' como default
       local.isInfinite = !!planta.isInfinite
       local.codigo = planta.codigo || ''
 
