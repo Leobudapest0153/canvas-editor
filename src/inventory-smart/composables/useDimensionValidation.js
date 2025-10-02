@@ -1,9 +1,18 @@
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useToast } from '@/inventory-smart/composables/useToast'
-import { CM_TO_PX, TOLERANCE_CM } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, TOLERANCE_CM, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 
 /**
  * Composable para validar dimensiones físicas de elementos
+ *
+ * LÓGICA DE VISTAS DE CONTEXTO:
+ * - Cada tipo de elemento en TIPOS_ENTIDAD tiene una propiedad 'contextView' (XY o XZ)
+ * - El contextView del padre determina en qué vista se posicionan sus hijos
+ * - Ejemplos:
+ *   - plantas (contextView: XY) → sus hijos (cuartos, elementos) se posicionan en vista XY
+ *   - cuartos (contextView: XZ) → sus hijos (pisos) se posicionan en vista XZ
+ *   - elementos (contextView: XZ) → sus hijos (contenedores) se posicionan en vista XZ
+ * - Las validaciones de contención usan el contextView del padre, NO la vista activa del canvas
  *
  * OPTIMIZACIÓN DE RENDIMIENTO:
  * - Usa la opción 'silencioso' para validaciones en tiempo real sin mostrar toasts
@@ -54,9 +63,21 @@ export function useDimensionValidation() {
       alto: nuevasDimensiones.alto ?? dimensionesActuales.alto ?? 100
     }
 
-    const vista = canvasStore.vistaActiva || 'XY'
-    const esVistaFrontal = vista === 'XZ'
+    // Determinar la vista de contexto donde se posiciona el elemento
+    // Si tiene padre, usar el contextView del padre
+    // Si no tiene padre, usar la vista activa del canvas
+    let contextView = canvasStore.vistaActiva || 'XY'
+    if (elemento.padre || elemento.parentId) {
+      const parentId = elemento.padre || elemento.parentId
+      const padre = canvasStore.elementoPorId(parentId)
+      if (padre) {
+        const tipoPadre = TIPOS_ENTIDAD.find(t => t.id === padre.tipo)
+        contextView = tipoPadre?.contextView || 'XY'
+      }
+    }
+    const esVistaFrontal = contextView === 'XZ'
 
+    // Calcular dimensiones en pixeles según la vista de contexto
     const widthPx = dimensionesFinal.ancho * CM_TO_PX
     const heightPx = esVistaFrontal ?
       (dimensionesFinal.alto * CM_TO_PX) :
@@ -112,6 +133,11 @@ export function useDimensionValidation() {
 
   /**
    * Valida que las nuevas dimensiones del elemento sean suficientes para contener a sus elementos hijos
+   * 
+   * Usa el contextView del elemento padre para determinar qué dimensiones validar:
+   * - Si contextView es 'XZ': valida que los hijos quepan en ancho × alto
+   * - Si contextView es 'XY': valida que los hijos quepan en ancho × largo
+   * 
    * @param {Object} elemento - Elemento con las nuevas dimensiones a validar
    * @returns {Object} Resultado de la validación
    */
@@ -122,12 +148,16 @@ export function useDimensionValidation() {
       return { valida: true, razon: 'No tiene elementos hijos' };
     }
 
-    const vista = canvasStore.vistaActiva || 'XY'
-    const esVistaFrontal = vista === 'XZ'
+    // Obtener el contextView del tipo de elemento padre
+    // Los hijos se posicionan según el contextView de su padre
+    const tipoElemento = TIPOS_ENTIDAD.find(t => t.id === elemento.tipo);
+    const contextView = tipoElemento?.contextView || 'XY';
+    const esVistaFrontal = contextView === 'XZ';
 
     const dimensionesPadre = elemento.dimensiones;
     const problemasContención = [];
 
+    // Determinar el área disponible según la vista de contexto del padre
     let anchoPadreCanvas, altoPadreCanvas;
     if (esVistaFrontal) {
       // Vista XZ: área disponible es ancho × alto
@@ -140,45 +170,24 @@ export function useDimensionValidation() {
     }
 
     for (const hijo of hijos) {
-      // Obtener posición del hijo en el canvas (en cm)
+      // Obtener posición del hijo en el canvas (en px, convertir a cm)
       const posHijoX_px = hijo.x || 0;
       const posHijoY_px = hijo.y || 0;
-      const posHijoX = posHijoX_px / CM_TO_PX; // Posición X en canvas
-      const posHijoY_raw = posHijoY_px / CM_TO_PX; // Posición Y en canvas
+      const posHijoX = posHijoX_px / CM_TO_PX;
+      const posHijoY = posHijoY_px / CM_TO_PX;
 
-      // Obtener dimensiones del hijo
+      // Obtener dimensiones del hijo según la vista de contexto
       const dimHijo = hijo.dimensiones || {};
-      let anchoHijoCanvas, altoHijoCanvas, posHijoY;
-      let correccionAplicada = false;
+      let anchoHijoCanvas, altoHijoCanvas;
 
       if (esVistaFrontal) {
-        // Vista XZ (frontal): validamos ancho × alto
-        // Y representa la coordenada Z (altura), usar tal como está
-        posHijoY = posHijoY_raw;
+        // Vista XZ (frontal): los hijos usan ancho × alto
         anchoHijoCanvas = dimHijo.ancho || 0;
         altoHijoCanvas = dimHijo.alto || 0;
       } else {
-        // Vista XY (superior): validamos ancho × largo
+        // Vista XY (superior): los hijos usan ancho × largo
         anchoHijoCanvas = dimHijo.ancho || 0;
-        altoHijoCanvas = dimHijo.largo || 0; // En vista XY mostramos largo
-
-        // CORRECCIÓN CRÍTICA: Detectar si el hijo fue posicionado en vista frontal
-        // Si un hijo se sale del área padre debido a desplazamiento Y, probablemente fue posicionado en vista frontal
-        const hijoDesplazadoEnY = posHijoY_raw > 1; // Más de 1cm de desplazamiento
-        const seSaleDelArea = (posHijoY_raw + altoHijoCanvas) > dimensionesPadre.largo;
-        const hijoTieneAltoProbablementeZ = (dimHijo.alto || 0) > (dimensionesPadre.largo * 0.5); // Su alto sugiere coordenada Z
-
-        // Condiciones para detectar posicionamiento en vista frontal:
-        // 1. Se sale del área Y está desplazado (caso más común)
-        // 2. O tiene alto significativo comparado con el largo del padre (sugiere que su Y es coordenada Z)
-        if ((seSaleDelArea && hijoDesplazadoEnY) || hijoTieneAltoProbablementeZ) {
-          // El hijo probablemente fue posicionado en vista frontal
-          posHijoY = 0; // Posicionar en Y=0 para vista superior
-          correccionAplicada = true;
-        } else {
-          // El hijo está correctamente posicionado en vista XY
-          posHijoY = posHijoY_raw;
-        }
+        altoHijoCanvas = dimHijo.largo || 0;
       }
 
       // Calcular límites del hijo en el canvas
@@ -237,11 +246,16 @@ export function useDimensionValidation() {
       };
     }
 
-    return { valida: true, razon: `Todos los elementos hijos caben dentro de las nuevas dimensiones en vista ${vista}` };
+    return { valida: true, razon: `Todos los elementos hijos caben dentro de las nuevas dimensiones en vista de contexto ${contextView}` };
   }
 
   /**
    * Valida que el elemento con sus nuevas dimensiones quepa dentro de su contenedor padre
+   * 
+   * Usa el contextView del padre para determinar qué dimensiones validar:
+   * - Si el padre tiene contextView 'XZ': valida que el elemento quepa en ancho × alto
+   * - Si el padre tiene contextView 'XY': valida que el elemento quepa en ancho × largo
+   * 
    * @param {Object} elemento - Elemento con las nuevas dimensiones a validar
    * @returns {Object} Resultado de la validación
    */
@@ -262,8 +276,11 @@ export function useDimensionValidation() {
       return { valida: true, razon: 'No se encontró la estructura padre o no tiene dimensiones' };
     }
 
-    const vista = canvasStore.vistaActiva || 'XY'
-    const esVistaFrontal = vista === 'XZ'
+    // Obtener el contextView del tipo de elemento padre
+    // El elemento actual se posiciona según el contextView de su padre
+    const tipoPadre = TIPOS_ENTIDAD.find(t => t.id === padre.tipo);
+    const contextView = tipoPadre?.contextView || 'XY';
+    const esVistaFrontal = contextView === 'XZ'
 
     // Obtener el área real disponible del canvas
     const { width: widthCanvasPx, height: heightCanvasPx } = canvasStore.canvasAdaptativo
@@ -378,7 +395,7 @@ export function useDimensionValidation() {
       };
     }
 
-    return { valida: true, razon: `El elemento cabe correctamente dentro del área real disponible en vista ${vista}` };
+    return { valida: true, razon: `El elemento cabe correctamente dentro del área real disponible en vista de contexto ${contextView}` };
   }
 
   /**

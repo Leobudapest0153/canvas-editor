@@ -22,6 +22,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'warehouse',
     restrictions: [],
+    contextView: 'XY',
   },
   {
     id: 'cuartos',
@@ -30,6 +31,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'room',
     restrictions: [],
+    contextView: 'XZ',
   },
   {
     id: 'pisos',
@@ -38,6 +40,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'mezzanine',
     restrictions: ['read-only-properties', 'right-click', 'drag'],
+    contextView: 'XY',
   },
   {
     id: 'pasillos',
@@ -46,6 +49,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'space',
     restrictions: [],
+    contextView: 'XY', // No tiene hijos, pero se incluye para consistencia
   },
   {
     id: 'elementos',
@@ -54,6 +58,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'space',
     restrictions: [],
+    contextView: 'XZ',
   },
   {
     id: 'contenedores',
@@ -62,6 +67,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'space',
     restrictions: ['read-only-properties', 'right-click', 'drag'],
+    contextView: 'XZ', // No tiene hijos, pero se incluye para consistencia
   },
 ]
 

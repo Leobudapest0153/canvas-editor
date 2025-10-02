@@ -680,7 +680,8 @@ import RulersOverlay from '@/inventory-smart/components/RulersOverlay.vue'
 import { detectConflictsFor, throttle, computeMTD } from '@/inventory-smart/utils/collision'
 import { boundaryToAreaBounds } from '@/inventory-smart/utils/bounds'
 import { solveDragPosition } from '@/inventory-smart/utils/placementSolver'
-import { resolveCoplanarNeighbors } from '@/inventory-smart/validation/placementOrchestrator'
+import { resolveCoplanarNeighbors, rangesOverlap, PLACEMENT_TOLERANCES } from '@/inventory-smart/validation/placementOrchestrator'
+import { resolveVerticalProps } from '@/inventory-smart/validation/fieldResolvers'
 import { snapToGrid, nudgePlace } from '@/inventory-smart/utils/geometry'
 import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
@@ -1539,12 +1540,28 @@ const dragBoundForElement = (pos, elemento) => {
 
     const candidates = canvasStore.elementosVisibles.filter((e) => e && e.id !== elemento.id)
     const coplanar = resolveCoplanarNeighbors({ ...moving }, candidates)
-    const neighbors = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'suelo' && (moving.ubicacion || 'suelo') === 'suelo')
+    const hardNeighbors = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'suelo' && (moving.ubicacion || 'suelo') === 'suelo')
+    const softWalls = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'pared' && (moving.ubicacion || 'suelo') === 'pared')
+    const softCross = candidates.filter((n) => {
+      const ua = (moving.ubicacion || 'suelo').toLowerCase()
+      const ub = (n.ubicacion || 'suelo').toLowerCase()
+      if ((ua === 'suelo' && ub === 'pared') || (ua === 'pared' && ub === 'suelo')) {
+        const a = resolveVerticalProps(moving, {})
+        const b = resolveVerticalProps(n, {})
+        if (!Number.isFinite(a.zBaseCm) || !Number.isFinite(a.altoCm) || !Number.isFinite(b.zBaseCm) || !Number.isFinite(b.altoCm)) return false
+        const a0 = a.zBaseCm, a1 = a.zBaseCm + a.altoCm
+        const b0 = b.zBaseCm, b1 = b.zBaseCm + b.altoCm
+        return rangesOverlap(a0, a1, b0, b1, PLACEMENT_TOLERANCES.Z_LAYER)
+      }
+      return false
+    })
+    const softNeighbors = [...softWalls, ...softCross]
 
     const solved = solveDragPosition({
       candidate: { x: lp.x, y: lp.y },
       movingEl: moving,
-      neighbors,
+      hardNeighbors,
+      softNeighbors,
       areaBounds,
       lastValidPos: lastPos,
       lastVelocity: lastVel,
