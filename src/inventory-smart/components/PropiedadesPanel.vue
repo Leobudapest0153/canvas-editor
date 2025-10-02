@@ -2,6 +2,21 @@
   <div class="h-full flex flex-col bg-white border-l border-gray-200" data-properties-panel>
     <div class="p-4 border-b border-gray-200 flex items-center justify-between">
       <h2 class="text-lg font-semibold text-gray-800">Propiedades</h2>
+      <!-- Botón Identificador -->
+      <button
+        v-if="elementoSeleccionado"
+        type="button"
+        class="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-primary text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer text-sm"
+        @click="emitirIdentificador"
+      >
+        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M19 8h-1V3H6v5H5c-1.1 0-2 .9-2 2v5h3v4h12v-4h3v-5c0-1.1-.9-2-2-2zM8 5h8v3H8V5zm8 14H8v-4h8v4zm1-6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"
+          />
+        </svg>
+        <span>Identificador</span>
+      </button>
     </div>
 
     <div v-if="elementoSeleccionado" class="flex-1 overflow-y-auto p-3">
@@ -516,6 +531,9 @@
 </template>
 
 <script setup>
+// Definir emits
+const emit = defineEmits(['imprimirIdentificador'])
+
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
@@ -1535,6 +1553,11 @@ const isElementRestricted = computed(() => {
    const restrictions = TIPOS_ENTIDAD.find(t => t.id === type)?.restrictions || [];
    return restrictions.includes('read-only-properties');
 })
+
+// Función para emitir evento de identificador
+const emitirIdentificador = () => {
+  emit('imprimirIdentificador', elementoSeleccionado.value);
+}
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)

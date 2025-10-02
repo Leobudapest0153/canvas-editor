@@ -34,7 +34,7 @@
         v-if="canvasStore.elementoSeleccionado"
         data-properties-panel
       >
-        <PropiedadesPanel />
+        <PropiedadesPanel @showIdentifier="handleShowIdentifier" />
       </div>
     </main>
     <!-- Contenedor de toasts -->
@@ -120,7 +120,7 @@ const props = defineProps({
     }
   }
 })// Definir emits para comunicar cambios al componente padre
-const emit = defineEmits(['configUpdated', 'back', 'printIdentifiers'])
+const emit = defineEmits(['configUpdated', 'back', 'imprimirIdentificadores', 'imprimirIdentificador'])
 
 const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
@@ -188,8 +188,12 @@ const handleConfigChanged = (configSerializada) => {
   }
 }
 
-const handleShowIdentifiers = () => {
-  emit('printIdentifiers')
+const handleShowIdentifiers = (value) => {
+  emit('imprimirIdentificadores', value)
+}
+
+const handleShowIdentifier = (value) => {
+  emit('imprimirIdentificador', value)
 }
 
 const elementoEslActual = computed(() => {
