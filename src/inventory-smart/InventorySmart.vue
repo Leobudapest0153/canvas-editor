@@ -388,7 +388,7 @@ useEditorShortcuts({
 onMounted(() => {
   try {
     if (typeof window !== 'undefined') {
-      window.addEventListener('beforeunload', handleBeforeUnload)
+      // window.addEventListener('beforeunload', handleBeforeUnload) // Desactivado temporalmente
     }
 
     // Provide de la API de servicios externos para componentes hijos
