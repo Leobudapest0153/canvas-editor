@@ -74,7 +74,7 @@ export const TIPOS_ENTIDAD = [
 export const JERARQUIA_PERMITIDA = {
   plantas: ['cuartos', 'elementos', 'pasillos'],
   cuartos: ['pisos'],
-  pisos: ['elementos'],
+  pisos: ['elementos', 'pasillos'],
   elementos: ['contenedores'],
   contenedores: [],
   pasillos: [],
@@ -384,7 +384,7 @@ export const DIMENSIONS = {
     estante_pared_pequeno: { min: { w: 40, h: 30, d: 20 }, max: { w: 500, h: 500, d: 500 } },
     barril_basico: { min: { w: 30, h: 30, d: 30 }, max: { w: 500, h: 500, d: 500 } },
     // Nuevos predefinidos
-    pasillo_base: { min: { w: 100, h: 10, d: 100 }, max: { w: 2000, h: 500, d: 2000 } },
+    pasillo_base: { min: { w: 10, h: 10, d: 10 }, max: { w: 2000, h: 500, d: 2000 } },
     cuarto_frio: { min: { w: 100, h: 100, d: 100 }, max: { w: 2000, h: 500, d: 2000 } },
     piso_base: { min: { w: 50, h: 10, d: 50 }, max: { w: 2000, h: 500, d: 2000 } },
   },

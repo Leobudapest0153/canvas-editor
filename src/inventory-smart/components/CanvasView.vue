@@ -687,7 +687,7 @@ import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
-import { GRID_SIZE, CM_TO_PX, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
+import { JERARQUIA_PERMITIDA, GRID_SIZE, CM_TO_PX, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { cmToPx, pxToCm, fmtCm, formatLengthsCm } from '@/inventory-smart/utils/units'
 import { useViewportStore } from '@/inventory-smart/stores/viewport'
@@ -1708,21 +1708,12 @@ const runPreDropValidations = (elemento, dropEvent) => {
   const contextoActual = canvasStore.contextoActual?.tipo || 'plantas'
   const tipoElemento = elemento.tipo
 
-  // Reglas de jerarquía actualizadas
-  const allowedByContext = {
-    plantas: ['cuartos', 'elementos', 'pasillos'],
-    cuartos: ['pisos'],
-    pisos: ['elementos'],
-    elementos: ['contenedores'],
-    contenedores: [],
-    pasillos: [],
-  }
-  const permitidos = allowedByContext[contextoActual] || []
+  const permitidos = JERARQUIA_PERMITIDA[contextoActual] || []
   if (!permitidos.includes(tipoElemento)) {
     const msgMap = {
       plantas: 'Aquí solo puedes agregar cuartos, elementos o pasillos.',
       cuartos: 'Aquí solo puedes agregar pisos.',
-      pisos: 'Aquí solo puedes agregar elementos.',
+      pisos: 'Aquí solo puedes agregar elementos y pasillos.',
       elementos: 'Dentro de elementos solo se permiten niveles.',
       contenedores: 'No puedes agregar elementos dentro de niveles.',
       pasillos: 'No puedes agregar elementos dentro de pasillos.',
@@ -1731,12 +1722,27 @@ const runPreDropValidations = (elemento, dropEvent) => {
     return { ok: false, reason: 'hierarchy' }
   }
 
-  // Si es pasillo, ajustar alto al de la planta ANTES de validar
+  // Si es pasillo, ajustar alto al del contenedor padre (planta o elemento) ANTES de validar
   let elementoParaPeso = elemento
-  const plantaAlto = canvasStore.plantaActivaData?.dimensiones?.alto
   if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
     const dims = { ...(elemento.dimensiones || {}) }
-    if (Number.isFinite(plantaAlto)) dims.alto = plantaAlto
+    
+    // Intentar obtener alto del padre según el contexto
+    let altoContenedor = null
+    
+    if (canvasStore.contextoActual?.tipo === 'plantas') {
+      // Si estamos en una planta, usar alto de la planta
+      altoContenedor = canvasStore.plantaActivaData?.dimensiones?.alto
+    } else {
+      // Si estamos dentro de un elemento (cuarto, piso, etc), usar su alto
+      const elementoPadre = canvasStore.elementoPorId(canvasStore.contextoActual?.id)
+      altoContenedor = elementoPadre?.dimensiones?.alto
+    }
+    
+    if (Number.isFinite(altoContenedor)) {
+      dims.alto = altoContenedor
+    }
+    
     elementoParaPeso = { ...elemento, dimensiones: dims }
   }
 
@@ -1772,8 +1778,20 @@ const runPreDropValidations = (elemento, dropEvent) => {
   let largoCm = elemento.dimensiones?.largo || 60
   let altoCm = elemento.dimensiones?.alto || 20
 
-  if ((elemento?.tipo || '').toLowerCase() === 'pasillos' && Number.isFinite(plantaAlto)) {
-    altoCm = plantaAlto
+  // Para pasillos, usar el alto del contenedor padre (planta o elemento)
+  if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
+    let altoContenedor = null
+    
+    if (canvasStore.contextoActual?.tipo === 'plantas') {
+      altoContenedor = canvasStore.plantaActivaData?.dimensiones?.alto
+    } else {
+      const elementoPadre = canvasStore.elementoPorId(canvasStore.contextoActual?.id)
+      altoContenedor = elementoPadre?.dimensiones?.alto
+    }
+    
+    if (Number.isFinite(altoContenedor)) {
+      altoCm = altoContenedor
+    }
   }
 
   const isSystemDefault = !!(

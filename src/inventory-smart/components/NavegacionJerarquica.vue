@@ -94,7 +94,7 @@
             {{ canvasStore.elementosVisibles.length }} pisos
           </span>
           <span v-else-if="canvasStore.estaEnPiso">
-            {{ canvasStore.elementosVisibles.length }} espacios
+            {{ canvasStore.elementosVisibles.length }} espacios o pasillos
           </span>
           <span v-else-if="canvasStore.estaEnElemento">
             {{ canvasStore.elementosVisibles.length }} niveles

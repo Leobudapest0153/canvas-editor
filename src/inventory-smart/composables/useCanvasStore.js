@@ -357,7 +357,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (padre?.hijos) {
         return padre.hijos
           .map((hid) => elementos.value.find((e) => e.id === hid))
-          .filter((h) => h && h.tipo === 'elementos').map(withRestrinctions);
+          .filter((h) => ['elementos', 'pasillos'].includes(h.tipo)).map(withRestrinctions);
       }
     }
 
@@ -1258,7 +1258,7 @@ const calcularCanvasAdaptativo = (elemento) => {
         //   }
         // }
 
-        // Ajuste SIEMPRE aplicado: altura de pasillos = alto de la planta
+        // Ajuste SIEMPRE aplicado: altura de pasillos = alto de la planta (solo para pasillos directos en planta)
         const plantaAlto = planta?.dimensiones?.alto
         if (Number.isFinite(plantaAlto)) {
           const pasillos = elementos.value.filter((e) => e.plantaId === plantaId && !e.padre && e.tipo === 'pasillos')
@@ -1370,8 +1370,8 @@ const calcularCanvasAdaptativo = (elemento) => {
       showToast('En cuartos solo se pueden agregar pisos')
       return null
     }
-    if (contextoActual === 'pisos' && tipoElemento !== 'elementos') {
-      showToast('En pisos solo se pueden agregar elementos')
+    if (contextoActual === 'pisos' && !['elementos', 'pasillos'].includes(tipoElemento)) {
+      showToast('En pisos solo se pueden agregar elementos o pasillos')
       return null
     }
     if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
@@ -1419,55 +1419,69 @@ const calcularCanvasAdaptativo = (elemento) => {
       }
     }
 
-    // Política especial: altura de pasillos = planta.alto al crear
+    // Política especial: altura de pasillos = alto del contenedor padre (planta o elemento padre)
     if (nuevoElemento.tipo === 'pasillos') {
-      const planta = plantas.value.find((p) => p.id === (nuevoElemento.plantaId || contextoNavegacion.value.id))
-      if (planta) {
-        if (!nuevoElemento.dimensiones) nuevoElemento.dimensiones = { ancho: 0, largo: 0, alto: 0 }
-        nuevoElemento.dimensiones.alto = planta.dimensiones.alto
+      if (!nuevoElemento.dimensiones) nuevoElemento.dimensiones = { ancho: 0, largo: 0, alto: 0 }
+
+      // Si tiene padre (está dentro de un elemento), usar el alto del padre
+      if (nuevoElemento.padre) {
+        console.log('Nuevo pasillo tiene padre:', nuevoElemento.padre)
+        console.log('Asignando alto de pasillo desde padre:', nuevoElemento.padre)
+        const elementoPadre = elementos.value.find((el) => el.id === nuevoElemento.padre)
+        if (elementoPadre?.dimensiones?.alto) {
+          nuevoElemento.dimensiones.alto = elementoPadre.dimensiones.alto
+          console.log('Alto asignado desde padre:', nuevoElemento.dimensiones.alto)
+        }
+      } else {
+        console.log('Nuevo pasillo NO tiene padre, asignando alto desde planta')
+        // Si no tiene padre, usar el alto de la planta
+        const planta = plantas.value.find((p) => p.id === (nuevoElemento.plantaId || contextoNavegacion.value.id))
+        if (planta?.dimensiones?.alto) {
+          nuevoElemento.dimensiones.alto = planta.dimensiones.alto
+        }
       }
     }
 
     // Política de dimensiones al crear en planta para elementos de sistema
-    try {
-      const shouldAuto = true
-      if (shouldAuto && ['cuartos','pisos','elementos','pasillos'].includes(nuevoElemento.tipo)) {
-        const typeKey = nuevoElemento.systemTypeKey || nuevoElemento.id
-        const isSystemDefault = !!(typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey))
-        const isLocked = nuevoElemento.dimensionLock === true
-        if (isSystemDefault && !isLocked) {
-          const planta = plantas.value.find((p) => p.id === nuevoElemento.plantaId)
-          if (planta && planta.dimensiones) {
-            const parentDims = {
-              w: planta.dimensiones.ancho,
-              h: planta.dimensiones.largo,
-              d: planta.dimensiones.alto,
-            }
-            const dims = computeDimsByAxisScale(typeKey, parentDims, { snap: true, gridPx: gridSize.value })
-            if (dims) {
-              // Ajustar dimensiones de modelo
-              nuevoElemento.dimensiones = { ...nuevoElemento.dimensiones, ...dims }
-              // Ajustar canvas en px según la vista ACTUAL (fix Option A: evita forzar 'XZ' en elementos cuando estamos en planta/XY)
-              let view = vistaActiva.value
-              // Si la vista calculada es XZ pero estamos creando en contexto planta (tipo 'plantas'), forzar XY para footprint inicial.
-              if (view === 'XZ' && contextoNavegacion.value?.tipo === 'plantas') {
-                view = 'XY'
-              }
-              const { width, height } = toCanvasSizePx(dims, view)
-              if (Number.isFinite(width)) nuevoElemento.width = width
-              if (Number.isFinite(height)) nuevoElemento.height = height
-            }
-            // Offset vertical configurable (por tipo)
-            const off = OFFSETS?.offsetByType?.[typeKey]?.zOffsetShare
-            if (typeof off === 'number' && isFinite(off)) {
-              nuevoElemento.alturaRespectoAlSuelo = Math.round((planta.dimensiones.alto || 0) * off)
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Auto-scale on create failed:', e)
-    }
+    // try {
+    //   const shouldAuto = true
+    //   if (shouldAuto && ['cuartos','pisos','elementos','pasillos'].includes(nuevoElemento.tipo)) {
+    //     const typeKey = nuevoElemento.systemTypeKey || nuevoElemento.id
+    //     const isSystemDefault = !!(typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey))
+    //     const isLocked = nuevoElemento.dimensionLock === true
+    //     if (isSystemDefault && !isLocked) {
+    //       const planta = plantas.value.find((p) => p.id === nuevoElemento.plantaId)
+    //       if (planta && planta.dimensiones) {
+    //         const parentDims = {
+    //           w: planta.dimensiones.ancho,
+    //           h: planta.dimensiones.largo,
+    //           d: planta.dimensiones.alto,
+    //         }
+    //         const dims = computeDimsByAxisScale(typeKey, parentDims, { snap: true, gridPx: gridSize.value })
+    //         if (dims) {
+    //           // Ajustar dimensiones de modelo
+    //           nuevoElemento.dimensiones = { ...nuevoElemento.dimensiones, ...dims }
+    //           // Ajustar canvas en px según la vista ACTUAL (fix Option A: evita forzar 'XZ' en elementos cuando estamos en planta/XY)
+    //           let view = vistaActiva.value
+    //           // Si la vista calculada es XZ pero estamos creando en contexto planta (tipo 'plantas'), forzar XY para footprint inicial.
+    //           if (view === 'XZ' && contextoNavegacion.value?.tipo === 'plantas') {
+    //             view = 'XY'
+    //           }
+    //           const { width, height } = toCanvasSizePx(dims, view)
+    //           if (Number.isFinite(width)) nuevoElemento.width = width
+    //           if (Number.isFinite(height)) nuevoElemento.height = height
+    //         }
+    //         // Offset vertical configurable (por tipo)
+    //         const off = OFFSETS?.offsetByType?.[typeKey]?.zOffsetShare
+    //         if (typeof off === 'number' && isFinite(off)) {
+    //           nuevoElemento.alturaRespectoAlSuelo = Math.round((planta.dimensiones.alto || 0) * off)
+    //         }
+    //       }
+    //     }
+    //   }
+    // } catch (e) {
+    //   console.warn('Auto-scale on create failed:', e)
+    // }
 
     try {
       if (nuevoElemento.tipo === 'pasillos') opts.resetName = true
