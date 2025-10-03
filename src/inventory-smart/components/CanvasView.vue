@@ -653,6 +653,13 @@
       @close="closeTemplateModal"
     />
 
+    <PlacementSuggestionModal
+      :open="suggestionModalOpen"
+      :suggestion="currentSuggestion"
+      @accept="handleSuggestionAccept"
+      @cancel="handleSuggestionCancel"
+    />
+
     <CanvasInfo />
 
     <FloatingControls
@@ -710,6 +717,9 @@ import { useTransformer } from '@/inventory-smart/composables/useTransformer'
 import { useElementDrag } from '@/inventory-smart/composables/useElementDrag'
 import { useMarqueeSelection } from '@/inventory-smart/composables/useMarqueeSelection'
 import TemplateSaveModal from '@/inventory-smart/components/TemplateSaveModal.vue'
+import PlacementSuggestionModal from '@/inventory-smart/components/modals/PlacementSuggestionModal.vue'
+import { usePlacementSuggestionState } from '@/inventory-smart/composables/usePlacementSuggestionState'
+import { buildPlacementSuggestion, applyPlacementSuggestion } from '@/inventory-smart/utils/placementSuggestions'
 import CanvasInfo from '@/inventory-smart/components/CanvasInfo.vue'
 import { useZoom } from '@/inventory-smart/composables/useZoom'
 import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
@@ -775,6 +785,29 @@ const openTemplateModal = (elementId) => {
 }
 const closeTemplateModal = () => {
   templateModalOpen.value = false
+}
+const {
+  isOpen: suggestionModalOpen,
+  currentSuggestion,
+  openSuggestion,
+  closeSuggestion,
+} = usePlacementSuggestionState()
+const pendingPlacement = ref(null)
+
+const handleSuggestionCancel = () => {
+  pendingPlacement.value = null
+  closeSuggestion()
+}
+
+const handleSuggestionAccept = () => {
+  const pending = pendingPlacement.value
+  pendingPlacement.value = null
+  closeSuggestion()
+  if (!pending) return
+  const adjustedElement = applyPlacementSuggestion(pending.element, pending.suggestion)
+  if (pending.origin === 'catalog') {
+    createElementFromDrop({ elemento: adjustedElement }, pending.dropEvent, { skipSuggestions: true })
+  }
 }
 const dimensionValidation = useDimensionValidation()
 
@@ -1702,8 +1735,18 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
 }
 
 // Pipeline unificado de validaciones previas al drop
-const runPreDropValidations = (elemento, dropEvent) => {
-  if (!elemento) return { ok: false, reason: 'invalid' }
+const runPreDropValidations = (elemento, dropEvent, options = {}) => {
+  const silent = options.silent === true
+  const fail = (reason, failure = {}) => {
+    if (!silent && failure.message) {
+      showToast(failure.message, failure.toastType || 'error')
+    }
+    return { ok: false, reason, failure }
+  }
+
+  if (!elemento) {
+    return fail('invalid', { type: 'invalid', message: 'Elemento inválido.' })
+  }
 
   const contextoActual = canvasStore.contextoActual?.tipo || 'plantas'
   const tipoElemento = elemento.tipo
@@ -1727,8 +1770,8 @@ const runPreDropValidations = (elemento, dropEvent) => {
       contenedores: 'No puedes agregar elementos dentro de niveles.',
       pasillos: 'No puedes agregar elementos dentro de pasillos.',
     }
-    showToast(msgMap[contextoActual] || 'No puedes agregar este tipo aquí.', 'error')
-    return { ok: false, reason: 'hierarchy' }
+    const message = msgMap[contextoActual] || 'No puedes agregar este tipo aquí.'
+    return fail('hierarchy', { type: 'hierarchy', message })
   }
 
   // Si es pasillo, ajustar alto al de la planta ANTES de validar
@@ -1760,11 +1803,13 @@ const runPreDropValidations = (elemento, dropEvent) => {
       tipoPadre = 'el elemento'
     }
     // El elemento excedería el peso máximo permitido
-    showToast(
-      `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`,
-      'error',
-    )
-    return { ok: false, reason: 'weight' }
+    const message = `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`
+    return fail('weight', {
+      type: 'weight',
+      message,
+      element: elementoParaPeso,
+      weightResult: resultadoValidacionPeso,
+    })
   }
 
   let { width, height } = getElementPixelDimensions(elemento)
@@ -1838,8 +1883,14 @@ const runPreDropValidations = (elemento, dropEvent) => {
     let local = sess.toLocal({ x: candX, y: candY }, parent)
     local = sess.finalizeLocal(local)
     if (!sess.isValidLocal(local)) {
-      showToast('No hay espacio suficiente aquí para colocar el elemento.', 'error')
-      return { ok: false, reason: 'bounds' }
+      return fail('bounds', {
+        type: 'space',
+        message: 'No hay espacio suficiente aquí para colocar el elemento.',
+        dimsCm: { ancho: anchoCm, largo: largoCm, alto: altoCm },
+        pixelSize: { width: finalWidth, height: finalHeight },
+        areaBounds: null,
+        view: canvasStore.vistaActiva,
+      })
     }
     const worldPos = sess.toWorld(local, parent)
     candX = worldPos.x
@@ -1913,14 +1964,32 @@ const runPreDropValidations = (elemento, dropEvent) => {
   }
 
   if (!ok) {
-    showToast('No fue posible colocar el elemento dentro de los límites de la planta.', 'error')
-    return { ok: false, reason: 'bounds' }
+    return fail('bounds', {
+      type: 'space',
+      message: 'No fue posible colocar el elemento dentro de los límites de la planta.',
+      dimsCm: { ancho: anchoCm, largo: largoCm, alto: altoCm },
+      pixelSize: { width: finalWidth, height: finalHeight },
+      areaBounds,
+      boundary,
+      candidate: { x: candX, y: candY },
+      conflicts: blocking,
+      view: canvasStore.vistaActiva,
+    })
   }
 
   // Validación final: asegurar que la posición final sea válida con la misma lógica que drag
   if (!insideAreaModel(finalPos, { ...tempEl, x: finalPos.x, y: finalPos.y }, areaBounds, 0.5)) {
-    showToast('El elemento quedaría fuera del área permitida.', 'error')
-    return { ok: false, reason: 'bounds' }
+    return fail('bounds', {
+      type: 'space',
+      message: 'El elemento quedaría fuera del área permitida.',
+      dimsCm: { ancho: anchoCm, largo: largoCm, alto: altoCm },
+      pixelSize: { width: finalWidth, height: finalHeight },
+      areaBounds,
+      boundary,
+      candidate: { x: finalPos.x, y: finalPos.y },
+      conflicts: blocking,
+      view: canvasStore.vistaActiva,
+    })
   }
 
   return {
@@ -1932,10 +2001,33 @@ const runPreDropValidations = (elemento, dropEvent) => {
   }
 }
 
-const createElementFromDrop = (data, dropEvent) => {
-  const elemento = data.elemento
-  const res = runPreDropValidations(elemento, dropEvent)
-  if (!res.ok) return
+const createElementFromDrop = (data, dropEvent, options = {}) => {
+  const elementSource = options.elementOverride || data.elemento
+  if (!elementSource) return
+
+  const elemento = JSON.parse(JSON.stringify(elementSource))
+  const skipSuggestions = options.skipSuggestions === true
+  const res = runPreDropValidations(elemento, dropEvent, { silent: !skipSuggestions })
+  if (!res.ok) {
+    const failure = res.failure
+    if (!skipSuggestions) {
+      const suggestion = buildPlacementSuggestion({ failure })
+      if (suggestion) {
+        pendingPlacement.value = {
+          origin: 'catalog',
+          element: elemento,
+          dropEvent,
+          suggestion,
+        }
+        openSuggestion(suggestion)
+        return
+      }
+    }
+    if (failure?.message) {
+      showToast(failure.message, 'error')
+    }
+    return
+  }
 
   let { ancho: anchoCm, largo: largoCm, alto: altoCm } = res.dimsCm
   let finalWidth = res.width
@@ -1950,8 +2042,6 @@ const createElementFromDrop = (data, dropEvent) => {
     id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
     tipo: elemento.tipo,
     categoria: elemento.categoria,
-    // Para pasillos: si vienen con nombre desde el catálogo, preservarlo;
-    // si no, dejar que el store genere el nombre por defecto.
     nombre: elemento.nombre || 'Nuevo elemento',
     dimensiones: { ancho: anchoCm, largo: largoCmFinal, alto: altoCm },
     x: finalPosition.x,
