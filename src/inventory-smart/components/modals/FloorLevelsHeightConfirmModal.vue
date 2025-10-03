@@ -21,14 +21,14 @@
         <div class="inline-flex rounded border border-gray-300 overflow-hidden">
           <button
             class="px-3 sm:px-4 py-1.5 text-sm"
-            :class="selectedStrategy === 'clamp' ? 'bg-primary-700 text-white' : 'bg-white text-gray-700'"
+            :class="selectedStrategy === 'clamp' ? 'bg-6700 text-white' : 'bg-white text-gray-700'"
             @click="selectedStrategy = 'clamp'"
           >
             Limitar
           </button>
           <button
             class="px-3 sm:px-4 py-1.5 text-sm"
-            :class="selectedStrategy === 'redistribute' ? 'bg-primary-700 text-white' : 'bg-white text-gray-700'"
+            :class="selectedStrategy === 'redistribute' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'"
             @click="selectedStrategy = 'redistribute'"
           >
             Forzar
@@ -220,7 +220,7 @@
           Cancelar
         </button>
         <button
-          class="bg-primary-700 text-white px-4 py-2 rounded cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+          class="bg-primary text-white px-4 py-2 rounded cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           :disabled="!canConfirm"
           @click="$emit('confirm', selectedStrategy)"
         >

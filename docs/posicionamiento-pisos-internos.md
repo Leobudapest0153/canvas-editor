@@ -47,7 +47,6 @@ Cada piso interno se crea como un elemento independiente:
   id: "cuarto_1234_piso_1",
   nombre: "Piso 1",
   tipo: "pisos",
-  categoria: "piso", 
   padre: "cuarto_1234", // referencia al cuarto/espacio padre
   plantaId: "planta_1",
   x: 0, // centrado horizontalmente (en pixels)

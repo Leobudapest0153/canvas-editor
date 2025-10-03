@@ -8,7 +8,6 @@ import { CM_TO_PX } from '@/inventory-smart/utils/constants'
  * @property {string} id
  * @property {string=} nombre
  * @property {string=} tipo
- * @property {string=} categoria
  * @property {string} plantaId
  * @property {string|null=} padre
  * @property {boolean=} visible

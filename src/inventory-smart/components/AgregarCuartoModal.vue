@@ -72,7 +72,7 @@
                 </div>
 
                 <!-- Tipo (De forma interna se maneja como Categorías) -->
-                <div>
+                <!-- <div>
                   <label class="block text-sm font-medium text-gray-700 mb-2">
                     Tipo de {{ modo }}*
                   </label>
@@ -101,7 +101,7 @@
                   >
                     Selecciona un tipo.
                   </p>
-                </div>
+                </div> -->
 
                 <!-- Bloque específico para espacios: orientación, ubicación y altura en pared -->
                 <template v-if="modo === 'espacio'">
@@ -621,7 +621,7 @@
         </button>
         <button
           @click="guardar"
-          class="bg-primary cursor-pointer px-4 py-2 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          class="bg-primary cursor-pointer px-4 py-2 text-white rounded-lg hover:bg-primary-600 transition-colors"
         >
           Aceptar
         </button>
@@ -657,14 +657,9 @@ import {
 import UiTooltip from './ui/UiTooltip.vue'
 import ProductTypesMultiSelect from './ui/ProductTypesMultiSelect.vue'
 
-
-// Catálogos dinámicos desde el store
 const canvasStore = useCanvasStore()
 const { catalogos } = storeToRefs(canvasStore)
 
-
-
-// Inline tooltip state/logic
 const tooltip = ref({ visible: false, text: '', x: 0, y: 0 })
 let tooltipTimer = null
 const openTooltip = (evt, text) => {
@@ -673,7 +668,6 @@ const openTooltip = (evt, text) => {
   tooltip.value.text = text
   tooltip.value.x = rect.left + rect.width / 2
   tooltip.value.y = rect.top - 8
-  // small delay for hover intention
   tooltipTimer = setTimeout(() => {
     tooltip.value.visible = true
   }, 120)
@@ -683,13 +677,6 @@ const closeTooltip = () => {
   tooltip.value.visible = false
 }
 
-
-// Helpers locales desde catálogos dinámicos
-
-
-
-
-// Props
 const props = defineProps({
   visible: {
     type: Boolean,
@@ -714,7 +701,7 @@ const { showError } = useToast()
 const datosGenerales = ref({
   nombre: '',
   color: '#3B82F6',
-  tipoSeleccionado: '',
+  // tipoSeleccionado: '',
   descripcion: '',
   orientacion: '',
   ubicacion: '',
@@ -736,7 +723,7 @@ const pisosNiveles = ref([])
 
 const touchedGeneral = ref({
   nombre: false,
-  tipoSeleccionado: false,
+  // tipoSeleccionado: false,
   orientacion: false,
   ubicacion: false,
   alturaRespectoAlSuelo: false,
@@ -747,7 +734,7 @@ const touchedGeneral = ref({
   capacidadCarga: false,
 })
 const validNombre = computed(() => datosGenerales.value.nombre.trim() !== '')
-const validTipo = computed(() => datosGenerales.value.tipoSeleccionado !== '')
+// const validTipo = computed(() => datosGenerales.value.tipoSeleccionado !== '')
 const validOrientacion = computed(() => datosGenerales.value.orientacion !== '')
 const validUbicacion = computed(() => datosGenerales.value.ubicacion !== '')
 const validAlturaRespectoAlSuelo = computed(() => {
@@ -807,10 +794,10 @@ const ensureTouchedForLevel = (nivel) => {
   return nivel._touched
 }
 
-const tiposDisponibles = computed(() => {
-  const tipos = props.modo === 'cuarto' ? catalogos.value.tiposCuarto : catalogos.value.tiposEspacio
-  return tipos.filter((t) => t.id !== 'pasillo')
-})
+// const tiposDisponibles = computed(() => {
+//   const tipos = props.modo === 'cuarto' ? catalogos.value.tiposCuarto : catalogos.value.tiposEspacio
+//   return tipos.filter((t) => t.id !== 'pasillo')
+// })
 
 const formasDisponibles = computed(() => {
   return FORMAS_DISPONIBLES
@@ -842,7 +829,8 @@ const esFormularioValido = computed(() => {
   const dg = datosGenerales.value
   const dim = dimensiones.value
 
-  let hasGeneral = dg.nombre.trim() !== '' && dg.tipoSeleccionado !== '' && dg.color && dg.orientacion !== ''
+  // let hasGeneral = dg.nombre.trim() !== '' && dg.tipoSeleccionado !== '' && dg.color && dg.orientacion !== ''
+  let hasGeneral = dg.nombre.trim() !== '' && dg.color && dg.orientacion !== ''
 
   // Para espacios, también validar ubicación y, si es pared, alturaRespectoAlSuelo
   if (props.modo === 'espacio') {
@@ -943,7 +931,7 @@ const inicializarFormulario = () => {
     datosGenerales.value = {
       nombre: dg.nombre || '',
       color: dg.color || '#3B82F6',
-      tipoSeleccionado: dg.tipoSeleccionado || '',
+      // tipoSeleccionado: dg.tipoSeleccionado || '',
       descripcion: dg.descripcion || '',
       orientacion: dg.orientacion || '',
       ubicacion: props.modo === 'espacio' ? (dg.ubicacion || '') : '',
@@ -998,7 +986,7 @@ const inicializarFormulario = () => {
   datosGenerales.value = {
     nombre: '',
     color: '#3B82F6',
-    tipoSeleccionado: '',
+    // tipoSeleccionado: '',
     descripcion: '',
     orientacion: '',
     ubicacion: '',
@@ -1061,7 +1049,7 @@ const eliminarPisoNivel = (index) => {
 const resetTouched = () => {
   touchedGeneral.value = {
     nombre: false,
-    tipoSeleccionado: false,
+    // tipoSeleccionado: false,
     orientacion: false,
     ubicacion: false,
     alturaRespectoAlSuelo: false,

@@ -45,7 +45,7 @@
           </button>
           <button
             type="submit"
-            class="px-4 py-2 cursor-pointer bg-primary text-white rounded-md text-sm hover:bg-primary-800"
+            class="px-4 py-2 cursor-pointer bg-primary text-white rounded-md text-sm hover:bg-primary-600"
           >
             Guardar Etiqueta
           </button>

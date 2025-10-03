@@ -11,7 +11,6 @@ export const exportTemplatesToDTO = (rawTemplates = []) => {
     const nodos = elements.map((el) => ({
       id: el.id,
       tipo: el.tipo || 'elementos',
-      categoria: el.categoria,
       nombre: el.nombre,
       dimensiones: el.dimensiones ? { ...el.dimensiones } : undefined,
       // Para plantillas: guardar coordenadas absolutas (los hijos se renderizan en canvas del padre)
@@ -70,7 +69,6 @@ export const importTemplatesFromDTO = (dtos = []) => {
       const elements = nodos.map(n => ({
         id: n.id,
         tipo: n.tipo,
-        categoria: n.categoria,
         nombre: n.nombre,
         dimensiones: n.dimensiones ? { ...n.dimensiones } : undefined,
         // Para plantillas: usar coordenadas absolutas directamente

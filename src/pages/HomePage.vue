@@ -6,6 +6,7 @@
       :supportedProductTypes="tiposProductoAdmitidos"
       :externalServices="externalServices"
       :author="{ name: 'David Deras', id: '123' }"
+      :themePalette="themePalette"
       @configUpdated="handleConfigUpdated"
       @back="handleBack"
       @printIdentifiers="handlePrintIdentifiers"
@@ -29,6 +30,16 @@ const tiposProductoAdmitidos = ref([
   { id: 'peligrosos', nombre: 'Peligrosos' },
   { id: 'voluminosos', nombre: 'Voluminosos' },
 ])
+
+const themePalette = ref({
+  primary: '#1c1e4d',
+  primaryGray: '#8b98a8',
+  secondary: '#e5e7eb',
+  success: '#4ba345',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+  info: '#0ea5e9',
+})
 
 // Estado inicial de la configuración del canvas
 const initialConfig = ref(null)
