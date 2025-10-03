@@ -390,6 +390,7 @@ export const useStatePersistence = () => {
       storeActions.clearState()
 
       if (!hasHydratedMode && typeof storeActions?.setModoEdicion === 'function') {
+        // Siempre ajustar modo de edición según el snapshot entrante
         storeActions.setModoEdicion(state.modoEdicion === true)
         hasHydratedMode = true
       }
