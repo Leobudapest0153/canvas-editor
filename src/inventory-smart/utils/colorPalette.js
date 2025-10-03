@@ -191,11 +191,9 @@ export function generatePalette(hex) {
       const hexOut = oklchToHexSafe({ L, C, h: base.h })
       result.push({ step, hex: hexOut })
     }
-    console.log('Paleta generada para', baseHex, result)
     return result
   } catch (e) {
     // Fallback extremadamente simple por error: regresar el color base en todos los steps
-    console.warn('generatePalette fallback por error:', e)
     const steps = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
     const baseHex = normalizeHex(hex)
     return steps.map((step) => ({ step, hex: baseHex }))
