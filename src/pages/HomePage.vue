@@ -114,11 +114,30 @@ const externalServices = ref([createContainerProductsService()])
 // Manejador para cuando se actualiza la configuración desde InventorySmart
 const handleConfigUpdated = (nuevaConfig) => {
   try {
+    console.log('\n========== [HomePage] handleConfigUpdated ==========')    
+    console.log('[HomePage] Received config length:', nuevaConfig?.length)
+    
+    // Parse para inspeccionar contenido
+    try {
+      const parsed = JSON.parse(nuevaConfig)
+      console.log('[HomePage] Config contains:')
+      console.log('  - plantas:', parsed.plantas?.length || 0)
+      console.log('  - elementos:', parsed.elementos?.length || 0)
+      console.log('  - plantillas:', parsed.plantillas?.length || 0)
+      console.log('  - catalogItems:', parsed.catalogItems?.length || 0)
+      console.log('  - changeHistory:', parsed.changeHistory ? 'YES' : 'NO')
+      console.log('  - changeHistory entries:', parsed.changeHistory?.entries?.length || 0)
+    } catch (e) {
+      console.error('[HomePage] Could not parse config:', e)
+    }
+    
     // Actualizar la referencia local de la configuración
     currentConfig.value = nuevaConfig
     // DEV: Guardar en localStorage para simular persistencia
     localStorage.setItem(SERIALIZE_CONFIG.STORAGE_KEY, nuevaConfig)
+    console.log('[HomePage] Saved to localStorage')
     initialConfig.value = nuevaConfig
+    console.log('====================================================\n')
 
     // Al implementar aqui se enviaría a la API
   } catch (error) {
@@ -141,14 +160,58 @@ const handlePrintIdentifier = (value) => {
 }
 
 onMounted(() => {
+  // Intercept localStorage.setItem to trace all saves
+  const originalSetItem = localStorage.setItem.bind(localStorage)
+  localStorage.setItem = function(key, value) {
+    if (key === SERIALIZE_CONFIG.STORAGE_KEY) {
+      const stack = new Error().stack
+      console.log('\n\n========== [INTERCEPTOR] localStorage.setItem called ==========')  
+      console.log('[INTERCEPTOR] Key:', key)
+      console.log('[INTERCEPTOR] Value length:', value?.length)
+      
+      try {
+        const parsed = JSON.parse(value)
+        console.log('[INTERCEPTOR] Value contains:')
+        console.log('  - plantas:', parsed.plantas?.length || 0)
+        console.log('  - elementos:', parsed.elementos?.length || 0)
+        console.log('  - plantillas:', parsed.plantillas?.length || 0)
+        console.log('  - catalogItems:', parsed.catalogItems?.length || 0)
+        console.log('  - changeHistory:', parsed.changeHistory ? 'YES' : 'NO')
+        console.log('  - changeHistory entries:', parsed.changeHistory?.entries?.length || 0)
+      } catch (e) {
+        console.error('[INTERCEPTOR] Could not parse value')
+      }
+      
+      console.log('[INTERCEPTOR] Call stack:')
+      console.log(stack)
+      console.log('================================================================\n\n')
+    }
+    return originalSetItem(key, value)
+  }
+  
   // DEV: Simular carga desde localStorage
   const savedConfig = localStorage.getItem(SERIALIZE_CONFIG.STORAGE_KEY)
   if (savedConfig) {
     try {
+      console.log('\n[HomePage onMounted] Loading config from localStorage')
+      try {
+        const parsed = JSON.parse(savedConfig)
+        console.log('[HomePage onMounted] Loaded config contains:')
+        console.log('  - plantas:', parsed.plantas?.length || 0)
+        console.log('  - elementos:', parsed.elementos?.length || 0)
+        console.log('  - plantillas:', parsed.plantillas?.length || 0)
+        console.log('  - catalogItems:', parsed.catalogItems?.length || 0)
+        console.log('  - changeHistory:', parsed.changeHistory ? 'YES' : 'NO')
+        console.log('  - changeHistory entries:', parsed.changeHistory?.entries?.length || 0)
+      } catch (e) {
+        console.error('[HomePage onMounted] Could not parse loaded config')
+      }
       initialConfig.value = savedConfig
     } catch (error) {
       console.error('Error al parsear la configuración guardada:', error)
     }
+  } else {
+    console.log('[HomePage onMounted] No saved config found in localStorage')
   }
 })
 </script>

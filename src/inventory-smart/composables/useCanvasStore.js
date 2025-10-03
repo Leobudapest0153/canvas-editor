@@ -1767,6 +1767,16 @@ const calcularCanvasAdaptativo = (elemento) => {
           parsed.meta.metrics.totalCatalogItems = itemsDTO.length
         }
       }
+      
+      // CRÍTICO: Agregar changeHistory al JSON final (se perdió en _serialize)
+      if (state.changeHistory) {
+        parsed.changeHistory = state.changeHistory
+        if (parsed.meta?.metrics) {
+          parsed.meta.metrics.totalChangeHistoryEntries = 
+            state.changeHistory.entries?.length || 0
+        }
+      }
+      
       return JSON.stringify(parsed, null, 2)
     } catch (e) {
       console.warn('No se pudo post-procesar JSON para plantillas', e)
@@ -1780,106 +1790,121 @@ const calcularCanvasAdaptativo = (elemento) => {
    * @returns {boolean} true si la deserialización fue exitosa
    */
   const deserialize = (jsonString) => {
-    const storeActions = {
-      clearState: () => {
-        plantas.value = []
-        elementos.value = []
-      },
-      addPlanta: (plantaData) => {
-        plantas.value.push(plantaData)
-      },
-      addElemento: (elementoData) => {
-        elementos.value.push(elementoData)
-      },
-      setModoEdicion: (value) => {
-        setModoEdicion(value)
-      },
-      setInitialNavigation: (plantaId, plantaNombre) => {
-        // Establecer la primera planta como activa siempre
-        plantaActiva.value = plantaId
-
-        // Establecer contexto de navegación siempre en la primera planta
-        contextoNavegacion.value = {
-          tipo: 'plantas',
-          id: plantaId,
-          path: [
-            {
-              tipo: 'plantas',
-              id: plantaId,
-              nombre: plantaNombre,
-            },
-          ],
-        }
-
-        // Resetear valores temporales a sus defaults
-        elementoSeleccionado.value = null
-        zoom.value = 1
-        panX.value = 0
-        panY.value = 0
-
-        // Canvas adaptativo se recalculará automáticamente por el watcher
-      }
-    }
-
-  const ok = _deserialize(jsonString, storeActions)
-
-    if (modoEdicion.value !== true) {
-      modoEdicion.value = false
-    }
-
-    // Post-procesar: garantizar que todas las plantas y elementos tengan 'codigo'
+    // Set flag to prevent watchers from persisting incomplete state during deserialization
+    isDeserializing.value = true
+    console.log('[useCanvasStore.deserialize] Setting isDeserializing=true')
+    
     try {
-      // Plantas: asignar códigos únicos incrementando la lista existente a medida que asignamos
-      if (Array.isArray(plantas.value)) {
-        const existentes = plantas.value.filter(p => !!p)
-        const existentesConCodigo = existentes.filter(p => !!p.codigo)
-        for (const p of existentes) {
-          if (!p.codigo) {
-            p.codigo = generateCodigo('plantas', { existing: existentesConCodigo })
-            existentesConCodigo.push(p)
+      const storeActions = {
+        clearState: () => {
+          plantas.value = []
+          elementos.value = []
+        },
+        addPlanta: (plantaData) => {
+          plantas.value.push(plantaData)
+        },
+        addElemento: (elementoData) => {
+          elementos.value.push(elementoData)
+        },
+        setModoEdicion: (value) => {
+          setModoEdicion(value)
+        },
+        setInitialNavigation: (plantaId, plantaNombre) => {
+          // Establecer la primera planta como activa siempre
+          plantaActiva.value = plantaId
+
+          // Establecer contexto de navegación siempre en la primera planta
+          contextoNavegacion.value = {
+            tipo: 'plantas',
+            id: plantaId,
+            path: [
+              {
+                tipo: 'plantas',
+                id: plantaId,
+                nombre: plantaNombre,
+              },
+            ],
+          }
+
+          // Resetear valores temporales a sus defaults
+          elementoSeleccionado.value = null
+          zoom.value = 1
+          panX.value = 0
+          panY.value = 0
+
+          // Canvas adaptativo se recalculará automáticamente por el watcher
+        }
+      }
+
+      const ok = _deserialize(jsonString, storeActions)
+
+      if (modoEdicion.value !== true) {
+        modoEdicion.value = false
+      }
+
+      // Post-procesar: garantizar que todas las plantas y elementos tengan 'codigo'
+      try {
+        // Plantas: asignar códigos únicos incrementando la lista existente a medida que asignamos
+        if (Array.isArray(plantas.value)) {
+          const existentes = plantas.value.filter(p => !!p)
+          const existentesConCodigo = existentes.filter(p => !!p.codigo)
+          for (const p of existentes) {
+            if (!p.codigo) {
+              p.codigo = generateCodigo('plantas', { existing: existentesConCodigo })
+              existentesConCodigo.push(p)
+            }
           }
         }
-      }
-      // Elementos
-      if (Array.isArray(elementos.value)) {
-        for (const el of elementos.value) {
-          try { assignCodigoNombre(el, elementos.value) } catch { /* ignore */ }
-        }
-      }
-    } catch (e) {
-      console.warn('Post-procesamiento de codigo/nombre tras deserializar falló:', e)
-    }
-
-    // Importar plantillas si existen (retrocompatible)
-    try {
-      const parsed = JSON.parse(jsonString)
-      // Importar historial de cambios si viene
-      try {
-        if (parsed.changeHistory) {
-          const ch = useChangeHistoryStore?.()
-          ch?.deserialize?.(parsed.changeHistory)
-          ch?.setBaseline?.({ plantas: plantas.value, elementos: elementos.value })
+        // Elementos
+        if (Array.isArray(elementos.value)) {
+          for (const el of elementos.value) {
+            try { assignCodigoNombre(el, elementos.value) } catch { /* ignore */ }
+          }
         }
       } catch (e) {
-        // ignore change history import errors
+        console.warn('Post-procesamiento de codigo/nombre tras deserializar falló:', e)
       }
-      if (Array.isArray(parsed.plantillas) && parsed.plantillas.length > 0) {
-        importTemplatesFromDTO(parsed.plantillas)
-      }
-      if (Array.isArray(parsed.catalogItems) && parsed.catalogItems.length > 0) {
-        importCatalogItemsFromDTO(parsed.catalogItems)
-      }
-    } catch (e) {
-      console.warn('No se pudieron importar plantillas', e)
-    }
 
-    try {
-      recomputePasilloAssignments()
-    } catch (e) {
-      console.warn('No se pudieron recalcular asignaciones de pasillo tras deserializar', e)
-    }
+      // Importar plantillas si existen (retrocompatible)
+      try {
+        const parsed = JSON.parse(jsonString)
+        // Importar historial de cambios si viene
+        try {
+          if (parsed.changeHistory) {
+            const ch = useChangeHistoryStore?.()
+            ch?.deserialize?.(parsed.changeHistory)
+            ch?.setBaseline?.({ plantas: plantas.value, elementos: elementos.value })
+          }
+        } catch (e) {
+          // ignore change history import errors
+        }
+        console.log('[useCanvasStore.deserialize] Processing plantillas and catalogItems')
+        if (Array.isArray(parsed.plantillas) && parsed.plantillas.length > 0) {
+          console.log('[useCanvasStore.deserialize] Importing', parsed.plantillas.length, 'templates')
+          importTemplatesFromDTO(parsed.plantillas)
+        }
+        if (Array.isArray(parsed.catalogItems) && parsed.catalogItems.length > 0) {
+          console.log('[useCanvasStore.deserialize] Importing', parsed.catalogItems.length, 'catalogItems')
+          importCatalogItemsFromDTO(parsed.catalogItems)
+        } else {
+          console.log('[useCanvasStore.deserialize] No catalogItems to import')
+        }
+      } catch (e) {
+        console.warn('No se pudieron importar plantillas', e)
+      }
 
-    return ok
+      try {
+        recomputePasilloAssignments()
+      } catch (e) {
+        console.warn('No se pudieron recalcular asignaciones de pasillo tras deserializar', e)
+      }
+
+      return ok
+    } finally {
+      // Always reset the flag, even if deserialization fails
+      isDeserializing.value = false
+      console.log('[useCanvasStore.deserialize] Setting isDeserializing=false')
+    }
   }
 
   // === FIN FUNCIONES DE SERIALIZACIÓN ===
@@ -2719,14 +2744,17 @@ const calcularCanvasAdaptativo = (elemento) => {
     { immediate: true },
   )
 
+  // Flag to prevent persist during deserialization
+  const isDeserializing = ref(false)
+
   watch(
     () => modoEdicion.value,
     () => {
-      try {
-        persist()
-      } catch (error) {
-        console.warn('No se pudo persistir el modo de edición', error)
-      }
+      // DISABLED: This watcher was causing data loss by persisting incomplete state
+      // Persistence now only happens via explicit save actions ("Guardar" button)
+      // The persist() function only saves plantas, elementos, and modoEdicion,
+      // but NOT plantillas, catalogItems, or changeHistory, causing data loss.
+      console.log('[useCanvasStore] modoEdicion changed to:', modoEdicion.value, '(auto-persist disabled)')
     },
   )
 

@@ -779,6 +779,8 @@ const guardarCambios = async () => {
       showToast('No puedes guardar si hay cambios pendientes de guardar', 'warn');
       return;
     }
+    console.log('\n========== [PlantasPanel] guardarCambios ==========')    
+    
     // Capturar snapshot para historial de cambios ANTES de serializar
     try {
       const changeHistoryStore = useChangeHistoryStore()
@@ -794,7 +796,24 @@ const guardarCambios = async () => {
     }
 
     const configSerializada = canvasStore.serialize(true)
+    
+    // Parse para inspeccionar contenido
+    try {
+      const parsed = JSON.parse(configSerializada)
+      console.log('[PlantasPanel] Serialized config contains:')
+      console.log('  - plantas:', parsed.plantas?.length || 0)
+      console.log('  - elementos:', parsed.elementos?.length || 0)
+      console.log('  - plantillas:', parsed.plantillas?.length || 0)
+      console.log('  - catalogItems:', parsed.catalogItems?.length || 0)
+      console.log('  - changeHistory:', parsed.changeHistory ? 'YES' : 'NO')
+      console.log('  - changeHistory entries:', parsed.changeHistory?.entries?.length || 0)
+    } catch (e) {
+      console.error('[PlantasPanel] Could not parse serialized config:', e)
+    }
+    
     emit('configChanged', configSerializada)
+    console.log('[PlantasPanel] Emitted configChanged event')
+    console.log('====================================================\n')
     showToast('Cambios guardados correctamente', 'success')
   } catch (error) {
     console.error('Error al guardar cambios:', error)

@@ -110,7 +110,11 @@ export const useCatalogStore = defineStore('catalog', () => {
         })
         // Preservar id y props del item original
         mapped.id = it.id
-        mapped.props = { ...(mapped.props || {}), ...(it.props || {}) }
+        mapped.props = { 
+          ...(mapped.props || {}), 
+          ...(it.props || {}),
+          source: 'predefined' // Marcar como predefinido
+        }
         mapped.createdAt = mapped.createdAt || new Date().toISOString()
         mapped.updatedAt = mapped.updatedAt || new Date().toISOString()
         return mapped
@@ -130,12 +134,26 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   // Función para actualizar elementos predefinidos desde props
   const setPredefinedElements = (predefinedElements) => {
+    // Guardar items de usuario antes de actualizar predefinidos
+    const userItems = items.value.filter(i => i?.props?.source === 'user')
+    console.log('[CatalogStore] setPredefinedElements called')
+    console.log('  - Current items count:', items.value.length)
+    console.log('  - User items found:', userItems.length, userItems.map(i => i.id))
+    
+    // Obtener nuevos predefinidos
+    let newPredefined = []
     if (predefinedElements && Array.isArray(predefinedElements)) {
-      items.value = normalizePredefined(predefinedElements)
+      newPredefined = normalizePredefined(predefinedElements)
     } else {
       // Si no se proporcionan elementos, usar los por defecto
-      items.value = normalizePredefined(ELEMENTOS_PREDEFINIDOS)
+      newPredefined = normalizePredefined(ELEMENTOS_PREDEFINIDOS)
     }
+    
+    console.log('  - Predefined items:', newPredefined.length)
+    
+    // Mezclar: predefinidos + items de usuario
+    items.value = [...newPredefined, ...userItems]
+    console.log('  - Final items count:', items.value.length)
   }
 
   const baseSystemGuard = (item) =>

@@ -84,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, provide } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, provide, nextTick } from 'vue'
 import SidebarPanel from './components/SidebarPanel.vue'
 import CanvasView from './components/CanvasView.vue'
 import PlantasPanel from './components/PlantasPanel.vue'
@@ -285,14 +285,31 @@ const canvasViewRef = ref(null)
 // Manejador para cuando PlantasPanel emite cambios de configuración
 const handleConfigChanged = (configSerializada) => {
   try {
+    console.log('\n========== [InventorySmart] handleConfigChanged ==========')    
     // Validar que se recibió una configuración
     if (!configSerializada) {
       console.warn('No se recibió configuración para actualizar')
       return
     }
 
+    // Parse para inspeccionar contenido
+    try {
+      const parsed = JSON.parse(configSerializada)
+      console.log('[InventorySmart] Config contains:')
+      console.log('  - plantas:', parsed.plantas?.length || 0)
+      console.log('  - elementos:', parsed.elementos?.length || 0)
+      console.log('  - plantillas:', parsed.plantillas?.length || 0)
+      console.log('  - catalogItems:', parsed.catalogItems?.length || 0)
+      console.log('  - changeHistory:', parsed.changeHistory ? 'YES' : 'NO')
+      console.log('  - changeHistory entries:', parsed.changeHistory?.entries?.length || 0)
+    } catch (e) {
+      console.error('[InventorySmart] Could not parse config:', e)
+    }
+
     // Emitir al componente padre la configuración actualizada
     emit('configUpdated', configSerializada)
+    console.log('[InventorySmart] Emitted configUpdated to parent')
+    console.log('====================================================\n')
     // Registrar última config emitida para evitar rehidratación inmediata en eco del padre
     // lastAppliedConfig.value = configSerializada
 
@@ -379,10 +396,28 @@ const continueUnloadFlow = () => {
 const saveAndExit = () => {
   const reason = pendingExitReason.value
   try {
+    console.log('\n========== [InventorySmart] saveAndExit ==========')    
     const json = canvasStore.serialize(true)
+    
+    // Parse para inspeccionar contenido
+    try {
+      const parsed = JSON.parse(json)
+      console.log('[InventorySmart] Serialized config contains:')
+      console.log('  - plantas:', parsed.plantas?.length || 0)
+      console.log('  - elementos:', parsed.elementos?.length || 0)
+      console.log('  - plantillas:', parsed.plantillas?.length || 0)
+      console.log('  - catalogItems:', parsed.catalogItems?.length || 0)
+      console.log('  - changeHistory:', parsed.changeHistory ? 'YES' : 'NO')
+      console.log('  - changeHistory entries:', parsed.changeHistory?.entries?.length || 0)
+    } catch (e) {
+      console.error('[InventorySmart] Could not parse serialized config:', e)
+    }
+    
     // Registrar última config emitida para evitar eco inmediato
     // lastAppliedConfig.value = json
     emit('configUpdated', json)
+    console.log('[InventorySmart] Emitted configUpdated to parent')
+    console.log('====================================================\n')
   } catch (e) {
     console.warn('Error serializando antes de salir', e)
   }
@@ -504,20 +539,35 @@ useEditorShortcuts({
 // Hidratar SIEMPRE ante cambios de la prop configCanvas (reacciona a cambios externos)
 watch(
   () => props.configCanvas,
-  (json) => {
+  async (json) => {
     if (typeof json !== 'string' || json.trim().length === 0) return
     // Evitar reimportar exactamente la misma configuración ya aplicada
     // if (json === lastAppliedConfig.value) return
     try {
+      isDeserializing.value = true
+      console.log('[InventorySmart] Starting deserialization')
+      
       const ok = canvasStore.deserialize(json)
+      
       if (!ok) {
         showToast('No se pudo importar la configuración', 'error')
       } else {
         // lastAppliedConfig.value = json
+        console.log('[InventorySmart] Deserialization complete')
       }
+      
+      // Esperar un tick para que todo se estabilice
+      await nextTick()
+      
+      // Ahora sí actualizar predefinidos (mezclará con los items de usuario ya importados)
+      isDeserializing.value = false
+      console.log('[InventorySmart] Calling setPredefinedElements after deserialization')
+      catalogStore.setPredefinedElements(props.predefinedElements)
+      
     } catch (e) {
       console.error('Error deserializando configCanvas:', e)
       showToast('Error al importar la configuración', 'error')
+      isDeserializing.value = false
     }
   },
   { immediate: true }
@@ -555,9 +605,17 @@ onUnmounted(() => {
   }
 })
 
+// Track si estamos deserializando para evitar sobrescribir catalogItems
+const isDeserializing = ref(false)
+
 watch(
   () => props.predefinedElements,
   (newElements) => {
+    // No actualizar predefinidos mientras deserializamos
+    if (isDeserializing.value) {
+      console.log('[InventorySmart] Skipping setPredefinedElements (deserializing)')
+      return
+    }
     try {
       catalogStore.setPredefinedElements(newElements)
     } catch (error) {

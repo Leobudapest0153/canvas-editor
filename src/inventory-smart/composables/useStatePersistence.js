@@ -75,6 +75,14 @@ export const useStatePersistence = () => {
           activa: Boolean(planta.activa),
           // Nuevo: flag de planta elástica (persistir si true; fallback false)
           isInfinite: planta.isInfinite === true,
+
+          // CRÍTICO: Código único de la planta
+          codigo: planta.codigo || null,
+
+          // Timestamps para auditoría
+          createdAt: planta.createdAt || new Date().toISOString(),
+          updatedAt: planta.updatedAt || new Date().toISOString(),
+
           propiedadesPersonalizadas: planta.propiedadesPersonalizadas || {},
         }
       }),
@@ -161,6 +169,25 @@ export const useStatePersistence = () => {
           // Jerarquía
           padre: elemento.padre || null,
           hijos: Array.isArray(elemento.hijos) ? elemento.hijos : [],
+
+          // CRÍTICO: Código único del elemento
+          codigo: elemento.codigo || null,
+
+          // CRÍTICO: Asignación de pasillo
+          pasilloId: elemento.pasilloId || null,
+
+          // Timestamps para auditoría
+          createdAt: elemento.createdAt || new Date().toISOString(),
+          updatedAt: elemento.updatedAt || new Date().toISOString(),
+
+          // Configuración de espacios/contenedores
+          tiposProductos: Array.isArray(elemento.tiposProductos) ? elemento.tiposProductos : [],
+          tipoZona: elemento.tipoZona || null,
+          permiteFragiles: Boolean(elemento.permiteFragiles),
+
+          // Props y metadatos del catálogo
+          props: elemento.props || {},
+          meta: elemento.meta || {},
 
           // Propiedades personalizadas
           propiedadesPersonalizadas: elemento.propiedadesPersonalizadas || {},
@@ -414,6 +441,14 @@ export const useStatePersistence = () => {
             activa: plantaData.activa === true,
             // Nuevo: flag de planta elástica (fallback false si no viene)
             isInfinite: plantaData.isInfinite === true,
+
+            // CRÍTICO: Código único (se regenerará si no existe)
+            codigo: plantaData.codigo || null,
+
+            // Timestamps
+            createdAt: plantaData.createdAt || new Date().toISOString(),
+            updatedAt: plantaData.updatedAt || new Date().toISOString(),
+
             propiedadesPersonalizadas: plantaData.propiedadesPersonalizadas || {},
           }
 
@@ -535,6 +570,27 @@ export const useStatePersistence = () => {
             // Jerarquía (se validará la consistencia después)
             padre: elementoData.padre || null,
             hijos: Array.isArray(elementoData.hijos) ? elementoData.hijos : [],
+
+            // CRÍTICO: Código único (se regenerará si no existe)
+            codigo: elementoData.codigo || null,
+
+            // CRÍTICO: Asignación de pasillo (se recalculará después)
+            pasilloId: elementoData.pasilloId || null,
+
+            // Timestamps
+            createdAt: elementoData.createdAt || new Date().toISOString(),
+            updatedAt: elementoData.updatedAt || new Date().toISOString(),
+
+            // Configuración de espacios/contenedores
+            tiposProductos: Array.isArray(elementoData.tiposProductos) 
+              ? elementoData.tiposProductos 
+              : [],
+            tipoZona: elementoData.tipoZona || null,
+            permiteFragiles: Boolean(elementoData.permiteFragiles),
+
+            // Props y metadatos del catálogo
+            props: elementoData.props || {},
+            meta: elementoData.meta || {},
 
             propiedadesPersonalizadas: elementoData.propiedadesPersonalizadas || {},
           }
