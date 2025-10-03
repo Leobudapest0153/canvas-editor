@@ -39,6 +39,46 @@ export function circleCircleContact(c1, r1, c2, r2, EPS = EPSILON * 10) {
   return 'separate';
 }
 
+export function circleCircleMTD(c1, r1, c2, r2, tolerance = EPSILON * 10) {
+  const dx = c1.x - c2.x;
+  const dy = c1.y - c2.y;
+  const distSq = dx * dx + dy * dy;
+  const dist = Math.sqrt(distSq);
+  const sum = (r1 || 0) + (r2 || 0);
+  const penetration = sum - dist;
+
+  if (distSq === 0) {
+    if (penetration <= tolerance) {
+      return { dx: 0, dy: 0, penetration: 0, normal: { x: 1, y: 0 } };
+    }
+    const clampedPenetration = Math.max(penetration, 0);
+    const normal = { x: 1, y: 0 };
+    return {
+      dx: normal.x * clampedPenetration,
+      dy: normal.y * clampedPenetration,
+      penetration: clampedPenetration,
+      normal
+    };
+  }
+
+  const invDist = dist > EPSILON ? 1 / dist : 0;
+  const normal = invDist > 0
+    ? { x: dx * invDist, y: dy * invDist }
+    : { x: 1, y: 0 };
+
+  if (penetration <= tolerance) {
+    return { dx: 0, dy: 0, penetration: 0, normal };
+  }
+
+  const amount = penetration;
+  return {
+    dx: normal.x * amount,
+    dy: normal.y * amount,
+    penetration: amount,
+    normal
+  };
+}
+
 /**
  * Extrae las propiedades geométricas de un elemento circular
  * @param {Object} element - Elemento del canvas
@@ -77,15 +117,38 @@ export function detectCircleCircleCollision(elementA, elementB, tolerance = EPSI
     return null; // Al menos uno no es circular
   }
 
+  const centerDistance = distance(geomA.center, geomB.center);
   const contact = circleCircleContact(geomA.center, geomA.radius, geomB.center, geomB.radius, tolerance);
+  const hasOverlap = contact === 'overlap';
+  const radiusSum = geomA.radius + geomB.radius;
+  const penetration = hasOverlap ? Math.max(0, radiusSum - centerDistance) : 0;
+
+  let normal = { x: 0, y: 0 };
+  if (centerDistance > EPSILON) {
+    const invDist = 1 / centerDistance;
+    normal = {
+      x: (geomA.center.x - geomB.center.x) * invDist,
+      y: (geomA.center.y - geomB.center.y) * invDist
+    };
+  } else {
+    normal = { x: 1, y: 0 };
+  }
+
+  const separation = hasOverlap
+    ? { dx: normal.x * penetration, dy: normal.y * penetration }
+    : { dx: 0, dy: 0 };
 
   return {
-    hasOverlap: contact === 'overlap',
+    hasOverlap,
     contact,
     geometryA: geomA,
-    geometryB: geomB
+    geometryB: geomB,
+    penetration,
+    normal,
+    separation
   };
 }
+
 
 /**
  * Verifica si dos elementos son circulares

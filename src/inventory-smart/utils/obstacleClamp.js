@@ -31,6 +31,21 @@ function approxEqual(a, b, eps = EPS) {
   return Math.abs(a - b) <= eps
 }
 
+function circlePairOptions(movingEl, x, y, w, h, other) {
+  if (movingEl?.forma !== 'circular' || other?.forma !== 'circular') return undefined
+  const radiusA = Math.min(w, h) / 2
+  const radiusB = Math.min(other.width || 0, other.height || 0) / 2
+  if (radiusA <= 0 || radiusB <= 0) return undefined
+  return {
+    isCircleA: true,
+    isCircleB: true,
+    centerA: { x: x + w / 2, y: y + h / 2 },
+    centerB: { x: other.x + (other.width || 0) / 2, y: other.y + (other.height || 0) / 2 },
+    radiusA,
+    radiusB
+  }
+}
+
 export function resolveBlockingOverlap({
   candidate,
   movingEl,
@@ -74,7 +89,8 @@ export function resolveBlockingOverlap({
       const res = evaluateConflict(movingNow, n)
       if (!res || !res.bloqueante) continue
       foundBlocking = true
-      const { dx, dy } = computeMTD(x, y, w, h, n.x, n.y, n.width, n.height)
+      const circleOpts = circlePairOptions(movingEl, x, y, w, h, n)
+      const { dx, dy } = computeMTD(x, y, w, h, n.x, n.y, n.width, n.height, circleOpts)
       accDx += dx
       accDy += dy
     }
