@@ -12,7 +12,6 @@ const addElement = (store, el) => {
     id: el.id,
     nombre: el.nombre || el.id,
     tipo: el.tipo || 'elementos',
-    categoria: el.categoria || 'anaqueles',
     x: el.x || 0,
     y: el.y || 0,
     width: el.width || 50,

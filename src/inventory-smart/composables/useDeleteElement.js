@@ -349,8 +349,7 @@ export function useDeleteElement() {
     const childElementsWithUsage = () => {
       const parent = store.elementos.find(el => el.id== selectedId);
 
-
-      if (parent.categoria === 'contenedores' && parent.uso && (parent.uso.volumen > 0 || parent.uso.peso > 0)) {
+      if (parent.tipo === 'contenedores' && parent.uso && (parent.uso.volumen > 0 || parent.uso.peso > 0)) {
         return true;
       }
 
@@ -365,7 +364,7 @@ export function useDeleteElement() {
           return false;
         }
 
-        const isContainer = hijo.categoria === 'contenedores';
+        const isContainer = hijo.tipo === 'contenedores';
         const hasUsage = hijo.uso && (hijo?.uso?.volumen > 0) || (hijo?.uso?.peso > 0);
 
         return isContainer && hasUsage;
@@ -690,12 +689,12 @@ const deleteAndCompact = async ({ id = null, withConfirm = true } = {}) => {
   // 6) Validar uso en contenedores (igual a deleteSelected)
   const hasUsage = (() => {
     const parent = store.elementos.find(el => el.id === targetId)
-    if (parent?.categoria === 'contenedores' && parent.uso && ((parent.uso.volumen ?? 0) > 0 || (parent.uso.peso ?? 0) > 0)) return true
+    if (parent?.tipo === 'contenedores' && parent.uso && ((parent.uso.volumen ?? 0) > 0 || (parent.uso.peso ?? 0) > 0)) return true
     if (!parent || !parent.hijos || parent.hijos.length === 0) return false
     return parent.hijos.some(hijoId => {
       const hijo = store.elementos.find(el => el.id === hijoId)
       if (!hijo) return false
-      const isContainer = hijo.categoria === 'contenedores'
+      const isContainer = hijo.tipo === 'contenedores'
       const has = hijo.uso && ((hijo?.uso?.volumen ?? 0) > 0 || (hijo?.uso?.peso ?? 0) > 0)
       return isContainer && has
     })

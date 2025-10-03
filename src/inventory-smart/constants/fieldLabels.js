@@ -2,26 +2,14 @@
 // Añade aquí cualquier nuevo campo que deba tener una etiqueta amigable en español
 
 import {
-  DEFAULT_TIPOS_ESPACIO,
-  DEFAULT_TIPOS_CUARTO,
-  DEFAULT_TIPOS_CONTENEDOR,
-  DEFAULT_TIPOS_PISO,
+  TIPOS_ENTIDAD
 } from '../utils/constants'
 
 /**
- * Obtiene el nombre amigable de un tipo desde DEFAULT_TIPOS_ESPACIO
+ * Obtiene el nombre amigable de un tipo desde TIPOS_ENTIDAD
  */
 const getTipoNombre = (tipoId) => {
-  let tipo = DEFAULT_TIPOS_ESPACIO.find((t) => t.id === tipoId)
-  if (tipo) return tipo.nombre
-  // Buscar en tipos específicos
-  tipo = DEFAULT_TIPOS_CUARTO.find((t) => t.id === tipoId)
-  if (tipo) return tipo.nombre
-  tipo = DEFAULT_TIPOS_CONTENEDOR.find((t) => t.id === tipoId)
-  if (tipo) return tipo.nombre
-  tipo = DEFAULT_TIPOS_PISO.find((t) => t.id === tipoId)
-  if (tipo) return tipo.nombre
-  return tipo ? tipo.nombre : tipoId
+  return TIPOS_ENTIDAD.find((t) => t.id === tipoId)?.nombre || tipoId
 }
 
 export const FIELD_LABELS = {
@@ -31,7 +19,6 @@ export const FIELD_LABELS = {
   nombre: 'Nombre',
   descripcion: 'Descripción',
   tipo: 'Tipo',
-  categoria: 'Tipo',
   codigo: 'Código',
   codigoEsl: 'Código ESL',
 

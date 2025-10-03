@@ -58,6 +58,21 @@ function dominantAxisFromVelocity(vx, vy) {
   return Math.abs(vx || 0) >= Math.abs(vy || 0) ? 'x' : 'y'
 }
 
+function circlePairOptions(movingEl, x, y, w, h, other) {
+  if (movingEl?.forma !== 'circular' || other?.forma !== 'circular') return undefined
+  const radiusA = Math.min(w, h) / 2
+  const radiusB = Math.min(other.width || 0, other.height || 0) / 2
+  if (radiusA <= 0 || radiusB <= 0) return undefined
+  return {
+    isCircleA: true,
+    isCircleB: true,
+    centerA: { x: x + w / 2, y: y + h / 2 },
+    centerB: { x: other.x + (other.width || 0) / 2, y: other.y + (other.height || 0) / 2 },
+    radiusA,
+    radiusB
+  }
+}
+
 // Resuelve una posición candidata aplicando:
 // - clamp de borde (si no es elástico)
 // - iteraciones de GS por eje (MTD proyectada) contra TODOS los bloqueantes
@@ -107,9 +122,12 @@ export function solveDragPosition({
           const otherId = b.aId === movingEl.id ? b.bId : b.aId
           const other = pool.find((n) => n.id === otherId)
           if (!other) continue
-          let { dx, dy } = computeMTD(x, y, aw, ah, other.x, other.y, other.width, other.height)
-          if (axis === 'x') dy = 0
-          else dx = 0
+          const circleOpts = circlePairOptions(movingEl, x, y, aw, ah, other)
+          let { dx, dy } = computeMTD(x, y, aw, ah, other.x, other.y, other.width, other.height, circleOpts)
+          if (!circleOpts) {
+            if (axis === 'x') dy = 0
+            else dx = 0
+          }
           if (Math.abs(dx) > 1e-6 || Math.abs(dy) > 1e-6) {
             x += dx
             y += dy
