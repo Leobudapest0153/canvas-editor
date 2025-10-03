@@ -185,13 +185,6 @@ const resolveBusinessPriority = (pasillo) => {
     if (normalized != null) return normalized
   }
 
-  if (typeof pasillo.categoria === 'string') {
-    const lowered = pasillo.categoria.toLowerCase()
-    for (const [label, value] of PRIORITY_LABELS) {
-      if (lowered.includes(label)) return value
-    }
-  }
-
   return null
 }
 

@@ -8,7 +8,7 @@ const deepClone = (obj) => JSON.parse(JSON.stringify(obj || null))
 // Campos considerados para diffs de elementos y plantas
 const FIELDS_PLANTA = ['nombre', 'descripcion', 'dimensiones', 'capacidadCargaSoportado']
 const FIELDS_ELEMENTO = [
-  'nombre', 'categoria', 'dimensiones',
+  'nombre', 'dimensiones',
   'alturaRespectoAlSuelo', 'orientacion', 'hijos', 'codigo', 'codigoEsl',
   'x', 'y', 'posicion'
 ]

@@ -97,7 +97,6 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'pasillo_base',
     nombre: 'Pasillo',
     tipo: 'pasillos',
-    categoria: 'pasillo',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#EDEDED',
@@ -117,7 +116,6 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'cuarto_frio',
     nombre: 'Cuarto frío',
     tipo: 'cuartos',
-    categoria: 'almacenamiento',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#e0f2fe',
@@ -145,7 +143,6 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'piso_base',
     nombre: 'Piso',
     tipo: 'pisos',
-    categoria: 'pisos',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#f1f5f9',
@@ -165,7 +162,6 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'anaquel_metalico_grande',
     nombre: 'Anaquel',
     tipo: 'elementos',
-    categoria: 'anaquel_metal',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#3b82f6',
@@ -193,7 +189,6 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'estante_pared_pequeno',
     nombre: 'Estante de Pared',
     tipo: 'elementos',
-    categoria: 'estante_madera',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#10b981',
@@ -222,7 +217,6 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'armario_pared_alto',
     nombre: 'Armario de Pared Alto',
     tipo: 'elementos',
-    categoria: 'armario',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#7c3aed',
@@ -251,7 +245,6 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'barril_basico',
     nombre: 'Barril',
     tipo: 'elementos',
-    categoria: 'barril',
     forma: 'circular',
     orientacion: 0,
     colorBase: '#f97316',
@@ -279,7 +272,6 @@ export const ELEMENTOS_PREDEFINIDOS = [
     id: 'nivel_base',
     nombre: 'Nivel Base',
     tipo: 'contenedores',
-    categoria: 'nivel',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#F0FAFF',
@@ -322,20 +314,6 @@ export const TIPOS_ZONA_ESPACIO = [
   { id: 'picking', nombre: 'Zona de picking' }
 ]
 
-// == Catálogos default (reales vendrán de la configuración)
-export const DEFAULT_TIPOS_ESPACIO = [
-  { id: 'anaquel_metal', nombre: 'Anaquel metal' },
-  { id: 'estante_madera', nombre: 'Estante madera' },
-  { id: 'repisa_aluminio', nombre: 'Repisa aluminio' },
-  { id: 'barril', nombre: 'Barril' },
-  { id: 'armario', nombre: 'Armario' },
-  { id: 'pasillo', nombre: 'Pasillo' },
-]
-export const DEFAULT_TIPOS_CUARTO = [
-  { id: 'almacenamiento', nombre: 'Zona de almacenaje' },
-  { id: 'zona_de_descarga', nombre: 'Zona de Descarga' },
-  { id: 'almacenaje', nombre: 'Almacenaje' },
-]
 export const DEFAULT_TIPOS_PRODUCTO_ADMITIDOS = [
   { id: 'secos', nombre: 'Productos secos' },
   { id: 'refrigerados', nombre: 'Refrigerados' },
@@ -345,47 +323,12 @@ export const DEFAULT_TIPOS_PRODUCTO_ADMITIDOS = [
   { id: 'voluminosos', nombre: 'Voluminosos' },
 ]
 
-// == Catálogos default
-
-export const DEFAULT_TIPOS_CONTENEDOR = [{ id: 'nivel', nombre: 'Nivel' }]
-
-export const DEFAULT_TIPOS_PISO = [{ id: 'piso', nombre: 'Piso' }]
-
-export const TODAS_LAS_CATEGORIAS = [...DEFAULT_TIPOS_CUARTO, ...DEFAULT_TIPOS_ESPACIO, ...DEFAULT_TIPOS_CONTENEDOR, ...DEFAULT_TIPOS_PISO]
-
 export const ORIENTACIONES = [
   { id: '0', nombre: 'Abajo' },
   { id: '90', nombre: 'Derecha' },
   { id: '180', nombre: 'Arriba' },
   { id: '270', nombre: 'Izquierda' },
 ]
-
-export const puedeContener = (tipoPadre, tipoHijo) => {
-  return JERARQUIA_PERMITIDA[tipoPadre]?.includes(tipoHijo) || false
-}
-
-export const getColorPorTipo = (tipo) => {
-  const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
-  return tipoInfo?.color || '#6b7280'
-}
-
-export const getColorPorCategoria = (categoriaId) => {
-  const cat = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
-  return cat?.color || '#3b82f6'
-}
-
-export const getIconoPorTipo = (tipo) => {
-  const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
-  return tipoInfo?.icono || '📦'
-}
-
-export const getColorCategoria = (categoriaId) => {
-  // Buscar categoria, su tipo y devolver color
-  const cat = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
-  if (!cat) return '#6b7280'
-  const tipoInfo = TIPOS_ENTIDAD.find((t) => puedeContener(t.id, cat.id))
-  return tipoInfo?.color || '#6b7280'
-}
 
 // Tolerancia para colisiones y ajustes
 export const TOLERANCE_CM = 0.1

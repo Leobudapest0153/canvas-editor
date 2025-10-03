@@ -56,29 +56,6 @@
                 :disabled="isSaving || isElementRestricted"
               />
             </div>
-            <div class="grid grid-cols-1 gap-3">
-              <!-- <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-                <input
-                  :value="getTipoNombre(elementoSeleccionado.tipo)"
-                  type="text"
-                  disabled
-                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed"
-                />
-              </div> -->
-              <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-                <select
-                  v-model="edited.categoria"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm capitalize"
-                >
-                  <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                    {{ cat.nombre }}
-                  </option>
-                </select>
-              </div>
-            </div>
-
             <div v-if="!esPasillo">
               <label class="block text-xs font-medium text-gray-600 mb-1">Color</label>
               <div class="flex items-center gap-3">
@@ -538,7 +515,7 @@ const emit = defineEmits(['showIdentifier'])
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
-import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, ORIENTACIONES } from '@/inventory-smart/utils/constants'
+import { TIPOS_ENTIDAD, CM_TO_PX, ORIENTACIONES } from '@/inventory-smart/utils/constants'
 import { deepClone, deepEqual, makePatch } from '@/inventory-smart/utils/object'
 import { useToast } from '@/inventory-smart/composables/useToast.js'
 import ContainerProductsList from './ContainerProductsList.vue'
@@ -613,7 +590,6 @@ const cargarDesdeStore = (el) =>
     tags: Array.isArray(el.etiquetas) ? [...el.etiquetas] : [],
     // Propiedad ESL
     codigoEsl: el.codigoEsl || '',
-    categoria: el.categoria
   })// Estado para trackear valores previos y evitar validaciones innecesarias
 const valorDimensionAnterior = ref({})
 const valorPesoAnterior = ref(0)
@@ -1218,16 +1194,6 @@ const getTipoNombre = (tipo) => {
   return TIPOS_ENTIDAD.find((t) => t.id === tipo)?.nombre || tipo
 }
 
-const categories = computed(() => {
-  if (elementoSeleccionado.value.tipo === 'cuartos') {
-    return DEFAULT_TIPOS_CUARTO;
-  }
-  if (elementoSeleccionado.value.tipo === 'elementos') {
-    return DEFAULT_TIPOS_ESPACIO;
-  }
-  return [];
-});
-
 const getTipoNombrePadre = () => {
   const { padreId, padreType } = padreContext.value
   if (!padreId || !padreType) return 'elemento'
@@ -1265,12 +1231,8 @@ const getTipoNombreActual = () => {
   return `del ${getTipoNombre(tipo)}`
 }
 
-const getCategoriaDisplay = (categoria) => {
-  return TODAS_LAS_CATEGORIAS.find((c) => c.id === categoria)?.nombre || categoria
-}
-
 const esEstructura = computed(() => {
-  const cat = elementoSeleccionado.value?.categoria
+  const cat = elementoSeleccionado.value?.tipo
   return cat !== 'contenedores' && cat !== 'pasillos'
 })
 

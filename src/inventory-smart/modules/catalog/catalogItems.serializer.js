@@ -12,7 +12,6 @@ export const exportCatalogItemsToDTO = (items = []) => {
       const nodos = elements.map(el => ({
         id: el.id,
         tipo: el.tipo || 'elementos',
-        categoria: el.categoria,
         nombre: el.nombre,
         dimensiones: el.dimensiones ? { ...el.dimensiones } : undefined,
         // Para catálogo: guardar coordenadas absolutas (los hijos se renderizan en canvas del padre)
@@ -39,7 +38,6 @@ export const exportCatalogItemsToDTO = (items = []) => {
         descripcion: i.descripcion,
         catalogKind: i.catalogKind,
         tipo: i.tipo,
-        categoria: i.categoria,
         color: i.color || i.colorBase,
         colorBase: i.colorBase || i.color,
         icono: i.icono,
@@ -66,7 +64,6 @@ export const importCatalogItemsFromDTO = (dtos = []) => {
       const elements = nodos.map(n => ({
         id: n.id,
         tipo: n.tipo,
-        categoria: n.categoria,
         nombre: n.nombre,
         dimensiones: n.dimensiones ? { ...n.dimensiones } : undefined,
         // Para catálogo: usar coordenadas absolutas directamente
@@ -93,7 +90,6 @@ export const importCatalogItemsFromDTO = (dtos = []) => {
         descripcion: dto.descripcion,
         catalogKind: dto.catalogKind,
         tipo: dto.tipo,
-        categoria: dto.categoria,
         color: dto.color || dto.colorBase,
         colorBase: dto.colorBase || dto.color,
         icono: dto.icono,

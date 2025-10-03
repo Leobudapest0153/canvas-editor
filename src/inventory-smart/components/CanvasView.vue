@@ -1854,7 +1854,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
     width: finalWidth,
     height: finalHeight,
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
-    tipo: elemento.tipo || elemento.categoria || 'elemento',
+    tipo: elemento.tipo || 'elementos',
     forma: elemento.forma || 'rectangular',
   }
 
@@ -1947,9 +1947,8 @@ const createElementFromDrop = (data, dropEvent) => {
   let largoCmFinal = largoCm
   let finalHeightFinal = finalHeight
   const nuevoElemento = {
-    id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
+    id: `${elemento.tipo || 'elemento'}_${Date.now()}`,
     tipo: elemento.tipo,
-    categoria: elemento.categoria,
     // Para pasillos: si vienen con nombre desde el catálogo, preservarlo;
     // si no, dejar que el store genere el nombre por defecto.
     nombre: elemento.nombre || 'Nuevo elemento',

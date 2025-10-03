@@ -19,7 +19,7 @@ import { resolvePasilloAssignment, PASILLO_ASSIGNMENT_DEFAULTS } from '@/invento
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
@@ -285,28 +285,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     menusEdicion: modoEdicion.value,
   }))
 
-  // === CATÁLOGOS DINÁMICOS (persistidos via useStatePersistence) ===
-  const catalogos = ref({
-    tiposEspacio: DEFAULT_TIPOS_ESPACIO,
-    tiposCuarto: DEFAULT_TIPOS_CUARTO,
-  })
-
   const tiposProductoAdmitidos = ref(DEFAULT_TIPOS_PRODUCTO_ADMITIDOS)
-
-  const setCatalogos = (cats) => {
-    try {
-      const safe = {
-        tiposEspacio: Array.isArray(cats?.tiposEspacio) ? cats.tiposEspacio : DEFAULT_TIPOS_ESPACIO,
-        tiposCuarto: Array.isArray(cats?.tiposCuarto) ? cats.tiposCuarto : DEFAULT_TIPOS_CUARTO,
-      }
-      catalogos.value = safe
-    } catch {
-      catalogos.value = {
-        tiposEspacio: DEFAULT_TIPOS_ESPACIO,
-        tiposCuarto: DEFAULT_TIPOS_CUARTO,
-      }
-    }
-  }
 
   const setTiposProductoAdmitidos = (tipos) => {
     try {
@@ -489,7 +468,7 @@ export const useCanvasStore = defineStore('canvas', () => {
             tipo: pathItem.tipo,
             id: elemento.id,
             nombre: elemento.nombre,
-            icono: getIconoElemento(elemento.tipo, elemento.categoria),
+            icono: getIconoElemento(elemento.tipo, elemento.ubicacion),
           })
         }
       }
@@ -503,28 +482,19 @@ export const useCanvasStore = defineStore('canvas', () => {
   })
 
   // Helper function para iconos
-  const getIconoElemento = (tipo, categoria) => {
+  const getIconoElemento = (tipo, ubicacion) => {
     // Iconos por tipo - usando nombres de SVG
     if (tipo === 'pasillos') return 'space'
     if (tipo === 'cuartos') return 'room'
     if (tipo === 'pisos') return 'mezzanine'
-    if (tipo === 'contenedores') {
-      const iconosContenedores = {
-        cajas: 'space',
-        bins: 'space',
-        bandejas: 'space',
-      }
-      return iconosContenedores[categoria] || 'space'
-    }
+    if (tipo === 'contenedores') return 'space'
 
     if (tipo === 'elementos') {
       const iconosElementos = {
-        anaqueles: 'space-on-wall',
-        estantes: 'space-on-wall',
-        mesas: 'space',
-        armarios: 'space',
+        pared: 'space-on-wall',
+        suelo: 'space',
       }
-      return iconosElementos[categoria] || 'space'
+      return iconosElementos[ubicacion] || 'space'
     }
 
     return 'space'
@@ -1102,7 +1072,6 @@ const calcularCanvasAdaptativo = (elemento) => {
       const state = {
         plantas: plantas.value,
         elementos: elementos.value,
-        catalogos: catalogos.value,
         modoEdicion: modoEdicion.value,
       }
       const data = _serialize(state)
@@ -1755,7 +1724,6 @@ const calcularCanvasAdaptativo = (elemento) => {
       elementos: elementos.value.map(e => e?._custom?.value || e),
       templates: catalogStore.templates?.map?.(t => t?._custom?.value || t) || [],
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
-      catalogos: catalogos.value,
       modoEdicion: modoEdicion.value,
     }
     // Incluir historial de cambios si existe
@@ -1808,9 +1776,6 @@ const calcularCanvasAdaptativo = (elemento) => {
       },
       addElemento: (elementoData) => {
         elementos.value.push(elementoData)
-      },
-      setCatalogos: (cats) => {
-        setCatalogos(cats)
       },
       setModoEdicion: (value) => {
         setModoEdicion(value)
@@ -2868,9 +2833,6 @@ const calcularCanvasAdaptativo = (elemento) => {
     cambiosNoAplicados,
     modoConfigurarEsl,
     elementoEslObjetivo,
-    // Catálogos dinámicos
-    catalogos,
-    setCatalogos,
     tiposProductoAdmitidos,
     setTiposProductoAdmitidos,
     gestionPisosPropiedadesModal,

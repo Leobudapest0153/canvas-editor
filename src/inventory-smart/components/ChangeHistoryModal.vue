@@ -344,7 +344,7 @@ const formatValue = (v, path) => {
   }
 
   // Caso especial para tipos: mostrar nombre amigable
-  if (last === 'categoria' || last === 'tipo' && typeof v === 'string') {
+  if (last === 'tipo' && typeof v === 'string') {
     return formatTipoValue(v)
   }
 

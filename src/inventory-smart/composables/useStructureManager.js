@@ -37,7 +37,6 @@ export function buildStructureFromForm(form) {
     id: rootId,
     nombre: datosGenerales.nombre,
     tipo: modo === 'cuarto' ? 'cuartos' : 'elementos',
-    categoria: datosGenerales.tipoSeleccionado || (modo === 'cuarto' ? 'cuartos' : 'elementos'),
     forma: dimensiones.forma,
     orientacion: datosGenerales.orientacion,
     color: datosGenerales.color || '#3B82F6',
@@ -69,14 +68,12 @@ export function buildStructureFromForm(form) {
     // Determinar tipo y categoría según si es cuarto o espacio
     const esEspacio = modo === 'espacio'
     const childType = esEspacio ? 'contenedores' : 'pisos'
-    const childCategory = esEspacio ? 'nivel' : 'piso'
     const childId = uid(esEspacio ? 'nivel' : 'piso')
 
     children.push({
       id: childId,
       nombre: p.nombre || `${modo === 'cuarto' ? 'Piso' : 'Nivel'} ${idx + 1}`,
       tipo: childType,
-      categoria: childCategory,
       padre: rootId,
       color: root.color,
       colorBase: root.colorBase,
@@ -132,7 +129,6 @@ export function toCatalogItemFromStructure({
     id,
     nombre: name || root?.nombre || 'Entrada',
     tipo: root?.tipo || 'elementos',
-    categoria: root?.categoria,
     forma: root?.forma,
     orientacion: root?.orientacion,
     color: color || root?.color || root?.colorBase || '#3B82F6',
@@ -176,7 +172,6 @@ export function toFormFromCatalogItem(item) {
     const datosGenerales = {
       nombre: root.nombre || item.nombre || '',
       color: root.color || root.colorBase || item.color || '#3B82F6',
-      tipoSeleccionado: root.categoria || '',
       descripcion: root.descripcion || item.descripcion || '',
       orientacion: root.orientacion || '',
       ubicacion: modo === 'espacio' ? (root.ubicacion || item.ubicacion || '') : '',
@@ -232,7 +227,6 @@ export function toFormFromCatalogItem(item) {
     const datosGenerales = {
       nombre: item.nombre || '',
       color: item.color || item.colorBase || '#3B82F6',
-      tipoSeleccionado: item.categoria || '',
       descripcion: item.descripcion || '',
       orientacion: item.orientacion || '',
       ubicacion: modo === 'espacio' ? (item.ubicacion || '') : '',
@@ -319,7 +313,7 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
   const newMap = new Map()
   let counter = 0
   for (const [oldId, el] of allElementsMap) {
-    const newId = uid(el.tipo || el.categoria || 'el') + '_' + counter++
+    const newId = uid(el.tipo || 'el') + '_' + counter++
     newIdMap.set(oldId, newId)
   }
   for (const [oldId, el] of allElementsMap) {
@@ -578,7 +572,7 @@ export function buildStructureFromCanvasElement(canvasStore, elementoId, { offse
   let counter = 0
   const cloneRec = (elem, parentNewId = null, level = 0) => {
     const uniqueTs = baseTs + counter
-    const newId = `${(elem.tipo || elem.categoria || 'elemento')}_${uniqueTs}_${Math.random().toString(36).slice(2, 6)}`
+    const newId = `${(elem.tipo || 'elemento')}_${uniqueTs}_${Math.random().toString(36).slice(2, 6)}`
     idMapping.set(elem.id, newId)
     counter++
 
@@ -621,14 +615,12 @@ export function buildChildFromDraft(draft, parentContext, index = 0, parentChild
   // 1. Determinar el tipo y categoría del hijo basándose en el padre
   const esPadreEspacio = parentContext.tipo === 'elementos';
   const childType = esPadreEspacio ? 'contenedores' : 'pisos';
-  const childCategory = esPadreEspacio ? 'nivel' : 'piso';
   const defaultName = `${esPadreEspacio ? 'Nivel' : 'Piso'} ${index + 1}`;
 
   // 2. Construir el objeto base con datos heredados y por defecto
   const baseChild = {
     id: draft.id || uid(esPadreEspacio ? 'nivel' : 'piso'),
     tipo: childType,
-    categoria: childCategory,
     padre: parentContext.id,
 
     // Datos heredados del padre
