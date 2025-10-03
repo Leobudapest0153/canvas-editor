@@ -200,6 +200,7 @@ const externalServicesAPI = {
 }
 
 const canvasViewRef = ref(null)
+// const lastAppliedConfig = ref(null)
 
 // Manejador para cuando PlantasPanel emite cambios de configuración
 const handleConfigChanged = (configSerializada) => {
@@ -212,6 +213,8 @@ const handleConfigChanged = (configSerializada) => {
 
     // Emitir al componente padre la configuración actualizada
     emit('configUpdated', configSerializada)
+    // Registrar última config emitida para evitar rehidratación inmediata en eco del padre
+    // lastAppliedConfig.value = configSerializada
 
   } catch (error) {
     console.error('Error al procesar la configuración actualizada:', error)
@@ -297,6 +300,8 @@ const saveAndExit = () => {
   const reason = pendingExitReason.value
   try {
     const json = canvasStore.serialize(true)
+    // Registrar última config emitida para evitar eco inmediato
+    // lastAppliedConfig.value = json
     emit('configUpdated', json)
   } catch (e) {
     console.warn('Error serializando antes de salir', e)
@@ -415,6 +420,28 @@ useEditorShortcuts({
 })
 
 // (Removed backup/restore/version comparison helpers)
+
+// Hidratar SIEMPRE ante cambios de la prop configCanvas (reacciona a cambios externos)
+watch(
+  () => props.configCanvas,
+  (json) => {
+    if (typeof json !== 'string' || json.trim().length === 0) return
+    // Evitar reimportar exactamente la misma configuración ya aplicada
+    // if (json === lastAppliedConfig.value) return
+    try {
+      const ok = canvasStore.deserialize(json)
+      if (!ok) {
+        showToast('No se pudo importar la configuración', 'error')
+      } else {
+        // lastAppliedConfig.value = json
+      }
+    } catch (e) {
+      console.error('Error deserializando configCanvas:', e)
+      showToast('Error al importar la configuración', 'error')
+    }
+  },
+  { immediate: true }
+)
 
 onMounted(() => {
   try {
