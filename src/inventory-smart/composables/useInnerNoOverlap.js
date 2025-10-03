@@ -2,32 +2,35 @@ import { mapDimsByView } from '@/inventory-smart/utils/innerViewDims'
 import { toLocal, toWorld } from '@/inventory-smart/utils/innerLocalCoords'
 import { clampRectToBounds, overlap } from '@/inventory-smart/utils/innerAABB'
 import { CM_TO_PX, GRID_SIZE } from '@/inventory-smart/utils/constants'
+import { solveDragPosition } from '@/inventory-smart/utils/placementSolver'
+import { resolveCoplanarNeighbors } from '@/inventory-smart/validation/placementOrchestrator'
 export function makeInnerSession({ parentEl, movingEl, siblings, vista }) {
+  const cmToPx = CM_TO_PX
   const { wCm, hCm } = mapDimsByView(parentEl, vista)
   const bounds = {
     minX: 0,
     minY: 0,
-    maxX: Math.max(1, wCm * CM_TO_PX),
-    maxY: Math.max(1, hCm * CM_TO_PX),
+    maxX: Math.max(1, wCm * cmToPx),
+    maxY: Math.max(1, hCm * cmToPx),
   }
   parentEl.__wPx = bounds.maxX
   parentEl.__hPx = bounds.maxY
   const mSizeCm = mapDimsByView(movingEl, vista)
   const mSize = {
-    w: Math.max(1, mSizeCm.wCm * CM_TO_PX),
-    h: Math.max(1, mSizeCm.hCm * CM_TO_PX),
+    w: Math.max(1, mSizeCm.wCm * cmToPx),
+    h: Math.max(1, mSizeCm.hCm * cmToPx),
   }
-  const sibRects = siblings
-    .filter((s) => s && s.id !== movingEl.id)
-    .map((s) => {
-      const szCm = mapDimsByView(s, vista)
-      const sz = {
-        w: Math.max(1, szCm.wCm * CM_TO_PX),
-        h: Math.max(1, szCm.hCm * CM_TO_PX),
-      }
-      const pl = toLocal(s.posicion || { x: 0, y: 0 }, parentEl)
-      return { x: pl.x, y: pl.y, w: sz.w, h: sz.h, id: s.id }
-    })
+  // Map rects de hermanos (en coords locales) y mantener referencia completa
+  const siblingsFull = siblings.filter((s) => s && s.id !== movingEl.id)
+  const sibRects = siblingsFull.map((s) => {
+    const szCm = mapDimsByView(s, vista)
+    const sz = {
+      w: Math.max(1, szCm.wCm * CM_TO_PX),
+      h: Math.max(1, szCm.hCm * CM_TO_PX),
+    }
+    const pl = toLocal(s.posicion || { x: 0, y: 0 }, parentEl)
+    return { x: pl.x, y: pl.y, w: sz.w, h: sz.h, id: s.id }
+  })
   let lastGoodLocal = toLocal(movingEl.posicion || { x: 0, y: 0 }, parentEl)
   let contact = { id: null, axis: null }
   const H = 1.0
@@ -57,42 +60,37 @@ export function makeInnerSession({ parentEl, movingEl, siblings, vista }) {
   function dragBoundFuncLocal(posLocal, vel = { x: 0, y: 0 }) {
     vxf = 0.8 * vxf + 0.2 * (vel.x || 0)
     vyf = 0.8 * vyf + 0.2 * (vel.y || 0)
-    let p = clampRectToBounds(posLocal, mSize, bounds)
-    const A = { x: p.x, y: p.y, w: mSize.w, h: mSize.h }
-    if (contact.id) {
-      const B = sibRects.find((s) => s.id === contact.id)
-      if (B) {
-        const touchingX = A.x + A.w > B.x - H && B.x + B.w > A.x - H
-        const touchingY = A.y + A.h > B.y - H && B.y + B.h > A.y - H
-        const stillTouching = contact.axis === 'x' ? touchingY : touchingX
-        if (stillTouching) {
-          if (contact.axis === 'x') {
-            p.x = p.x >= B.x ? B.x + B.w : B.x - mSize.w
-          } else {
-            p.y = p.y >= B.y ? B.y + B.h : B.y - mSize.h
-          }
-          p = clampRectToBounds(p, mSize, bounds)
-        } else {
-          contact = { id: null, axis: null }
-        }
-      } else {
-        contact = { id: null, axis: null }
-      }
+
+    // Área local como areaBounds
+    const areaBounds = {
+      minX: bounds.minX,
+      minY: bounds.minY,
+      maxX: bounds.maxX,
+      maxY: bounds.maxY,
+      mode: 'fixed',
+      polygon: null,
     }
-    if (!contact.id) {
-      for (const B of sibRects) {
-        if (!overlap({ x: p.x, y: p.y, w: mSize.w, h: mSize.h }, B)) continue
-        const axis = Math.abs(vxf) >= Math.abs(vyf) ? 'x' : 'y'
-        contact = { id: B.id, axis }
-        if (axis === 'x') {
-          p.x = p.x >= B.x ? B.x + B.w : B.x - mSize.w
-        } else {
-          p.y = p.y >= B.y ? B.y + B.h : B.y - mSize.h
-        }
-        p = clampRectToBounds(p, mSize, bounds)
-        break
-      }
-    }
+
+    // Filtrar vecinos coplanares
+    const coplanar = resolveCoplanarNeighbors({ ...movingEl }, siblingsFull)
+    const neighbors = coplanar.map((s) => {
+      const szCm = mapDimsByView(s, vista)
+      const size = { w: Math.max(1, szCm.wCm * CM_TO_PX), h: Math.max(1, szCm.hCm * CM_TO_PX) }
+      const pl = toLocal(s.posicion || { x: 0, y: 0 }, parentEl)
+      return { id: s.id, x: pl.x, y: pl.y, width: size.w, height: size.h, ubicacion: s.ubicacion || 'suelo' }
+    }).filter((n) => (n.ubicacion || 'suelo') === 'suelo' && (movingEl.ubicacion || 'suelo') === 'suelo')
+
+    const solved = solveDragPosition({
+      candidate: { x: posLocal.x, y: posLocal.y },
+      movingEl: { id: movingEl.id, width: mSize.w, height: mSize.h, forma: movingEl.forma || 'rectangular', ubicacion: movingEl.ubicacion || 'suelo' },
+      neighbors,
+      areaBounds,
+      lastValidPos: lastGoodLocal,
+      lastVelocity: { x: vxf, y: vyf },
+      maxIters: 6,
+    })
+
+    const p = { x: solved.x, y: solved.y }
     if (inside(p, mSize, bounds)) {
       let ok = true
       const A2 = { x: p.x, y: p.y, w: mSize.w, h: mSize.h }
@@ -102,13 +100,49 @@ export function makeInnerSession({ parentEl, movingEl, siblings, vista }) {
     return p
   }
   function finalizeLocal(candidateLocal) {
-    contact = { id: null, axis: null }
-    let p = clampRectToBounds(candidateLocal, mSize, bounds)
-    if (!isValidLocal(p)) p = lastGoodLocal
+    // Resolver con solver compartido y luego snap opcional
+    const areaBounds = {
+      minX: bounds.minX,
+      minY: bounds.minY,
+      maxX: bounds.maxX,
+      maxY: bounds.maxY,
+      mode: 'fixed',
+      polygon: null,
+    }
+    const coplanar = resolveCoplanarNeighbors({ ...movingEl }, siblingsFull)
+    const neighbors = coplanar.map((s) => {
+      const szCm = mapDimsByView(s, vista)
+      const size = { w: Math.max(1, szCm.wCm * CM_TO_PX), h: Math.max(1, szCm.hCm * CM_TO_PX) }
+      const pl = toLocal(s.posicion || { x: 0, y: 0 }, parentEl)
+      return { id: s.id, x: pl.x, y: pl.y, width: size.w, height: size.h, ubicacion: s.ubicacion || 'suelo' }
+    }).filter((n) => (n.ubicacion || 'suelo') === 'suelo' && (movingEl.ubicacion || 'suelo') === 'suelo')
+
+    let solved = solveDragPosition({
+      candidate: { x: candidateLocal.x, y: candidateLocal.y },
+      movingEl: { id: movingEl.id, width: mSize.w, height: mSize.h, forma: movingEl.forma || 'rectangular', ubicacion: movingEl.ubicacion || 'suelo' },
+      neighbors,
+      areaBounds,
+      lastValidPos: lastGoodLocal,
+      lastVelocity: { x: 0, y: 0 },
+      maxIters: 6,
+    })
+
+    let p = { x: solved.x, y: solved.y }
     // En vista frontal (XZ) no aplicar redondeo a la grilla; y si GRID_SIZE=0, respetar desactivación
     const G = (vista === 'XZ') ? 0 : (GRID_SIZE > 0 ? GRID_SIZE : 0)
     if (G > 0) {
       p = { x: Math.round(p.x / G) * G, y: Math.round(p.y / G) * G }
+      // Re-resolver ligero tras snap para evitar entrar en bloqueo
+      solved = solveDragPosition({
+        candidate: { x: p.x, y: p.y },
+        movingEl: { id: movingEl.id, width: mSize.w, height: mSize.h, forma: movingEl.forma || 'rectangular', ubicacion: movingEl.ubicacion || 'suelo' },
+        neighbors,
+        areaBounds,
+        lastValidPos: lastGoodLocal,
+        lastVelocity: { x: 0, y: 0 },
+        maxIters: 3,
+      })
+      p = { x: solved.x, y: solved.y }
     }
     p = clampRectToBounds(p, mSize, bounds)
     if (!isValidLocal(p)) p = lastGoodLocal

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { resolveCandidateWithBoundary, projectMTDAgainstBoundary, detectConflictsFor } from '@/inventory-smart/utils/collision'
+import { solveDragPosition } from '@/inventory-smart/utils/placementSolver'
 
 function el(id, x, y, w, h, ubicacion = 'suelo') {
   return { id, x, y, width: w, height: h, ubicacion }
@@ -22,7 +23,6 @@ describe('Resolución con prioridad de contorno (no-expansiva)', () => {
     // Resolver B contra A dentro del área [0..W,0..H]
     const resolved = resolveCandidateWithBoundary(B, [A, B], W, H, 3, { x: B.x, y: B.y })
     B = { ...B, x: resolved.x, y: resolved.y }
-
     // Ambos deben quedar dentro del área
     const insideA = A.x >= 0 && A.y >= 0 && A.x + A.width <= W && A.y + A.height <= H
     const insideB = B.x >= 0 && B.y >= 0 && B.x + B.width <= W && B.y + B.height <= H
@@ -75,6 +75,40 @@ describe('Resolución con prioridad de contorno (no-expansiva)', () => {
 
     const insideB = B.x >= 0 && B.y >= 0 && B.x + B.width <= W && B.y + B.height <= H
     expect(insideB).toBe(true)
+  })
+})
+
+describe('Deslizamiento circular', () => {
+  it('permite tangencia estable al resolver drag de c?rculos', () => {
+    const areaBounds = { minX: 0, minY: 0, maxX: 500, maxY: 500 }
+    const neighbor = { id: 'A', x: 100, y: 100, width: 80, height: 80, forma: 'circular', ubicacion: 'suelo' }
+    const movingEl = { id: 'B', x: 150, y: 120, width: 80, height: 80, forma: 'circular', ubicacion: 'suelo' }
+    const candidate = { x: 150, y: 120 }
+    const result = solveDragPosition({
+      candidate,
+      movingEl,
+      hardNeighbors: [neighbor],
+      softNeighbors: [],
+      areaBounds,
+      lastVelocity: { x: 30, y: 10 }
+    })
+    expect(result.fellBack).toBe(false)
+    const radius = movingEl.width / 2
+    const otherRadius = neighbor.width / 2
+    const center = { x: result.x + radius, y: result.y + radius }
+    const neighborCenter = { x: neighbor.x + otherRadius, y: neighbor.y + otherRadius }
+    const candidateCenter = { x: candidate.x + radius, y: candidate.y + radius }
+    const initialDelta = { x: candidateCenter.x - neighborCenter.x, y: candidateCenter.y - neighborCenter.y }
+    const initialDist = Math.hypot(initialDelta.x, initialDelta.y)
+    const expectedCenter = {
+      x: neighborCenter.x + (initialDelta.x / initialDist) * (radius + otherRadius),
+      y: neighborCenter.y + (initialDelta.y / initialDist) * (radius + otherRadius)
+    }
+    const distance = Math.hypot(center.x - neighborCenter.x, center.y - neighborCenter.y)
+    expect(distance).toBeCloseTo(radius + otherRadius, 3)
+    expect(result.x).toBeCloseTo(expectedCenter.x - radius, 3)
+    expect(result.y).toBeCloseTo(expectedCenter.y - radius, 3)
+    expect(Math.abs(result.y - movingEl.y)).toBeGreaterThan(0)
   })
 })
 

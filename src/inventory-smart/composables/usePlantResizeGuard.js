@@ -83,7 +83,12 @@ export function fitsIndividually(el, newW, newH, rotPerm = true, margin = 0) {
   const W = Math.max(0, newW - 2 * margin)
   const H = Math.max(0, newH - 2 * margin)
   if (w <= W && h <= H) return true
-  if (rotPerm && h <= W && w <= H) return true
+  if (!rotPerm) return false
+
+  const hasExplicitRotation = Math.abs(((el.posicion?.rotation ?? el.rotation ?? 0) % 180)) === 90
+  if (hasExplicitRotation) {
+    return h <= W && w <= H
+  }
   return false
 }
 
@@ -170,10 +175,15 @@ export function pack(elements, bounds, opts = {}) {
     let y = margin + cursorY
 
     if (gridCm > 0) {
-      const sx = Math.round((x - margin) / gridCm) * gridCm + margin
-      const sy = Math.round((y - margin) / gridCm) * gridCm + margin
-      x = Math.max(margin, sx)
-      y = Math.max(margin, sy)
+      const snappedX = Math.round(x / gridCm) * gridCm
+      const snappedY = Math.round(y / gridCm) * gridCm
+      x = Math.max(margin, snappedX)
+      y = Math.max(margin, snappedY)
+      const maxX = bounds.W - margin - oW
+      const maxY = bounds.H - margin - oH
+      if (x > maxX + 1e-6 || y > maxY + 1e-6) {
+        return null
+      }
     }
 
     placements.push({ id: el.id, x, y, rotation, width: oW, height: oH })

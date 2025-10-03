@@ -2,10 +2,30 @@
   <div class="h-full flex flex-col bg-white border-l border-gray-200" data-properties-panel>
     <div class="p-4 border-b border-gray-200 flex items-center justify-between">
       <h2 class="text-lg font-semibold text-gray-800">Propiedades</h2>
+      <!-- Botón Identificador -->
+      <button
+        v-if="elementoSeleccionado"
+        type="button"
+        class="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-primary text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer text-sm"
+        @click="emitirIdentificador"
+      >
+        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path
+            fill="currentColor"
+            d="M19 8h-1V3H6v5H5c-1.1 0-2 .9-2 2v5h3v4h12v-4h3v-5c0-1.1-.9-2-2-2zM8 5h8v3H8V5zm8 14H8v-4h8v4zm1-6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"
+          />
+        </svg>
+        <span>Identificador</span>
+      </button>
     </div>
 
-    <div v-if="elementoSeleccionado" class="flex-1 overflow-y-auto p-3">
-      <div class="space-y-4">
+    <div v-if="elementoSeleccionado" class="flex-1 overflow-y-auto overflow-x-hidden p-3">
+      <fieldset
+        class="properties-fieldset"
+        :disabled="propertiesDisabled"
+        :title="propertiesDisabled ? VISUAL_MODE_MESSAGE : null"
+      >
+        <div class="space-y-4">
         <!-- Información general -->
         <details open class="bg-gray-50 rounded-lg p-4">
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">
@@ -48,12 +68,14 @@
               </div> -->
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-                <input
-                  :value="getCategoriaDisplay(elementoSeleccionado.categoria)"
-                  type="text"
-                  disabled
-                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed capitalize"
-                />
+                <select
+                  v-model="edited.categoria"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm capitalize"
+                >
+                  <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                    {{ cat.nombre }}
+                  </option>
+                </select>
               </div>
             </div>
 
@@ -79,9 +101,22 @@
               </div>
             </div>
 
+            <div v-if="pasilloAsignadoNombre && !esPasillo">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Pasillo asignado</label>
+              <input
+                :value="pasilloAsignadoNombre"
+                type="text"
+                class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-600 cursor-not-allowed"
+                disabled
+              />
+              <p v-if="pasilloAsignado" class="text-xs text-gray-500 mt-1">
+                El nombre se sincroniza automáticamente según el pasillo relacionado.
+              </p>
+            </div>
+
             <!-- Orientación (oculta para pasillos y circulares) -->
             <div v-if="!esPasillo && !esCircular">
-              <label class="block text-xs font-medium text-gray-600 mb-1">Orientación</label>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Cara frontal</label>
               <select
                 v-model.number="edited.orientacion"
                 :disabled="isSaving || isElementRestricted"
@@ -89,10 +124,9 @@
                 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
                 disabled:cursor-not-allowed disabled:text-gray-500 cursor-pointer"
               >
-                <option :value="0">0°</option>
-                <option :value="90">90°</option>
-                <option :value="180">180°</option>
-                <option :value="270">270°</option>
+                <option v-for="opt in ORIENTACIONES" :key="opt.id" :value="opt.id">
+                  {{ opt.nombre }}
+                </option>
               </select>
               <p class="text-xs text-gray-500 mt-1">
                 Indica el lado de referencia del elemento para su orientación visual.
@@ -132,8 +166,8 @@
                 <div class="flex items-center">
                   <input
                     type="number"
-                    min="0"
-                    step="any"
+                    min="0.10"
+                    step="0.01"
                     v-model.number="edited.dimensiones.ancho"
                     @change="validarDimension('ancho')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
@@ -149,8 +183,8 @@
                 <div class="flex items-center">
                   <input
                     type="number"
-                    min="0"
-                    step="any"
+                    min="0.10"
+                    step="0.01"
                     v-model.number="edited.dimensiones.largo"
                     @change="validarDimension('largo')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
@@ -167,8 +201,8 @@
               <div class="flex items-center">
                 <input
                   type="number"
-                  min="0"
-                  step="any"
+                  min="0.10"
+                  step="0.01"
                   v-model.number="edited.dimensiones.alto"
                   @change="validarDimension('alto')"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
@@ -188,8 +222,8 @@
               <div class="flex items-center">
                 <input
                   type="number"
-                  min="1"
-                  step="any"
+                  min="0.10"
+                  step="0.01"
                   :max="maxDiametroPlanta"
                   v-model.number="edited.diametroCm"
                   @change="validarDiametro"
@@ -341,10 +375,10 @@
         >
           <summary class="text-sm font-medium text-gray-700 cursor-pointer">
             <div class="flex justify-between items-center w-full -mt-6 pl-4">
-              Pisos
+              {{ elementoSeleccionado.tipo == 'cuartos' ? 'Pisos' : 'Niveles' }}
               <button
                 :disabled="isSaving || isElementRestricted"
-                @click="canvasStore.abrirCuartoNivelesPropiedades(elementoSeleccionado.id)"
+                @click="canvasStore.abrirCuartoNivelesPropiedades(elementoSeleccionado.id, childrenType)"
                 class="bg-primary-700 text-white p-1 rounded-full cursor-pointer
                 disabled:bg-gray-400 disabled:cursor-not-allowed">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
@@ -361,7 +395,7 @@
                 class="bg-white p-3 flex items-center justify-between rounded-md shadow-sm relative"
               >
               <div class="flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" class="text-[#1C1E4D] mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" class="text-primary mr-2">
                   <path fill="currentColor" d="M11.325 11.5q-.825 0-1.412-.587T9.325 9.5V7q0-.825.588-1.412T11.325 5H19q.825 0 1.413.588T21 7v2.5q0 .825-.587 1.413T19 11.5zm6.35 7.5q-.825 0-1.412-.587T15.675 17v-2.5q0-.825.588-1.412t1.412-.588H19q.825 0 1.413.588T21 14.5V17q0 .825-.587 1.413T19 19zm-6.35 0q-.825 0-1.412-.587T9.325 17v-2.5q0-.825.588-1.412t1.412-.588h1.35q.825 0 1.413.588t.587 1.412V17q0 .825-.587 1.413T12.675 19zM5 19q-.825 0-1.413-.587T3 17V7q0-.825.588-1.412T5 5h1.325q.825 0 1.413.588T8.325 7v10q0 .825-.587 1.413T6.325 19z"/>
                 </svg>
               <span class="text-[14px] text-[#637381]">{{ piso.nombre }}</span>
@@ -460,7 +494,8 @@
             </div>
           </div>
         </details>
-      </div>
+        </div>
+      </fieldset>
     </div>
 
     <div v-if="elementoSeleccionado" class="p-4 border-t border-gray-200 bg-white">
@@ -497,10 +532,13 @@
 </template>
 
 <script setup>
+// Definir emits
+const emit = defineEmits(['showIdentifier'])
+
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
-import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, ORIENTACIONES } from '@/inventory-smart/utils/constants'
 import { deepClone, deepEqual, makePatch } from '@/inventory-smart/utils/object'
 import { useToast } from '@/inventory-smart/composables/useToast.js'
 import ContainerProductsList from './ContainerProductsList.vue'
@@ -514,10 +552,14 @@ import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { toPrecisionCm } from '../utils/fixedDimensions'
 import IdentifyEslModal from './modals/IdentifyEslModal.vue'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement';
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode';
 
 const canvasStore = useCanvasStore()
 const { showWarning, showSuccess } = useToast()
 const { deleteAndCompact } = useDeleteElement();
+const { canEditProperties } = useEditorMode()
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
+const propertiesDisabled = computed(() => !canEditProperties.value)
 const confirmDialog = useConfirmDialog()
 const {
   validarPesoElemento,
@@ -571,10 +613,15 @@ const cargarDesdeStore = (el) =>
     tags: Array.isArray(el.etiquetas) ? [...el.etiquetas] : [],
     // Propiedad ESL
     codigoEsl: el.codigoEsl || '',
+    categoria: el.categoria
   })// Estado para trackear valores previos y evitar validaciones innecesarias
 const valorDimensionAnterior = ref({})
 const valorPesoAnterior = ref(0)
 const valorDiametroAnterior = ref(0)
+
+const childrenType = computed(() => {
+  return elementoSeleccionado.value.tipo == 'cuartos' ? 'pisos' : 'contenedores';
+})
 
 watch(
   () => elementoSeleccionado.value?.id,
@@ -1171,6 +1218,16 @@ const getTipoNombre = (tipo) => {
   return TIPOS_ENTIDAD.find((t) => t.id === tipo)?.nombre || tipo
 }
 
+const categories = computed(() => {
+  if (elementoSeleccionado.value.tipo === 'cuartos') {
+    return DEFAULT_TIPOS_CUARTO;
+  }
+  if (elementoSeleccionado.value.tipo === 'elementos') {
+    return DEFAULT_TIPOS_ESPACIO;
+  }
+  return [];
+});
+
 const getTipoNombrePadre = () => {
   const { padreId, padreType } = padreContext.value
   if (!padreId || !padreType) return 'elemento'
@@ -1238,6 +1295,26 @@ const esPasillo = computed(
   () => (elementoSeleccionado.value?.tipo || '').toLowerCase() === 'pasillos',
 )
 
+// Reflejamos el pasillo calculado (pasilloId) en el panel para ayudar a depurar asignaciones.
+const pasilloAsignado = computed(() => {
+  if (!elementoSeleccionado.value || esPasillo.value) return null
+  const id = elementoSeleccionado.value.pasilloId
+  if (!id) return null
+  return canvasStore.elementoPorId(id) || null
+})
+
+// Mostramos un nombre amigable y dejamos un fallback determinista si el pasillo fue removido.
+const pasilloAsignadoNombre = computed(() => {
+  if (!elementoSeleccionado.value || esPasillo.value) return ''
+  const id = elementoSeleccionado.value.pasilloId
+  if (!id) return ''
+  const pasillo = pasilloAsignado.value
+  if (pasillo) {
+    return pasillo.nombre || pasillo.codigo || `Pasillo ${pasillo.id}`
+  }
+  return `Pasillo no disponible (ID: ${id})`
+})
+
 /**
  * Uso real del elemento
  */
@@ -1296,10 +1373,32 @@ const alturaPlanta = computed(
 )
 const advertenciaAltura = computed(() => {
   if (!esEstructura.value) return null
-  const max = alturaPlanta.value
+  // No validar altura en plantas infinitas
+  const plantaActiva = canvasStore.plantaPorId(canvasStore.plantaActiva)
+  if (plantaActiva?.isInfinite === true) return null
+
   const actual = edited.value?.dimensiones?.alto || 0
-  return actual > max
-    ? `La altura no debe superar ${max} cm (debido a la altura de planta o un elemento situado encima)`
+
+  // Obtener la altura máxima permitida considerando tanto la planta como el padre
+  let maxAltura = alturaPlanta.value
+  let razonLimite = 'la altura de planta'
+
+  // Si el elemento tiene un padre contenedor, validar contra la altura del padre
+  const { padreId, padreType } = padreContext.value
+  if (padreId && padreType !== 'plantas') {
+    const padre = canvasStore.elementoPorId(padreId)
+    if (padre && padre.dimensiones && padre.dimensiones.alto) {
+      const alturaPadre = Number(padre.dimensiones.alto)
+      if (alturaPadre < maxAltura) {
+        maxAltura = alturaPadre
+        const nombrePadre = padre.nombre || padre.codigo || getTipoNombre(padre.tipo)
+        razonLimite = `la altura del ${getTipoNombre(padre.tipo)} "${nombrePadre}"`
+      }
+    }
+  }
+
+  return actual > maxAltura
+    ? `La altura no debe superar ${maxAltura} cm (debido a su ubicación)`
     : null
 })
 
@@ -1410,7 +1509,22 @@ const validarDiametro = () => {
 }
 
 const maxAlturaSobreSuelo = computed(() => {
-  const techo = Number(alturaPlanta.value) || 0
+  // No validar en plantas infinitas
+  const plantaActiva = canvasStore.plantaPorId(canvasStore.plantaActiva)
+  if (plantaActiva?.isInfinite === true) return Infinity
+
+  let techo = Number(alturaPlanta.value) || 0
+
+  // Si el elemento tiene un padre contenedor, usar la menor altura entre planta y padre
+  const { padreId, padreType } = padreContext.value
+  if (padreId && padreType !== 'plantas') {
+    const padre = canvasStore.elementoPorId(padreId)
+    if (padre && padre.dimensiones && padre.dimensiones.alto) {
+      const alturaPadre = Number(padre.dimensiones.alto)
+      techo = Math.min(techo, alturaPadre)
+    }
+  }
+
   const alto = Number(edited.value?.dimensiones?.alto || 0)
   return Math.max(0, techo - alto)
 })
@@ -1419,8 +1533,32 @@ const advertenciaZBase = computed(() => {
   if (!estaUbicadoEnPared.value) return null
   const z = Number(edited.value?.alturaSobreSueloCm)
   if (!Number.isFinite(z) || z < 0) return 'La altura sobre suelo debe ser mayor o igual a 0 cm'
+  // No validar límites en plantas infinitas
+  const plantaActiva = canvasStore.plantaPorId(canvasStore.plantaActiva)
+  if (plantaActiva?.isInfinite === true) return null
   const max = maxAlturaSobreSuelo.value
-  return z > max ? `La altura sobre el suelo no debe superar ${max} cm` : null
+
+  if (z > max) {
+    // Determinar cuál es el limitante (planta o padre)
+    const { padreId, padreType } = padreContext.value
+    let mensaje = `La altura sobre el suelo no debe superar ${max} cm`
+
+    if (padreId && padreType !== 'plantas') {
+      const padre = canvasStore.elementoPorId(padreId)
+      if (padre && padre.dimensiones && padre.dimensiones.alto) {
+        const alturaPadre = Number(padre.dimensiones.alto)
+        const alturaPlantaVal = Number(alturaPlanta.value) || 0
+        if (alturaPadre < alturaPlantaVal) {
+          const nombrePadre = padre.nombre || padre.codigo || getTipoNombre(padre.tipo)
+          mensaje += ` (debido a la altura del ${getTipoNombre(padre.tipo)} "${nombrePadre}")`
+        }
+      }
+    }
+
+    return mensaje
+  }
+
+  return null
 })
 
 const validarAlturaSobreSuelo = () => {
@@ -1431,6 +1569,9 @@ const validarAlturaSobreSuelo = () => {
     edited.value.alturaSobreSueloCm = snapshotOriginal.value.alturaSobreSueloCm
     return
   }
+  // No validar límites en plantas infinitas
+  const plantaActiva = canvasStore.plantaPorId(canvasStore.plantaActiva)
+  if (plantaActiva?.isInfinite === true) return
   const max = maxAlturaSobreSuelo.value
   if (z > max) {
     showWarning(`La altura sobre el suelo no debe superar ${max} cm`)
@@ -1477,6 +1618,11 @@ const isElementRestricted = computed(() => {
    return restrictions.includes('read-only-properties');
 })
 
+// Función para emitir evento de identificador
+const emitirIdentificador = () => {
+  emit('showIdentifier', elementoSeleccionado.value);
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   document.addEventListener('click', handleClickOutside);
@@ -1515,5 +1661,42 @@ onBeforeRouteLeave(async (to, from, next) => {
 </script>
 
 <style scoped>
-/* No custom styles */
+.properties-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.properties-fieldset[disabled] {
+  cursor: not-allowed;
+}
+
+/* Prevenir overflow horizontal en elementos de texto */
+.properties-fieldset p,
+.properties-fieldset li,
+.properties-fieldset span {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+  white-space: normal;
+}
+
+/* Asegurar que los inputs y selects no se desborden */
+.properties-fieldset input,
+.properties-fieldset select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Prevenir overflow en barras de progreso y elementos flex */
+.properties-fieldset .flex {
+  min-width: 0;
+}
+
+/* Asegurar que los elementos con texto largo se ajusten suavemente */
+.properties-fieldset [class*="text-"] {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+}
 </style>

@@ -14,7 +14,7 @@
 -->
 
 <template>
-  <div class="elementos-catalogo h-full flex flex-col bg-white border-r border-gray-200">
+  <div class="elementos-catalogo relative h-full flex flex-col bg-white border-r border-gray-200">
     <!-- Header del catálogo -->
     <div class="catalogo-header p-1 border-gray-200">
   <div class="relative px-4 mb-1" v-if="hayElementosEnTab">
@@ -45,42 +45,13 @@
           >
             <div class="p-3 grid grid-cols-1 gap-3">
               <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Buscar por nombre</label>
                 <input
                   v-model="filtroTexto"
                   @keyup.enter="() => (filtrosVisibles = false)"
-                  placeholder="Nombre..."
+                  placeholder="Buscar..."
                   class="w-full px-3 py-2 border rounded-md text-sm"
                 />
-              </div>
-              <!-- Filtro de tipo (internamente manejado como categoria) -->
-              <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
-                <select
-                  v-model="categoriaSeleccionada"
-                  class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white"
-                >
-                  <option :value="null">Todos</option>
-                  <option v-for="c in categoriasDisponibles" :key="c.id" :value="c.id">
-                    {{ c.nombre }}
-                  </option>
-                </select>
-              </div>
-              <div v-if="modo !== 'cuarto'">
-                <label class="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
-                <select
-                  v-model="ubicacionSeleccionada"
-                  class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white"
-                >
-                  <option value="">Todas</option>
-                  <option
-                    v-for="u in ubicacionesDisponibles"
-                    :key="u.id"
-                    :value="u.id"
-                  >
-                    {{ u.nombre }}
-                  </option>
-                </select>
               </div>
               <div class="pt-1">
                 <button
@@ -107,7 +78,7 @@
         :delay="500"
       >
         <button
-          @click="mostrarModalAgregarEspacio = true"
+          @click="openAddModal" :disabled="catalogReadOnly"
           class="flex justify-center items-center flex-row px-2 py-1 cursor-pointer bg-primary hover:bg-primary-600 text-white rounded-xl text-xs"
         >
           <!-- icono de + -->
@@ -132,10 +103,13 @@
         <div
           v-for="elemento in elementosFiltrados"
           :key="elemento.id"
-          :draggable="true"
+          :draggable="canEditCanvas"
           @dragstart="iniciarArrastre(elemento, $event)"
           @dragend="finalizarArrastre"
-          class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]"
+          :class="[
+            'group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]',
+            catalogReadOnly ? 'catalog-item--disabled cursor-not-allowed hover:scale-100' : ''
+          ]"
           :style="{
             borderLeftColor:
               elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria),
@@ -272,6 +246,7 @@
 import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import {
@@ -313,7 +288,11 @@ const modo = computed(() => props.modo)
 
 // Stores
 const canvasStore = useCanvasStore()
+const { modoEdicion } = storeToRefs(canvasStore)
 const { showToast } = useToast();
+const { canEditCanvas, canMutateCatalog } = useEditorMode()
+const catalogReadOnly = computed(() => !canMutateCatalog.value)
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 const catalogStore = useCatalogStore()
 const { filteredCatalogItems, catalogContext, searchText, selectedCategory, items } =
   storeToRefs(catalogStore)
@@ -321,15 +300,13 @@ const confirmDialog = useConfirmDialog()
 
 // Estado local
 const filtroTexto = searchText
-const categoriaSeleccionada = selectedCategory
 // Filtros UI
 const filtrosVisibles = ref(false)
-const ubicacionSeleccionada = ref('')
 const filtrosBotonRef = ref(null)
 const filtrosPanelRef = ref(null)
 
 const hayFiltrosActivos = computed(() => {
-  return !!(filtroTexto.value || categoriaSeleccionada.value || ubicacionSeleccionada.value)
+  return !!(filtroTexto.value)
 })
 
 const toggleFiltros = () => {
@@ -338,8 +315,6 @@ const toggleFiltros = () => {
 
 const limpiarFiltros = () => {
   filtroTexto.value = ''
-  categoriaSeleccionada.value = null
-  ubicacionSeleccionada.value = ''
 }
 
 const handleClickOutside = (event) => {
@@ -354,6 +329,13 @@ const handleClickOutside = (event) => {
   }
 }
 const mostrarModalAgregarEspacio = ref(false)
+const openAddModal = () => {
+  if (catalogReadOnly.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
+  mostrarModalAgregarEspacio.value = true
+}
 const editingItem = ref(null) // item que se edita
 const editingForm = ref(null) // formulario derivado del item
 const kebabMenu = ref({ visible: false, x: 0, y: 0, item: null })
@@ -390,22 +372,6 @@ const nuevoElemento = ref({
 
 // Computed: categorías disponibles según el tab (dinámicos desde store)
 const categoriasDisponibles = computed(() => (modo.value === 'cuarto' ? canvasStore.catalogos.tiposCuarto : canvasStore.catalogos.tiposEspacio))
-
-// Ubicaciones disponibles según el modo actual
-const ubicacionesDisponibles = computed(() => {
-  // Mapear el modo a los tipos que aplican en constantes
-  const aplicaTipo = modo.value === 'cuarto' ? 'cuartos' : 'elementos'
-  return UBICACIONES_DISPONIBLES.filter((u) => (u.aplicaA || []).includes(aplicaTipo))
-})
-
-// Si la ubicación seleccionada ya no es válida para el modo, limpiar
-watch([ubicacionSeleccionada, ubicacionesDisponibles], () => {
-  const ids = new Set(ubicacionesDisponibles.value.map((u) => u.id))
-  if (ubicacionSeleccionada.value && !ids.has(ubicacionSeleccionada.value)) {
-    ubicacionSeleccionada.value = ''
-  }
-})
-
 // Base por modo (sin filtros de texto/categoría/ubicación) — sirve para decidir si mostrar Filtros
 const elementosBasePorModo = computed(() => {
   const base = Array.isArray(filteredCatalogItems.value)
@@ -425,24 +391,15 @@ const elementosFiltrados = computed(() => {
   // Partimos del base por modo y aplicamos filtros UI
   let out = elementosBasePorModo.value.slice()
 
-  // Filtro por texto (nombre o descripción)
+  // Filtro por texto (nombre, código o código ESL)
   if (filtroTexto && filtroTexto.value) {
     const q = String(filtroTexto.value).toLowerCase()
     out = out.filter((el) => {
       const nombre = String(el.nombre || '').toLowerCase()
-      const desc = String(el.descripcion || '').toLowerCase()
-      return nombre.includes(q) || desc.includes(q)
+      const codigo = String(el.codigo || '').toLowerCase()
+      const codigoESL = String(el.codigoESL || '').toLowerCase()
+      return nombre.includes(q) || codigo.includes(q) || codigoESL.includes(q)
     })
-  }
-
-  // Filtro por categoría
-  if (categoriaSeleccionada.value) {
-    out = out.filter((el) => el.categoria === categoriaSeleccionada.value)
-  }
-
-  // Filtro por ubicación
-  if (ubicacionSeleccionada.value) {
-    out = out.filter((el) => el.ubicacion === ubicacionSeleccionada.value)
   }
 
   return out
@@ -473,7 +430,6 @@ const onGuardarEspacio = (datosEspacio) => {
       })
       items.value.push(item)
     }
-    categoriaSeleccionada.value = null
     filtroTexto.value = ''
     mostrarModalAgregarEspacio.value = false
   } catch (e) {
@@ -483,21 +439,6 @@ const onGuardarEspacio = (datosEspacio) => {
     editingForm.value = null
   }
 }
-
-// Evitar que el select quede con un valor no listado
-watch([() => categoriaSeleccionada.value, () => categoriasDisponibles.value], () => {
-  const ids = new Set((categoriasDisponibles.value || []).map((c) => c.id))
-  if (categoriaSeleccionada.value && !ids.has(categoriaSeleccionada.value)) {
-    categoriaSeleccionada.value = null
-  }
-})
-
-// Si cambiamos a modo 'cuarto', limpiar la ubicación para que no quede filtro oculto aplicado
-watch(modo, (nuevo) => {
-  if (nuevo === 'cuarto') {
-    ubicacionSeleccionada.value = ''
-  }
-})
 
 const getTipoNombre = (tipo) => {
   const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
@@ -553,6 +494,11 @@ const getCardDims = (item) => item?.dimensiones || { ancho: 0, largo: 0, alto: 0
 
 // Drag and Drop
 const iniciarArrastre = (elemento, event) => {
+  if (catalogReadOnly.value || !canEditCanvas.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    event.preventDefault()
+    return
+  }
   if (canvasStore.cambiosNoAplicados) {
     showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn');
     event.preventDefault()
@@ -643,6 +589,10 @@ watch(
 // --- Lógica del menú kebab y edición/eliminación ---
 const toggleKebab = (evt, item) => {
   evt.preventDefault()
+  if (catalogReadOnly.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
   if (isKebabRestricted(item)) return
   const isSame = kebabMenu.value.visible && kebabMenu.value.item?.id === item.id
   kebabMenu.value = isSame
@@ -655,6 +605,10 @@ const closeKebab = () => {
 }
 
 const startEdit = (item) => {
+  if (catalogReadOnly.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return closeKebab()
+  }
   if (!item) return closeKebab()
   const form = toFormFromCatalogItem(item)
   if (!form) return closeKebab()
@@ -671,6 +625,10 @@ const cancelEdit = () => {
 }
 
 const handleDeleteItem = async (item) => {
+  if (catalogReadOnly.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return closeKebab()
+  }
   if (!item) return closeKebab()
   const ok = await confirmDialog.confirm({
     title: 'Eliminar elemento',
@@ -682,6 +640,14 @@ const handleDeleteItem = async (item) => {
   removeCatalogItem(items.value, item.id)
   closeKebab()
 }
+
+watch(modoEdicion, (isEditing) => {
+  if (isEditing) return
+  filtrosVisibles.value = false
+  limpiarFiltros()
+  cancelEdit()
+  closeKebab()
+})
 
 // Cerrar kebab al hacer click fuera
 const onGlobalClickKebab = (e) => {
@@ -701,6 +667,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.catalog-item--disabled {
+  opacity: 0.6;
+}
+
 .unroll-enter-active,
 .unroll-leave-active {
   transition: all 0.3s ease-in-out;

@@ -21,6 +21,7 @@ const historyStack = ref([])
 const currentIndex = ref(-1)
 const maxHistorySize = ref(10) // Máximo 10 estados en el historial
 const isUndoRedoOperation = ref(false)
+const historyApiCache = new WeakMap()
 
 // Sistema de logging para debugging
 const historyEvents = reactive({
@@ -31,6 +32,9 @@ const historyEvents = reactive({
 
 export const useCanvasHistory = () => {
   const canvasStore = useCanvasStore()
+  if (historyApiCache.has(canvasStore)) {
+    return historyApiCache.get(canvasStore)
+  }
 
   // Computed properties
   const canUndo = computed(() => currentIndex.value > 0)
@@ -130,6 +134,11 @@ export const useCanvasHistory = () => {
         changes: changes.length
       })
     } finally {
+      try {
+        canvasStore?.recomputePasilloAssignments?.()
+      } catch (e) {
+        console.warn('No se pudieron recalcular asignaciones de pasillo durante applyIncrementalChanges', e)
+      }
       isUndoRedoOperation.value = false
     }
   }
@@ -137,7 +146,7 @@ export const useCanvasHistory = () => {
   /**
    * Restaurar un snapshot del estado con manejo mejorado de errores
    */
-  const restoreSnapshot = async (snapshot) => {
+  const restoreSnapshot = (snapshot) => {
     isUndoRedoOperation.value = true
 
     try {
@@ -154,6 +163,12 @@ export const useCanvasHistory = () => {
       canvasStore.zoom = snapshot.zoom
       canvasStore.panX = snapshot.panX
       canvasStore.panY = snapshot.panY
+
+      try {
+        canvasStore?.recomputePasilloAssignments?.()
+      } catch (e) {
+        console.warn('No se pudieron recalcular asignaciones de pasillo al restaurar snapshot', e)
+      }
     } catch (error) {
       console.error('Error al restaurar snapshot:', error)
       historyEvents.errors.push({
@@ -191,6 +206,11 @@ export const useCanvasHistory = () => {
       historyStack.value.push(snapshot)
       currentIndex.value = historyStack.value.length - 1
 
+      // Limpiar snapshots antiguos periódicamente (cada 10 operaciones)
+      if (historyEvents.operationsCount > 0 && historyEvents.operationsCount % 10 === 0) {
+        cleanOldSnapshots()
+      }
+
       // Gestión inteligente del tamaño del historial
       if (historyStack.value.length > maxHistorySize.value) {
         // Eliminar estados más antiguos, pero mantener el estado inicial si es posible
@@ -226,26 +246,41 @@ export const useCanvasHistory = () => {
   /**
    * Deshacer la última acción con manejo mejorado de errores
    */
-  const undo = async () => {
+  const undo = () => {
     if (!canUndo.value) {
       console.warn('No hay acciones para deshacer')
       return false
     }
 
     try {
+      // Guardar referencia al elemento actualmente seleccionado
+      const wasElementSelected = canvasStore?.elementoSeleccionado || null
+
       currentIndex.value--
       const snapshot = historyStack.value[currentIndex.value]
 
       // Aplicar cambios según el tipo de snapshot
       if (snapshot.type === 'full') {
-        await restoreSnapshot(snapshot)
+        restoreSnapshot(snapshot)
       } else if (snapshot.changes) {
         // Para cambios incrementales, necesitamos aplicar en reversa
-        await applyIncrementalChanges(snapshot.changes.map(change => ({
+        applyIncrementalChanges(snapshot.changes.map(change => ({
           ...change,
           newValue: change.oldValue,
           oldValue: change.newValue
         })).reverse())
+      }
+
+      // Limpiar estado de "cambios pendientes" si había un elemento seleccionado
+      // Esto evita que el panel de propiedades muestre falsos positivos de cambios
+      if (wasElementSelected && canvasStore?.setCambiosNoAplicados) {
+        canvasStore.setCambiosNoAplicados(false)
+      }
+
+      // Deseleccionar elemento para cerrar el panel y evitar conflictos
+      // El usuario puede volver a seleccionarlo si desea editar
+      if (wasElementSelected && canvasStore?.seleccionarElemento) {
+        canvasStore.seleccionarElemento(null)
       }
 
       // Actualizar eventos
@@ -275,21 +310,36 @@ export const useCanvasHistory = () => {
   /**
    * Rehacer la siguiente acción con manejo mejorado de errores
    */
-  const redo = async () => {
+  const redo = () => {
     if (!canRedo.value) {
       console.warn('No hay acciones para rehacer')
       return false
     }
 
     try {
+      // Guardar referencia al elemento actualmente seleccionado
+      const wasElementSelected = canvasStore?.elementoSeleccionado || null
+
       currentIndex.value++
       const snapshot = historyStack.value[currentIndex.value]
 
       // Aplicar cambios según el tipo de snapshot
       if (snapshot.type === 'full') {
-        await restoreSnapshot(snapshot)
+        restoreSnapshot(snapshot)
       } else if (snapshot.changes) {
-        await applyIncrementalChanges(snapshot.changes)
+        applyIncrementalChanges(snapshot.changes)
+      }
+
+      // Limpiar estado de "cambios pendientes" si había un elemento seleccionado
+      // Esto evita que el panel de propiedades muestre falsos positivos de cambios
+      if (wasElementSelected && canvasStore?.setCambiosNoAplicados) {
+        canvasStore.setCambiosNoAplicados(false)
+      }
+
+      // Deseleccionar elemento para cerrar el panel y evitar conflictos
+      // El usuario puede volver a seleccionarlo si desea editar
+      if (wasElementSelected && canvasStore?.seleccionarElemento) {
+        canvasStore.seleccionarElemento(null)
       }
 
       // Actualizar eventos
@@ -344,7 +394,51 @@ export const useCanvasHistory = () => {
     // Resetear contadores de eventos
     historyEvents.operationsCount = 0
     historyEvents.errors = []
-  }  /**
+  }
+
+  /**
+   * Limpiar snapshots antiguos basados en su edad
+   * @param {number} maxAgeMs - Edad máxima en milisegundos (por defecto 30 minutos)
+   */
+  const cleanOldSnapshots = (maxAgeMs = 30 * 60 * 1000) => {
+    if (historyStack.value.length <= 1) return // Mantener al menos el estado inicial
+
+    const now = Date.now()
+    const currentSnapshot = historyStack.value[currentIndex.value]
+
+    // Filtrar snapshots, manteniendo:
+    // 1. El estado inicial (índice 0)
+    // 2. El estado actual
+    // 3. Estados recientes (dentro de maxAgeMs)
+    const validSnapshots = historyStack.value.filter(
+      (snap, idx) => {
+        if (idx === 0) return true // Siempre mantener el inicial
+        if (idx === currentIndex.value) return true // Siempre mantener el actual
+        return (now - snap.timestamp) < maxAgeMs
+      }
+    )
+
+    if (validSnapshots.length < historyStack.value.length) {
+      // Encontrar el nuevo índice del snapshot actual
+      const newCurrentIndex = validSnapshots.findIndex(
+        s => s.timestamp === currentSnapshot.timestamp
+      )
+
+      historyStack.value = validSnapshots
+      currentIndex.value = newCurrentIndex >= 0 ? newCurrentIndex : validSnapshots.length - 1
+
+      // Log de limpieza
+      historyEvents.lastOperation = {
+        type: 'clean',
+        description: 'Limpieza de snapshots antiguos',
+        timestamp: new Date().toISOString(),
+        removed: historyStack.value.length - validSnapshots.length,
+        historySize: validSnapshots.length
+      }
+    }
+  }
+
+  /**
    * Inicializar historial con estado inicial mejorado
    */
   const initializeHistory = (description = 'Estado inicial') => {
@@ -458,7 +552,7 @@ export const useCanvasHistory = () => {
     return true
   }
 
-  return {
+  const historyApi = {
     // Estado
     isUndoRedoOperation: computed(() => isUndoRedoOperation.value),
 
@@ -480,10 +574,14 @@ export const useCanvasHistory = () => {
     getHistoryInfo,
     getHistoryList,
     jumpToState,
+    cleanOldSnapshots,
 
     // Métodos internos (para testing o casos especiales)
     createSnapshot,
     restoreSnapshot,
     applyIncrementalChanges,
   }
+
+  historyApiCache.set(canvasStore, historyApi)
+  return historyApi
 }

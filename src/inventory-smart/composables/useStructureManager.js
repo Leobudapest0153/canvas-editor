@@ -8,6 +8,7 @@
  */
 
 import { CM_TO_PX } from '@/inventory-smart/utils/constants'
+import { cloneCanvasElement } from '@/inventory-smart/utils/fastClone'
 import { generateCodigo, generateNombre } from '@/inventory-smart/utils/codeNameGenerator.js'
 import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
 
@@ -52,7 +53,8 @@ export function buildStructureFromForm(form) {
       ? { alturaRespectoAlSuelo: Math.round(Number(datosGenerales.alturaRespectoAlSuelo) * 100) }
       : {}),
     // Metadata que indica que al instanciar debe regenerar pisos
-    meta: { tienePisosGenerados: true },
+    // fromForm indica que viene directamente del formulario (no de plantilla guardada)
+    meta: { tienePisosGenerados: true, fromForm: true },
     // Calcular width/height directamente para evitar problemas de serialización
     width: dimsCm.ancho * CM_TO_PX,
     height: dimsCm.largo * CM_TO_PX, // cuartos/espacios usan vista XY (largo->height)
@@ -95,8 +97,8 @@ export function buildStructureFromForm(form) {
       props: { catalogVisible: false },
       // Metadatos diferentes según tipo
       meta: esEspacio
-        ? { esNivelInterno: true, indiceNivel: idx + 1 }
-        : { esPisoInterno: true, indicePiso: idx + 1 },
+        ? { esNivelInterno: true, indiceNivel: idx + 1, fromForm: true }
+        : { esPisoInterno: true, indicePiso: idx + 1, fromForm: true },
     })
     root.hijos.push(childId)
   })
@@ -150,6 +152,8 @@ export function toCatalogItemFromStructure({
       tienePisosGenerados: !!(root?.meta?.tienePisosGenerados || structure.meta?.childrenCount > 0),
       childrenCount: structure.meta?.childrenCount ?? (Array.isArray(root?.hijos) ? root.hijos.length : 0),
       source: kind,
+      // Limpiar fromForm al crear entrada de catálogo (ya no viene directamente del formulario)
+      fromForm: false,
     },
     tags,
   }
@@ -304,11 +308,16 @@ export function removeCatalogItem(itemsArray, id) {
  * Requiere el canvasStore para realizar la inserción (evitamos import directo para no circular).
  */
 export function instantiateStructureOnCanvas(canvasStore, payload, position) {
+  console.time('⏱️ instantiate: total')
   if (!canvasStore || !payload?.rootId || !Array.isArray(payload.elements)) return false
 
-  // Mapear elementos por id
+  console.time('⏱️ instantiate: mapear elementos')
+  // Mapear elementos por id (optimizado: usar cloneCanvasElement)
   const allElementsMap = new Map()
-  for (const el of payload.elements) allElementsMap.set(el.id, JSON.parse(JSON.stringify(el)))
+  for (const el of payload.elements) {
+    allElementsMap.set(el.id, cloneCanvasElement(el))
+  }
+  console.timeEnd('⏱️ instantiate: mapear elementos')
 
   // Regenerar IDs únicos (similar a useCanvasBuffer)
   const newIdMap = new Map()
@@ -423,7 +432,7 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     if (!parentId) { delete base.plantaId; base.padre = null }
 
     let newId
-    if (!parentId) newId = canvasStore.agregarElemento(base, { preserveExistingCode: false, resetName: true, regenerateCode: true })
+    if (!parentId) newId = canvasStore.agregarElemento(base, { preserveExistingCode: false, resetName: false, regenerateCode: true, saveHistory: false, skipReorder: true })
     else newId = addChildDirect(canvasStore, base, parentId)
     if (!newId) return null
 
@@ -437,21 +446,20 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     // Regenerar solo si:
     // 1. Es root con pisos/niveles generados automáticamente
     // 2. Tiene pisos/niveles como hijos
-    // 3. Los pisos/niveles parecen venir del formulario (posiciones básicas) NO de plantilla (posiciones complejas)
-    const shouldRegenerate = isRootWithFloors && hasFloorChildren && childFloors.every((f, idx) => {
-      // Si no tiene posición definida, es del formulario
-      if (!(Number.isFinite(f?.x) && Number.isFinite(f?.y))) return true
-
-      // Si tiene posición básica de formulario (x=0, y secuencial), es del formulario
-      const hasBasicPosition = f.x === 0 && f.y === (idx * 50)
-
-      // Si tiene posición compleja/no básica, es de plantilla -> NO regenerar
-      return hasBasicPosition
-    })
+    // 3. Los pisos/niveles vienen directamente del formulario (no de plantilla guardada)
+    //
+    // DETECCIÓN MEJORADA: Usar metadatos explícitos en lugar de heurística de posiciones
+    // - Si base.meta.fromForm === true → viene directamente del formulario, regenerar
+    // - Si base.meta.fromForm === false o undefined → viene de plantilla/catálogo, NO regenerar
+    // - Fallback: si los hijos tienen fromForm === true en sus metadatos, regenerar
+    const isFromForm = base.meta?.fromForm === true || childFloors.some((f) => f.meta?.fromForm === true)
+    const shouldRegenerate = isRootWithFloors && hasFloorChildren && isFromForm
 
     if (shouldRegenerate) {
+      console.log('Regenerando pisos/niveles internos para', base.tipo || base.categoria, newId)
       regenerateFloors(canvasStore, elem, newMap, newId, base.dimensiones)
     } else if (hasChildren) {
+      console.log('Pegando hijos de', base.tipo || base.categoria, newId)
       for (const hid of elem.hijos) {
         const child = newMap.get(hid)
         if (!child) continue
@@ -463,7 +471,29 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     return newId
   }
 
-  return pasteRecursive(root, position, null)
+  const rootId = pasteRecursive(root, position, null)
+
+  // Reordenar una sola vez al final (en lugar de N veces durante el proceso)
+  if (rootId && canvasStore.reorderVisibleByHeightForContext) {
+    try {
+      const ctxTipo = canvasStore.contextoNavegacion?.value?.tipo || canvasStore.contextoNavegacion?.tipo
+      const ctxId = canvasStore.contextoNavegacion?.value?.id || canvasStore.contextoNavegacion?.id
+      if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+        canvasStore.reorderVisibleByHeightForContext(ctxTipo, ctxId)
+      }
+    } catch (e) { /* noop */ }
+  }
+
+  // Guardar en historial una sola vez al final con toda la estructura
+  if (rootId && canvasStore.saveToHistory) {
+    const elementCount = payload.elements.length
+    const mensaje = elementCount > 1
+      ? `Estructura pegada (${elementCount} elementos)`
+      : `Elemento "${root.nombre || root.tipo}" pegado`
+    canvasStore.saveToHistory(mensaje)
+  }
+
+  return rootId
 }
 
 // Inserción directa como hijo sin depender del contexto
@@ -491,8 +521,7 @@ function addChildDirect(canvasStore, elemento, parentId) {
       else elemento.height = (dims.alto || 10) * 10
     }
 
-    // Generar codigo/nombre de forma unificada como si fuera nuevo (no preservar, resetear nombre)
-    assignCodigoNombre(elemento, canvasStore.elementos, { preserveExistingCode: false, resetName: true, regenerateCode: true })
+    assignCodigoNombre(elemento, canvasStore.elementos, { preserveExistingCode: false, resetName: false, regenerateCode: true })
 
     // Agregar a la lista de elementos
     canvasStore.elementos.push(elemento)
@@ -561,14 +590,19 @@ export function buildStructureFromCanvasElement(canvasStore, elementoId, { offse
     counter++
 
     // Para plantillas: mantener coordenadas tal cual para preservar estructura
-    const cloned = {
-      ...JSON.parse(JSON.stringify(elem)),
-      id: newId,
-      x: (elem.x || 0) + offsetX,
-      y: (elem.y || 0) + offsetY,
-      padre: parentNewId,
-      hijos: [],
+    // Optimizado: usar cloneCanvasElement en lugar de JSON.parse(JSON.stringify())
+    const cloned = cloneCanvasElement(elem)
+    cloned.id = newId
+    cloned.x = (elem.x || 0) + offsetX
+    cloned.y = (elem.y || 0) + offsetY
+    cloned.padre = parentNewId
+    cloned.hijos = []
+    
+    // Limpiar flag fromForm: al serializar desde canvas, ya no es "directo del formulario"
+    if (cloned.meta && cloned.meta.fromForm !== undefined) {
+      cloned.meta = { ...cloned.meta, fromForm: false }
     }
+
     if (level === 0) { delete cloned.plantaId; cloned.padre = null }
     all.set(newId, cloned)
     if (Array.isArray(elem.hijos) && elem.hijos.length) {

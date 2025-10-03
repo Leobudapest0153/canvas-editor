@@ -1,14 +1,32 @@
 <template>
   <div id="inventory-smart">
+    <!-- Mensaje para móviles -->
+    <div v-if="isMobileDevice" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary">
+      <div class="bg-white/95 rounded-2xl p-10 max-w-md w-full text-center shadow-2xl">
+        <div class="text-7xl mb-6">📱</div>
+        <h2 class="text-slate-800 text-2xl font-semibold mb-6">Dispositivo no compatible</h2>
+        <p class="text-slate-600 text-lg leading-relaxed mb-3">Esta aplicación requiere una pantalla de al menos 768px de ancho.</p>
+        <p class="text-slate-600 text-lg leading-relaxed">Por favor, usa una tablet, laptop o computadora de escritorio.</p>
+      </div>
+    </div>
+
     <!-- Panel de plantas -->
-  <PlantasPanel :author="author" @configChanged="handleConfigChanged" />
+  <PlantasPanel
+    :author="author"
+    @configChanged="handleConfigChanged"
+    @back="handleBack"
+    @showIdentifiers="handleShowIdentifiers"
+  />
 
     <!-- Navegación jerárquica -->
     <NavegacionJerarquica />
 
     <main class="app-main relative">
       <!-- Sidebar con tabs -->
-      <div class="app-sidebar-left">
+      <div
+        class="app-sidebar-left"
+        v-if="canvasStore.modoEdicion"
+      >
         <SidebarPanel />
       </div>
 
@@ -26,7 +44,7 @@
         v-if="canvasStore.elementoSeleccionado"
         data-properties-panel
       >
-        <PropiedadesPanel />
+        <PropiedadesPanel @showIdentifier="handleShowIdentifier" />
       </div>
     </main>
     <!-- Contenedor de toasts -->
@@ -37,20 +55,31 @@
     <LoaderOverlay />
     <!-- Gestión de plantas -->
     <WorkspaceEditor />
-
-    <!-- Modal de aviso: el servidor trae cambios más recientes; se descartarán locales -->
-    <ConfirmReplaceModal
-      :mostrar="showReplaceNotice"
-      modo="notice"
-      tipo="info"
-      titulo="Se detectaron cambios en el servidor"
-      mensaje="Para evitar conflictos, se descartarán los cambios locales que tenías sin guardar y se aplicará la configuración más reciente del servidor."
-      :closeOnBackdrop="true"
-      @confirmar="applyPendingServerConfig"
-      @cerrar="applyPendingServerConfig"
+    <UnsavedChangesModal
+      :open="showUnsavedModal"
+      :changes="unsavedDiff.changes"
+      :summary="unsavedDiff.summary"
+      @close="handleDismissUnsavedModal"
+      @save="saveAndExit"
+      @continue="exitWithoutSaving"
     />
+
     <!-- Gestión de pisos de cuartos desde las propiedades -->
     <ManagmentFloorRoomPropertiesModal/>
+
+    <IdentifyEslModal
+      v-if="isIdentifyEslModalOpen"
+      @close="handleIdentifyEslClose"
+      @save="handleIdentifyEslSave"
+    />
+
+    <!-- Alerta de contexto de navegación -->
+    <ContextAlert
+      :show="contextAlert.showAlert.value"
+      :message="contextAlert.alertMessage.value"
+      :duration="contextAlert.alertDuration.value"
+      @close="contextAlert.hideAlert"
+    />
   </div>
 </template>
 
@@ -63,24 +92,61 @@ import PropiedadesPanel from './components/PropiedadesPanel.vue'
 import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import ManagmentFloorRoomPropertiesModal from './components/modals/ManagmentFloorRoomPropertiesModal.vue'
+import IdentifyEslModal from './components/modals/IdentifyEslModal.vue'
+import ContextAlert from './components/ContextAlert.vue'
 import { useCanvasImportExport } from './composables/useCanvasImportExport'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
 import { useDeleteElement } from './composables/useDeleteElement'
 import { useAutoPaste } from './composables/useAutoPaste'
 import { useToast } from './composables/useToast'
+import { useContextAlert } from './composables/useContextAlert'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import LoaderOverlay from './components/LoaderOverlay.vue'
-import { AUTOSAVE_CONFIG } from '@/inventory-smart/utils/constants'
-import ConfirmReplaceModal from '@/inventory-smart/components/modals/ConfirmReplaceModal.vue'
+// removed autosave/backup constants
 import { useServicesStore } from './stores/services.js'
 import { useStatePersistence } from './composables/useStatePersistence'
+import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
+import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
+import UnsavedChangesModal from './components/UnsavedChangesModal.vue'
+import { useEditorMode } from './composables/useEditorMode'
+import { useEditorShortcuts } from './composables/useEditorShortcuts'
+import { useCatalogStore } from './stores/catalog'
 
 const props = defineProps({
   configCanvas: {
     type: [String, null],
     default: () => '',
+  },
+  predefinedElements: {
+    type: Array,
+    default: () => null,
+    validator: (value) => {
+      if (value === null) return true
+      if (!Array.isArray(value)) return false
+      return value.every(item =>
+        item &&
+        typeof item === 'object' &&
+        typeof item.id === 'string' &&
+        typeof item.nombre === 'string' &&
+        typeof item.tipo === 'string'
+      )
+    }
+  },
+  supportedProductTypes: {
+    type: Array,
+    default: () => null,
+    validator: (value) => {
+      if (value === null) return true
+      if (!Array.isArray(value)) return false
+      return value.every(item =>
+        item &&
+        typeof item === 'object' &&
+        typeof item.id === 'string' &&
+        typeof item.nombre === 'string'
+      )
+    }
   },
   author: {
     type: Object,
@@ -104,7 +170,7 @@ const props = defineProps({
     }
   }
 })// Definir emits para comunicar cambios al componente padre
-const emit = defineEmits(['configUpdated'])
+const emit = defineEmits(['configUpdated', 'back', 'printIdentifiers', 'printIdentifier'])
 
 const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
@@ -113,6 +179,21 @@ const { deleteSelected } = useDeleteElement()
 const { handlePaste: autoPaste } = useAutoPaste()
 const { showToast } = useToast()
 const servicesStore = useServicesStore()
+const { ensureEditable } = useEditorMode()
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
+const catalogStore = useCatalogStore()
+
+// Inicializar sistema de alertas de contexto
+const contextAlert = useContextAlert()
+
+// Estado reactivo para saber si es móvil
+const isMobileDevice = ref(false)
+
+let mediaQuery
+
+const updateMediaQuery = (e) => {
+  isMobileDevice.value = e.matches
+}
 
 // ======= Gestión de Servicios Externos =======
 // Registrar servicios externos en la store cuando cambien las props
@@ -151,64 +232,7 @@ const externalServicesAPI = {
 }
 
 const canvasViewRef = ref(null)
-
-// Estado del modal de aviso de reemplazo por servidor
-const showReplaceNotice = ref(false)
-let pendingServerConfig = null
-// Flag para evitar ejecuciones duplicadas del handler (confirmar + cerrar)
-const isApplyingServerConfig = ref(false)
-
-// Helper: obtener la instancia de autosave registrada en el store
-const getAutoSaveInstance = () => {
-  const auto = canvasStore?.autoSaveInstance
-  return auto && ('value' in auto ? auto.value : auto)
-}
-
-// Limpia las copias de seguridad locales (autosave)
-const clearLocalBackups = async () => {
-  try {
-    // Reutilizar instancia de autosave si está registrada en el store
-    const instance = getAutoSaveInstance()
-    if (instance?.clearAllBackups) {
-      await instance.clearAllBackups()
-    } else {
-      // Fallback a localStorage por compatibilidad
-      localStorage.removeItem(AUTOSAVE_CONFIG.STORAGE_KEY)
-    }
-  } catch (e) {
-    console.warn('No se pudieron limpiar los backups locales', e)
-  }
-}
-
-const applyPendingServerConfig = async () => {
-  // Evitar ejecuciones duplicadas (p. ej., si el modal emite confirmar y luego cerrar)
-  if (isApplyingServerConfig.value) return
-  if (!pendingServerConfig) {
-    showReplaceNotice.value = false
-    return
-  }
-  isApplyingServerConfig.value = true
-  try {
-    showToast('Aplicando configuración del servidor…', 'info')
-    const instance = getAutoSaveInstance()
-    const wasEnabled = instance?.isEnabled === true
-    // Pausar autosave si aplica
-    instance?.stopAutoSave?.()
-    // Al aplicar servidor, limpiar backups locales
-    await clearLocalBackups()
-    const ok = canvasStore.deserialize(pendingServerConfig)
-    // Crear un backup inmediato del estado aplicado
-    if (ok && instance?.performBackup) {
-      await instance.performBackup({ isServerVersion: true })
-    }
-    // Reanudar autosave si estaba activo
-    if (wasEnabled) instance?.startAutoSave?.()
-  } finally {
-    pendingServerConfig = null
-    showReplaceNotice.value = false
-    isApplyingServerConfig.value = false
-  }
-}
+// const lastAppliedConfig = ref(null)
 
 // Manejador para cuando PlantasPanel emite cambios de configuración
 const handleConfigChanged = (configSerializada) => {
@@ -221,6 +245,8 @@ const handleConfigChanged = (configSerializada) => {
 
     // Emitir al componente padre la configuración actualizada
     emit('configUpdated', configSerializada)
+    // Registrar última config emitida para evitar rehidratación inmediata en eco del padre
+    // lastAppliedConfig.value = configSerializada
 
   } catch (error) {
     console.error('Error al procesar la configuración actualizada:', error)
@@ -228,50 +254,129 @@ const handleConfigChanged = (configSerializada) => {
   }
 }
 
-// Atajos de teclado globales
-const handleKeydown = (e) => {
-  // Solo procesar si no estamos en un input
-  if (e.target.matches('input, textarea, select, [contenteditable]')) {
-    return
-  }
+const handleShowIdentifiers = (value) => {
+  emit('printIdentifiers', value)
+}
 
-  // Bloquear si hay texto seleccionado
-  if (window.getSelection().toString()) {
-    return
-  }
+const handleShowIdentifier = (value) => {
+  emit('printIdentifier', value)
+}
 
-  // Bloquear si hay drag global activo
-  if (typeof window !== 'undefined' && window.__dvCanvasDragActive) {
-    return
-  }
+const elementoEslActual = computed(() => {
+  const targetId = canvasStore.elementoEslObjetivo
+  if (!targetId) return null
+  return canvasStore.elementoPorId(targetId)
+})
 
-  if (e.ctrlKey || e.metaKey) {
-    if (e.key === 'z' && !e.shiftKey) {
-      e.preventDefault()
-      undo()
-    } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
-      e.preventDefault()
-      redo()
-    } else if (e.key === 'c') {
-      e.preventDefault()
-      handleCopyToBuffer()
-    } else if (e.key === 'v') {
-      e.preventDefault()
-      triggerPaste()
+const isIdentifyEslModalOpen = computed(() => canvasStore.modoConfigurarEsl && !!canvasStore.elementoEslObjetivo)
+
+const handleIdentifyEslSave = ({ codigoEsl }) => {
+  if (!canvasStore.elementoEslObjetivo) return
+  const success = canvasStore.guardarCodigoEslElemento(canvasStore.elementoEslObjetivo, codigoEsl)
+  if (success) {
+    const target = elementoEslActual.value
+    const descriptor = target?.nombre || target?.codigo || target?.id || 'elemento'
+    showToast(`Código ESL configurado para ${descriptor}`, 'success')
+  } else {
+    showToast('No se pudo actualizar el código ESL', 'error')
+  }
+}
+
+const handleIdentifyEslClose = () => {
+  canvasStore.finalizarConfiguracionEsl()
+}
+
+// Propagar evento regresar
+const changeHistoryStore = useChangeHistoryStore()
+const showUnsavedModal = ref(false)
+const unsavedDiff = ref({ changes: [], summary: { created:0, updated:0, deleted:0 } })
+const pendingExitReason = ref(null)
+const bypassBeforeUnloadOnce = ref(false)
+
+const getCurrentCanvasState = () => ({ plantas: canvasStore.plantas, elementos: canvasStore.elementos })
+
+const requestUnsavedConfirmation = (reason) => {
+  try {
+    const diff = changeHistoryStore.previewUnsavedChanges(getCurrentCanvasState())
+    if (diff?.changes?.length) {
+      pendingExitReason.value = reason
+      unsavedDiff.value = diff
+      showUnsavedModal.value = true
+      return true
     }
-  } else if (e.key === 'Delete' || e.key === 'Backspace') {
-    // Supr o Retroceso -> eliminar seleccionado
-    const hasSelection = !!canvasStore.elementoSeleccionado
-    if (hasSelection) {
-      e.preventDefault()
-      // No es necesario await; el modal gestiona la interacción
-      deleteSelected({ withConfirm: true })
-    }
+  } catch (e) {
+    console.warn('No se pudo evaluar cambios pendientes', e)
   }
+  return false
+}
+
+const handleBack = () => {
+  if (requestUnsavedConfirmation('back')) return
+  emit('back')
+}
+
+const handleDismissUnsavedModal = () => {
+  showUnsavedModal.value = false
+  pendingExitReason.value = null
+}
+
+const continueUnloadFlow = () => {
+  if (typeof window === 'undefined') return
+  bypassBeforeUnloadOnce.value = true
+  window.setTimeout(() => {
+    window.location.reload()
+  }, 50)
+}
+
+const saveAndExit = () => {
+  const reason = pendingExitReason.value
+  try {
+    const json = canvasStore.serialize(true)
+    // Registrar última config emitida para evitar eco inmediato
+    // lastAppliedConfig.value = json
+    emit('configUpdated', json)
+  } catch (e) {
+    console.warn('Error serializando antes de salir', e)
+  }
+  showUnsavedModal.value = false
+  pendingExitReason.value = null
+
+  if (reason === 'back') {
+    emit('back')
+  } else if (reason === 'unload') {
+    continueUnloadFlow()
+  }
+}
+
+const exitWithoutSaving = () => {
+  const reason = pendingExitReason.value
+  showUnsavedModal.value = false
+  pendingExitReason.value = null
+
+  if (reason === 'back') {
+    emit('back')
+  } else if (reason === 'unload') {
+    continueUnloadFlow()
+  }
+}
+
+const handleBeforeUnload = (event) => {
+  if (bypassBeforeUnloadOnce.value) {
+    bypassBeforeUnloadOnce.value = false
+    return
+  }
+  const shouldBlock = requestUnsavedConfirmation('unload')
+  if (!shouldBlock) return
+  const warningMessage = 'Tienes cambios sin guardar. ¿Seguro que deseas salir sin guardar?'
+  event.preventDefault()
+  event.returnValue = warningMessage
 }
 
 // Handlers para buffer
 const handleCopyToBuffer = () => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
   const elementoSeleccionado = canvasStore.elementoSeleccionado
   if (elementoSeleccionado) {
     buffer.copyToBuffer(elementoSeleccionado)
@@ -279,6 +384,9 @@ const handleCopyToBuffer = () => {
 }
 
 const triggerPaste = () => {
+  if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+    return
+  }
   try {
     const stage = canvasViewRef.value?.getStage?.()
     const viewportSize = canvasViewRef.value?.getStageSize?.() || null
@@ -328,153 +436,108 @@ const triggerPaste = () => {
   }
 }
 
-// ======= Resolución de conflictos (Servidor vs Backups locales) =======
-// Helper: obtener timestamp (ms) desde una configuración serializada
-const getConfigTimestamp = (jsonString) => {
-  try {
-    const data = JSON.parse(jsonString)
-    const ts = data?.meta?.timestamp
-    const t = ts ? Date.parse(ts) : NaN
-    return Number.isFinite(t) ? t : null
-  } catch (e) {
-    console.warn('No se pudo parsear timestamp de configuración', e)
-    return null
-  }
-}
+useEditorShortcuts({
+  onUndo: () => undo(),
+  onRedo: () => redo(),
+  onCopy: () => handleCopyToBuffer(),
+  onPaste: () => triggerPaste(),
+  onDelete: () => {
+    if (!ensureEditable(() => showToast(VISUAL_MODE_MESSAGE, 'warning'))) {
+      return
+    }
+    if (!canvasStore.elementoSeleccionado) return
+    deleteSelected({ withConfirm: true })
+  },
+  onBlocked: () => showToast(VISUAL_MODE_MESSAGE, 'warning'),
+})
 
-// Helper: carga la copia de seguridad local más reciente
-const getLatestLocalBackup = () => {
-  try {
-    const raw = localStorage.getItem(AUTOSAVE_CONFIG.STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    const backups = Array.isArray(parsed?.backups) ? parsed.backups : []
-    if (!backups.length) return null
-    // Elegir por timestamp más reciente (fallback a meta interna si existe)
-    const withTs = backups.map((b) => {
-      let t = b?.timestamp ? Date.parse(b.timestamp) : NaN
-      if (!Number.isFinite(t)) {
-        try {
-          const d = JSON.parse(b?.data || '{}')
-          const mt = Date.parse(d?.meta?.timestamp)
-          if (Number.isFinite(mt)) t = mt
-        } catch (e) { /* noop */ }
+// (Removed backup/restore/version comparison helpers)
+
+// Hidratar SIEMPRE ante cambios de la prop configCanvas (reacciona a cambios externos)
+watch(
+  () => props.configCanvas,
+  (json) => {
+    if (typeof json !== 'string' || json.trim().length === 0) return
+    // Evitar reimportar exactamente la misma configuración ya aplicada
+    // if (json === lastAppliedConfig.value) return
+    try {
+      const ok = canvasStore.deserialize(json)
+      if (!ok) {
+        showToast('No se pudo importar la configuración', 'error')
+      } else {
+        // lastAppliedConfig.value = json
       }
-      return { ...b, _ts: Number.isFinite(t) ? t : 0 }
-    })
-    withTs.sort((a, b) => b._ts - a._ts)
-    const latest = withTs[0]
-    // Normalizar resultado
-    return latest ? { id: latest.id, timestamp: latest.timestamp, ts: latest._ts, data: latest.data } : null
-  } catch (e) {
-    return null
-  }
-}
-
-const fmtDate = (iso) => {
-  try {
-    return new Date(iso).toLocaleString('es-ES', {
-      hour12: true,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  } catch {
-    return iso || ''
-  }
-}
+    } catch (e) {
+      console.error('Error deserializando configCanvas:', e)
+      showToast('Error al importar la configuración', 'error')
+    }
+  },
+  { immediate: true }
+)
 
 onMounted(() => {
   try {
-    window.addEventListener('keydown', handleKeydown)
+    // Crear media query para max-width 767px (smartphones)
+    mediaQuery = window.matchMedia('(max-width: 767px)')
+
+    // Inicializar valor
+    isMobileDevice.value = mediaQuery.matches
+
+    // Escuchar cambios
+    mediaQuery.addEventListener('change', updateMediaQuery)
 
     // Provide de la API de servicios externos para componentes hijos
     provide('externalServicesAPI', externalServicesAPI)
   } catch (error) {
-    window.removeEventListener('keydown', handleKeydown)
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
     showToast('Ha ocurrido un error al importar la configuración', 'error')
     console.error('Error al importar la configuración:', error)
   }
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown)
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+  }
+
+    if (mediaQuery) {
+    mediaQuery.removeEventListener('change', updateMediaQuery)
+  }
 })
 
 watch(
-  () => props.configCanvas,
-  async (newConfig, oldConfig) => {
+  () => props.predefinedElements,
+  (newElements) => {
     try {
-      // Si no se provee una configuracion inicial
-      if (!newConfig) {
-        const mensaje = oldConfig ? null : 'Iniciando área de trabajo'
-        if (mensaje) showToast(mensaje, 'info' )
-        const plantaInicial = canvasStore.plantas.find((p) => p.activa) || canvasStore.plantas[0]
-        if (plantaInicial) {
-          canvasStore.navegarAPlanta(plantaInicial.id)
-        }
-        return
-      }
-
-      // Validar la prop
-      const isValid = validarJSON(newConfig)
-      if (!isValid) {
-        showToast('La configuración importada no es válida', 'error')
-        return
-      }
-
-      // Comparar timestamps entre servidor y backup local más reciente
-      const serverTs = getConfigTimestamp(newConfig)
-      const latestBackup = getLatestLocalBackup()
-      const { getLastSerializationTimestamp } = useStatePersistence()
-      const latestBackupTimestamp = Date.parse(getLastSerializationTimestamp())
-
-      // Si hay backup y es más reciente que el servidor -> restaurar backup automáticamente
-      if (latestBackup && latestBackupTimestamp && (!latestBackupTimestamp || latestBackupTimestamp > serverTs)) {
-        const restored = canvasStore.deserialize(latestBackup.data)
-        if (restored) {
-          showToast(
-            `Restaurando últimos cambios sin guardar (${fmtDate(latestBackup.timestamp)}).`,
-            'info',
-          )
-          return
-        }
-      }
-
-      // Si el servidor es más reciente que el backup local -> solo avisar y aplicar servidor
-      if (serverTs && latestBackup && latestBackupTimestamp && serverTs > latestBackupTimestamp) {
-        pendingServerConfig = newConfig
-        showReplaceNotice.value = true
-        return
-      }
-
-      // Caso por defecto: aplicar servidor (y limpiar backups locales)
-      const mensaje = oldConfig ? null : 'Iniciando área de trabajo'
-      if (mensaje) showToast(mensaje, 'info' )
-      const instance = getAutoSaveInstance()
-      const wasEnabled = instance?.isEnabled === true
-      instance?.stopAutoSave?.()
-      await clearLocalBackups()
-      const ok = canvasStore.deserialize(newConfig)
-      // Crear un backup inmediato del estado del servidor
-      if (ok && instance?.performBackup) {
-        await instance.performBackup({ isServerVersion: true })
-      }
-      if (wasEnabled) instance?.startAutoSave?.()
+      catalogStore.setPredefinedElements(newElements)
     } catch (error) {
-      showToast('Ha ocurrido un error al importar la configuración', 'error')
-      console.error('Error al importar la configuración:', error)
+      console.error('Error al configurar elementos predefinidos:', error)
+      showToast('Error al configurar elementos predefinidos', 'error')
     }
   },
+  { immediate: true }
+)
+
+watch(
+  () => props.supportedProductTypes,
+  (newTipos) => {
+    try {
+      canvasStore.setTiposProductoAdmitidos(newTipos)
+    } catch (error) {
+      console.error('Error al configurar tipos de producto admitidos:', error)
+      showToast('Error al configurar tipos de producto admitidos', 'error')
+    }
+  },
+  { immediate: true }
 )
 </script>
 
 <style>
 @import 'tailwindcss';
 
-/* Ignorar warning de unknown at rule */
+/* Ignorar warning de unknown at rule @theme */
 @theme {
   --color-primary: #1c1e4d;
   --color-primary-100: #f0f1f5;
@@ -748,7 +811,6 @@ watch(
   outline: 2px dashed red;
 }
 
-/* Cambios recientes */
 .elastic-badge {
   display: inline-flex;
   align-items: center;

@@ -10,7 +10,10 @@ import { enablePerfMode } from '@/inventory-smart/composables/usePerfMode'
 import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { applyEdgeConstraint } from '@/inventory-smart/utils/edgeConstraint'
 import { resetEdgeState } from '@/inventory-smart/composables/useEdgeState'
-import { finalizePlacement } from '@/inventory-smart/utils/finalizeDrag'
+import { finalizePlacement, solveFinalPlacement } from '@/inventory-smart/utils/finalizeDrag'
+import { solveDragPosition } from '@/inventory-smart/utils/placementSolver'
+import { resolveCoplanarNeighbors, rangesOverlap, PLACEMENT_TOLERANCES } from '@/inventory-smart/validation/placementOrchestrator'
+import { resolveVerticalProps } from '@/inventory-smart/validation/fieldResolvers'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
 import { GRID_SIZE, CM_TO_PX } from '@/inventory-smart/utils/constants'
@@ -60,6 +63,8 @@ export function useElementDrag({
   const rafControllers = new Map()
   const perfContexts = new Map()
   const innerSessions = new Map()
+  // Estado de contacto por elemento para deslizamiento (como en sesiones internas)
+  const contactState = new Map()
   const throttle2 = throttleEveryNFrames(2)
 
   // Schedule drawing
@@ -78,16 +83,9 @@ export function useElementDrag({
     })
   }
 
-  // Resolver posición contra obstáculos bloqueantes (suelo–suelo) usando MTD AABB
+  // Resolver posición con solver compartido (deslizante por eje, multi-vecino), respetando polígono/infinito
   const resolveAgainstBlockingObstacles = (candidateX, candidateY, elemento) => {
     const all = canvasStore.elementosVisibles
-    const w = elemento.width
-    const h = elemento.height
-    let x = candidateX
-    let y = candidateY
-
-    // Iterar para resolver múltiples colisiones respetando contorno
-    const MAX_ITERS = 3
     const boundary = computeBoundary() || {}
     const areaBounds = boundaryToAreaBounds(boundary, {
       minX: 0,
@@ -97,145 +95,51 @@ export function useElementDrag({
       mode: boundary?.mode || 'fixed',
       polygon: boundary?.type === 'polygon' ? boundary.points : null,
     })
-    const boundaryMode = areaBounds.mode ?? 'fixed'
-    const clampToBoundary = boundaryMode !== 'elastic'
-    const boundaryType = boundary.type
-    const rectMinX = areaBounds.minX ?? 0
-    const rectMinY = areaBounds.minY ?? 0
-    const rectWidth = boundaryType === 'rect' ? Math.max(0, (areaBounds.maxX ?? rectMinX) - rectMinX) : Infinity
-    const rectHeight = boundaryType === 'rect' ? Math.max(0, (areaBounds.maxY ?? rectMinY) - rectMinY) : Infinity
 
-    // Paso (1): clamp al área primero
-    if (clampToBoundary && boundaryType === 'rect') {
-      const c = clampRectToRect(x - rectMinX, y - rectMinY, w, h, rectWidth, rectHeight)
-      x = c.x + rectMinX
-      y = c.y + rectMinY
-    } else if (clampToBoundary && boundaryType === 'polygon') {
-      // Para elementos circulares, usar clamp circular con posición previa para movimiento suave
-      if (elemento.forma === 'circular') {
-        const radius = Math.min(w, h) / 2
-        const centerX = x + radius
-        const centerY = y + radius
+    // Vecinos candidatos (excluir self)
+    const candidates = all.filter((e) => e && e.id !== elemento.id)
+    // Coplanares (misma ubic y misma capa Z)
+    const coplanar = resolveCoplanarNeighbors({ ...elemento }, candidates)
+    const hardNeighbors = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'suelo' && (elemento.ubicacion || 'suelo') === 'suelo')
 
-        // Obtener posición previa para movimiento suave
-        const lastPos = lastValidPositions.value.get(elemento.id)
-        const previousCenter = lastPos ? { x: lastPos.x + radius, y: lastPos.y + radius } : null
-
-        const clampedCenter = clampCircleToPolygonSmooth(
-          { x: centerX, y: centerY, radius },
-          boundary.inset,
-          previousCenter
-        )
-        x = clampedCenter.x - radius
-        y = clampedCenter.y - radius
-      } else {
-        const c = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
-        x = c.x
-        y = c.y
+    // Soft neighbors para efecto deslizante:
+    // - pared–pared: coplanares en pared
+    const softWalls = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'pared' && (elemento.ubicacion || 'suelo') === 'pared')
+    // - suelo–pared con solape vertical (Z)
+    const softCross = candidates.filter((n) => {
+      const ua = (elemento.ubicacion || 'suelo').toLowerCase()
+      const ub = (n.ubicacion || 'suelo').toLowerCase()
+      if ((ua === 'suelo' && ub === 'pared') || (ua === 'pared' && ub === 'suelo')) {
+        const a = resolveVerticalProps(elemento, {})
+        const b = resolveVerticalProps(n, {})
+        if (!Number.isFinite(a.zBaseCm) || !Number.isFinite(a.altoCm) || !Number.isFinite(b.zBaseCm) || !Number.isFinite(b.altoCm)) return false
+        const a0 = a.zBaseCm, a1 = a.zBaseCm + a.altoCm
+        const b0 = b.zBaseCm, b1 = b.zBaseCm + b.altoCm
+        return rangesOverlap(a0, a1, b0, b1, PLACEMENT_TOLERANCES.Z_LAYER)
       }
-    }
+      return false
+    })
+    const softNeighbors = [...softWalls, ...softCross]
 
-    for (let iter = 0; iter < MAX_ITERS; iter++) {
-      const moving = { ...elemento, x, y }
-      const conflicts = detectConflictsFor(moving, all)
-      const blocking = conflicts.filter((c) => c.bloqueante)
-      if (blocking.length === 0) break
+    const lastPos = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+    const lastVel = lastVelocityMap.value.get(elemento.id) || { x: 0, y: 0 }
 
-      // (3) MTD agregado sobre AABB
-      let accDx = 0
-      let accDy = 0
-      for (const c of blocking) {
-        const otherId = c.aId === elemento.id ? c.bId : c.aId
-        const other = all.find((el) => el.id === otherId)
-        if (!other) continue
-        const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height)
-        accDx += dx
-        accDy += dy
-      }
+    const moving = elemento.forma === 'circular'
+      ? { ...elemento, width: Math.min(elemento.width, elemento.height), height: Math.min(elemento.width, elemento.height), forma: 'circular' }
+      : { ...elemento, forma: elemento.forma || 'rectangular' }
 
-      // Ignorar correcciones muy pequeñas (ruido/rounding) SOLO en vista frontal (XZ)
-      if (canvasStore.vistaActiva === 'XZ') {
-        const MIN_NUDGE_PX = 0.5
-        if (Math.abs(accDx) < MIN_NUDGE_PX && Math.abs(accDy) < MIN_NUDGE_PX) break
-        if (Math.abs(accDx) < MIN_NUDGE_PX) accDx = 0
-        if (Math.abs(accDy) < MIN_NUDGE_PX) accDy = 0
-      }
+    const solved = solveDragPosition({
+      candidate: { x: candidateX, y: candidateY },
+      movingEl: moving,
+      hardNeighbors,
+      softNeighbors,
+      areaBounds,
+      lastValidPos: lastPos,
+      lastVelocity: lastVel,
+      maxIters: 6,
+    })
 
-      // Proyección del MTD contra el contorno rectangular
-      if (clampToBoundary && boundaryType === 'rect') {
-        const proj = projectMTDAgainstBoundary(
-          x - rectMinX,
-          y - rectMinY,
-          accDx,
-          accDy,
-          w,
-          h,
-          rectWidth,
-          rectHeight,
-        )
-        accDx = proj.dx
-        accDy = proj.dy
-      }
-
-      // Aplicar MTD y volver a clavar al área
-      x += accDx
-      y += accDy
-
-      if (clampToBoundary && boundaryType === 'rect') {
-        const c2 = clampRectToRect(x - rectMinX, y - rectMinY, w, h, rectWidth, rectHeight)
-        x = c2.x + rectMinX
-        y = c2.y + rectMinY
-      } else if (clampToBoundary && boundaryType === 'polygon') {
-        if (elemento.forma === 'circular') {
-          const radius = Math.min(w, h) / 2
-          const centerX = x + radius
-          const centerY = y + radius
-
-          // Obtener posición previa para movimiento suave
-          const lastPos = lastValidPositions.value.get(elemento.id)
-          const previousCenter = lastPos ? { x: lastPos.x + radius, y: lastPos.y + radius } : null
-
-          const clampedCenter = clampCircleToPolygonSmooth(
-            { x: centerX, y: centerY, radius },
-            boundary.inset,
-            previousCenter
-          )
-          x = clampedCenter.x - radius
-          y = clampedCenter.y - radius
-        } else {
-          const c2 = clampRectToPolygon({ x, y, width: w, height: h }, boundary.inset)
-          x = c2.x
-          y = c2.y
-        }
-      }
-
-      // Si la corrección fue nula o insignificante, detener
-      if (Math.abs(accDx) < 1e-6 && Math.abs(accDy) < 1e-6) break
-    }
-
-    // Validaciones finales: si aún hay colisión bloqueante o quedó fuera, volver a última válida
-    const movingEnd = { ...elemento, x, y }
-    const endConf = detectConflictsFor(movingEnd, all).filter((c) => c.bloqueante)
-    const outsideArea =
-      clampToBoundary &&
-      (boundaryType === 'rect'
-        ? x < rectMinX - 1e-6 ||
-          y < rectMinY - 1e-6 ||
-          x + w > rectMinX + rectWidth + 1e-6 ||
-          y + h > rectMinY + rectHeight + 1e-6
-        : !pointInPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.points))
-    if (outsideArea) {
-      const cp = clampPointToPolygon({ x: x + w / 2, y: y + h / 2 }, boundary.inset)
-      x = cp.x - w / 2
-      y = cp.y - h / 2
-    }
-    if (endConf.length > 0 || outsideArea) {
-      const prev = lastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
-      return { x: prev.x, y: prev.y, fellBack: true }
-    }
-
-    // No hacer snap aquí para no cuantizar el arrastre
-    return { x, y, fellBack: false }
+    return { x: solved.x, y: solved.y, fellBack: solved.fellBack }
   }
 
   // Map of template refs for draggable nodes, keyed by element id
@@ -543,12 +447,34 @@ export function useElementDrag({
           let candY = shape.y()
 
           // Vecinos bloqueantes (suelo–suelo)
-          const neighbors = canvasStore.elementosVisibles.filter(
-            (e) =>
-              e.id !== elementId &&
-              (e.ubicacion || 'suelo') === 'suelo' &&
-              (elementoActual.ubicacion || 'suelo') === 'suelo',
-          )
+          let neighbors = []
+          try {
+            const isInfiniteFloor = canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true
+            const plantaId = canvasStore.plantaActivaData?.id
+            if (isInfiniteFloor && plantaId && typeof canvasStore.elementosEnPlanta === 'function') {
+              neighbors = (canvasStore.elementosEnPlanta(plantaId) || []).filter(
+                (e) =>
+                  e &&
+                  e.id !== elementId &&
+                  (e.ubicacion || 'suelo') === 'suelo' &&
+                  (elementoActual.ubicacion || 'suelo') === 'suelo',
+              )
+            } else {
+              neighbors = canvasStore.elementosVisibles.filter(
+                (e) =>
+                  e.id !== elementId &&
+                  (e.ubicacion || 'suelo') === 'suelo' &&
+                  (elementoActual.ubicacion || 'suelo') === 'suelo',
+              )
+            }
+          } catch {
+            neighbors = canvasStore.elementosVisibles.filter(
+              (e) =>
+                e.id !== elementId &&
+                (e.ubicacion || 'suelo') === 'suelo' &&
+                (elementoActual.ubicacion || 'suelo') === 'suelo',
+            )
+          }
 
           // strokePxEstable: usar el stroke normal del elemento (no la selección). Por defecto 1px
           const strokePx = 1
@@ -741,15 +667,26 @@ export function useElementDrag({
           polygon: boundary?.type === 'polygon' ? boundary.points : null,
           mode: boundary?.mode || 'fixed',
         })
-        const neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
-        const isValidNow = isPlacementValid({
-          pos: { x: finalX, y: finalY },
-          movingEl: storeEl,
-          neighbors,
-          areaBounds,
-          CM_TO_PX,
-          epsPx: 0.5,
-        })
+          let neighbors = []
+          try {
+            const isInfiniteFloor = canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true
+            const plantaId = canvasStore.plantaActivaData?.id
+            if (isInfiniteFloor && plantaId && typeof canvasStore.elementosEnPlanta === 'function') {
+              neighbors = (canvasStore.elementosEnPlanta(plantaId) || []).filter((e) => e && e.id !== elementId)
+            } else {
+              neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
+            }
+          } catch {
+            neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
+          }
+          const isValidNow = isPlacementValid({
+            pos: { x: finalX, y: finalY },
+            movingEl: storeEl,
+            neighbors,
+            areaBounds,
+            CM_TO_PX,
+            epsPx: 0.5,
+          })
 
         if (isValidNow) {
           const guardRes = onDragEndGuard(storeEl, { x: finalX, y: finalY })
@@ -816,6 +753,8 @@ export function useElementDrag({
         /* ignore */
       }
     }
+    // Limpiar memoria de contacto del elemento al finalizar
+    contactState.delete(elementId)
     rafControllers.delete(elementId)
     const perf = perfContexts.get(elementId)
     try {
@@ -824,6 +763,25 @@ export function useElementDrag({
       console.warn('Error al restaurar el contexto de rendimiento del elemento:', elementId)
     }
     perfContexts.delete(elementId)
+
+    // Forzar un redibujado completo del layer para asegurar que todos los elementos se renderizan correctamente
+    // Esto es especialmente importante cuando hay elementos grandes que pueden haber usado cache
+    try {
+      const layer = layerRef.value?.getNode?.()
+      if (layer) {
+        await nextTick()
+        // Limpiar cache del layer completo y redibujar
+        layer.clearCache?.()
+        layer.batchDraw?.()
+        // Segundo frame para asegurar que el navegador ha procesado el cambio
+        await new Promise((r) => requestAnimationFrame(() => {
+          layer.batchDraw?.()
+          r()
+        }))
+      }
+    } catch (err) {
+      console.warn('Error al forzar redibujado completo del layer:', err)
+    }
   }
 
   const onShapeDragStart = (e, el) => {
@@ -975,6 +933,7 @@ export function useElementDrag({
     stageDragEnabled,
     dragStartPositions,
     lastValidPositions,
+    innerSessions,
 
     // Methods
     startElementDrag,

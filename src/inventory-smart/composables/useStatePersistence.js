@@ -13,9 +13,11 @@
  * - Serialización/deserialización opcional del historial de cambios
  */
 
-import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS } from "../utils/constants"
+import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO } from "../utils/constants"
 
 export const useStatePersistence = () => {
+  let hasHydratedMode = false
+
   /**
    * Serializa el estado completo del canvas a JSON
    * @param {Object} state - Estado del store (plantas, elementos, etc.)
@@ -53,8 +55,9 @@ export const useStatePersistence = () => {
       catalogos: {
         tiposEspacio: state.catalogos?.tiposEspacio || DEFAULT_TIPOS_ESPACIO,
         tiposCuarto: state.catalogos?.tiposCuarto || DEFAULT_TIPOS_CUARTO,
-        tiposProductoAdmitidos: state.catalogos?.tiposProductoAdmitidos || DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
       },
+
+      modoEdicion: state.modoEdicion === true,
 
       // Estado de plantas con todas sus propiedades
       plantas: state.plantas.map((planta) => {
@@ -386,6 +389,12 @@ export const useStatePersistence = () => {
       // === LIMPIEZA Y PREPARACIÓN ===
       storeActions.clearState()
 
+      if (!hasHydratedMode && typeof storeActions?.setModoEdicion === 'function') {
+        // Siempre ajustar modo de edición según el snapshot entrante
+        storeActions.setModoEdicion(state.modoEdicion === true)
+        hasHydratedMode = true
+      }
+
       // === RESTAURAR CATÁLOGOS ===
       if (state.catalogos) {
         const catalogosRestaurados = {
@@ -395,9 +404,6 @@ export const useStatePersistence = () => {
           tiposCuarto: Array.isArray(state.catalogos.tiposCuarto)
             ? state.catalogos.tiposCuarto
             : DEFAULT_TIPOS_CUARTO,
-          tiposProductoAdmitidos: Array.isArray(state.catalogos.tiposProductoAdmitidos)
-            ? state.catalogos.tiposProductoAdmitidos
-            : DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
         }
         storeActions.setCatalogos(catalogosRestaurados)
       } else {
@@ -405,7 +411,6 @@ export const useStatePersistence = () => {
         storeActions.setCatalogos({
           tiposEspacio: DEFAULT_TIPOS_ESPACIO,
           tiposCuarto: DEFAULT_TIPOS_CUARTO,
-          tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
         })
       }
 
@@ -1125,7 +1130,6 @@ export const useStatePersistence = () => {
     return {
       tiposEspacio: state.catalogos?.tiposEspacio || DEFAULT_TIPOS_ESPACIO,
       tiposCuarto: state.catalogos?.tiposCuarto || DEFAULT_TIPOS_CUARTO,
-      tiposProductoAdmitidos: state.catalogos?.tiposProductoAdmitidos || DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
     }
   }
 
@@ -1179,7 +1183,6 @@ export const useStatePersistence = () => {
     // Catálogos por defecto (para referencia)
     DEFAULT_TIPOS_ESPACIO,
     DEFAULT_TIPOS_CUARTO,
-    DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
 
     // Utilidades internas (para testing o debugging)
     validateStateBeforeSerialization,

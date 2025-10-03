@@ -123,6 +123,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     }
   }
 
+  // Inicializar con elementos por defecto
   const items = ref(normalizePredefined(ELEMENTOS_PREDEFINIDOS))
   const searchText = ref('')
   const selectedCategory = ref(null)
@@ -130,6 +131,16 @@ export const useCatalogStore = defineStore('catalog', () => {
   const templates = ref([])
 
   const catalogContext = ref({ mode: 'root', currentId: undefined, currentType: undefined })
+
+  // Función para actualizar elementos predefinidos desde props
+  const setPredefinedElements = (predefinedElements) => {
+    if (predefinedElements && Array.isArray(predefinedElements)) {
+      items.value = normalizePredefined(predefinedElements)
+    } else {
+      // Si no se proporcionan elementos, usar los por defecto
+      items.value = normalizePredefined(ELEMENTOS_PREDEFINIDOS)
+    }
+  }
 
   const baseSystemGuard = (item) =>
     item?.props?.system === true && item?.props?.catalogVisible !== false
@@ -246,6 +257,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     catalogContext,
     setCatalogContext,
     setSelectedCatalog,
+    setPredefinedElements,
     addTemplate,
     removeTemplate,
     loadTemplatesFromLocalStorage,

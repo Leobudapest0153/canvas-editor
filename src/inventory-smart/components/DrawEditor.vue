@@ -61,9 +61,11 @@
       </v-layer>
 
       <v-layer>
-        <v-line :config="{ points: flatPoints, closed:true, stroke:'#0ea5e9', fill:'rgba(14,165,233,0.08)', strokeWidth:2 / stageScale }" />
-        <template v-for="(seg, i) in segments" :key="'seg-'+i">
-          <v-text :config="{ x: seg.mx, y: seg.my, text: seg.label, fontSize: 9 / stageScale, fill:'#334155' }" />
+        <v-line v-if="!isInfinite" :config="{ points: flatPoints, closed:true, stroke:'#0ea5e9', fill:'rgba(14,165,233,0.08)', strokeWidth:2 / stageScale }" />
+        <template v-if="!isInfinite">
+          <template v-for="(seg, i) in segments" :key="'seg-'+i">
+            <v-text :config="{ x: seg.mx, y: seg.my, text: seg.label, fontSize: 9 / stageScale, fill:'#334155' }" />
+          </template>
         </template>
         <template v-if="dragging">
           <v-line :config="{ points:[guidePos.x, worldViewRect.y1, guidePos.x, worldViewRect.y2], stroke:'#94a3b8', dash:[4,4], strokeWidth:2 / stageScale }" />
@@ -80,14 +82,16 @@
           }" />
           <v-text :config="{ x: guidePos.x + 12 / stageScale, y: guidePos.y + 12 / stageScale, text: guideLabel, fontSize: 12 / stageScale, fill:'#0f172a' }" />
         </template>
-        <template v-for="(p, idx) in polygon" :key="idx">
-          <v-circle :config="{ x:p.x, y:p.y, radius: (selectedIdx === idx ? 8 : 6) / stageScale, fill:selectedIdx===idx?'#0284c7':'#0ea5e9', draggable:!deleting, stroke:selectedIdx===idx?'#0284c7':'#0ea5e9', strokeWidth: (selectedIdx === idx ? 2 : 1) / stageScale, name: 'vertex' }"
-                    @click="evt => onVertexClick(idx, evt)"
-                    @mousedown="evt => onVertexMouseDown(evt)"
-                    @dragmove="e => onPointDrag(idx, e)"
-                    @dragend="e => onPointDragEnd(idx, e)"
-                    @mouseover="onVertexMouseOver"
-                    @mouseout="onVertexMouseOut"/>
+        <template v-if="!isInfinite">
+          <template v-for="(p, idx) in polygon" :key="idx">
+            <v-circle :config="{ x:p.x, y:p.y, radius: (selectedIdx === idx ? 8 : 6) / stageScale, fill:selectedIdx===idx?'#0284c7':'#0ea5e9', draggable:!deleting, stroke:selectedIdx===idx?'#0284c7':'#0ea5e9', strokeWidth: (selectedIdx === idx ? 2 : 1) / stageScale, name: 'vertex' }"
+                      @click="evt => onVertexClick(idx, evt)"
+                      @mousedown="evt => onVertexMouseDown(evt)"
+                      @dragmove="e => onPointDrag(idx, e)"
+                      @dragend="e => onPointDragEnd(idx, e)"
+                      @mouseover="onVertexMouseOver"
+                      @mouseout="onVertexMouseOut"/>
+          </template>
         </template>
         <template v-if="adding">
           <v-text :config="{ x: 8, y: 8, text: 'Clic en un borde para añadir un vértice.', fontSize: 14, fill:'#0f172a' }" />
@@ -115,11 +119,13 @@ const props = defineProps({
   deleting: { type: Boolean, default: false },
   // Plantas infinitas → preview se encuadra al BBox de elementos con padding.
   frameBBox: { type: Object, default: null },
+  // Flag para indicar si es una planta infinita (no mostrar polígono)
+  isInfinite: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:polygon', 'notice']);
 
-const { polygon, elements, worldWidth, worldHeight, adding, deleting, frameBBox } = toRefs(props);
+const { polygon, elements, worldWidth, worldHeight, adding, deleting, frameBBox, isInfinite } = toRefs(props);
 
 const PIXELS_PER_CM = 10
 const canvasW = ref(1400)

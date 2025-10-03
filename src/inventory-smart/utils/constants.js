@@ -22,6 +22,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'warehouse',
     restrictions: [],
+    contextView: 'XY',
   },
   {
     id: 'cuartos',
@@ -30,6 +31,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'room',
     restrictions: [],
+    contextView: 'XZ',
   },
   {
     id: 'pisos',
@@ -38,6 +40,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'mezzanine',
     restrictions: ['read-only-properties', 'right-click', 'drag'],
+    contextView: 'XY',
   },
   {
     id: 'pasillos',
@@ -46,6 +49,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'space',
     restrictions: [],
+    contextView: 'XY', // No tiene hijos, pero se incluye para consistencia
   },
   {
     id: 'elementos',
@@ -54,6 +58,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'space',
     restrictions: [],
+    contextView: 'XZ',
   },
   {
     id: 'contenedores',
@@ -62,6 +67,7 @@ export const TIPOS_ENTIDAD = [
     color: '#1C1E4D',
     icono: 'space',
     restrictions: ['read-only-properties', 'right-click', 'drag'],
+    contextView: 'XZ', // No tiene hijos, pero se incluye para consistencia
   },
 ]
 
@@ -120,7 +126,7 @@ export const ELEMENTOS_PREDEFINIDOS = [
       largo: 400,
       alto: 250,
     },
-    capacidadCarga: 500,
+    capacidadCarga: 1500,
     ubicacion: 'suelo',
     descripcion: 'Cuarto especial',
     icono: 'home',
@@ -270,10 +276,10 @@ export const ELEMENTOS_PREDEFINIDOS = [
   },
   // Contenedor básico (único disponible)
   {
-    id: 'contenedor_base',
-    nombre: 'Contenedor Base',
+    id: 'nivel_base',
+    nombre: 'Nivel Base',
     tipo: 'contenedores',
-    categoria: 'contenedores',
+    categoria: 'nivel',
     forma: 'rectangular',
     orientacion: 0,
     colorBase: '#F0FAFF',
@@ -348,10 +354,10 @@ export const DEFAULT_TIPOS_PISO = [{ id: 'piso', nombre: 'Piso' }]
 export const TODAS_LAS_CATEGORIAS = [...DEFAULT_TIPOS_CUARTO, ...DEFAULT_TIPOS_ESPACIO, ...DEFAULT_TIPOS_CONTENEDOR, ...DEFAULT_TIPOS_PISO]
 
 export const ORIENTACIONES = [
-  { id: '0', nombre: '0°' },
-  { id: '90', nombre: '90°' },
-  { id: '180', nombre: '180°' },
-  { id: '270', nombre: '270°' },
+  { id: '0', nombre: 'Abajo' },
+  { id: '90', nombre: 'Derecha' },
+  { id: '180', nombre: 'Arriba' },
+  { id: '270', nombre: 'Izquierda' },
 ]
 
 export const puedeContener = (tipoPadre, tipoHijo) => {
@@ -402,6 +408,7 @@ export const MARGIN_CM = 5 // margen perimetral interno en cm para packing
 export const FACTOR_UTILIZACION = 0.9 // porcentaje máximo de ocupación de área
 
 // === CONFIGURACIÓN DE AUTOSAVE ===
+// !DEPRECATED: Se eliminó la lógica de copias de seguridad automáticas.
 export const AUTOSAVE_CONFIG = {
   INTERVAL_MS: 60000,
   MAX_BACKUPS: 10,

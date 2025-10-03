@@ -87,6 +87,8 @@ export function validateWallZBaseRequired(element = {}, candidate = {}, ctx = {}
 export function validateHeightWithinWarehouse(element = {}, candidate = {}, ctx = {}) {
   const { zBaseCm, altoCm } = resolveVerticalProps(element, candidate)
   const limit = Number(ctx.alturaBodega)
+  // Omitir validación si la planta es infinita
+  if (ctx.isInfinite === true) return { valid: true }
   if (!Number.isFinite(limit) || limit <= 0) return { valid: true }
   if (!Number.isFinite(zBaseCm) || !Number.isFinite(altoCm)) return { valid: true }
 
@@ -106,8 +108,12 @@ export function validateZStacking(
   element = {},
   candidate = {},
   neighbors = [],
-  options = {}
+  options = {},
+  ctx = {}
 ) {
+  // Omitir validación si la planta es infinita
+  if (ctx.isInfinite === true) return { valid: true }
+
   // Usar tolerancia relajada si es una transformación
   const Z_EPS = options.isTransforming
     ? PLACEMENT_TOLERANCES.Z_STACKING * 5 // 5x más tolerante durante transformaciones

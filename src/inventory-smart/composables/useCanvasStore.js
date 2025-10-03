@@ -1,5 +1,6 @@
 import { generateCodigo, generateNombre } from '@/inventory-smart/utils/codeNameGenerator.js'
 import { assignCodigoNombre } from '@/inventory-smart/utils/codeNameAssigner.js'
+import { resolvePasilloAssignment, PASILLO_ASSIGNMENT_DEFAULTS } from '@/inventory-smart/utils/pasilloAssignment.js'
 /**
  * useCanvasStore.js
  *
@@ -29,11 +30,14 @@ import {
   errorsPlacement,
 } from '@/inventory-smart/validation/placementOrchestrator'
 import { proposeLevelChange, applyLevelChange } from '@/inventory-smart/composables/useLevelStacking'
+import { checkChildrenFit } from '@/inventory-smart/composables/useChildFitting'
 // Importar store de catálogo para sincronizar selección al abrir detalle
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { exportTemplatesToDTO, importTemplatesFromDTO } from '@/inventory-smart/modules/templates/templates.serializer.js'
 import { useChangeHistoryStore } from '@/inventory-smart/stores/changeHistory'
 import { exportCatalogItemsToDTO, importCatalogItemsFromDTO } from '@/inventory-smart/modules/catalog/catalogItems.serializer.js'
+
+const SIDEBAR_TAB_IDS = new Set(['elementos', 'capas', 'buffer'])
 
 export const useCanvasStore = defineStore('canvas', () => {
   const { showToast } = useToast()
@@ -63,6 +67,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       capacidadCargaSoportado: 5000, // kg
       // Nuevo flag para plantas elásticas (por defecto false)
       isInfinite: false,
+      forma: 'rectangle', // Plantilla por defecto
       poligono: [
         {
           x: 0,
@@ -89,6 +94,128 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Estado básico para desarrollo
   const elementos = ref([])
 
+  const PASILLO_SCOPE_TYPES = new Set(['pisos', 'cuartos'])
+  const PASILLO_SCOPE_FALLBACK = '__scope:root__'
+
+  const makeElementIndex = () => {
+    const map = new Map()
+    for (const el of elementos.value) {
+      if (el?.id) {
+        map.set(el.id, el)
+      }
+    }
+    return map
+  }
+
+  const computeScopeKey = (element, index = null) => {
+    if (!element) return PASILLO_SCOPE_FALLBACK
+    const idx = index || makeElementIndex()
+    let current = element
+    let depthGuard = 0
+    while (current?.padre && depthGuard < 50) {
+      const parent = idx.get(current.padre)
+      if (!parent) break
+      if (PASILLO_SCOPE_TYPES.has(parent.tipo)) {
+        return `${parent.tipo}:${parent.id}`
+      }
+      current = parent
+      depthGuard += 1
+    }
+    const plantaId = element.plantaId || current?.plantaId
+    return plantaId ? `planta:${plantaId}` : PASILLO_SCOPE_FALLBACK
+  }
+
+  const buildPasilloAssignmentContext = () => {
+    const index = makeElementIndex()
+    const scopeMemo = new Map()
+
+    const getScope = (element) => {
+      if (!element?.id) return PASILLO_SCOPE_FALLBACK
+      if (scopeMemo.has(element.id)) {
+        return scopeMemo.get(element.id)
+      }
+      const scope = computeScopeKey(element, index)
+      scopeMemo.set(element.id, scope)
+      return scope
+    }
+
+    const pasillosByScope = new Map()
+    for (const el of index.values()) {
+      if (el?.tipo === 'pasillos') {
+        const scope = getScope(el)
+        const key = scope || PASILLO_SCOPE_FALLBACK
+        if (!pasillosByScope.has(key)) pasillosByScope.set(key, [])
+        pasillosByScope.get(key).push(el)
+      }
+    }
+
+    const getPasillosForScope = (scope) => {
+      const key = scope || PASILLO_SCOPE_FALLBACK
+      return pasillosByScope.get(key) || []
+    }
+
+    return {
+      index,
+      getScope,
+      getPasillosForScope,
+      settings: PASILLO_ASSIGNMENT_DEFAULTS,
+    }
+  }
+
+  const assignPasilloWithContext = (ctx, element) => {
+    if (!element) return
+    if (element.tipo === 'pasillos') {
+      element.pasilloId = null
+      return
+    }
+    if (!Object.prototype.hasOwnProperty.call(element, 'pasilloId')) {
+      element.pasilloId = null
+    }
+    const scope = ctx.getScope(element)
+    const pasillos = ctx.getPasillosForScope(scope)
+    if (!pasillos.length) {
+      element.pasilloId = null
+      return
+    }
+    const match = resolvePasilloAssignment({
+      element,
+      pasillos,
+      config: ctx.settings,
+    })
+    const newId = match?.id ?? null
+    element.pasilloId = newId
+  }
+
+  const applyPasilloAssignments = (ctx, { scope = null, elementIds = null } = {}) => {
+    if (Array.isArray(elementIds) && elementIds.length > 0) {
+      for (const id of elementIds) {
+        const target = ctx.index.get(id)
+        if (target) assignPasilloWithContext(ctx, target)
+      }
+      return
+    }
+
+    if (scope != null) {
+      for (const target of ctx.index.values()) {
+        if (target?.tipo === 'pasillos') continue
+        if (ctx.getScope(target) === scope) {
+          assignPasilloWithContext(ctx, target)
+        }
+      }
+      return
+    }
+
+    for (const target of ctx.index.values()) {
+      if (target?.tipo === 'pasillos') continue
+      assignPasilloWithContext(ctx, target)
+    }
+  }
+
+  const recomputePasilloAssignments = (options = {}) => {
+    const ctx = buildPasilloAssignmentContext()
+    applyPasilloAssignments(ctx, options)
+  }
+
   // Etiquetas
   const etiquetas = ref([
     { id: 1, texto: 'Urgente', colorFondo: '#FECACA', colorTexto: '#991B1B' },
@@ -98,6 +225,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const etiquetasSeleccionadas = ref([])
 
   const elementoSeleccionado = ref(null)
+  const elementosSeleccionadosMultiple = ref([]) // Array de IDs para selección múltiple
   const cambiosNoAplicados = ref(false);
 
   // === NAVEGACIÓN JERÁRQUICA (se declara antes de vistaActiva para evitar ReferenceError) ===
@@ -142,30 +270,49 @@ export const useCanvasStore = defineStore('canvas', () => {
   const propuestaAlturasNiveles = ref(null);
 
   const isDraggable = ref(true)
+  const modoEdicion = ref(false)
+  const modoConfigurarEsl = ref(false)
+  const elementoEslObjetivo = ref(null)
+  const sidebarActiveTab = ref('elementos')
+
+  const editorPermissions = computed(() => ({
+    modo: modoEdicion.value ? 'edicion' : 'visualizacion',
+    canvasInteractivo: modoEdicion.value,
+    propiedadesEditable: modoEdicion.value,
+    catalogoMutable: modoEdicion.value,
+    capasPersistentes: modoEdicion.value,
+    atajosActivos: modoEdicion.value,
+    menusEdicion: modoEdicion.value,
+  }))
 
   // === CATÁLOGOS DINÁMICOS (persistidos via useStatePersistence) ===
   const catalogos = ref({
     tiposEspacio: DEFAULT_TIPOS_ESPACIO,
     tiposCuarto: DEFAULT_TIPOS_CUARTO,
-    tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
   })
+
+  const tiposProductoAdmitidos = ref(DEFAULT_TIPOS_PRODUCTO_ADMITIDOS)
 
   const setCatalogos = (cats) => {
     try {
       const safe = {
         tiposEspacio: Array.isArray(cats?.tiposEspacio) ? cats.tiposEspacio : DEFAULT_TIPOS_ESPACIO,
         tiposCuarto: Array.isArray(cats?.tiposCuarto) ? cats.tiposCuarto : DEFAULT_TIPOS_CUARTO,
-        tiposProductoAdmitidos: Array.isArray(cats?.tiposProductoAdmitidos)
-          ? cats.tiposProductoAdmitidos
-          : DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
       }
       catalogos.value = safe
     } catch {
       catalogos.value = {
         tiposEspacio: DEFAULT_TIPOS_ESPACIO,
         tiposCuarto: DEFAULT_TIPOS_CUARTO,
-        tiposProductoAdmitidos: DEFAULT_TIPOS_PRODUCTO_ADMITIDOS,
       }
+    }
+  }
+
+  const setTiposProductoAdmitidos = (tipos) => {
+    try {
+      tiposProductoAdmitidos.value = Array.isArray(tipos) ? tipos : DEFAULT_TIPOS_PRODUCTO_ADMITIDOS
+    } catch {
+      tiposProductoAdmitidos.value = DEFAULT_TIPOS_PRODUCTO_ADMITIDOS
     }
   }
   // Configuración de grilla y snap
@@ -396,11 +543,8 @@ export const useCanvasStore = defineStore('canvas', () => {
       return
     }
 
-    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    // Limpiar timer de zoom/pan
     clearZoomPanDebounce()
-    if (historyInstance.value) {
-      historyInstance.value.clearHistory()
-    }
 
     // Actualizar contexto de navegación
     let nuevoPath = [...contextoNavegacion.value.path]
@@ -427,6 +571,14 @@ export const useCanvasStore = defineStore('canvas', () => {
       path: nuevoPath,
     }
 
+    // Limpiar historial de undo/redo al cambiar de contexto
+    if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+      historyInstance.value.clearHistoryOnContextChange(
+        { tipo: elemento.tipo, id: elementoId },
+        `Navegación a ${elemento.nombre || elemento.tipo}`
+      )
+    }
+
     // Calcular tamaño del canvas según el elemento
     calcularCanvasAdaptativo(elemento)
 
@@ -440,11 +592,8 @@ export const useCanvasStore = defineStore('canvas', () => {
       return
     }
 
-    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    // Limpiar timer de zoom/pan
     clearZoomPanDebounce()
-    if (historyInstance.value) {
-      historyInstance.value.clearHistory()
-    }
 
     // Remover último elemento del path
     const nuevoPath = [...contextoNavegacion.value.path]
@@ -460,6 +609,15 @@ export const useCanvasStore = defineStore('canvas', () => {
         path: nuevoPath,
       }
 
+      // Limpiar historial de undo/redo al cambiar de contexto
+      if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+        const planta = plantaPorId.value(ultimoElemento.id)
+        historyInstance.value.clearHistoryOnContextChange(
+          { tipo: 'plantas', id: ultimoElemento.id },
+          `Navegación a planta ${planta?.nombre || ultimoElemento.id}`
+        )
+      }
+
       // Calcular canvas adaptativo para la planta
       const planta = plantaPorId.value(ultimoElemento.id)
       calcularCanvasAdaptativoPlanta(planta)
@@ -469,6 +627,15 @@ export const useCanvasStore = defineStore('canvas', () => {
         tipo: ultimoElemento.tipo,
         id: ultimoElemento.id,
         path: nuevoPath,
+      }
+
+      // Limpiar historial de undo/redo al cambiar de contexto
+      if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+        const elementoPadre = elementoPorId.value(ultimoElemento.id)
+        historyInstance.value.clearHistoryOnContextChange(
+          { tipo: ultimoElemento.tipo, id: ultimoElemento.id },
+          `Navegación a ${elementoPadre?.nombre || ultimoElemento.tipo}`
+        )
       }
 
       const elementoPadre = elementoPorId.value(ultimoElemento.id)
@@ -489,16 +656,29 @@ export const useCanvasStore = defineStore('canvas', () => {
   const navegarAContexto = (tipo, id, path) => {
     if (!path || !Array.isArray(path) || path.length === 0) return
 
-    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    // Limpiar timer de zoom/pan
     clearZoomPanDebounce()
-    if (historyInstance.value) {
-      historyInstance.value.clearHistory()
-    }
 
     contextoNavegacion.value = {
       tipo: tipo,
       id: id,
       path: path,
+    }
+
+    // Limpiar historial de undo/redo al cambiar de contexto
+    if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+      let nombreContexto = tipo
+      if (tipo === 'plantas') {
+        const planta = plantaPorId.value(id)
+        nombreContexto = planta?.nombre || tipo
+      } else {
+        const elemento = elementoPorId.value(id)
+        nombreContexto = elemento?.nombre || tipo
+      }
+      historyInstance.value.clearHistoryOnContextChange(
+        { tipo, id },
+        `Navegación a ${nombreContexto}`
+      )
     }
 
     // Actualizar canvas adaptativo según el nuevo contexto
@@ -522,11 +702,8 @@ export const useCanvasStore = defineStore('canvas', () => {
       return
     }
 
-    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    // Limpiar timer de zoom/pan
     clearZoomPanDebounce()
-    if (historyInstance.value) {
-      historyInstance.value.clearHistory()
-    }
 
     // Reset a vista de planta
     contextoNavegacion.value = {
@@ -541,6 +718,14 @@ export const useCanvasStore = defineStore('canvas', () => {
       ],
     }
 
+    // Limpiar historial de undo/redo al cambiar de contexto
+    if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+      historyInstance.value.clearHistoryOnContextChange(
+        { tipo: 'plantas', id: plantaId },
+        `Navegación a planta ${planta.nombre}`
+      )
+    }
+
     // Actualizar planta activa
     plantaActiva.value = plantaId
 
@@ -552,45 +737,28 @@ export const useCanvasStore = defineStore('canvas', () => {
     elementoSeleccionado.value = null
   }
 
-  const calcularCanvasAdaptativo = (elemento) => {
-    // Calcular tamaño del canvas basado en las dimensiones del elemento
+const calcularCanvasAdaptativo = (elemento) => {
+    // Calcular tamaño del canvas basado en las dimensiones del elemento (ignorando orientacion)
     let elementWidthPx, elementHeightPx
 
     if (elemento.dimensiones) {
-      // XY para cuartos/pisos/pasillos; XZ para elementos
+      // XY para pisos; XZ para elementos y cuartos
       if (['pisos'].includes(elemento.tipo)) {
-        elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
-        elementHeightPx = elemento.dimensiones.largo * CM_TO_PX
+        elementWidthPx = (Number(elemento.dimensiones.ancho) || 0) * CM_TO_PX
+        elementHeightPx = (Number(elemento.dimensiones.largo) || 0) * CM_TO_PX
       } else if (['elementos', 'cuartos'].includes(elemento.tipo)) {
-        // Vista XZ para elementos y cuartos - considerar orientación
-        const orientacion = Number(elemento.orientacion || 0)
-        const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-        const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
-
-        // En vista XZ: orientación determina qué usar como ancho
-        elementWidthPx = useAncho
-          ? elemento.dimensiones.ancho * CM_TO_PX
-          : elemento.dimensiones.largo * CM_TO_PX
-        elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
+        // En vista XZ para elementos y cuartos: width=ancho, height=alto
+        elementWidthPx = (Number(elemento.dimensiones.ancho) || 0) * CM_TO_PX
+        elementHeightPx = (Number(elemento.dimensiones.alto) || 0) * CM_TO_PX
       } else {
-        // Para otros tipos (pasillos)
-        elementWidthPx = elemento.dimensiones.ancho * CM_TO_PX
-        elementHeightPx = elemento.dimensiones.alto * CM_TO_PX
+        // Otros tipos
+        elementWidthPx = (Number(elemento.dimensiones.ancho) || 0) * CM_TO_PX
+        elementHeightPx = (Number(elemento.dimensiones.alto) || 0) * CM_TO_PX
       }
     } else if (elemento.width && elemento.height) {
-      // Fallback a dimensiones legacy en píxeles
-      if (['elementos', 'cuartos'].includes(elemento.tipo)) {
-        // Para elementos y cuartos legacy, también aplicar orientación
-        const orientacion = Number(elemento.orientacion || 0)
-        const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-        const useAncho = (orientacionNormalizada === 0 || orientacionNormalizada === 180)
-
-        elementWidthPx = useAncho ? elemento.width : elemento.height
-        elementHeightPx = elemento.height // Altura siempre es height en legacy
-      } else {
-        elementWidthPx = elemento.width
-        elementHeightPx = elemento.height
-      }
+      // Fallback a dimensiones legacy en píxeles (no alterar por orientacion)
+      elementWidthPx = elemento.width
+      elementHeightPx = elemento.height
     } else {
       // Fallback final - tamaño mínimo para contenedores pequeños
       const defaultWidth = elemento.tipo === 'contenedores' ? 30 : 100 // contenedores más pequeños
@@ -681,11 +849,44 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Actions
   const seleccionarElemento = (id) => {
     elementoSeleccionado.value = id
+    // Limpiar selección múltiple al seleccionar un solo elemento
+    elementosSeleccionadosMultiple.value = []
     // Forzar catálogo de 'elementos' al abrir detalle si estaba en 'plantillas'
     if (id && catalogStore.selectedCatalog === 'plantillas') {
       catalogStore.setSelectedCatalog('elementos')
     }
   }
+
+  // Selección múltiple: establecer array de IDs seleccionados
+  const seleccionarElementosMultiple = (ids) => {
+    if (!Array.isArray(ids)) {
+      console.warn('seleccionarElementosMultiple requiere un array de IDs')
+      return
+    }
+    elementosSeleccionadosMultiple.value = [...ids]
+    // Si hay múltiples, limpiar selección individual
+    if (ids.length > 0) {
+      elementoSeleccionado.value = null
+    }
+  }
+
+  // Limpiar selección de elementos (individual y múltiple)
+  const limpiarSeleccionElementos = () => {
+    elementoSeleccionado.value = null
+    elementosSeleccionadosMultiple.value = []
+  }
+
+  // Computed: obtener todos los elementos seleccionados (individual + múltiple)
+  const todosLosElementosSeleccionados = computed(() => {
+    const seleccionados = []
+    if (elementoSeleccionado.value) {
+      seleccionados.push(elementoSeleccionado.value)
+    }
+    if (elementosSeleccionadosMultiple.value.length > 0) {
+      seleccionados.push(...elementosSeleccionadosMultiple.value)
+    }
+    return [...new Set(seleccionados)] // Eliminar duplicados
+  })
 
   const actualizarPosicion = (id, x, y, saveHistory = false, description = null) => {
     const elemento = elementos.value.find((el) => el.id === id)
@@ -693,10 +894,27 @@ export const useCanvasStore = defineStore('canvas', () => {
       elemento.x = x
       elemento.y = y
 
+      const ctx = buildPasilloAssignmentContext()
+      if (elemento.tipo === 'pasillos') {
+        const scope = ctx.getScope(elemento)
+        applyPasilloAssignments(ctx, { scope })
+      } else {
+        applyPasilloAssignments(ctx, { elementIds: [elemento.id] })
+      }
+
       // Solo guardar en historial si se especifica explícitamente
       if (saveHistory && description) {
         saveToHistory(description)
       }
+
+      // Reordenar visibles si corresponde al contexto actual (plantas, pisos, elementos)
+      try {
+        const ctxTipo = contextoNavegacion.value?.tipo
+        const ctxId = contextoNavegacion.value?.id
+        if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+          reorderVisibleByHeightForContext(ctxTipo, ctxId)
+        }
+      } catch (e) { /* noop */ }
     }
   }
 
@@ -711,6 +929,10 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
 
       const prev = elementos.value[idx];
+      const indexBefore = makeElementIndex()
+      const previousScope = prev?.tipo === 'pasillos'
+        ? computeScopeKey(prev, indexBefore)
+        : null
 
       const next = {
         ...prev,
@@ -743,7 +965,28 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
       }
 
+      if (!Object.prototype.hasOwnProperty.call(next, 'pasilloId')) {
+        next.pasilloId = prev?.pasilloId ?? null
+      }
+      if (next.tipo === 'pasillos') {
+        next.pasilloId = null
+      }
+
       elementos.value.splice(idx, 1, next);
+
+      const ctx = buildPasilloAssignmentContext()
+      if (next.tipo === 'pasillos') {
+        const newScope = ctx.getScope(next)
+        applyPasilloAssignments(ctx, { scope: newScope })
+        if (previousScope && newScope !== previousScope) {
+          applyPasilloAssignments(ctx, { scope: previousScope })
+        }
+      } else {
+        applyPasilloAssignments(ctx, { elementIds: [next.id] })
+        if (prev?.tipo === 'pasillos' && previousScope) {
+          applyPasilloAssignments(ctx, { scope: previousScope })
+        }
+      }
 
       // if (saveHistory) {
       //   if (typeof registrarEnHistorial === 'function') {
@@ -760,12 +1003,25 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   };
 
+  // Después de actualizar sin validación, reordenar visibles si aplica
+  const _afterUpdateReorderIfNeeded = () => {
+    try {
+      const ctxTipo = contextoNavegacion.value?.tipo
+      const ctxId = contextoNavegacion.value?.id
+      if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+        reorderVisibleByHeightForContext(ctxTipo, ctxId)
+      }
+    } catch (e) { /* noop */ }
+  }
+
 
 
   const actualizarElemento = (elementoId, propiedades, saveHistory = false, description = null) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     if (!elemento) return false
     if (!runPlacementValidators(elemento, propiedades)) return false
+    const prevWasPasillo = elemento.tipo === 'pasillos'
+    const previousScope = prevWasPasillo ? computeScopeKey(elemento, makeElementIndex()) : null
     if (elemento) {
       for (const key in propiedades) {
         if (
@@ -805,12 +1061,38 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
       }
 
+      const ctx = buildPasilloAssignmentContext()
+      if (elemento.tipo === 'pasillos') {
+        elemento.pasilloId = null
+        const newScope = ctx.getScope(elemento)
+        applyPasilloAssignments(ctx, { scope: newScope })
+        if (previousScope && newScope !== previousScope) {
+          applyPasilloAssignments(ctx, { scope: previousScope })
+        }
+      } else {
+        if (!Object.prototype.hasOwnProperty.call(elemento, 'pasilloId')) {
+          elemento.pasilloId = null
+        }
+        applyPasilloAssignments(ctx, { elementIds: [elemento.id] })
+        if (prevWasPasillo && previousScope) {
+          applyPasilloAssignments(ctx, { scope: previousScope })
+        }
+      }
+
       // Guardar en historial si se especifica
       if (saveHistory) {
         const descripcionAuto =
           description || `Propiedades actualizadas: ${Object.keys(propiedades).join(', ')}`
         saveToHistory(descripcionAuto)
       }
+      // Reordenar visibles después de una actualización normal
+      try {
+        const ctxTipo = contextoNavegacion.value?.tipo
+        const ctxId = contextoNavegacion.value?.id
+        if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+          reorderVisibleByHeightForContext(ctxTipo, ctxId)
+        }
+      } catch (e) { /* noop */ }
     }
     return true
   }
@@ -821,6 +1103,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         plantas: plantas.value,
         elementos: elementos.value,
         catalogos: catalogos.value,
+        modoEdicion: modoEdicion.value,
       }
       const data = _serialize(state)
       return _persist(data)
@@ -837,7 +1120,14 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (el) {
         el.updatedAt = new Date().toISOString()
       }
-      // persist()
+      // Reordenar visibles si corresponde (persist no forzado aquí)
+      try {
+        const ctxTipo = contextoNavegacion.value?.tipo
+        const ctxId = contextoNavegacion.value?.id
+        if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+          reorderVisibleByHeightForContext(ctxTipo, ctxId)
+        }
+      } catch (e) { /* noop */ }
     }
     return ok
   }
@@ -866,6 +1156,13 @@ export const useCanvasStore = defineStore('canvas', () => {
     const zoomAnterior = zoom.value
     zoom.value = Math.max(minZoom, Math.min(5, nuevoZoom))
 
+    // Sincronizar con Konva Stage
+    const stage = window.__konvaStage
+    if (stage && typeof stage.scale === 'function') {
+      stage.scale({ x: zoom.value, y: zoom.value })
+      stage.batchDraw?.()
+    }
+
     // Solo guardar en historial si cambió significativamente
     if (Math.abs(zoom.value - zoomAnterior) > 0.01) {
       saveZoomPanToHistory()
@@ -878,6 +1175,13 @@ export const useCanvasStore = defineStore('canvas', () => {
     panX.value = x
     panY.value = y
 
+    // Sincronizar con Konva Stage
+    const stage = window.__konvaStage
+    if (stage && typeof stage.position === 'function') {
+      stage.position({ x: panX.value, y: panY.value })
+      stage.batchDraw?.()
+    }
+
     // Solo guardar en historial si cambió significativamente
     if (Math.abs(x - panXAnterior) > 1 || Math.abs(y - panYAnterior) > 1) {
       saveZoomPanToHistory()
@@ -886,11 +1190,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Actions para plantas
   const seleccionarPlanta = (plantaId) => {
-    // Limpiar historial y timer de zoom/pan al cambiar contexto
+    // Limpiar timer de zoom/pan
     clearZoomPanDebounce()
-    if (historyInstance.value) {
-      historyInstance.value.clearHistory()
-    }
 
     plantaActiva.value = plantaId
     // Deseleccionar elemento al cambiar de planta
@@ -909,6 +1210,14 @@ export const useCanvasStore = defineStore('canvas', () => {
             nombre: planta.nombre,
           },
         ],
+      }
+
+      // Limpiar historial de undo/redo al cambiar de planta
+      if (historyInstance.value && historyInstance.value.clearHistoryOnContextChange) {
+        historyInstance.value.clearHistoryOnContextChange(
+          { tipo: 'plantas', id: plantaId },
+          `Selección de planta: ${planta.nombre}`
+        )
       }
 
       // Calcular canvas adaptativo para la planta seleccionada
@@ -1010,21 +1319,37 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (index > -1) {
       plantas.value.splice(index, 1)
 
-      // Si se elimina la planta activa, cambiar a la primera disponible
-      if (plantaActiva.value === plantaId && plantas.value.length > 0) {
-        plantaActiva.value = plantas.value[0].id
+      const contextRootId = contextoNavegacion.value.path?.[0]?.id
+      const contextMatches =
+        contextoNavegacion.value.tipo === 'plantas' && contextoNavegacion.value.id === plantaId
+
+      if (plantaActiva.value === plantaId || contextMatches || contextRootId === plantaId) {
+        if (plantas.value.length > 0) {
+          const nextId = plantas.value[0].id
+          seleccionarPlanta(nextId)
+        } else {
+          plantaActiva.value = null
+          contextoNavegacion.value = {
+            tipo: 'plantas',
+            id: null,
+            path: [],
+          }
+        }
       }
     }
   }
 
   const runPlacementValidators = (element, candidate) => {
     const planta = plantaPorId.value(plantaActiva.value)
-    const ctx = { alturaBodega: planta?.dimensiones?.alto }
+    const ctx = {
+      alturaBodega: planta?.dimensiones?.alto,
+      isInfinite: planta?.isInfinite === true
+    }
     const neighbors = elementosVisibles.value.filter((n) => n.id !== element?.id)
     const checks = [
       (el, cand) => validateWallZBaseRequired(el, cand, ctx),
       (el, cand) => validateHeightWithinWarehouse(el, cand, ctx),
-      (el, cand) => validateZStacking(el, cand, neighbors),
+      (el, cand) => validateZStacking(el, cand, neighbors, {}, ctx),
     ]
     for (const v of checks) {
       const res = v(element, candidate)
@@ -1039,6 +1364,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Actions para elementos
   const agregarElemento = (nuevoElemento, opts = {}) => {
+    const { saveHistory = true, skipReorder = false } = opts  // Permitir desactivar guardado de historial y reordenamiento
     const ubic = (
       nuevoElemento.ubicacion ||
       nuevoElemento.ubic ||
@@ -1188,6 +1514,13 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     }
 
+    if (!Object.prototype.hasOwnProperty.call(nuevoElemento, 'pasilloId')) {
+      nuevoElemento.pasilloId = null
+    }
+    if (nuevoElemento.tipo === 'pasillos') {
+      nuevoElemento.pasilloId = null
+    }
+
     elementos.value.push(nuevoElemento)
 
     // Normalización inmediata post-inserción: asegurar que en vista XY height represente largo (caso Anaquel)
@@ -1202,8 +1535,30 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
     } catch (e) { /* noop */ }
 
-    // Guardar estado en historial
-    saveToHistory(`Elemento agregado: ${nuevoElemento.nombre || nuevoElemento.tipo}`)
+    const ctx = buildPasilloAssignmentContext()
+    if (nuevoElemento.tipo === 'pasillos') {
+      const scope = ctx.getScope(nuevoElemento)
+      applyPasilloAssignments(ctx, { scope })
+    } else {
+      applyPasilloAssignments(ctx, { elementIds: [nuevoElemento.id] })
+    }
+
+    // Guardar estado en historial (solo si está habilitado)
+    if (saveHistory) {
+      saveToHistory(`Elemento agregado: ${nuevoElemento.nombre || nuevoElemento.tipo}`)
+    }
+
+    // Reordenar elementos visibles según altura si el contexto actual es plantas o elementos
+    // (Solo si no está desactivado explícitamente para operaciones en lote)
+    if (!skipReorder) {
+      try {
+        const ctxTipo = contextoNavegacion.value?.tipo
+        const ctxId = contextoNavegacion.value?.id
+        if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+          reorderVisibleByHeightForContext(ctxTipo, ctxId)
+        }
+      } catch (e) { /* noop */ }
+    }
 
     return nuevoElemento.id
   }
@@ -1243,8 +1598,23 @@ export const useCanvasStore = defineStore('canvas', () => {
         }
       }
 
+      if (!Object.prototype.hasOwnProperty.call(next, 'pasilloId')) {
+        next.pasilloId = null
+      }
+      if (next.tipo === 'pasillos') {
+        next.pasilloId = null
+      }
+
       // Insertar directamente en el store
       elementos.value.push(next);
+
+      const ctx = buildPasilloAssignmentContext()
+      if (next.tipo === 'pasillos') {
+        const scope = ctx.getScope(next)
+        applyPasilloAssignments(ctx, { scope })
+      } else {
+        applyPasilloAssignments(ctx, { elementIds: [next.id] })
+      }
 
       // Agregar hijo al padre si aplica
       if (next.padre) {
@@ -1273,6 +1643,15 @@ export const useCanvasStore = defineStore('canvas', () => {
         } catch { /* ignore historial error */ }
       }
 
+      // Reordenar visibles si corresponde al contexto actual
+      try {
+        const ctxTipo = contextoNavegacion.value?.tipo
+        const ctxId = contextoNavegacion.value?.id
+        if (ctxTipo === 'plantas' || ctxTipo === 'pisos') {
+          reorderVisibleByHeightForContext(ctxTipo, ctxId)
+        }
+      } catch (e) { /* noop */ }
+
       return next.id;
     } catch (err) {
       console.error('[insertarElementoSinValidacion] Error:', err);
@@ -1284,6 +1663,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   const eliminarElemento = (elementoId) => {
     const elemento = elementos.value.find((el) => el.id === elementoId)
     const index = elementos.value.findIndex((el) => el.id === elementoId)
+    const wasPasillo = elemento?.tipo === 'pasillos'
+    const previousScope = wasPasillo ? computeScopeKey(elemento, makeElementIndex()) : null
 
     if (index > -1) {
       // Remover de la planta si no tiene padre
@@ -1309,6 +1690,11 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
 
       elementos.value.splice(index, 1)
+
+      if (wasPasillo && previousScope) {
+        const ctx = buildPasilloAssignmentContext()
+        applyPasilloAssignments(ctx, { scope: previousScope })
+      }
 
       // Deseleccionar si era el elemento seleccionado
       if (elementoSeleccionado.value === elementoId) {
@@ -1370,6 +1756,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       templates: catalogStore.templates?.map?.(t => t?._custom?.value || t) || [],
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
       catalogos: catalogos.value,
+      modoEdicion: modoEdicion.value,
     }
     // Incluir historial de cambios si existe
     try {
@@ -1425,6 +1812,9 @@ export const useCanvasStore = defineStore('canvas', () => {
       setCatalogos: (cats) => {
         setCatalogos(cats)
       },
+      setModoEdicion: (value) => {
+        setModoEdicion(value)
+      },
       setInitialNavigation: (plantaId, plantaNombre) => {
         // Establecer la primera planta como activa siempre
         plantaActiva.value = plantaId
@@ -1453,6 +1843,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
   const ok = _deserialize(jsonString, storeActions)
+
+    if (modoEdicion.value !== true) {
+      modoEdicion.value = false
+    }
 
     // Post-procesar: garantizar que todas las plantas y elementos tengan 'codigo'
     try {
@@ -1500,6 +1894,12 @@ export const useCanvasStore = defineStore('canvas', () => {
       console.warn('No se pudieron importar plantillas', e)
     }
 
+    try {
+      recomputePasilloAssignments()
+    } catch (e) {
+      console.warn('No se pudieron recalcular asignaciones de pasillo tras deserializar', e)
+    }
+
     return ok
   }
 
@@ -1526,7 +1926,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     plantaEnEdicion.value = null
   }
 
-  const abrirCuartoNivelesPropiedades = (idElemento) => {
+  const abrirCuartoNivelesPropiedades = (idElemento, tipo) => {
     const elemento = elementos.value.find((e) => e.id === idElemento);
     if (!elemento) {
       console.error('Elemento no encontrado:', idElemento);
@@ -1535,7 +1935,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     // El elemento es un padre
     if (['elementos', 'cuartos'].includes(elemento.tipo)) {
       console.log('Vamos a editar un hijo guardando el id del padre:', idElemento);
-      nivelAEditar.value = { padre: idElemento }
+      nivelAEditar.value = { padre: idElemento, tipo }
     }
     // El elemento es un nivel hijo
     if (['pisos', 'contenedores'].includes(elemento.tipo)) {
@@ -1599,14 +1999,57 @@ export const useCanvasStore = defineStore('canvas', () => {
       return;
     }
 
-    // 1) Proponer cambio (solo nos importa dimensiones aquí; alto es clave)
+    // Validación previa: calcular encaje de hijos (para usarlo si el cambio no requiere confirmación)
+    let preFit = null
+    try {
+      const pisoActual = elementos.value.find(e => e.id === id) || nivelAEditar.value
+      if (pisoActual && Array.isArray(pisoActual.hijos) && pisoActual.hijos.length > 0) {
+        preFit = checkChildrenFit(pisoActual, {
+          anchoCm: Number(nivelActualizado?.dimensiones?.ancho),
+          largoCm: Number(nivelActualizado?.dimensiones?.largo),
+          altoCm: Number(nivelActualizado?.dimensiones?.alto),
+          capacidadCarga: Number(nivelActualizado?.capacidadCarga),
+        }, elementos.value)
+      }
+    } catch (e) {
+      console.warn('checkChildrenFit pre calculation failed', e)
+    }
+
+    // 1) Proponer cambio (alto/peso entre hermanos; incluye childFit en draft para el modal)
     const res = proposeLevelChange(elementos.value, id, nivelActualizado || {}, nivelAEditar.value.padre);
     if (res.status === 'error') {
       showToast(res.message || 'No se pudo aplicar el cambio', 'error');
       return;
     }
+    if (res.status === 'ok' && preFit && preFit.ok === false) {
+       console.log('Hermanos OK, pero hijos no caben. Promoviendo a needs_confirmation.');
+
+       res.status = 'needs_confirmation';
+
+       if (res.draft) {
+         res.draft.childFitError = preFit; // `preFit` contiene { ok: false, minAnchoCm, ... }
+       }
+    }
 
     if (res.status === 'ok') {
+      // Si no requiere confirmación, validar que los hijos aún quepan y bloquear si no
+      if (preFit && preFit.ok === false) {
+        const parts = []
+        const proposed = {
+          anchoCm: Number(nivelActualizado?.dimensiones?.ancho),
+          largoCm: Number(nivelActualizado?.dimensiones?.largo),
+          altoCm: Number(nivelActualizado?.dimensiones?.alto),
+          capacidadCarga: Number(nivelActualizado?.capacidadCarga),
+        }
+        if (preFit.minAnchoCm != null && proposed.anchoCm < preFit.minAnchoCm) parts.push(`ancho mínimo ${(preFit.minAnchoCm / 100).toFixed(2)}m`)
+        if (preFit.minLargoCm != null && proposed.largoCm < preFit.minLargoCm) parts.push(`largo mínimo ${(preFit.minLargoCm / 100).toFixed(2)}m`)
+        if (preFit.minAltoCm != null && proposed.altoCm < preFit.minAltoCm) parts.push(`alto mínimo ${(preFit.minAltoCm / 100).toFixed(2)}m`)
+        if (preFit.minCapacidad != null && proposed.capacidadCarga < preFit.minCapacidad) parts.push(`capacidad mínima ${Math.round(preFit.minCapacidad)}kg`)
+        const detalle = parts.length ? ` Requisitos: ${parts.join(', ')}.` : ''
+        showToast(`No se puede aplicar: los elementos del piso no caben con las nuevas propiedades.${detalle}`, 'error')
+        return
+      }
+
       // 2) Aplicar directamente
       const ok = applyLevelChange(
         elementos.value,
@@ -1646,6 +2089,36 @@ export const useCanvasStore = defineStore('canvas', () => {
     // Agregar padre si falta (caso nuevo nivel)
     if (!draft.padre && nivelAEditar.value?.padre) {
       draft.padre = nivelAEditar.value.padre;
+    }
+
+    // Si estrategia es 'clamp' o 'redistribute', ajustar automáticamente a los mínimos requeridos por los hijos
+    try {
+      if (draft?.childFit) {
+        const f = draft.childFit;
+        const tp = draft.targetPatch || {};
+        const dims = { ...(tp.dimensiones || {}) };
+
+        if (Number.isFinite(f.minAnchoCm)) {
+          const cur = Number(dims.ancho);
+          if (!Number.isFinite(cur) || cur < f.minAnchoCm) dims.ancho = f.minAnchoCm;
+        }
+        if (Number.isFinite(f.minLargoCm)) {
+          const cur = Number(dims.largo);
+          if (!Number.isFinite(cur) || cur < f.minLargoCm) dims.largo = f.minLargoCm;
+        }
+        if (Number.isFinite(f.minAltoCm)) {
+          const cur = Number(dims.alto);
+          if (!Number.isFinite(cur) || cur < f.minAltoCm) dims.alto = f.minAltoCm;
+        }
+        if (Number.isFinite(f.minCapacidad)) {
+          const cur = Number(tp.capacidadCarga);
+          if (!Number.isFinite(cur) || cur < f.minCapacidad) tp.capacidadCarga = f.minCapacidad;
+        }
+
+        draft.targetPatch = { ...tp, dimensiones: dims };
+      }
+    } catch (e) {
+      console.warn('auto adjust to child minimums failed', e);
     }
 
     const ok = applyLevelChange(
@@ -1873,28 +2346,65 @@ export const useCanvasStore = defineStore('canvas', () => {
    * Enfoca (zoom + pan) el elemento indicado haciendo que quepa dentro del viewport
    * con un padding visual y animación opcional.
    * @param {string} elementoId
-   * @param {{paddingPx?:number, fitRatio?:number, animate?:boolean, duration?:number}} opts
+   * @param {{paddingPx?:number, fitRatio?:number, animate?:boolean, duration?:number, offsetRight?:number}} opts
    */
   const focusElemento = (elementoId, opts = {}) => {
     const el = elementoPorId.value(elementoId)
-    if (!el) return
+    if (!el) {
+      return
+    }
+
     const stage = typeof window !== 'undefined' ? window.__konvaStage : null
-    if (!stage) return
+    if (!stage) {
+      return
+    }
+    // Invalidate cualquier animación previa (nueva sesión de enfoque)
+    if (focusElemento._raf) cancelAnimationFrame(focusElemento._raf)
+    focusElemento._sessionCounter = (focusElemento._sessionCounter || 0) + 1
+    const sessionId = focusElemento._sessionCounter
+    focusElemento._currentSession = sessionId
   const paddingPx = Number.isFinite(opts.paddingPx) ? opts.paddingPx : 40
   const fitRatio = Number.isFinite(opts.fitRatio) ? opts.fitRatio : 0.92
   const animate = opts.animate !== false
   const duration = Number.isFinite(opts.duration) ? opts.duration : 340
   const coarseSnapThreshold = Number.isFinite(opts.coarseSnapThreshold) ? opts.coarseSnapThreshold : 0.3 // diferencia relativa de escala para decidir snap
-    const exact = opts.exact === true
+  const exact = opts.exact === true
+  const offsetRight = Number.isFinite(opts.offsetRight) ? opts.offsetRight : 0
 
-    if (focusElemento._raf) cancelAnimationFrame(focusElemento._raf)
+  // Marcar si había otra animación en progreso y es otro elemento → forzar snap (sin animación) para evitar interferencia
+  const previousSessionInProgress = focusElemento._inProgress === true && focusElemento._lastTargetId && focusElemento._lastTargetId !== el.id
+  focusElemento._lastTargetId = el.id
+  // Flag de progreso
+  focusElemento._inProgress = true
 
+    // Flag para marcar interrupciones externas (zoom manual durante animación anterior)
+    focusElemento._interrupted = false
+
+    // Dimensiones canónicas por vista (evita tomar 'alto' como height en vista XY)
+    const vista = vistaActiva.value
     const getDrawWidth = (typeof window !== 'undefined' && window.__getDrawWidth) ? window.__getDrawWidth : (e) => e.width || 0
     const getDrawHeight = (typeof window !== 'undefined' && window.__getDrawHeight) ? window.__getDrawHeight : (e) => e.height || 0
-    const fallbackW = getDrawWidth(el) || el.width || (el?.dimensiones?.ancho ? el.dimensiones.ancho * CM_TO_PX : 0) || 1
-    const dimLargo = el?.dimensiones?.largo ? el.dimensiones.largo * CM_TO_PX : 0
-    const dimAlto = el?.dimensiones?.alto ? el.dimensiones.alto * CM_TO_PX : 0
-    const fallbackH = getDrawHeight(el) || el.height || Math.max(dimLargo, dimAlto) || 1
+    const hasDims = !!el?.dimensiones
+    const dimAnchoPx = hasDims && Number.isFinite(el.dimensiones.ancho) ? el.dimensiones.ancho * CM_TO_PX : 0
+    const dimLargoPx = hasDims && Number.isFinite(el.dimensiones.largo) ? el.dimensiones.largo * CM_TO_PX : 0
+    const dimAltoPx = hasDims && Number.isFinite(el.dimensiones.alto) ? el.dimensiones.alto * CM_TO_PX : 0
+    let fallbackW = 0, fallbackH = 0
+    if (hasDims) {
+      if (vista === 'XZ') {
+        fallbackW = dimAnchoPx || el.width || getDrawWidth(el) || 1
+        fallbackH = dimAltoPx || el.height || getDrawHeight(el) || 1
+      } else { // XY o default
+        fallbackW = dimAnchoPx || el.width || getDrawWidth(el) || 1
+        fallbackH = dimLargoPx || el.height || getDrawHeight(el) || 1
+      }
+    } else {
+      // Legacy sin dimensiones canónicas
+      fallbackW = getDrawWidth(el) || el.width || 1
+      fallbackH = getDrawHeight(el) || el.height || 1
+    }
+    // Salvaguarda mínima
+    if (!(fallbackW > 0)) fallbackW = 1
+    if (!(fallbackH > 0)) fallbackH = 1
     const fallbackX = el.x || 0
     const fallbackY = el.y || 0
 
@@ -1903,28 +2413,50 @@ export const useCanvasStore = defineStore('canvas', () => {
     const prevState = focusElemento._last[el.id]
 
     const computeAndAnimate = (bbox, phase = 0) => {
+      if (focusElemento._currentSession !== sessionId) return // sesión obsoleta
       const viewportW = stage.width() || 1
       const viewportH = stage.height() || 1
-      const usableW = Math.max(1, viewportW - paddingPx * 2)
+      // Considerar el offset del panel de propiedades para calcular el espacio útil
+      const effectiveViewportW = Math.max(1, viewportW - offsetRight)
+      const usableW = Math.max(1, effectiveViewportW - paddingPx * 2)
       const usableH = Math.max(1, viewportH - paddingPx * 2)
       let targetScale = Math.min(usableW / bbox.w, usableH / bbox.h)
       if (!exact) targetScale *= fitRatio
       if (!Number.isFinite(targetScale) || targetScale <= 0) targetScale = 1
-      targetScale = Math.max(0.05, Math.min(5, targetScale))
+
+      // El targetScale calculado naturalmente YA es correcto:
+      // - Para elementos grandes → targetScale bajo (0.001 - 0.1)
+      // - Para elementos pequeños → targetScale alto (1 - 5)
+      // Solo aplicamos límites globales razonables (0.0001 mínimo, 5 máximo)
+
+      const elementMaxDim = Math.max(bbox.w, bbox.h)
+      const viewportMaxDim = Math.max(viewportW, viewportH)
+      const sizeRatio = elementMaxDim / viewportMaxDim
+
+      // Aplicar solo límites globales para evitar valores extremos
+      targetScale = Math.max(0.0001, Math.min(5, targetScale))
+
       const cx = bbox.x + bbox.w / 2
       const cy = bbox.y + bbox.h / 2
-      const targetPanX = (viewportW / 2) - cx * targetScale
-      const targetPanY = (viewportH / 2) - cy * targetScale
+      // Centrar en el espacio visible (desplazado a la izquierda si hay panel)
+      const centerX = (effectiveViewportW / 2)
+      const centerY = (viewportH / 2)
+      const targetPanX = centerX - cx * targetScale
+      const targetPanY = centerY - cy * targetScale
       const currentScale = zoom.value || 1
       const scaleDiffRel = Math.abs(targetScale - currentScale) / Math.max(currentScale, 0.0001)
+
       // Si cambio grande o usuario pidió no animar
       const shouldSnap = scaleDiffRel > coarseSnapThreshold
-      if (!animate || shouldSnap) {
-        configurarZoom(targetScale)
+      const animateEffective = (!previousSessionInProgress && animate && !shouldSnap)
+
+      if (!animateEffective) {
+        // Permitir cualquier zoom calculado, sin restricciones artificiales
+        const effectiveMinZoom = 0.0001 // Mínimo absoluto para elementos gigantescos
+        configurarZoom(targetScale, effectiveMinZoom)
         configurarPan(targetPanX, targetPanY)
         focusElemento._last[el.id] = { scale: targetScale, w: bbox.w, h: bbox.h }
-        // Programar verificación para ajustar si el bounding real difiere tras layout final
-        scheduleRefine(targetScale, targetPanX, targetPanY, bbox, phase)
+        scheduleRefine(sessionId, targetScale, targetPanX, targetPanY, bbox, phase)
         return
       }
       const startZoom = zoom.value
@@ -1938,19 +2470,34 @@ export const useCanvasStore = defineStore('canvas', () => {
         zoom.value = startZoom + (targetScale - startZoom) * k
         panX.value = startPanX + (targetPanX - startPanX) * k
         panY.value = startPanY + (targetPanY - startPanY) * k
+
+        // Sincronizar con Konva durante animación
+        const stage = window.__konvaStage
+        if (stage) {
+          if (typeof stage.scale === 'function') {
+            stage.scale({ x: zoom.value, y: zoom.value })
+          }
+          if (typeof stage.position === 'function') {
+            stage.position({ x: panX.value, y: panY.value })
+          }
+          stage.batchDraw?.()
+        }
+
+        if (focusElemento._currentSession !== sessionId) return // abortar animación obsoleta
         if (tt < 1) {
           focusElemento._raf = requestAnimationFrame(step)
         } else {
           saveZoomPanToHistory()
           focusElemento._last[el.id] = { scale: targetScale, w: bbox.w, h: bbox.h }
-          scheduleRefine(targetScale, targetPanX, targetPanY, bbox, phase)
+          scheduleRefine(sessionId, targetScale, targetPanX, targetPanY, bbox, phase)
         }
       }
       focusElemento._raf = requestAnimationFrame(step)
     }
 
-    const scheduleRefine = (appliedScale, appliedPanX, appliedPanY, appliedBBox, phase) => {
+    const scheduleRefine = (sid, appliedScale, appliedPanX, appliedPanY, appliedBBox, phase) => {
       const refine = () => {
+        if (focusElemento._currentSession !== sid) return // refinamiento viejo
         try {
           const node = stage.findOne(`#${el.id}`)
           if (!node || typeof node.getClientRect !== 'function') return
@@ -1966,22 +2513,31 @@ export const useCanvasStore = defineStore('canvas', () => {
           // Recalcular objetivo con bounding real
           const viewportW = stage.width() || 1
             const viewportH = stage.height() || 1
-            const usableW = Math.max(1, viewportW - paddingPx * 2)
+            // Considerar el offset del panel de propiedades
+            const effectiveViewportW = Math.max(1, viewportW - offsetRight)
+            const usableW = Math.max(1, effectiveViewportW - paddingPx * 2)
             const usableH = Math.max(1, viewportH - paddingPx * 2)
             let idealScale = Math.min(usableW / rw, usableH / rh)
             if (!exact) idealScale *= fitRatio
-            idealScale = Math.max(0.05, Math.min(5, idealScale))
+
+            // El idealScale natural YA es correcto para TODOS los tamaños
+            // Solo límites globales para evitar valores extremos
+            idealScale = Math.max(0.0001, Math.min(5, idealScale))
           const diff = Math.abs(idealScale - appliedScale) / Math.max(idealScale, 0.0001)
           // Si la diferencia es significativa refinamos (pero evitar bucles infinitos: solo 1 refinamiento por invocación)
           if (diff > 0.08 && phase < 2) {
             const cx = rx + rw / 2
             const cy = ry + rh / 2
-            const newPanX = (viewportW / 2) - cx * idealScale
-            const newPanY = (viewportH / 2) - cy * idealScale
+            // Centrar en el espacio visible (desplazado a la izquierda si hay panel)
+            const centerX = (effectiveViewportW / 2)
+            const centerY = (viewportH / 2)
+            const newPanX = centerX - cx * idealScale
+            const newPanY = centerY - cy * idealScale
             // Si la corrección es muy grande, aplicar snap; si es moderada, animación breve
             const large = diff > 0.35
             if (large) {
-              configurarZoom(idealScale)
+              const effectiveMinZoom = 0.0001 // Permitir cualquier zoom
+              configurarZoom(idealScale, effectiveMinZoom)
               configurarPan(newPanX, newPanY)
               focusElemento._last[el.id] = { scale: idealScale, w: rw, h: rh }
             } else {
@@ -1995,9 +2551,23 @@ export const useCanvasStore = defineStore('canvas', () => {
               const step = (now) => {
                 const tt = Math.min(1, (now - startTime) / refineDur)
                 const k = ease(tt)
+                if (focusElemento._currentSession !== sid) return
                 zoom.value = startZoom + (idealScale - startZoom) * k
                 panX.value = startPanX + (newPanX - startPanX) * k
                 panY.value = startPanY + (newPanY - startPanY) * k
+
+                // Sincronizar con Konva durante animación
+                const stage = window.__konvaStage
+                if (stage) {
+                  if (typeof stage.scale === 'function') {
+                    stage.scale({ x: zoom.value, y: zoom.value })
+                  }
+                  if (typeof stage.position === 'function') {
+                    stage.position({ x: panX.value, y: panY.value })
+                  }
+                  stage.batchDraw?.()
+                }
+
                 if (tt < 1) {
                   focusElemento._raf = requestAnimationFrame(step)
                 } else {
@@ -2008,89 +2578,53 @@ export const useCanvasStore = defineStore('canvas', () => {
               focusElemento._raf = requestAnimationFrame(step)
             }
           }
+          // Marcar finalización segura después de primer refinamiento (o no-op)
+          focusElemento._inProgress = false
         } catch { /* ignore refine errors */ }
       }
       // Dos frames después de aplicar para asegurar layout estable
-      requestAnimationFrame(() => requestAnimationFrame(refine))
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (focusElemento._currentSession !== sid) return
+        refine()
+      }))
     }
 
-    // Primera medición diferida para usar rect real antes de animar
+    // Medición simplificada: usar canonical dims como fallback inmediato y luego un refinamiento tras 1 frame
+    const canonicalW = vista === 'XZ' ? dimAnchoPx : dimAnchoPx
+    const canonicalH = vista === 'XZ' ? dimAltoPx : dimLargoPx
+    let bx = fallbackX
+    let by = fallbackY
+    let bw = (canonicalW > 0 ? canonicalW : fallbackW)
+    let bh = (canonicalH > 0 ? canonicalH : fallbackH)
+    // Evitar valores absurdos
+    if (!(bw > 0)) bw = 1
+    if (!(bh > 0)) bh = 1
+
+    // Programar refinamiento para capturar bounding real si difiere significativamente
     requestAnimationFrame(() => {
-      let bx = fallbackX, by = fallbackY, bw = fallbackW, bh = fallbackH
-      let haveReal = false
+      if (focusElemento._currentSession !== sessionId) return
       try {
         const node = stage.findOne(`#${el.id}`)
         if (node && typeof node.getClientRect === 'function') {
           const rect = node.getClientRect({ skipStroke: false, skipShadow: true })
-          const scaleNow = stage.scaleX ? (stage.scaleX() || 1) : 1
-          const stageX = stage.x ? (stage.x() || 0) : 0
-          const stageY = stage.y ? (stage.y() || 0) : 0
-          const rx = (rect.x - stageX) / scaleNow
-          const ry = (rect.y - stageY) / scaleNow
-          const rw = rect.width / scaleNow
-          const rh = rect.height / scaleNow
+          const sc = stage.scaleX ? (stage.scaleX() || 1) : 1
+          const sx = stage.x ? (stage.x() || 0) : 0
+          const sy = stage.y ? (stage.y() || 0) : 0
+          const rx = (rect.x - sx) / sc
+          const ry = (rect.y - sy) / sc
+          const rw = rect.width / sc
+          const rh = rect.height / sc
           if (Number.isFinite(rw) && rw > 0 && Number.isFinite(rh) && rh > 0) {
-            // Descarta si es absurdamente pequeño (<35% fallback) para evitar mid-group
-            const tooSmall = (rw < fallbackW * 0.35) || (rh < fallbackH * 0.35)
+            const tooSmall = (rw < bw * 0.35) || (rh < bh * 0.35)
             if (!tooSmall) {
-              bx = rx; by = ry; bw = rw; bh = rh; haveReal = true
+              bx = rx; by = ry; bw = rw; bh = rh
             }
           }
         }
-      } catch { /* ignore */ }
-      if (!haveReal) {
-        // Segundo frame para intentar rect real antes de animar
-        requestAnimationFrame(() => {
-          try {
-            const node2 = stage.findOne(`#${el.id}`)
-            if (node2 && typeof node2.getClientRect === 'function') {
-              const rect2 = node2.getClientRect({ skipStroke: false, skipShadow: true })
-              const sc = stage.scaleX ? (stage.scaleX() || 1) : 1
-              const sx = stage.x ? (stage.x() || 0) : 0
-              const sy = stage.y ? (stage.y() || 0) : 0
-              const rx2 = (rect2.x - sx) / sc
-              const ry2 = (rect2.y - sy) / sc
-              const rw2 = rect2.width / sc
-              const rh2 = rect2.height / sc
-              if (Number.isFinite(rw2) && rw2 > 0 && Number.isFinite(rh2) && rh2 > 0) {
-                const tooSmall2 = (rw2 < fallbackW * 0.35) || (rh2 < fallbackH * 0.35)
-                if (!tooSmall2) {
-                  bx = rx2; by = ry2; bw = rw2; bh = rh2
-                }
-              }
-            }
-          } catch { /* ignore second try */ }
-          if ((bw === fallbackW && bh === fallbackH) || bw < 2 || bh < 2) {
-            // Tercer frame (último intento) si seguimos solo con fallback o valores irrisorios
-            requestAnimationFrame(() => {
-              try {
-                const node3 = stage.findOne(`#${el.id}`)
-                if (node3 && typeof node3.getClientRect === 'function') {
-                  const rect3 = node3.getClientRect({ skipStroke: false, skipShadow: true })
-                  const sc3 = stage.scaleX ? (stage.scaleX() || 1) : 1
-                  const sx3 = stage.x ? (stage.x() || 0) : 0
-                  const sy3 = stage.y ? (stage.y() || 0) : 0
-                  const rx3 = (rect3.x - sx3) / sc3
-                  const ry3 = (rect3.y - sy3) / sc3
-                  const rw3 = rect3.width / sc3
-                  const rh3 = rect3.height / sc3
-                  if (Number.isFinite(rw3) && rw3 > 0 && Number.isFinite(rh3) && rh3 > 0) {
-                    const tooSmall3 = (rw3 < fallbackW * 0.35) || (rh3 < fallbackH * 0.35)
-                    if (!tooSmall3) {
-                      bx = rx3; by = ry3; bw = rw3; bh = rh3
-                    }
-                  }
-                }
-              } catch { /* ignore third try */ }
-              computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
-            })
-          } else {
-            computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
-          }
-        })
-      } else {
-        computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
+      } catch (err) {
+        // ignore refine errors
       }
+      computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
     })
   }
 
@@ -2100,6 +2634,83 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   const setDraggableMode = (mode) => {
     isDraggable.value = !!mode
+  }
+
+  const setModoConfigurarEsl = (value, { silent = false } = {}) => {
+    const next = value === true
+    if (modoConfigurarEsl.value === next) return
+
+    if (next && modoEdicion.value) {
+      modoEdicion.value = false
+      isDraggable.value = false
+    }
+
+    modoConfigurarEsl.value = next
+
+    if (!next) {
+      elementoEslObjetivo.value = null
+      if (!silent) {
+        showToast('Modo Configurar ESL desactivado', 'info')
+      }
+      return
+    }
+
+    setDraggableMode(false)
+    if (!silent) {
+      showToast('Modo Configurar ESL activo: haz clic en un elemento para asignar su ESL', 'info')
+    }
+  }
+
+  const activarModoConfigurarEsl = (options) => setModoConfigurarEsl(true, options)
+  const desactivarModoConfigurarEsl = (options) => setModoConfigurarEsl(false, options)
+  const toggleModoConfigurarEsl = (options) => setModoConfigurarEsl(!modoConfigurarEsl.value, options)
+
+  const setModoEdicion = (value) => {
+    const next = value === true
+    // Si se activa el modo edición, desactivar configuración de ESL
+    if (next && modoConfigurarEsl.value) {
+      setModoConfigurarEsl(false, { silent: true })
+    }
+    modoEdicion.value = next
+    if (!modoEdicion.value) {
+      isDraggable.value = false
+    }
+  }
+
+  const activarModoEdicion = () => setModoEdicion(true)
+  const desactivarModoEdicion = () => setModoEdicion(false)
+  const toggleModoEdicion = () => setModoEdicion(!modoEdicion.value)
+
+  const iniciarConfiguracionEsl = (elementoId) => {
+    if (!modoConfigurarEsl.value) return false
+    if (!elementoId) return false
+    const existe = elementos.value.find((el) => el?.id === elementoId)
+    if (!existe) return false
+    elementoEslObjetivo.value = elementoId
+    return true
+  }
+
+  const finalizarConfiguracionEsl = () => {
+    elementoEslObjetivo.value = null
+  }
+
+  const guardarCodigoEslElemento = (elementoId, codigoEsl) => {
+    const elemento = elementos.value.find((el) => el?.id === elementoId)
+    if (!elemento) return false
+
+    const trimmed = typeof codigoEsl === 'string' ? codigoEsl.trim() : ''
+    const success = actualizarElementoSinValidacion(elementoId, { codigoEsl: trimmed })
+    if (!success) return false
+
+    setCambiosNoAplicados(true)
+    const descriptor = elemento.nombre || elemento.codigo || elementoId
+    const accion = trimmed ? 'asignado' : 'limpiado'
+    saveToHistory(`Código ESL ${accion}: ${descriptor}`)
+    return true
+  }
+
+  const setSidebarActiveTab = (tabId) => {
+    sidebarActiveTab.value = SIDEBAR_TAB_IDS.has(tabId) ? tabId : 'elementos'
   }
 
   // === INTEGRACIÓN CON AUTOSAVE ===
@@ -2118,6 +2729,27 @@ export const useCanvasStore = defineStore('canvas', () => {
   const setCambiosNoAplicados = (value = false) => {
     cambiosNoAplicados.value = value;
   }
+
+  watch(
+    () => modoEdicion.value,
+    (activo) => {
+      if (!activo) {
+        isDraggable.value = false
+      }
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => modoEdicion.value,
+    () => {
+      try {
+        persist()
+      } catch (error) {
+        console.warn('No se pudo persistir el modo de edición', error)
+      }
+    },
+  )
 
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
   watch(
@@ -2138,31 +2770,109 @@ export const useCanvasStore = defineStore('canvas', () => {
     { immediate: true },
   )
 
+  /**
+   * Reordena en-place los elementos visibles del contexto dado según
+   * `alturaRespectoAlSuelo`, poniendo al final aquellos con mayor altura.
+   * Operamos por índices para tocar únicamente las posiciones visibles
+   * y evitar resort de toda la lista global `elementos.value`.
+   *
+   * @param {string} contextType - tipo de contexto (p. ej. 'plantas' o 'elementos')
+   * @param {string} contextId - id del contexto (planta o elemento padre)
+   */
+  const reorderVisibleByHeightForContext = (contextType, contextId) => {
+    try {
+      if (!contextType) return
+
+      // Determinar los ids y sus índices en elementos.value que son "visibles"
+      const visibleCriteria = []
+
+      if (contextType === 'plantas') {
+        for (let i = 0; i < elementos.value.length; i++) {
+          const el = elementos.value[i]
+          if (!el) continue
+          if (el.plantaId === contextId && !el.padre && ['cuartos', 'elementos'].includes(el.tipo)) {
+            visibleCriteria.push({ index: i, el })
+          }
+        }
+      } else if (contextType === 'pisos') {
+        // contexto 'pisos': visibles son los hijos del elemento padre de tipo 'pisos'
+        const padre = elementos.value.find((e) => e.id === contextId)
+        if (padre?.hijos && Array.isArray(padre.hijos)) {
+          const hijoSet = new Set(padre.hijos)
+          for (let i = 0; i < elementos.value.length; i++) {
+            const el = elementos.value[i]
+            if (!el) continue
+            if (hijoSet.has(el.id) && el.tipo === 'pisos') {
+              visibleCriteria.push({ index: i, el })
+            }
+          }
+        }
+      } else {
+        return
+      }
+
+      if (!visibleCriteria.length) return
+
+      // Establecer orden estable: usar alturaRespectoAlSuelo (num); fallback a 0.
+      const withOrder = visibleCriteria.map((v, idx) => ({
+        origIndex: idx,
+        index: v.index,
+        el: v.el,
+        key: Number((v.el && Number(v.el.alturaRespectoAlSuelo)) || 0),
+      }))
+
+      // Orden ascendente para que los mayores queden al final
+      withOrder.sort((a, b) => {
+        if (a.key === b.key) return a.origIndex - b.origIndex
+        return a.key - b.key
+      })
+
+      // Reasignar en los índices detectados (manteniendo otros elementos intactos)
+      for (let i = 0; i < withOrder.length; i++) {
+        const targetIndex = visibleCriteria[i].index
+        const sourceEl = withOrder[i].el
+        elementos.value[targetIndex] = sourceEl
+      }
+    } catch (e) {
+      // No bloquear la inserción si falla el reorder
+      console.warn('reorderVisibleByHeightForContext failed', e)
+    }
+  }
+
   return {
     // State
     elementos,
     plantas,
     plantaActiva,
     elementoSeleccionado,
+    elementosSeleccionadosMultiple,
+    todosLosElementosSeleccionados,
     vistaActiva,
     zoom,
     panX,
     panY,
     gridSize,
     snapGridEps,
+    modoEdicion,
+  sidebarActiveTab,
+    editorPermissions,
     crearPlanta,
     plantaEnEdicion,
     etiquetas,
     etiquetasSeleccionadas,
     elementoDestacadoId,
     idsElementosFiltrados,
-  elementoAura,
-  auraOpacity,
+    elementoAura,
+    auraOpacity,
     isDraggable,
     cambiosNoAplicados,
-  // Catálogos dinámicos
-  catalogos,
-  setCatalogos,
+    modoConfigurarEsl,
+    elementoEslObjetivo,
+    // Catálogos dinámicos
+    catalogos,
+    setCatalogos,
+    tiposProductoAdmitidos,
+    setTiposProductoAdmitidos,
     gestionPisosPropiedadesModal,
     nivelAEditar,
 
@@ -2190,6 +2900,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Actions - Canvas
     seleccionarElemento,
+    seleccionarElementosMultiple,
+    limpiarSeleccionElementos,
     setCambiosNoAplicados,
     actualizarPosicion,
     actualizarElemento,
@@ -2199,6 +2911,18 @@ export const useCanvasStore = defineStore('canvas', () => {
     configurarPan,
     setGridSize,
     setSnapGridEps,
+    setModoEdicion,
+    activarModoEdicion,
+    desactivarModoEdicion,
+    toggleModoEdicion,
+    setModoConfigurarEsl,
+    activarModoConfigurarEsl,
+    desactivarModoConfigurarEsl,
+    toggleModoConfigurarEsl,
+    iniciarConfiguracionEsl,
+    finalizarConfiguracionEsl,
+    guardarCodigoEslElemento,
+    setSidebarActiveTab,
 
     // Actions - Plantas
     seleccionarPlanta,
@@ -2208,6 +2932,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // Actions - Elementos
     agregarElemento,
+    agregarElementoSinValidacion,
     eliminarElemento,
     toggleElementoVisibilidad,
 
@@ -2228,6 +2953,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     // === INTEGRACIÓN CON AUTOSAVE ===
     setAutoSaveInstance,
     autoSaveInstance,
+
+    // === UTILIDADES INTERNAS (expuestas para optimización) ===
+    reorderVisibleByHeightForContext,
 
     // === FUNCIONES DE SERIALIZACIÓN ===
     serialize,
@@ -2253,7 +2981,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // == Destacar
     destacarElemento,
-  focusElemento,
+    focusElemento,
     actualizarIdsFiltrados,
 
     setDraggableMode,
@@ -2267,5 +2995,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     propuestaAlturasNiveles,
     confirmacionAlturasNivelesModal,
     actualizarElementoSinValidacion,
+    recomputePasilloAssignments,
   }
 })
+
+
+

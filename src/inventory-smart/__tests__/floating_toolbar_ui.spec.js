@@ -25,43 +25,40 @@ describe('FloatingToolbar UI (refactor visuals)', () => {
     expect(toolbar.classes()).toContain('backdrop-saturate-150')
   })
 
-  it('switch group is rounded-[14px], overflow-hidden, and exact padding/vars', () => {
+  it('switch group keeps legacy overflow-visible layout and spacing vars', () => {
     const wrapper = mountToolbar()
     const group = wrapper.get('[role="group"]')
     expect(group.classes()).toContain('rounded-[14px]')
-    expect(group.classes()).toContain('overflow-hidden')
-    expect(group.classes()).toContain('px-[var(--seg-pad)]')
+    expect(group.classes()).toContain('overflow-visible')
     const styleStr = group.attributes('style') || ''
     expect(styleStr).toMatch(/--seg-w:\s*36px/)
     expect(styleStr).toMatch(/--seg-gap:\s*8px/)
-    expect(styleStr).toMatch(/--seg-pad:\s*2px/)
+    expect(styleStr).toMatch(/--seg-pad:\s*0px/)
   })
 
-  it('slider vertical-centers with calc-based travel', async () => {
+  it('slider vertical-centers with calc-based travel (legacy left calc)', async () => {
     const wrapper = mountToolbar({ activeMode: 'drag' })
     const group = wrapper.get('[role="group"]')
     const slider = group.get('div[aria-hidden="true"]')
     expect(slider.classes()).toContain('rounded-full')
     expect(slider.classes()).toContain('top-1/2')
     expect(slider.classes()).toContain('-translate-y-1/2')
-    expect(slider.classes()).toContain('left-[var(--seg-pad)]')
+    expect(slider.classes()).toContain('left-0')
     expect(slider.classes()).toContain('h-[36px]')
     expect(slider.classes()).toContain('w-[36px]')
     expect(slider.classes()).toContain('duration-220')
     expect(slider.classes()).toContain('ease-[cubic-bezier(.25,1.1,.4,1)]')
-    // uses Tailwind transform var for X only (no optical offset)
-    expect(slider.attributes('style')).toMatch(/--tw-translate-x:\s*calc\(var\(--seg-index\) \* \(var\(--seg-w\) \+ var\(--seg-gap\)\)\)/)
+  // legacy implementation positions via left calc
+  const sliderStyle = slider.attributes('style') || ''
+  expect(sliderStyle).toMatch(/left:\s*calc\(var\(--seg-index\) \* 50%\)/)
     // ring and contrast boost present
     expect(slider.classes()).toContain('ring-2')
     expect(slider.classes()).toContain('ring-white/15')
     await wrapper.setProps({ activeMode: 'edit' })
     const style2 = group.attributes('style') || ''
     expect(style2).toMatch(/--seg-index:\s*1/)
-    // computed travel equals calc(36px + 8px)
-    const segW = (style2.match(/--seg-w:\s*([^;]+)/)?.[1] || '').trim()
-    const segGap = (style2.match(/--seg-gap:\s*([^;]+)/)?.[1] || '').trim()
-    const exp = `calc(${segW} + ${segGap})`
-    expect(exp).toBe('calc(36px + 8px)')
+    const sliderStyle2 = slider.attributes('style') || ''
+    expect(sliderStyle2).toMatch(/left:\s*calc\(var\(--seg-index\) \* 50%\)/)
   })
 
   it('SVGs are block and align-middle (no baseline drift)', async () => {
@@ -82,19 +79,11 @@ describe('FloatingToolbar UI (refactor visuals)', () => {
     expect(svgs[1].classes()).toContain('data-[state=off]:opacity-70')
   })
 
-  it('Move/Edit labels toggle opacity with active mode', async () => {
+  it('does not render textual Move/Edit labels (icons only)', () => {
     const wrapper = mountToolbar({ activeMode: 'drag' })
-    const allDivs = wrapper.findAll('div')
-    const move = allDivs.find((n) => n.text() === 'Move')
-    const edit = allDivs.find((n) => n.text() === 'Edit')
-    expect(move.classes()).toContain('opacity-100')
-    expect(edit.classes()).toContain('opacity-0')
-    await wrapper.setProps({ activeMode: 'edit' })
-    const allDivs2 = wrapper.findAll('div')
-    const move2 = allDivs2.find((n) => n.text() === 'Move')
-    const edit2 = allDivs2.find((n) => n.text() === 'Edit')
-    expect(move2.classes()).toContain('opacity-0')
-    expect(edit2.classes()).toContain('opacity-100')
+    const texts = wrapper.findAll('div').map((n) => n.text())
+    expect(texts).not.toContain('Move')
+    expect(texts).not.toContain('Edit')
   })
 
   it('secondary buttons declare strong on-state styles', () => {

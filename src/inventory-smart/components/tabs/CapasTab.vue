@@ -41,53 +41,15 @@
           <div class="p-4 space-y-3">
             <div>
               <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide">
-                Nombre de elemento
+                Buscar por nombre, código y ESL
               </label>
               <input
                 v-model="filtroNombre"
                 @keyup.enter="() => filtrosVisibles = false"
                 class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
-                placeholder="Nombre del elemento..."
+                placeholder="Buscar..."
               />
             </div>
-            <!-- Filtro por tipo (internamente manejado como categoría) -->
-            <div>
-              <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide"
-                >Tipo:</label
-              >
-              <select
-                v-model="filtroCategoria"
-                class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
-              >
-                <option value="">Todos los tipos</option>
-                <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
-                  {{ categoria.nombre }}
-                </option>
-              </select>
-            </div>
-
-            <!-- Filtro por ubicación -->
-            <div>
-              <label class="block text-xs font-medium text-gray-700 mb-1 tracking-wide"
-                >Ubicación:</label
-              >
-              <select
-                v-model="filtroUbicacion"
-                class="w-full cursor-pointer px-3 py-2 border border-gray-300 rounded-md text-sm bg-white text-gray-900 focus:outline-none focus:border-blue-500 focus:ring focus:ring-blue-100"
-              >
-                <option value="">Todas las ubicaciones</option>
-                <option value="suelo">Suelo</option>
-                <option value="pared">Pared</option>
-              </select>
-            </div>
-
-            <!-- FILTRO DE ETIQUETAS -->
-            <TagFilter
-              :selected-ids="canvasStore.etiquetasSeleccionadas"
-              @add="canvasStore.seleccionarEtiqueta"
-              @remove="canvasStore.deseleccionarEtiqueta"
-              @create="abrirModalCrearEtiqueta"
-            />
 
             <!-- Botón para limpiar filtros -->
             <UiTooltip
@@ -196,7 +158,7 @@
               :label="elemento.visible === false ? 'Mostrar' : 'Ocultar'"
             >
             <button
-              @click.stop="canvasStore.toggleElementoVisibilidad(elemento.id)"
+              @click.stop="toggleVisibilidad(elemento.id)"
               class="p-0 text-gray-400 hover:text-gray-600 cursor-pointer"
             >
               <svg
@@ -250,7 +212,7 @@
               label="Eliminar elemento"
             >
             <button
-              @click.stop="onDelete(elemento.id)"
+              @click.stop="onDelete(elemento.id)" :disabled="!canMutateLayers"
               class="p-0 text-gray-400 hover:text-red-700 cursor-pointer"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 1024 1024"><path fill="currentColor" d="M360 184h-8c4.4 0 8-3.6 8-8zh304v-8c0 4.4 3.6 8 8 8h-8v72h72v-80c0-35.3-28.7-64-64-64H352c-35.3 0-64 28.7-64 64v80h72zm504 72H160c-17.7 0-32 14.3-32 32v32c0 4.4 3.6 8 8 8h60.4l24.7 523c1.6 34.1 29.8 61 63.9 61h454c34.2 0 62.3-26.8 63.9-61l24.7-523H888c4.4 0 8-3.6 8-8v-32c0-17.7-14.3-32-32-32M731.3 840H292.7l-24.2-512h487z"/></svg>
@@ -274,7 +236,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { TODAS_LAS_CATEGORIAS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import TagFilter from '@/inventory-smart/components/TagFilter.vue'
 import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
@@ -288,15 +252,16 @@ import RoomIcon from '@/inventory-smart/icons/RoomIcon.vue'
 const { showToast } = useToast()
 // Composables
 const canvasStore = useCanvasStore()
+const { modoEdicion } = storeToRefs(canvasStore)
 
 const deleteElement = useDeleteElement();
+const { canMutateLayers } = useEditorMode()
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 const confirmDialog = useConfirmDialog();
 
 // Estado local
-const filtroCategoria = ref('')
-const filtroUbicacion = ref('')
 const filtrosVisibles = ref(false)
-const filtroNombre = ref('');
+const filtroNombre = ref('')
 const modalVisible = ref(false)
 const textoNuevaEtiqueta = ref('')
 
@@ -313,7 +278,14 @@ const showAuraElement = (elementoId) => {
     return;
   }
   // Primero enfocar (zoom+pan) para garantizar que el nodo esté en viewport
-  canvasStore.focusElemento(elementoId, { paddingPx: 60, fitRatio: 0.95, animate: true, duration: 450 });
+  // offsetRight: 320 = ancho del panel de propiedades que se abrirá después del focus
+  canvasStore.focusElemento(elementoId, {
+    paddingPx: 60,
+    fitRatio: 0.95,
+    animate: true,
+    duration: 450,
+    offsetRight: 320
+  });
   // Luego (en el siguiente frame) destacar para tomar bounding correcto tras animación inicial
   requestAnimationFrame(() => canvasStore.destacarElemento(elementoId));
   // Seleccionar
@@ -343,29 +315,14 @@ const elementosFiltrados = computed(() => {
     (a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0)
   )
 
+  // Filtro por texto (nombre, código o código ESL)
   if (filtroNombre.value) {
-    elementos = elementos.filter((elemento) => elemento.nombre.toLowerCase().includes(filtroNombre.value.toLowerCase()));
-  }
-
-  if (filtroCategoria.value) {
-    elementos = elementos.filter((elemento) => elemento.categoria === filtroCategoria.value)
-  }
-
-  if (filtroUbicacion.value) {
+    const q = String(filtroNombre.value).toLowerCase()
     elementos = elementos.filter((elemento) => {
-      // Asumimos que la propiedad 'ubicacion' está en la raíz del objeto limpio
-      return elemento.ubicacion === filtroUbicacion.value
-    })
-  }
-
-  if (canvasStore.etiquetasSeleccionadas.length > 0) {
-    elementos = elementos.filter((elemento) => {
-      if (!elemento.etiquetas || !Array.isArray(elemento.etiquetas)) {
-        return false
-      }
-      return canvasStore.etiquetasSeleccionadas.every((tagId) =>
-        elemento.etiquetas.includes(tagId)
-      )
+      const nombre = String(elemento.nombre || '').toLowerCase()
+      const codigo = String(elemento.codigo || '').toLowerCase()
+      const codigoESL = String(elemento.codigoESL || '').toLowerCase()
+      return nombre.includes(q) || codigo.includes(q) || codigoESL.includes(q)
     })
   }
 
@@ -373,12 +330,7 @@ const elementosFiltrados = computed(() => {
 })
 
 const hayFiltrosActivos = computed(() => {
-  return !!(
-    filtroCategoria.value ||
-    filtroUbicacion.value ||
-    filtroNombre.value ||
-    canvasStore.etiquetasSeleccionadas.length > 0
-  )
+  return !!(filtroNombre.value)
 })
 
 // Métodos
@@ -387,13 +339,23 @@ const toggleFiltros = () => {
 }
 
 const limpiarFiltros = () => {
-  filtroCategoria.value = ''
-  filtroUbicacion.value = ''
-  filtroNombre.value = '';
-  canvasStore.limpiarSeleccion()
+  filtroNombre.value = ''
 }
 
+watch(modoEdicion, (isEditing) => {
+  if (isEditing) return
+  filtrosVisibles.value = false
+  modalVisible.value = false
+  textoNuevaEtiqueta.value = ''
+  limpiarFiltros()
+  canvasStore.actualizarIdsFiltrados(null)
+})
+
 const onDelete = async (id) => {
+  if (!canMutateLayers.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
   if (!id) return
   if (canvasStore.cambiosNoAplicados) {
     showToast('No se pueden eliminar elementos con cambios pendientes de guardar', 'warn')
@@ -415,12 +377,24 @@ const onDelete = async (id) => {
   await deleteElement.deleteSelected({ withConfirm: true })
 }
 
+const toggleVisibilidad = (id) => {
+  if (!canMutateLayers.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
+  canvasStore.toggleElementoVisibilidad(id)
+}
+
 const abrirModalCrearEtiqueta = (texto) => {
   textoNuevaEtiqueta.value = texto
   modalVisible.value = true
 }
 
 const guardarNuevaEtiqueta = (nuevaEtiqueta) => {
+  if (!canMutateLayers.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
   canvasStore.agregarYSeleccionarEtiqueta(nuevaEtiqueta)
   modalVisible.value = false;
 }

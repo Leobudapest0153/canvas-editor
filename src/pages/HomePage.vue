@@ -2,9 +2,14 @@
   <div id="app">
     <InventorySmart
       :configCanvas="initialConfig"
+      :predefinedElements="ELEMENTOS_PREDEFINIDOS"
+      :supportedProductTypes="tiposProductoAdmitidos"
       :externalServices="externalServices"
       :author="{ name: 'David Deras', id: '123' }"
       @configUpdated="handleConfigUpdated"
+      @back="handleBack"
+      @printIdentifiers="handlePrintIdentifiers"
+      @printIdentifier="handlePrintIdentifier"
     />
   </div>
 </template>
@@ -13,6 +18,17 @@
 import { onMounted, ref } from 'vue'
 import InventorySmart from '@/inventory-smart/InventorySmart.vue'
 import { SERIALIZE_CONFIG } from '../inventory-smart/utils/constants'
+import { ELEMENTOS_PREDEFINIDOS } from '../inventory-smart/utils/constants'
+
+// Catálogo de tipos de producto admitidos (datos de ejemplo)
+const tiposProductoAdmitidos = ref([
+  { id: 'secos', nombre: 'Productos secos' },
+  { id: 'refrigerados', nombre: 'Refrigerados' },
+  { id: 'congelados', nombre: 'Congelados' },
+  { id: 'fragiles', nombre: 'Frágiles' },
+  { id: 'peligrosos', nombre: 'Peligrosos' },
+  { id: 'voluminosos', nombre: 'Voluminosos' },
+])
 
 // Estado inicial de la configuración del canvas
 const initialConfig = ref(null)
@@ -88,7 +104,6 @@ const externalServices = ref([createContainerProductsService()])
 const handleConfigUpdated = (nuevaConfig) => {
   try {
     // Actualizar la referencia local de la configuración
-
     currentConfig.value = nuevaConfig
     // DEV: Guardar en localStorage para simular persistencia
     localStorage.setItem(SERIALIZE_CONFIG.STORAGE_KEY, nuevaConfig)
@@ -98,6 +113,20 @@ const handleConfigUpdated = (nuevaConfig) => {
   } catch (error) {
     console.error('Error al manejar la configuración actualizada:', error)
   }
+}
+
+const handleBack = () => {
+  // Aquí se manejaría la navegación de regreso en la aplicación real
+  console.log('Navegando de regreso')
+}
+
+const handlePrintIdentifiers = () => {
+  // Aquí se manejaría la acción de imprimir identificadores en la aplicación real
+  console.log('Imprimiendo identificadores')
+}
+
+const handlePrintIdentifier = (value) => {
+  console.log('Imprimiendo identificador:', value)
 }
 
 onMounted(() => {

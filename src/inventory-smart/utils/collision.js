@@ -1,7 +1,7 @@
 // /inventory-smart/utils/collision.js
 // Detección de conflictos: broad-phase (AABB), narrow-phase (2D) y chequeo Z
 
-import { detectCircleCircleCollision, areBothCircular, detectCircleRectCollision } from './circleCollisions'
+import { detectCircleCircleCollision, areBothCircular, detectCircleRectCollision, circleCircleMTD } from './circleCollisions'
 import { PRECISION_PIXELS } from './precision'
 
 // Pequeño throttle (16-32ms)
@@ -160,21 +160,23 @@ export function classifyPair(a, b) {
 // Regla de permisos y bloqueos (warning=true para clases no bloqueantes con XY solapado)
 export function evaluateConflict(a, b) {
   const clase = classifyPair(a, b)
-  const { intersectXY } = narrowPhase2D(a, b)
+  const { intersectXY, circleCollision } = narrowPhase2D(a, b)
   if (!intersectXY) return null
 
   const z = zOverlapCheck(a, b)
   const base = { aId: a.id, bId: b.id, clase, xyOverlap: true, zOverlap: z.overlap, zAmount: z.amount }
+  const extra = circleCollision ? { circleCollision } : {}
 
   if (clase === 'suelo-suelo') {
-    return { ...base, permitido: false, bloqueante: true, warning: false }
+    return { ...base, ...extra, permitido: false, bloqueante: true, warning: false }
   }
   if (clase === 'suelo-pared' || clase === 'pared-pared') {
-    return { ...base, permitido: true, bloqueante: false, warning: true }
+    return { ...base, ...extra, permitido: true, bloqueante: false, warning: true }
   }
   // Otros casos: permitido, advertencia si XY
-  return { ...base, permitido: true, bloqueante: false, warning: true }
+  return { ...base, ...extra, permitido: true, bloqueante: false, warning: true }
 }
+
 
 export function detectConflictsFor(movingEl, allElements) {
   const index = buildSpatialIndex(allElements)
@@ -191,7 +193,26 @@ export function detectConflictsFor(movingEl, allElements) {
 }
 
 // MTD (mínima traslación) entre AABB A y B para separar A de B
-export function computeMTD(ax, ay, aw, ah, bx, by, bw, bh) {
+export function computeMTD(ax, ay, aw, ah, bx, by, bw, bh, options = null) {
+  const hasOptions = !!options
+  const isCircleA = hasOptions && (options.isCircleA === true || options.circleGeomA || typeof options.radiusA === 'number' || options.shapeA?.forma === 'circular')
+  const isCircleB = hasOptions && (options.isCircleB === true || options.circleGeomB || typeof options.radiusB === 'number' || options.shapeB?.forma === 'circular')
+
+  if (isCircleA && isCircleB) {
+    const radiusA = options.radiusA ?? options.circleGeomA?.radius ?? Math.min(aw, ah) / 2
+    const radiusB = options.radiusB ?? options.circleGeomB?.radius ?? Math.min(bw, bh) / 2
+    if (radiusA > 0 && radiusB > 0) {
+      const centerA = options.centerA ?? options.circleGeomA?.center ?? { x: ax + aw / 2, y: ay + ah / 2 }
+      const centerB = options.centerB ?? options.circleGeomB?.center ?? { x: bx + bw / 2, y: by + bh / 2 }
+      const tolerance = options.tolerance
+      const circleRes = circleCircleMTD(centerA, radiusA, centerB, radiusB, tolerance)
+      if (circleRes.penetration > 0) {
+        return { dx: circleRes.dx, dy: circleRes.dy }
+      }
+      return { dx: 0, dy: 0 }
+    }
+  }
+
   const aLeft = ax
   const aRight = ax + aw
   const aTop = ay
@@ -201,30 +222,24 @@ export function computeMTD(ax, ay, aw, ah, bx, by, bw, bh) {
   const bTop = by
   const bBottom = by + bh
 
-  // Si no hay solape, no hay MTD
   if (aRight <= bLeft || bRight <= aLeft || aBottom <= bTop || bBottom <= aTop) {
     return { dx: 0, dy: 0 }
   }
 
-  // Traslaciones necesarias para separar A de B en cada eje
-  // Eje X: valores positivos desplazan A hacia la derecha, negativos hacia la izquierda
-  const moveLeft = aRight - bLeft // mover A hacia la izquierda (dx negativo)
-  const moveRight = bRight - aLeft // mover A hacia la derecha (dx positivo)
+  const moveLeft = aRight - bLeft
+  const moveRight = bRight - aLeft
+  const moveUp = aBottom - bTop
+  const moveDown = bBottom - aTop
 
-  // Eje Y: valores positivos desplazan A hacia abajo, negativos hacia arriba
-  const moveUp = aBottom - bTop // mover A hacia arriba (dy negativo)
-  const moveDown = bBottom - aTop // mover A hacia abajo (dy positivo)
-
-  // Elegir la menor magnitud en cada eje
   const mtdX = Math.abs(moveLeft) < Math.abs(moveRight) ? -moveLeft : moveRight
   const mtdY = Math.abs(moveUp) < Math.abs(moveDown) ? -moveUp : moveDown
 
-  // Proyectar a un único eje: elegir el de menor magnitud absoluta
-  if (Math.abs(mtdX) < Math.abs(mtdY)) {
+  if (Math.abs(mtdX) <= Math.abs(mtdY)) {
     return { dx: mtdX, dy: 0 }
   }
   return { dx: 0, dy: mtdY }
 }
+
 
 export function mtdAgainstSet(candidateRect, neighborsRects, XY_EPS = 0.01) {
   let best = { dx: 0, dy: 0 }
@@ -311,7 +326,17 @@ export function resolveCandidateWithBoundary(movingEl, allElements, W, H, iterat
       const otherId = c.aId === movingEl.id ? c.bId : c.aId
       const other = allElements.find((el) => el.id === otherId)
       if (!other) continue
-      const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height)
+      const circleOpts = movingEl.forma === 'circular' && other?.forma === 'circular'
+        ? {
+            isCircleA: true,
+            isCircleB: true,
+            centerA: { x: x + w / 2, y: y + h / 2 },
+            centerB: { x: other.x + (other.width || 0) / 2, y: other.y + (other.height || 0) / 2 },
+            radiusA: Math.min(w, h) / 2,
+            radiusB: Math.min(other.width || 0, other.height || 0) / 2
+          }
+        : undefined
+      const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height, circleOpts)
       accDx += dx
       accDy += dy
     }

@@ -1,13 +1,18 @@
-<!--
-  ElementosTab.vue
-  Tab que contiene el catálogo completo de elementos.
-  Este componente encapsula todo el contenido del ElementosCatalogo original.
--->
-
 <template>
-  <div class="h-full flex flex-col">
-  <div class="p-2 flex items-center justify-center">
-      <!-- Conmutador compacto: botones icon + etiqueta compacta -->
+  <div v-if="isContextoInvalido" class="h-full flex flex-col items-center justify-center p-6 text-center bg-gray-50">
+    <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+    </svg>
+    <h3 class="text-lg font-semibold text-gray-800 mb-2">
+      Acción no disponible
+    </h3>
+    <p class="text-sm text-gray-600 max-w-xs">
+      No es posible añadir elementos dentro de un cuarto o de otro elemento directamente desde este catálogo.
+    </p>
+  </div>
+
+  <div v-else class="h-full flex flex-col">
+    <div class="p-2 flex items-center justify-center">
       <div class="catalog-switch !mb-0">
         <div role="tablist" aria-label="Cambiar catálogo" class="flex gap-1">
           <button
@@ -67,7 +72,6 @@
         </div>
       </div>
 
-      <!-- Fallback móvil: dropdown -->
       <div class="catalog-switch catalog-switch--compact">
         <label for="catalogSelect" class="sr-only">Catálogo</label>
         <select
@@ -81,18 +85,16 @@
       </div>
     </div>
 
-    <!-- Contenido dinámico según catálogo -->
     <div
       v-if="selectedCatalog === 'elementos'"
       class="flex-1 overflow-hidden"
     >
-  <ElementosCatalogo :modo="currentModo" />
+      <ElementosCatalogo :modo="currentModo" />
     </div>
     <div
       v-else
       class="flex-1 overflow-hidden flex flex-col"
     >
-      <!-- Header de filtros solo cuando hay plantillas -->
       <div class="catalogo-header border-b border-gray-200" v-if="templates && templates.length > 0">
         <div class="relative">
           <div class="px-4 mb-1 bg-white" ref="filtrosBotonRef">
@@ -114,34 +116,13 @@
             <div v-if="filtrosVisibles" class="absolute top-full left-0 w-full bg-gray-50 shadow-lg z-10" ref="filtrosPanelRef">
               <div class="p-3 grid grid-cols-1 gap-3">
                 <div>
-                  <label class="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Buscar por nombre</label>
                   <input
                     v-model="filtroNombre"
                     @keyup.enter="() => (filtrosVisibles = false)"
-                    placeholder="Nombre..."
+                    placeholder="Buscar..."
                     class="w-full px-3 py-2 border rounded-md text-sm"
                   />
-                </div>
-
-                <!-- Filtro por tipo (internamente manejado como categoría) -->
-                <div>
-                  <label class="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
-                  <select v-model="filtroCategoria" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
-                    <option value="">Todos</option>
-                    <option v-for="c in categoriasPlantillas" :key="c.id" :value="c.id">
-                      {{ c.nombre }}
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-xs font-medium text-gray-700 mb-1">Ubicación</label>
-                  <select v-model="filtroUbicacion" class="w-full cursor-pointer px-3 py-2 border rounded-md text-sm bg-white">
-                    <option value="">Todas</option>
-                    <option v-for="u in ubicacionesPlantillas" :key="u.id" :value="u.id">
-                      {{ u.nombre }}
-                    </option>
-                  </select>
                 </div>
                 <div class="pt-1">
                   <button v-if="hayFiltrosActivos" @click="limpiarFiltros" class="px-3 py-2 bg-gray-100 rounded-md text-xs">Limpiar filtros</button>
@@ -152,9 +133,7 @@
         </div>
       </div>
 
-      <!-- Contenido principal - SIEMPRE se muestra -->
       <div class="elementos-lista flex-1 overflow-y-auto p-4">
-        <!-- Mensaje vacío cuando no hay plantillas - CENTRADO Y MÁS ARRIBA -->
         <div v-if="!templates || !Array.isArray(templates) || templates.length === 0" class="flex items-center justify-center h-full">
           <div class="text-center">
             <svg
@@ -177,7 +156,6 @@
           </div>
         </div>
 
-        <!-- Lista + vacío por filtros -->
         <div v-else>
           <div class="grid grid-cols-1 gap-3">
             <div
@@ -190,7 +168,6 @@
               class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md border-l-4 hover:scale-[1.02] hover:bg-gray-50 transition duration-200"
               :style="{ borderLeftColor: getTemplateColor(tpl) }"
             >
-              <!-- Botón de acciones (tres puntos) -->
               <button
                 type="button"
                 class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded cursor-pointer"
@@ -228,11 +205,7 @@
                     <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
                     <span class="spec-value text-gray-700">{{ formatTemplateWeight(tpl) }}</span>
                   </div>
-                  <!-- <div class="spec-item flex justify-between text-xs">
-                    <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
-                    <span class="spec-value text-gray-700 capitalize">{{ formatTemplateLocation(tpl) }}</span>
-                  </div> -->
-                </div>
+                  </div>
 
                 <div class="mt-2 flex gap-1">
                   <span
@@ -244,19 +217,11 @@
                   >
                     Plantillas
                   </span>
-                  <!-- <span
-                    v-for="tag in tpl.tags"
-                    :key="tag"
-                    class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700"
-                  >
-                    {{ tag }}
-                  </span> -->
-                </div>
+                  </div>
               </div>
             </div>
           </div>
 
-          <!-- Mensaje de vacío por filtros -->
           <div v-if="plantillasFiltradas.length === 0" class="text-center py-12">
             <svg
               class="w-12 h-12 text-gray-300 mx-auto mb-4"
@@ -279,7 +244,6 @@
         </div>
       </div>
 
-      <!-- Menú contextual para plantillas (clic derecho o kebab) -->
       <div
         v-if="ctxMenu.visible"
         class="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-1"
@@ -333,19 +297,13 @@ const ctxMenu = ref({ visible: false, x: 0, y: 0, template: null })
 
 // --- Filtros (patrón tomado de CapasTab.vue)
 const filtrosVisibles = ref(false)
-const filtroCategoria = ref('')
-const filtroUbicacion = ref('')
 const filtrosBotonRef = ref(null)
 const filtrosPanelRef = ref(null)
 // Reutilizamos searchText del store para el filtro por nombre
 const filtroNombre = searchText
 
 const hayFiltrosActivos = computed(() => {
-  return !!(
-    filtroCategoria.value ||
-    filtroUbicacion.value ||
-    (filtroNombre && filtroNombre.value)
-  )
+  return !!((filtroNombre && filtroNombre.value))
 })
 
 const toggleFiltros = () => {
@@ -353,8 +311,6 @@ const toggleFiltros = () => {
 }
 
 const limpiarFiltros = () => {
-  filtroCategoria.value = ''
-  filtroUbicacion.value = ''
   if (filtroNombre) filtroNombre.value = ''
 }
 
@@ -416,6 +372,15 @@ const selectCuartos = () => {
 
 // Opciones de filtros en Plantillas
 const canvasStore = useCanvasStore()
+
+// --- MODIFICACIÓN CLAVE ---
+// NUEVO: Computed para determinar si el contexto actual deshabilita el tab.
+const isContextoInvalido = computed(() => {
+  const tipoContexto = canvasStore.contextoActual?.tipo
+  return tipoContexto === 'cuartos' || tipoContexto === 'elementos'
+})
+// --- FIN MODIFICACIÓN ---
+
 const isPlantaContext = computed(() => canvasStore.contextoActual?.tipo === 'plantas')
 const tabsOrder = computed(() => ['espacios', ...(isPlantaContext.value ? ['cuartos'] : []), 'plantillas'])
 const categoriasPlantillas = computed(() => {
@@ -455,33 +420,22 @@ watch(isPlantaContext, (enPlanta) => {
 // Resultado de búsqueda global (texto) sobre plantillas
 const filteredTemplates = computed(() => catalogStore.searchTemplates(searchText.value))
 
-// Computed local para filtrar plantillas por nombre/categoría/ubicación (patrón CapasTab)
+// Computed local para filtrar plantillas por nombre/código/ESL (patrón CapasTab)
 const plantillasFiltradas = computed(() => {
-  // Lista visible = búsqueda global (si hay) + filtros locales (nombre/categoría/ubicación)
+  // Lista visible = búsqueda global (si hay) + filtros locales (nombre/código/ESL)
   const base = Array.isArray(filteredTemplates.value) ? filteredTemplates.value.slice() : []
   let out = base
 
+  // Filtro por texto (nombre, código o código ESL)
   if (filtroNombre && filtroNombre.value) {
     const q = String(filtroNombre.value).toLowerCase()
     out = out.filter((tpl) => {
       const nombre = String(tpl.name || '').toLowerCase()
-      const desc = String(tpl.notes || '').toLowerCase()
-      return nombre.includes(q) || desc.includes(q)
-    })
-  }
-
-  if (filtroCategoria.value) {
-    out = out.filter((tpl) => {
-      // Intentamos derivar la categoría de la raíz de la plantilla
+      // Intentamos derivar código y codigoESL de la raíz de la plantilla
       const root = (tpl.payload?.elements || []).find((e) => e.id === tpl.payload?.rootId) || (tpl.payload?.elements || [])[0] || {}
-      return root.categoria === filtroCategoria.value
-    })
-  }
-
-  if (filtroUbicacion.value) {
-    out = out.filter((tpl) => {
-      const root = (tpl.payload?.elements || []).find((e) => e.id === tpl.payload?.rootId) || (tpl.payload?.elements || [])[0] || {}
-      return (root.ubicacion || tpl.meta?.location || '').toLowerCase() === String(filtroUbicacion.value).toLowerCase()
+      const codigo = String(root.codigo || '').toLowerCase()
+      const codigoESL = String(root.codigoESL || '').toLowerCase()
+      return nombre.includes(q) || codigo.includes(q) || codigoESL.includes(q)
     })
   }
 

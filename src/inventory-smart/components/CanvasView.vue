@@ -19,6 +19,7 @@
       'drag-over': isDragOverCanvas,
       'cursor-grab': !dragModeGlobal,
       'infinite-floor': isInfinitePlant,
+      'esl-mode': canvasStore.modoConfigurarEsl,
     }"
     @drop="handleDrop"
     @dragover="handleDragOver"
@@ -30,6 +31,8 @@
       :config="stageConfig"
       @wheel="handleWheel"
       @mousedown="handleStageMouseDown"
+      @mousemove="handleStageMouseMove"
+      @mouseup="handleStageMouseUp"
       @click="handleStageClick"
     >
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
@@ -201,6 +204,7 @@
             <v-rect
               v-if="getOrientationBarRect(elemento)"
               :config="getOrientationBarRect(elemento)"
+              @click="() => handleOrientationBarClick(elemento)"
             />
             <!-- Etiqueta centrada del elemento (rectangular) -->
             <v-text :config="computeLabelProps(elemento)" />
@@ -545,6 +549,22 @@
           :zoom="canvasStore.zoom"
         />
 
+        <!-- Rectángulo de selección múltiple (marquesina) -->
+        <v-rect
+          v-if="isMarqueeActive"
+          :config="{
+            x: marqueeRect.x,
+            y: marqueeRect.y,
+            width: marqueeRect.width,
+            height: marqueeRect.height,
+            stroke: '#3b82f6',
+            strokeWidth: 2 / canvasStore.zoom,
+            fill: 'rgba(59, 130, 246, 0.1)',
+            dash: [4 / canvasStore.zoom, 4 / canvasStore.zoom],
+            listening: false,
+          }"
+        />
+
         <v-transformer
           v-if="
             isEditingSelected &&
@@ -596,6 +616,7 @@
     />
 
     <FloatingToolbar
+      v-if="isEditMode"
       :is-element-selected="canvasStore.elementoSeleccionado ? true : false"
       :is-element-locked="selectedElementLocked"
       :is-snapping-enabled="isSnappingEnabled"
@@ -615,7 +636,7 @@
 
     <!-- Menú contextual -->
     <SpeedDialContext
-      v-if="ctxVisible"
+      v-if="ctxVisible && canUseContextMenus"
       :visible="ctxVisible"
       :x="ctxX"
       :y="ctxY"
@@ -656,7 +677,11 @@ import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWit
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
 import RulersOverlay from '@/inventory-smart/components/RulersOverlay.vue'
-import { detectConflictsFor, throttle } from '@/inventory-smart/utils/collision'
+import { detectConflictsFor, throttle, computeMTD } from '@/inventory-smart/utils/collision'
+import { boundaryToAreaBounds } from '@/inventory-smart/utils/bounds'
+import { solveDragPosition } from '@/inventory-smart/utils/placementSolver'
+import { resolveCoplanarNeighbors, rangesOverlap, PLACEMENT_TOLERANCES } from '@/inventory-smart/validation/placementOrchestrator'
+import { resolveVerticalProps } from '@/inventory-smart/validation/fieldResolvers'
 import { snapToGrid, nudgePlace } from '@/inventory-smart/utils/geometry'
 import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
@@ -670,6 +695,7 @@ import { getActiveBounds } from '@/inventory-smart/utils/activeBounds'
 import SpeedDialContext from '@/inventory-smart/components/SpeedDialContext.vue'
 import { useContextMenu } from '@/inventory-smart/composables/useContextMenu'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement'
+import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
@@ -682,6 +708,7 @@ import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useTransformer } from '@/inventory-smart/composables/useTransformer'
 import { useElementDrag } from '@/inventory-smart/composables/useElementDrag'
+import { useMarqueeSelection } from '@/inventory-smart/composables/useMarqueeSelection'
 import TemplateSaveModal from '@/inventory-smart/components/TemplateSaveModal.vue'
 import CanvasInfo from '@/inventory-smart/components/CanvasInfo.vue'
 import { useZoom } from '@/inventory-smart/composables/useZoom'
@@ -709,6 +736,10 @@ const overlaysLayerRef = ref(null)
 const indicatorsLayerRef = ref(null)
 const lastFitTarget = ref(null)
 
+// Estado de contacto y último pos para dragBound en plantas (memoria por elemento)
+const boundContactState = new Map()
+const boundLastWorldPos = new Map()
+
 // Composable con historial integrado
 const { store: canvasStore, undo, redo, canUndo, canRedo } = useCanvasWithHistory()
 const { onDragStartGuard, onDragMoveGuard, onDragEndGuard, onTransformEndGuard } =
@@ -724,6 +755,18 @@ const {
 } = ctx
 const { deleteSelected } = useDeleteElement()
 const weightValidation = useWeightValidation()
+const { modoEdicion } = useEditorMode()
+const isEditMode = computed(() => modoEdicion.value === true && !['cuartos', 'elementos'].includes(canvasStore.contextoActual.tipo))
+const canUseContextMenus = computed(() => isEditMode.value)
+const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
+
+const ensureCanvasEditable = () => {
+  if (!isEditMode.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return false
+  }
+  return true
+}
 
 const templateModalOpen = ref(false)
 const openTemplateModal = (elementId) => {
@@ -741,6 +784,18 @@ const { activeGuides: snapGuides, isSnapping, performSnap, clearGuides } = useOb
 // Estado para controlar si el snapping está habilitado
 const isSnappingEnabled = ref(true)
 
+// Selección múltiple con marquesina
+const {
+  isMarqueeActive,
+  marqueeRect,
+  selectedElementIds,
+  startMarquee,
+  updateMarquee,
+  endMarquee,
+  cancelMarquee,
+  stageToLayerCoords,
+} = useMarqueeSelection({ canvasStore, stageRef })
+
 // === HELPERS DE CONVERSIÓN ===
 /**
  * Obtiene las dimensiones de un elemento en píxeles, convirtiendo desde cm si es necesario
@@ -750,59 +805,27 @@ const isSnappingEnabled = ref(true)
 const viewport = useViewportStore()
 
 const getElementPixelDimensions = (elemento) => {
-  // Si ya tiene width/height en píxeles, usarlos solo si no tiene dimensiones en cm
-  // Esto es para compatibilidad con elementos legacy que solo tienen width/height
+  // Si ya tiene width/height en píxeles y no hay dimensiones en cm, usarlos tal cual (legacy)
   if (!elemento.dimensiones && elemento.width && elemento.height) {
-    // Para elementos legacy, aplicar orientación en vista XZ
-    if (canvasStore.vistaActiva === 'XZ') {
-      const orientacion = Number(elemento.orientacion || 0)
-      const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-      const useAncho = orientacionNormalizada === 0 || orientacionNormalizada === 180
-
-      return {
-        width: useAncho ? elemento.width : elemento.height,
-        height: elemento.height,
-      }
-    }
     return { width: elemento.width, height: elemento.height }
   }
 
-  // Priorizar dimensiones en cm y convertir según la vista
+  // Priorizar dimensiones en cm y convertir según la vista (sin considerar orientacion)
   if (elemento.dimensiones) {
     let widthCm, heightCm
 
     if (canvasStore.vistaActiva === 'XY') {
       // Vista aérea (XY): width = ancho, height = largo
-      widthCm =
-        elemento.dimensiones.ancho ||
-        (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
-      heightCm =
-        elemento.dimensiones.largo ||
-        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.largo || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else if (canvasStore.vistaActiva === 'XZ') {
-      // Vista de frente (XZ): considerar orientación para el width
-      const orientacion = Number(elemento.orientacion || 0)
-      const orientacionNormalizada = ((orientacion % 360) + 360) % 360
-      const useAncho = orientacionNormalizada === 0 || orientacionNormalizada === 180
-
-      // En XZ: orientación determina si width usa ancho o largo
-      widthCm = useAncho
-        ? elemento.dimensiones.ancho ||
-          (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
-        : elemento.dimensiones.largo ||
-          (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
-      // Height siempre es alto en XZ
-      heightCm =
-        elemento.dimensiones.alto ||
-        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      // Vista de frente (XZ): width = ancho, height = alto
+      widthCm = elemento.dimensiones.ancho || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.alto || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     } else {
-      // Fallback a vista aérea (XY)
-      widthCm =
-        elemento.dimensiones.ancho ||
-        (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
-      heightCm =
-        elemento.dimensiones.largo ||
-        (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
+      // Fallback a vista lateral (ZY): width = largo, height = alto
+      widthCm = elemento.dimensiones.largo || (elemento.width ? pxToCm(elemento.width, viewport.cmPerPx) : 10)
+      heightCm = elemento.dimensiones.alto || (elemento.height ? pxToCm(elemento.height, viewport.cmPerPx) : 6)
     }
 
     return {
@@ -1336,10 +1359,33 @@ onUnmounted(() => {
 
 // === FUNCIONES DE CANVAS/STAGE ===
 const handleStageMouseDown = (e) => {
-  // Si el click es en el stage (no en un elemento), habilitar arrastre del canvas
-  // Solo si NO hay elemento seleccionado bloqueado
-  const seleccionado = canvasStore.elementoSeleccionado
+  // Si el click es en el stage (no en un elemento)
   if (e.target === e.target.getStage()) {
+    const seleccionado = canvasStore.elementoSeleccionado
+
+    // Si hay cambios pendientes o modo ESL, no permitir marquesina
+    if (canvasStore.cambiosNoAplicados || canvasStore.modoConfigurarEsl) {
+      if (seleccionado && isElementLocked(seleccionado)) {
+        stageDragEnabled.value = false
+        return
+      }
+      stageDragEnabled.value = true
+      return
+    }
+
+    // Si se presiona Shift, iniciar selección por marquesina
+    if (e.evt.shiftKey) {
+      const stage = stageRef.value?.getNode?.()
+      const pointer = stage?.getPointerPosition?.()
+      if (pointer) {
+        const layerPos = stageToLayerCoords(pointer)
+        startMarquee(layerPos)
+        stageDragEnabled.value = false // Deshabilitar drag del stage mientras se dibuja marquesina
+      }
+      return
+    }
+
+    // Comportamiento normal: habilitar arrastre del canvas si no hay bloqueo
     if (seleccionado && isElementLocked(seleccionado)) {
       stageDragEnabled.value = false
       return
@@ -1348,7 +1394,29 @@ const handleStageMouseDown = (e) => {
   }
 }
 
+const handleStageMouseMove = (e) => {
+  if (!isMarqueeActive.value) return
+
+  const stage = stageRef.value?.getNode?.()
+  const pointer = stage?.getPointerPosition?.()
+  if (pointer) {
+    const layerPos = stageToLayerCoords(pointer)
+    updateMarquee(layerPos)
+  }
+}
+
+const handleStageMouseUp = () => {
+  if (isMarqueeActive.value) {
+    endMarquee()
+    stageDragEnabled.value = true // Rehabilitar drag del stage
+  }
+}
+
 const handleStageClick = (e) => {
+  if (canvasStore.modoConfigurarEsl && e.target === e.target.getStage()) {
+    canvasStore.finalizarConfiguracionEsl()
+    return
+  }
   // Deseleccionar elemento si click en área vacía
   if (e.target === e.target.getStage() && !canvasStore.cambiosNoAplicados && !canvasStore.nivelAEditar) {
     canvasStore.seleccionarElemento(null)
@@ -1372,6 +1440,12 @@ const handleStageClick = (e) => {
 
 // === FUNCIONES DE ELEMENTOS ===
 const selectElement = (element) => {
+  if (canvasStore.modoConfigurarEsl) {
+    if (element?.id) {
+      canvasStore.iniciarConfiguracionEsl(element.id)
+    }
+    return
+  }
   if (element?.restrictions && element?.restrictions.includes('open-properties')) return
   const isNotCurrentElement = canvasStore.elementoSeleccionado !== element.id
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado && isNotCurrentElement) {
@@ -1387,6 +1461,12 @@ const selectElement = (element) => {
   } else {
     editingElementId.value = null
   }
+}
+
+const handleOrientationBarClick = (elemento) => {
+  if (!canvasStore.modoConfigurarEsl) return
+  if (!elemento?.id) return
+  canvasStore.iniciarConfiguracionEsl(elemento.id)
 }
 
 const handleElementDoubleClick = (evt, elemento) => {
@@ -1436,21 +1516,61 @@ const toStageCoords = (pos) => {
 // Drag bound para cada elemento y forma (clamp mínimo al contorno)
 const dragBoundForElement = (pos, elemento) => {
   try {
-    if (isInfinitePlant.value) {
-      return pos
-    }
     const lp = toLayerCoords(pos)
     const boundary = computeBoundary()
+    const areaBounds = boundaryToAreaBounds(boundary, {
+      minX: 0,
+      minY: 0,
+      maxX: layerConfig.value.width,
+      maxY: layerConfig.value.height,
+      mode: boundary?.mode || 'fixed',
+      polygon: boundary?.type === 'polygon' ? boundary.points : null,
+    })
+
     const { w_cm, h_cm } = dimsCmFor(elemento, canvasStore.vistaActiva)
-    const w = w_cm * CM_TO_PX
-    const h = h_cm * CM_TO_PX
+    const w = Math.max(1, w_cm * CM_TO_PX)
+    const h = Math.max(1, h_cm * CM_TO_PX)
 
-    // Obtener posición previa para movimiento suave
-    const lastPos = dragLastValidPositions.value.get(elemento.id)
+    const lastPos = boundLastWorldPos.get(elemento.id) || dragLastValidPositions.value.get(elemento.id) || { x: elemento.x, y: elemento.y }
+    const lastVel = { x: lp.x - (lastPos.x || 0), y: lp.y - (lastPos.y || 0) }
 
-    const c = clampInsideArea(lp.x, lp.y, w, h, boundary, elemento, true, lastPos)
-    return toStageCoords(c)
-  } catch {
+    const moving = elemento.forma === 'circular'
+      ? { ...elemento, width: Math.min(w, h), height: Math.min(w, h), forma: 'circular' }
+      : { ...elemento, width: w, height: h, forma: elemento.forma || 'rectangular' }
+
+    const candidates = canvasStore.elementosVisibles.filter((e) => e && e.id !== elemento.id)
+    const coplanar = resolveCoplanarNeighbors({ ...moving }, candidates)
+    const hardNeighbors = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'suelo' && (moving.ubicacion || 'suelo') === 'suelo')
+    const softWalls = coplanar.filter((e) => (e.ubicacion || 'suelo') === 'pared' && (moving.ubicacion || 'suelo') === 'pared')
+    const softCross = candidates.filter((n) => {
+      const ua = (moving.ubicacion || 'suelo').toLowerCase()
+      const ub = (n.ubicacion || 'suelo').toLowerCase()
+      if ((ua === 'suelo' && ub === 'pared') || (ua === 'pared' && ub === 'suelo')) {
+        const a = resolveVerticalProps(moving, {})
+        const b = resolveVerticalProps(n, {})
+        if (!Number.isFinite(a.zBaseCm) || !Number.isFinite(a.altoCm) || !Number.isFinite(b.zBaseCm) || !Number.isFinite(b.altoCm)) return false
+        const a0 = a.zBaseCm, a1 = a.zBaseCm + a.altoCm
+        const b0 = b.zBaseCm, b1 = b.zBaseCm + b.altoCm
+        return rangesOverlap(a0, a1, b0, b1, PLACEMENT_TOLERANCES.Z_LAYER)
+      }
+      return false
+    })
+    const softNeighbors = [...softWalls, ...softCross]
+
+    const solved = solveDragPosition({
+      candidate: { x: lp.x, y: lp.y },
+      movingEl: moving,
+      hardNeighbors,
+      softNeighbors,
+      areaBounds,
+      lastValidPos: lastPos,
+      lastVelocity: lastVel,
+      maxIters: 6,
+    })
+
+    boundLastWorldPos.set(elemento.id, { x: solved.x, y: solved.y })
+    return toStageCoords({ x: solved.x, y: solved.y })
+  } catch (err) {
     return pos
   }
 }
@@ -1474,6 +1594,10 @@ const handleDragLeave = (e) => {
 const handleDrop = (e) => {
   e.preventDefault()
   isDragOverCanvas.value = false
+
+  if (!ensureCanvasEditable()) {
+    return
+  }
 
   try {
     const dataText = e.dataTransfer.getData('application/json')
@@ -1510,6 +1634,7 @@ const {
   onShapeDragMove,
   onShapeDragEnd,
   registerDraggableRef,
+  innerSessions,
 } = useElementDrag({
   canvasStore,
   stageRef,
@@ -1821,14 +1946,13 @@ const createElementFromDrop = (data, dropEvent) => {
 
   let largoCmFinal = largoCm
   let finalHeightFinal = finalHeight
-
-  const isAisle = (elemento?.tipo || '').toLowerCase() === 'pasillos'
   const nuevoElemento = {
     id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
     tipo: elemento.tipo,
     categoria: elemento.categoria,
-    // Para pasillos NO establecer nombre por defecto; dejar que el store lo genere
-    ...(isAisle ? {} : { nombre: elemento.nombre || 'Nuevo elemento' }),
+    // Para pasillos: si vienen con nombre desde el catálogo, preservarlo;
+    // si no, dejar que el store genere el nombre por defecto.
+    nombre: elemento.nombre || 'Nuevo elemento',
     dimensiones: { ancho: anchoCm, largo: largoCmFinal, alto: altoCm },
     x: finalPosition.x,
     y: finalPosition.y,
@@ -1854,16 +1978,29 @@ const createElementFromDrop = (data, dropEvent) => {
 }
 
 const getElementShadow = (elemento) => {
+  // Resaltar elemento destacado
   if (canvasStore.elementoDestacadoId === elemento.id) {
     return {
       color: elemento.color,
-      // Un valor base muy grande para el resplandor
       blur: 120,
-      opacity: 1, // Opacidad máxima para un color sólido
+      opacity: 1,
       offsetX: 0,
       offsetY: 0,
     }
   }
+
+  // Resaltar elementos en selección múltiple
+  const isMultiSelected = canvasStore.elementosSeleccionadosMultiple?.includes(elemento.id)
+  if (isMultiSelected) {
+    return {
+      color: '#3b82f6', // Azul para indicar selección múltiple
+      blur: 20,
+      opacity: 0.8,
+      offsetX: 0,
+      offsetY: 0,
+    }
+  }
+
   // Sombra por defecto
   return {
     color: 'black',
@@ -1896,10 +2033,13 @@ const getOrientationBarRect = (elemento) => {
     // Barra pegada al borde (sin margen), grosor escalado por zoom
     const margin = 0
     const thick = Math.max(2, 4 / (canvasStore.zoom || 1))
-    const color = '#fdfd43'
+    const eslModeActive = canvasStore.modoConfigurarEsl
+    const hasCodigo = typeof elemento.codigoEsl === 'string' && elemento.codigoEsl.trim().length > 0
+    const color = eslModeActive ? (hasCodigo ? '#16a34a' : '#dc2626') : '#fdfd43'
+    const listening = eslModeActive
     if (o === 180) {
       const width = Math.max(1, w - 2 * margin)
-      return { x: margin, y: 0, width, height: thick, fill: color, listening: false, opacity: 0.95 }
+      return { x: margin, y: 0, width, height: thick, fill: color, listening, opacity: 0.95, name: 'orientation-bar' }
     }
     if (o === 0) {
       const width = Math.max(1, w - 2 * margin)
@@ -1909,8 +2049,9 @@ const getOrientationBarRect = (elemento) => {
         width,
         height: thick,
         fill: color,
-        listening: false,
+        listening,
         opacity: 0.95,
+        name: 'orientation-bar',
       }
 
     }
@@ -1922,13 +2063,14 @@ const getOrientationBarRect = (elemento) => {
         width: thick,
         height,
         fill: color,
-        listening: false,
+        listening,
         opacity: 0.95,
+        name: 'orientation-bar',
       }
     }
     // 270
     const height = Math.max(1, h - 2 * margin)
-    return { x: 0, y: margin, width: thick, height, fill: color, listening: false, opacity: 0.95 }
+    return { x: 0, y: margin, width: thick, height, fill: color, listening, opacity: 0.95, name: 'orientation-bar' }
   } catch {
     return null
   }
@@ -2137,9 +2279,30 @@ const createElementFromTemplate = (data, dropEvent) => {
 
 // Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
 // Por defecto activado (true) para que el modo edición esté disponible al iniciar
-const dragModeGlobal = ref(true)
+const dragModeGlobal = ref(false)
 
 const isDragModeActive = computed(() => dragModeGlobal.value)
+
+watch(
+  () => isEditMode.value,
+  (enabled) => {
+    dragModeGlobal.value = enabled
+    if (typeof canvasStore.setDraggableMode === 'function') {
+      canvasStore.setDraggableMode(enabled)
+    }
+    if (!enabled) {
+      editingElementId.value = null
+      ctxVisible.value = false
+    } else {
+      const sel = canvasStore.elementoSeleccionado
+      if (sel && !isElementLocked(sel)) {
+        editingElementId.value = sel
+        nextTick(setupTransformer)
+      }
+    }
+  },
+  { immediate: true },
+)
 
 // Limpiar modos si se bloquea el elemento
 watch(selectedElementLocked, (locked) => {
@@ -2155,6 +2318,9 @@ watch(selectedElementLocked, (locked) => {
 // Al hacer lock/unlock desde el UI, mantener el estado de modo global y solo cerrar
 // la edición si el elemento queda bloqueado.
 const toggleLockAndPreserveDrag = async (elementId) => {
+  if (!ensureCanvasEditable()) {
+    return
+  }
   if (!elementId) return
   toggleLockElement(elementId)
   await nextTick()
@@ -2163,9 +2329,15 @@ const toggleLockAndPreserveDrag = async (elementId) => {
   }
 }
 const toggleDragMode = () => {
+  if (!ensureCanvasEditable()) {
+    return
+  }
   // Alterna el modo arrastre global. Cuando se activa y hay un elemento seleccionado y no bloqueado,
   // se activa también la edición (transformer) para permitir cambiar dimensiones.
   dragModeGlobal.value = !dragModeGlobal.value
+  if (typeof canvasStore.setDraggableMode === 'function') {
+    canvasStore.setDraggableMode(dragModeGlobal.value)
+  }
   if (!dragModeGlobal.value) {
     editingElementId.value = null
   } else {
@@ -2186,6 +2358,7 @@ const toggleSnapping = () => {
 }
 
 const canDragElement = (elemento) => {
+  if (!isEditMode.value) return false
   // Solo permitir drag si el modo global está activo y el elemento no está bloqueado
   // Y si no hay cambios sin aplicar de otro elemento
   const isNotCurrentElement = canvasStore.elementoSeleccionado != elemento.id
@@ -2236,7 +2409,33 @@ const handleGlobalClick = (e) => {
 const handleKeyDown = (e) => {
   if (!e) return
   const key = e.key.toLowerCase()
+
+  // Manejar tecla Delete/Suprimir
+  if (key === 'delete' || key === 'supr' || key === 'del') {
+    // No procesar si estamos en un input
+    if (e.target instanceof Element && e.target.matches('input, textarea, select, [contenteditable]')) {
+      return
+    }
+
+    // Si hay selección (individual o múltiple), eliminar
+    const hasSelection = canvasStore.elementoSeleccionado ||
+                         (canvasStore.elementosSeleccionadosMultiple?.length > 0)
+
+    if (hasSelection && isEditMode.value) {
+      e.preventDefault()
+      deleteSelected({ withConfirm: true })
+    }
+    return
+  }
+
   if (key === 'escape' || key === 'esc') {
+    // Cancelar marquesina si está activa
+    if (isMarqueeActive.value) {
+      cancelMarquee()
+      stageDragEnabled.value = true
+      return
+    }
+
     if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
       showToast('Tienes cambios pendientes de guardar', 'warn')
       return
@@ -2249,6 +2448,7 @@ const handleKeyDown = (e) => {
     editingElementId.value = null
     clearGuides()
   } else {
+    if (!isEditMode.value) return
     handleCanvasHotkeys(e, {
       dragMode: dragModeGlobal,
       toggleDragMode,
@@ -2491,6 +2691,7 @@ const getClientXY = (e) => {
 }
 
 const onShapeContextMenu = (evt, elemento) => {
+  if (!isEditMode.value) return
   if (elemento?.restrictions && elemento.restrictions.includes('right-click')) return
   try {
     ;(evt?.evt || evt)?.preventDefault?.()
@@ -2528,6 +2729,7 @@ const onShapePointerDown = (evt, elemento) => {
   // Long press (600ms) en mobile/puntero
   clearTimeout(longPressTimer)
   longPressTimer = setTimeout(() => {
+    if (!isEditMode.value) return
     if (!isElementDragging.value && lastPointerDown.elId) {
       ctx.openAt({ x: lastPointerDown.x, y: lastPointerDown.y, elementId: lastPointerDown.elId })
     }
@@ -2540,6 +2742,10 @@ const onShapePointerUp = () => {
 
 // Acción bloquear/desbloquear desde el menú contextual
 const toggleLock = async (id) => {
+  if (!ensureCanvasEditable()) {
+    ctx.close()
+    return
+  }
   if (!id) return
   toggleLockElement(id)
   ctx.close()
@@ -2547,9 +2753,18 @@ const toggleLock = async (id) => {
 
 // Acción eliminar desde el menú contextual
 const onDelete = async (id) => {
+  if (!ensureCanvasEditable()) {
+    ctx.close()
+    return
+  }
   if (!id) return
-  const el =
-    canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id)
+
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('Guarda los cambios antes de eliminar elementos', 'warn');
+    return;
+  }
+
+  const el = canvasStore.elementosVisibles.find((e) => e.id === id) || canvasStore.elementoPorId?.(id);
   if (el && (el.bloqueado === true || el.locked === true)) {
     showToast('Elemento bloqueado — desbloquéalo para eliminar', 'warning', { timeout: 5000 })
     ctx.close()
@@ -2611,6 +2826,14 @@ defineExpose({
   background: #eff6ff;
   border-color: #3b82f6;
   box-shadow: inset 0 0 0 2px #3b82f6;
+}
+
+.canvas-container.esl-mode {
+  cursor: pointer;
+}
+
+.canvas-container.esl-mode :deep(.konvajs-content) {
+  cursor: pointer !important;
 }
 
 .canvas-info {

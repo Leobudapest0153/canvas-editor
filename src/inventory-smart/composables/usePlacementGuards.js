@@ -30,7 +30,8 @@ export function usePlacementGuards({ useTopeClamp = true } = {}) {
       planta?.dimensiones?.alto ??
       planta?.altura ??
       null
-    return { alturaBodega }
+    const isInfinite = planta?.isInfinite === true
+    return { alturaBodega, isInfinite }
   }
 
   const dragState = new Map()
@@ -75,7 +76,7 @@ export function usePlacementGuards({ useTopeClamp = true } = {}) {
     const neighbors = store.elementosVisibles.filter((n) => n.id !== el?.id)
     for (const v of validators) {
       let res
-      if (v === validateZStacking) res = v(el, cand, neighbors, options)
+      if (v === validateZStacking) res = v(el, cand, neighbors, options, ctx)
       else res = v(el, cand, ctx)
       if (res && res.valid === false) return res
     }

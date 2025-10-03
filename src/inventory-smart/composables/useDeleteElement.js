@@ -10,13 +10,12 @@ import { useCanvasBuffer } from './useCanvasBuffer'
 import { useConfirmDialog } from './useConfirmDialog'
 import { useToast } from './useToast'
 
-const { showInfo } = useToast()
-
 export function useDeleteElement() {
   const store = useCanvasStore()
   const history = useCanvasHistory()
   const buffer = useCanvasBuffer()
   const confirmDialog = useConfirmDialog()
+  const { showInfo } = useToast()
 
   const collectDescendants = (rootId, accSet) => {
     const el = store.elementoPorId(rootId)
@@ -120,12 +119,7 @@ export function useDeleteElement() {
     for (const id of idsABorrar) {
       const el = idToEl.get(id)
       if (isLocked(el)) {
-        confirmDialog.confirm({
-          title: 'Acción no permitida',
-          message: 'No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero.',
-          confirmLabel: 'Entendido',
-          cancelLabel: 'Cerrar',
-        })
+        showInfo('No se puede eliminar porque hay elemento(s) bloqueado(s). Desbloquéelos primero.')
         return false
       }
     }
@@ -172,8 +166,8 @@ export function useDeleteElement() {
         for (const it of items.slice()) if (idsABorrar.has(it.originalId)) buffer.removeFromBuffer(it.id)
       } catch (e) { void e }
 
-      // Un solo snapshot
-      history.pushState('Eliminar en cascada')
+    // Un solo snapshot
+    history.pushState('Eliminar en cascada')
     } finally {
       // Rehabilitar pintado y hacer un único batchDraw explícito si existe
       if (typeof window !== 'undefined') {
@@ -191,11 +185,103 @@ export function useDeleteElement() {
     return true
   }
 
+  /**
+   * Elimina múltiples elementos seleccionados
+   */
+  const deleteMultipleSelected = async (ids, { withConfirm = true } = {}) => {
+    if (!Array.isArray(ids) || ids.length === 0) return false
+
+    const elements = ids.map(id => store.elementoPorId(id)).filter(Boolean)
+    if (elements.length === 0) return false
+
+    // Verificar elementos protegidos
+    const protectedEls = elements.filter(el => isProtected(el))
+    if (protectedEls.length > 0) {
+      await confirmDialog.confirm({
+        title: 'Acción no permitida',
+        message: `${protectedEls.length} elemento(s) están protegidos y no pueden eliminarse.`,
+        confirmLabel: 'Entendido',
+        cancelLabel: 'Cerrar',
+      })
+      return false
+    }
+
+    // Verificar elementos bloqueados
+    const lockedEls = elements.filter(el => isLocked(el))
+    if (lockedEls.length > 0) {
+      showInfo(`${lockedEls.length} elemento(s) están bloqueados. Desbloquéelos primero.`)
+      return false
+    }
+
+    // Confirmación
+    if (withConfirm) {
+      const LIMIT = 12
+      const lines = elements.slice(0, LIMIT).map(el => `• ${el.nombre || el.id}`)
+      const extra = elements.length > LIMIT ? `\n… (+${elements.length - LIMIT} más)` : ''
+      const msg = `Se eliminarán ${elements.length} elemento(s):\n\n${lines.join('\n')}${extra}\n\n¿Desea continuar?`
+      const ok = await confirmDialog.confirm({
+        title: 'Eliminar múltiples elementos',
+        message: msg,
+        confirmLabel: 'Eliminar',
+        cancelLabel: 'Cancelar',
+      })
+      if (!ok) return false
+    }
+
+    // Eliminar en cascada todos los IDs
+    const okCascade = deleteCascade(ids)
+    if (!okCascade) return false
+
+    // Limpiar selección múltiple
+    if (typeof store.limpiarSeleccionElementos === 'function') {
+      store.limpiarSeleccionElementos()
+    }
+
+    // Toast con deshacer
+    try {
+      if (typeof window !== 'undefined') {
+        let tiempo = 5
+        let interval
+        let toastCerrado = false
+        const generarMensaje = () => `${elements.length} elemento(s) eliminados — Deshacer (${tiempo}s)`
+        showInfo(generarMensaje(), {
+          timeout: 6000,
+          onDismiss: () => {
+            toastCerrado = true
+            if (interval) { clearInterval(interval); interval = null }
+          },
+          cta: {
+            label: 'Deshacer',
+            onClick: () => {
+              toastCerrado = true
+              if (interval) { clearInterval(interval); interval = null }
+              try { history.undo() } catch (err) { void err }
+            },
+          },
+        })
+        interval = setInterval(() => {
+          if (toastCerrado) { clearInterval(interval); interval = null; return }
+          tiempo--
+          if (tiempo <= 0) { clearInterval(interval); interval = null; return }
+        }, 1000)
+      }
+    } catch (e) { void e }
+
+    return true
+  }
+
   const deleteSelected = async ({ withConfirm = true } = {}) => {
     // No eliminar si hay drag global activo
     if (typeof window !== 'undefined' && window.__dvCanvasDragActive) return false
 
-    const selectedId = store.elementoSeleccionado
+    // Manejar selección múltiple
+    const multipleIds = store.elementosSeleccionadosMultiple || []
+    if (multipleIds.length > 1) {
+      return await deleteMultipleSelected(multipleIds, { withConfirm })
+    }
+
+    // Lógica original para elemento individual
+    const selectedId = multipleIds.length === 1 ? multipleIds[0] : store.elementoSeleccionado
     if (!selectedId) return false
 
     const selected = store.elementoPorId(selectedId)
@@ -223,12 +309,7 @@ export function useDeleteElement() {
 
     // Bloqueo: impedir borrar elementos bloqueados (selección)
     if (isLocked(selected)) {
-      await confirmDialog.confirm({
-        title: 'Acción no permitida',
-        message: 'No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero.',
-        confirmLabel: 'Entendido',
-        cancelLabel: 'Cerrar',
-      })
+      showInfo('No se puede eliminar porque el elemento está bloqueado. Desbloquéelo primero.')
       return false
     }
 
@@ -238,6 +319,17 @@ export function useDeleteElement() {
 
     // Referencias bloqueantes (buffer y vínculos)
     const idsToAffect = new Set([selectedId, ...descendants])
+
+    const hasLockedDescendants = Array.from(idsToAffect).some((id) => {
+      if (id === selectedId) return false
+      const el = store.elementoPorId(id)
+      return isLocked(el)
+    })
+    if (hasLockedDescendants) {
+      showInfo('No se puede eliminar porque hay elemento(s) bloqueado(s) dentro. Desbloquéelos primero.')
+      return false
+    }
+
     const refs = findBlockingReferences(idsToAffect)
     if (refs.length > 0) {
       const K = refs.length
@@ -295,11 +387,23 @@ export function useDeleteElement() {
 
     // Confirmación siempre que se solicite
     if (withConfirm) {
-      const msg = descendants.size > 0
-        ? `Se eliminará también ${descendants.size} elemento(s) dentro`
-        : '¿Seguro que deseas eliminar este elemento?'
+      // Construir lista para modal descriptivo
+      const idsLista = [selectedId, ...Array.from(descendants)]
+      const elementosLista = idsLista
+        .map(id => store.elementoPorId(id))
+        .filter(Boolean)
+      const LIMIT = 12
+      const lines = elementosLista.slice(0, LIMIT).map(el => `• ${el.nombre || el.id}`)
+      const extra = elementosLista.length > LIMIT ? `\n… (+${elementosLista.length - LIMIT} más)` : ''
+      const cabecera = elementosLista.length > 1
+        ? `Se eliminarán los siguientes elementos:`
+        : 'Se eliminará el elemento:'
+      const descLine = descendants.size > 0
+        ? `Se eliminará también ${descendants.size} elemento(s) dentro.\n\n`
+        : ''
+      const msg = `${descLine}${cabecera}\n\n${lines.join('\n')}${extra}\n\n¿Desea continuar?`
       const ok = await confirmDialog.confirm({
-        title: 'Eliminar elemento',
+        title: `Eliminar elemento${elementosLista.length > 1 ? 's' : ''}`,
         message: msg,
         confirmLabel: 'Eliminar',
         cancelLabel: 'Cancelar',
@@ -310,6 +414,20 @@ export function useDeleteElement() {
     // Ejecutar eliminación en cascada optimizada
     const okCascade = deleteCascade([selectedId])
     if (!okCascade) return false
+
+    if (selected?.tipo === 'pisos') {
+      const ctx = store.contextoNavegacion
+      if (ctx?.tipo === 'pisos' && ctx?.id === selectedId) {
+        const parentId = selected.padre || null
+        if (typeof store.navegarAlPadre === 'function') {
+          store.navegarAlPadre()
+        }
+        const sibling = store.elementos.find((el) => el.tipo === 'pisos' && el.padre === parentId)
+        if (sibling && typeof store.navegarAElemento === 'function') {
+          store.navegarAElemento(sibling.id)
+        }
+      }
+    }
 
     // Snackbar con deshacer (5s) - versión reactiva
     try {
@@ -324,7 +442,7 @@ export function useDeleteElement() {
 
         // Crear el toast inicial
         toastId = showInfo(generarMensaje(), {
-          timeout: 6000, // Un poco más que nuestra cuenta regresiva
+          timeout: 5000,
           onDismiss: () => {
             toastCerrado = true
             if (interval) {

@@ -39,9 +39,9 @@ Estructura relevante:
 - `ElementosCatalogo.vue` — Catálogo y drag & drop al canvas
 - `PropiedadesPanel.vue` — Edición de propiedades del elemento seleccionado
 - `HistorialPanel.vue` — UI de undo/redo
-- `BackupModal.vue` — Persistencia
 - `ToastContainer.vue` — Render de toasts del plugin
 - `WorkspaceEditor.vue` — Editor de plantas
+- `MarqueeHint.vue` — Hint visual para selección múltiple con marquesina
 
 ## Composables (`src/inventory-smart/composables/`)
 
@@ -50,9 +50,10 @@ Algunos hooks destacados:
 - `useCanvasStore.js` — Store/estado principal, con helpers del canvas
 - `useCanvasHistory.js`, `useCanvasWithHistory.js` — Historial y Undo/Redo
 - `useElementDrag.js`, `useRafDrag.js`, `useObjectSnapping.js` — Drag y snapping
+- `useMarqueeSelection.js` — Selección múltiple por marquesina (Shift + Arrastrar)
 - `usePlacementGuards.js`, `usePlantResizeGuard.js` — Reglas de placement y resize
 - `useContextMenu.js`, `useConfirmDialog.js`, `useToast.js` — UX y diálogo
-- `useAutoSave.js`, `useStatePersistence.js`, `useCanvasImportExport.js` — Persistencia
+- `useStatePersistence.js`, `useCanvasImportExport.js` — Persistencia
 - `usePerfMode.js`, `useCacheOnDrag.js` — Rendimiento
 - `useWeightValidation.js`, `useDimensionValidation.js` — Validaciones de negocio
 
