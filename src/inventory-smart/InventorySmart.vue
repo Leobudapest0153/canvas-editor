@@ -1,5 +1,15 @@
 <template>
 <div id="inventory-smart" :style="themeStyle">
+    <!-- Mensaje para móviles -->
+    <div v-if="isMobileDevice" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary">
+      <div class="bg-white/95 rounded-2xl p-10 max-w-md w-full text-center shadow-2xl">
+        <div class="text-7xl mb-6">📱</div>
+        <h2 class="text-slate-800 text-2xl font-semibold mb-6">Dispositivo no compatible</h2>
+        <p class="text-slate-600 text-lg leading-relaxed mb-3">Esta aplicación requiere una pantalla de al menos 768px de ancho.</p>
+        <p class="text-slate-600 text-lg leading-relaxed">Por favor, usa una tablet, laptop o computadora de escritorio.</p>
+      </div>
+    </div>
+
     <!-- Panel de plantas -->
   <PlantasPanel
     :author="author"
@@ -175,6 +185,16 @@ const servicesStore = useServicesStore()
 const { ensureEditable } = useEditorMode()
 const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 const catalogStore = useCatalogStore()
+
+
+// Estado reactivo para saber si es móvil
+const isMobileDevice = ref(false)
+
+let mediaQuery
+
+const updateMediaQuery = (e) => {
+  isMobileDevice.value = e.matches
+}
 
 // Mapea claves de la prop a los prefijos de variables del @theme actual
 const THEME_KEY_TO_PREFIX = {
@@ -495,9 +515,14 @@ watch(
 
 onMounted(() => {
   try {
-    if (typeof window !== 'undefined') {
-      // window.addEventListener('beforeunload', handleBeforeUnload) // Desactivado temporalmente
-    }
+    // Crear media query para max-width 767px (smartphones)
+    mediaQuery = window.matchMedia('(max-width: 767px)')
+
+    // Inicializar valor
+    isMobileDevice.value = mediaQuery.matches
+
+    // Escuchar cambios
+    mediaQuery.addEventListener('change', updateMediaQuery)
 
     // Provide de la API de servicios externos para componentes hijos
     provide('externalServicesAPI', externalServicesAPI)
@@ -513,6 +538,10 @@ onMounted(() => {
 onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('beforeunload', handleBeforeUnload)
+  }
+
+    if (mediaQuery) {
+    mediaQuery.removeEventListener('change', updateMediaQuery)
   }
 })
 
