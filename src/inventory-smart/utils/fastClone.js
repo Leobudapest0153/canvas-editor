@@ -79,6 +79,9 @@ export function fastDeepClone(obj, cache = new WeakMap()) {
   return objCopy
 }
 
+// Alias utilizado por composables que requieren una función de clonación profunda
+export const fastClone = fastDeepClone
+
 /**
  * Clona un elemento del canvas de forma optimizada
  * Conoce la estructura típica y solo clona lo necesario

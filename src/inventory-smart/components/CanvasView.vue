@@ -653,6 +653,15 @@
       @close="closeTemplateModal"
     />
 
+    <PlacementSuggestionModal
+      :open="placementSuggestionOpen"
+      :suggestions="placementSuggestionPayload?.suggestions || []"
+      :failure-message="placementSuggestionPayload?.message"
+      :element-label="placementSuggestionLabel"
+      @accept="handlePlacementSuggestionAccept"
+      @cancel="handlePlacementSuggestionCancel"
+    />
+
     <CanvasInfo />
 
     <FloatingControls
@@ -698,6 +707,9 @@ import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement
 import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { useWeightValidation } from '@/inventory-smart/composables/useWeightValidation'
 import { useDimensionValidation } from '@/inventory-smart/composables/useDimensionValidation'
+import PlacementSuggestionModal from '@/inventory-smart/components/modals/PlacementSuggestionModal.vue'
+import { usePlacementSuggestionModal } from '@/inventory-smart/composables/usePlacementSuggestionModal'
+import { generatePlacementSuggestions } from '@/inventory-smart/utils/placementSuggestions'
 import { makeInnerSession } from '@/inventory-smart/composables/useInnerNoOverlap'
 import { getUsageIndicatorColor } from '@/inventory-smart/composables/useSimulateProducts'
 import { useObjectSnapping } from '@/inventory-smart/composables/useObjectSnapping'
@@ -777,6 +789,15 @@ const closeTemplateModal = () => {
   templateModalOpen.value = false
 }
 const dimensionValidation = useDimensionValidation()
+
+const {
+  open: placementSuggestionOpen,
+  payload: placementSuggestionPayload,
+  elementLabel: placementSuggestionLabel,
+  show: showPlacementSuggestionModal,
+  close: closePlacementSuggestionModal,
+  buildAdjustedElement,
+} = usePlacementSuggestionModal()
 
 // Object snapping
 const { activeGuides: snapGuides, isSnapping, performSnap, clearGuides } = useObjectSnapping()
@@ -1685,8 +1706,8 @@ const {
 
 // Función auxiliar para convertir coordenadas del puntero a coordenadas de mundo
 const getWorldCoordinatesFromPointer = (dropEvent) => {
-  const stage = stageRef.value.getNode()
-  const rect = containerRef.value.getBoundingClientRect()
+  const stageNode = stageRef.value?.getNode?.()
+  const rect = containerRef.value?.getBoundingClientRect?.() || { left: 0, top: 0 }
 
   // Obtener posición del puntero considerando zoom y pan
   const pointerPos = {
@@ -1695,15 +1716,25 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   }
 
   // Convertir a coordenadas de mundo (layer) considerando transformación del stage
-  const worldX = (pointerPos.x - stage.x()) / stage.scaleX()
-  const worldY = (pointerPos.y - stage.y()) / stage.scaleY()
+  if (!stageNode || typeof stageNode.x !== 'function') {
+    return { x: pointerPos.x, y: pointerPos.y }
+  }
+
+  const worldX = (pointerPos.x - stageNode.x()) / (stageNode.scaleX?.() || 1)
+  const worldY = (pointerPos.y - stageNode.y()) / (stageNode.scaleY?.() || 1)
 
   return { x: worldX, y: worldY }
 }
 
 // Pipeline unificado de validaciones previas al drop
 const runPreDropValidations = (elemento, dropEvent) => {
-  if (!elemento) return { ok: false, reason: 'invalid' }
+  if (!elemento) {
+    return {
+      ok: false,
+      reason: 'invalid',
+      message: 'No se pudo interpretar el elemento a colocar.',
+    }
+  }
 
   const contextoActual = canvasStore.contextoActual?.tipo || 'plantas'
   const tipoElemento = elemento.tipo
@@ -1727,8 +1758,8 @@ const runPreDropValidations = (elemento, dropEvent) => {
       contenedores: 'No puedes agregar elementos dentro de niveles.',
       pasillos: 'No puedes agregar elementos dentro de pasillos.',
     }
-    showToast(msgMap[contextoActual] || 'No puedes agregar este tipo aquí.', 'error')
-    return { ok: false, reason: 'hierarchy' }
+    const message = msgMap[contextoActual] || 'No puedes agregar este tipo aquí.'
+    return { ok: false, reason: 'hierarchy', message }
   }
 
   // Si es pasillo, ajustar alto al de la planta ANTES de validar
@@ -1740,10 +1771,14 @@ const runPreDropValidations = (elemento, dropEvent) => {
     elementoParaPeso = { ...elemento, dimensiones: dims }
   }
 
+  const contextoActualData = canvasStore.contextoActual || {}
+  const contextoId = contextoActualData.id ?? canvasStore.plantaActiva ?? null
+  const contextoTipo = contextoActualData.tipo ?? 'plantas'
+
   const resultadoValidacionPeso = weightValidation.validarPesoElemento(
     elementoParaPeso,
-    canvasStore.contextoActual.id,
-    canvasStore.contextoActual.tipo,
+    contextoId,
+    contextoTipo,
   )
 
   if (!resultadoValidacionPeso.valido) {
@@ -1759,12 +1794,18 @@ const runPreDropValidations = (elemento, dropEvent) => {
     } else if (canvasStore.estaEnElemento) {
       tipoPadre = 'el elemento'
     }
-    // El elemento excedería el peso máximo permitido
-    showToast(
-      `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`,
-      'error',
-    )
-    return { ok: false, reason: 'weight' }
+    const message = `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`
+    return {
+      ok: false,
+      reason: 'weight',
+      message,
+      failureContext: {
+        reason: 'weight',
+        vista: canvasStore.vistaActiva,
+        cmPerPx: viewport.cmPerPx,
+        weightResult: resultadoValidacionPeso,
+      },
+    }
   }
 
   let { width, height } = getElementPixelDimensions(elemento)
@@ -1821,7 +1862,9 @@ const runPreDropValidations = (elemento, dropEvent) => {
   candX = snapped.x
   candY = snapped.y
 
-  if (!canvasStore.estaEnPlanta) {
+  const isPlantContext = canvasStore.estaEnPlanta !== false
+
+  if (!isPlantContext) {
     const parent = canvasStore.estructuraContenedorActual
     const siblings = parent?.hijos?.map((id) => canvasStore.elementoPorId(id)).filter(Boolean) || []
     const temp = {
@@ -1838,8 +1881,11 @@ const runPreDropValidations = (elemento, dropEvent) => {
     let local = sess.toLocal({ x: candX, y: candY }, parent)
     local = sess.finalizeLocal(local)
     if (!sess.isValidLocal(local)) {
-      showToast('No hay espacio suficiente aquí para colocar el elemento.', 'error')
-      return { ok: false, reason: 'bounds' }
+      return {
+        ok: false,
+        reason: 'bounds',
+        message: 'No hay espacio suficiente aquí para colocar el elemento.',
+      }
     }
     const worldPos = sess.toWorld(local, parent)
     candX = worldPos.x
@@ -1913,14 +1959,38 @@ const runPreDropValidations = (elemento, dropEvent) => {
   }
 
   if (!ok) {
-    showToast('No fue posible colocar el elemento dentro de los límites de la planta.', 'error')
-    return { ok: false, reason: 'bounds' }
+    const message = 'No hay espacio aquí para colocar el elemento'
+    return {
+      ok: false,
+      reason: 'bounds',
+      message,
+      failureContext: {
+        reason: 'bounds',
+        candidate: { x: candX, y: candY, width: finalWidth, height: finalHeight },
+        areaBounds,
+        neighbors: all,
+        vista: canvasStore.vistaActiva,
+        cmPerPx: viewport.cmPerPx,
+      },
+    }
   }
 
   // Validación final: asegurar que la posición final sea válida con la misma lógica que drag
   if (!insideAreaModel(finalPos, { ...tempEl, x: finalPos.x, y: finalPos.y }, areaBounds, 0.5)) {
-    showToast('El elemento quedaría fuera del área permitida.', 'error')
-    return { ok: false, reason: 'bounds' }
+    const message = 'El elemento quedaría fuera del área permitida.'
+    return {
+      ok: false,
+      reason: 'bounds',
+      message,
+      failureContext: {
+        reason: 'bounds',
+        candidate: { x: finalPos.x, y: finalPos.y, width: finalWidth, height: finalHeight },
+        areaBounds,
+        neighbors: all,
+        vista: canvasStore.vistaActiva,
+        cmPerPx: viewport.cmPerPx,
+      },
+    }
   }
 
   return {
@@ -1932,10 +2002,32 @@ const runPreDropValidations = (elemento, dropEvent) => {
   }
 }
 
-const createElementFromDrop = (data, dropEvent) => {
+const createElementFromDrop = (data, dropEvent, options = {}) => {
   const elemento = data.elemento
   const res = runPreDropValidations(elemento, dropEvent)
-  if (!res.ok) return
+  if (!res.ok) {
+    if (!options.skipSuggestions && res.failureContext) {
+      const dropMetaData = { ...data }
+      delete dropMetaData.elemento
+      const suggestions = generatePlacementSuggestions({
+        ...res.failureContext,
+        element: elemento,
+      })
+      const opened = showPlacementSuggestionModal({
+        element: elemento,
+        suggestions,
+        message: res.message,
+        dropMeta: {
+          clientX: dropEvent?.clientX ?? 0,
+          clientY: dropEvent?.clientY ?? 0,
+          data: dropMetaData,
+        },
+      })
+      if (opened) return
+    }
+    if (res.message) showToast(res.message, 'error')
+    return
+  }
 
   let { ancho: anchoCm, largo: largoCm, alto: altoCm } = res.dimsCm
   let finalWidth = res.width
@@ -1975,6 +2067,37 @@ const createElementFromDrop = (data, dropEvent) => {
   }
   canvasStore.agregarElemento(nuevoElemento)
   canvasStore.seleccionarElemento(nuevoElemento.id)
+}
+
+const handlePlacementSuggestionAccept = async () => {
+  const payload = placementSuggestionPayload.value
+  if (!payload) {
+    closePlacementSuggestionModal()
+    return
+  }
+
+  const adjustedElement = buildAdjustedElement()
+  const dropMeta = payload.dropMeta
+  closePlacementSuggestionModal()
+
+  if (!dropMeta || !adjustedElement) {
+    if (payload.message) showToast(payload.message, 'error')
+    return
+  }
+
+  const syntheticEvent = {
+    clientX: dropMeta.clientX ?? 0,
+    clientY: dropMeta.clientY ?? 0,
+  }
+
+  const retryData = { ...(dropMeta.data || {}), elemento: adjustedElement }
+  await createElementFromDrop(retryData, syntheticEvent, { skipSuggestions: true })
+}
+
+const handlePlacementSuggestionCancel = () => {
+  const message = placementSuggestionPayload.value?.message
+  closePlacementSuggestionModal()
+  if (message) showToast(message, 'error')
 }
 
 const getElementShadow = (elemento) => {

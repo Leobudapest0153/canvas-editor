@@ -7,6 +7,17 @@ import { errorsPlacement } from '@/inventory-smart/validation/placementOrchestra
 import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 import { usePlacementGuards } from '@/inventory-smart/composables/usePlacementGuards'
 
+vi.mock('@/inventory-smart/composables/usePlacementSuggestionModal', () => ({
+  usePlacementSuggestionModal: () => ({
+    open: { value: false, __v_isRef: true },
+    payload: { value: null, __v_isRef: true },
+    elementLabel: { value: 'Elemento', __v_isRef: true },
+    show: () => false,
+    close: vi.fn(),
+    buildAdjustedElement: vi.fn(),
+  }),
+}))
+
 let CanvasView
 
 const mountWithElements = async (elements) => {
@@ -47,6 +58,7 @@ describe('coplanar hard clamp', () => {
     setActivePinia(createPinia())
     const toastMock = { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 }
     config.global.provide = { ...(config.global.provide || {}), [ToastSymbol]: toastMock }
+    config.global.stubs = { ...(config.global.stubs || {}), FloatingControls: true, PlacementSuggestionModal: true }
     CanvasView = null
   })
 
