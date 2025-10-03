@@ -199,12 +199,11 @@ const updateMediaQuery = (e) => {
 // Mapea claves de la prop a los prefijos de variables del @theme actual
 const THEME_KEY_TO_PREFIX = {
   primary: 'primary',          // --color-primary[...]
-  secondary: 'primary-gray',   // --color-primary-gray[...]
+  secondary: 'secondary',      // --color-secondary[...]
   success: 'success',          // --color-success[...]
   danger: 'danger',            // --color-danger[...]
   warning: 'warning',          // --color-warning[...]
   info: 'info',                // --color-info[...]
-  neutral: 'primary-gray'      // alias para neutral sobre la escala gris
 }
 
 const buildThemeVars = (paletteProp) => {
