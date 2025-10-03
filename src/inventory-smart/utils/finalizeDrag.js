@@ -62,6 +62,21 @@ function dominantAxisFromVelocity(vx, vy) {
   return 'y'
 }
 
+function circlePairOptions(movingEl, x, y, w, h, other) {
+  if (movingEl?.forma !== 'circular' || other?.forma !== 'circular') return undefined
+  const radiusA = Math.min(w, h) / 2
+  const radiusB = Math.min(other.width || 0, other.height || 0) / 2
+  if (radiusA <= 0 || radiusB <= 0) return undefined
+  return {
+    isCircleA: true,
+    isCircleB: true,
+    centerA: { x: x + w / 2, y: y + h / 2 },
+    centerB: { x: other.x + (other.width || 0) / 2, y: other.y + (other.height || 0) / 2 },
+    radiusA,
+    radiusB
+  }
+}
+
 function corridorFeasible({ movingEl, neighbors = [], areaBounds, axis = 'x', CM_TO_PX, strokeHalf = 0, marginPx = 0 }) {
   void CM_TO_PX
   // Bypass de corredor si el área es infinita
@@ -128,7 +143,8 @@ function resolveBlockingCollisions(x0, y0, el, elements, areaBounds) {
       const otherId = c.aId === el.id ? c.bId : c.aId
       const other = elements.find((e) => e.id === otherId)
       if (!other) continue
-      const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height)
+      const circleOpts = circlePairOptions(el, x, y, w, h, other)
+      const { dx, dy } = computeMTD(x, y, w, h, other.x, other.y, other.width, other.height, circleOpts)
       accDx += dx
       accDy += dy
     }
@@ -292,10 +308,12 @@ export function solveFinalPlacement({
         const nbh = (n.height || 0) + strokeHalf * 2
         if (!overlapAABB(pos.x, pos.y, w, h, nbx, nby, nbw, nbh)) continue
         anyOverlap = true
-        let { dx, dy } = computeMTD(pos.x, pos.y, w, h, nbx, nby, nbw, nbh)
-        // Anular eje no elegido para evitar diagonales
-        if (axis === 'x') dy = 0
-        else dx = 0
+        const circleOpts = circlePairOptions(movingEl, pos.x, pos.y, w, h, n)
+        let { dx, dy } = computeMTD(pos.x, pos.y, w, h, nbx, nby, nbw, nbh, circleOpts)
+        if (!circleOpts) {
+          if (axis === 'x') dy = 0
+          else dx = 0
+        }
         const nx = pos.x + dx
         const ny = pos.y + dy
         if (!isInf && rectOutsideBounds(nx, ny, w, h, bStroke, EPS)) {
