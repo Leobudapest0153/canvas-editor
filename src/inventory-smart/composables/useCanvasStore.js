@@ -1156,6 +1156,13 @@ const calcularCanvasAdaptativo = (elemento) => {
     const zoomAnterior = zoom.value
     zoom.value = Math.max(minZoom, Math.min(5, nuevoZoom))
 
+    // Sincronizar con Konva Stage
+    const stage = window.__konvaStage
+    if (stage && typeof stage.scale === 'function') {
+      stage.scale({ x: zoom.value, y: zoom.value })
+      stage.batchDraw?.()
+    }
+
     // Solo guardar en historial si cambió significativamente
     if (Math.abs(zoom.value - zoomAnterior) > 0.01) {
       saveZoomPanToHistory()
@@ -1167,6 +1174,13 @@ const calcularCanvasAdaptativo = (elemento) => {
     const panYAnterior = panY.value
     panX.value = x
     panY.value = y
+
+    // Sincronizar con Konva Stage
+    const stage = window.__konvaStage
+    if (stage && typeof stage.position === 'function') {
+      stage.position({ x: panX.value, y: panY.value })
+      stage.batchDraw?.()
+    }
 
     // Solo guardar en historial si cambió significativamente
     if (Math.abs(x - panXAnterior) > 1 || Math.abs(y - panYAnterior) > 1) {
@@ -2332,13 +2346,18 @@ const calcularCanvasAdaptativo = (elemento) => {
    * Enfoca (zoom + pan) el elemento indicado haciendo que quepa dentro del viewport
    * con un padding visual y animación opcional.
    * @param {string} elementoId
-   * @param {{paddingPx?:number, fitRatio?:number, animate?:boolean, duration?:number}} opts
+   * @param {{paddingPx?:number, fitRatio?:number, animate?:boolean, duration?:number, offsetRight?:number}} opts
    */
   const focusElemento = (elementoId, opts = {}) => {
     const el = elementoPorId.value(elementoId)
-    if (!el) return
+    if (!el) {
+      return
+    }
+
     const stage = typeof window !== 'undefined' ? window.__konvaStage : null
-    if (!stage) return
+    if (!stage) {
+      return
+    }
     // Invalidate cualquier animación previa (nueva sesión de enfoque)
     if (focusElemento._raf) cancelAnimationFrame(focusElemento._raf)
     focusElemento._sessionCounter = (focusElemento._sessionCounter || 0) + 1
@@ -2350,6 +2369,7 @@ const calcularCanvasAdaptativo = (elemento) => {
   const duration = Number.isFinite(opts.duration) ? opts.duration : 340
   const coarseSnapThreshold = Number.isFinite(opts.coarseSnapThreshold) ? opts.coarseSnapThreshold : 0.3 // diferencia relativa de escala para decidir snap
   const exact = opts.exact === true
+  const offsetRight = Number.isFinite(opts.offsetRight) ? opts.offsetRight : 0
 
   // Marcar si había otra animación en progreso y es otro elemento → forzar snap (sin animación) para evitar interferencia
   const previousSessionInProgress = focusElemento._inProgress === true && focusElemento._lastTargetId && focusElemento._lastTargetId !== el.id
@@ -2396,23 +2416,44 @@ const calcularCanvasAdaptativo = (elemento) => {
       if (focusElemento._currentSession !== sessionId) return // sesión obsoleta
       const viewportW = stage.width() || 1
       const viewportH = stage.height() || 1
-      const usableW = Math.max(1, viewportW - paddingPx * 2)
+      // Considerar el offset del panel de propiedades para calcular el espacio útil
+      const effectiveViewportW = Math.max(1, viewportW - offsetRight)
+      const usableW = Math.max(1, effectiveViewportW - paddingPx * 2)
       const usableH = Math.max(1, viewportH - paddingPx * 2)
       let targetScale = Math.min(usableW / bbox.w, usableH / bbox.h)
       if (!exact) targetScale *= fitRatio
       if (!Number.isFinite(targetScale) || targetScale <= 0) targetScale = 1
-      targetScale = Math.max(0.05, Math.min(5, targetScale))
+
+      // El targetScale calculado naturalmente YA es correcto:
+      // - Para elementos grandes → targetScale bajo (0.001 - 0.1)
+      // - Para elementos pequeños → targetScale alto (1 - 5)
+      // Solo aplicamos límites globales razonables (0.0001 mínimo, 5 máximo)
+
+      const elementMaxDim = Math.max(bbox.w, bbox.h)
+      const viewportMaxDim = Math.max(viewportW, viewportH)
+      const sizeRatio = elementMaxDim / viewportMaxDim
+
+      // Aplicar solo límites globales para evitar valores extremos
+      targetScale = Math.max(0.0001, Math.min(5, targetScale))
+
       const cx = bbox.x + bbox.w / 2
       const cy = bbox.y + bbox.h / 2
-      const targetPanX = (viewportW / 2) - cx * targetScale
-      const targetPanY = (viewportH / 2) - cy * targetScale
+      // Centrar en el espacio visible (desplazado a la izquierda si hay panel)
+      const centerX = (effectiveViewportW / 2)
+      const centerY = (viewportH / 2)
+      const targetPanX = centerX - cx * targetScale
+      const targetPanY = centerY - cy * targetScale
       const currentScale = zoom.value || 1
       const scaleDiffRel = Math.abs(targetScale - currentScale) / Math.max(currentScale, 0.0001)
+
       // Si cambio grande o usuario pidió no animar
       const shouldSnap = scaleDiffRel > coarseSnapThreshold
       const animateEffective = (!previousSessionInProgress && animate && !shouldSnap)
+
       if (!animateEffective) {
-        configurarZoom(targetScale)
+        // Permitir cualquier zoom calculado, sin restricciones artificiales
+        const effectiveMinZoom = 0.0001 // Mínimo absoluto para elementos gigantescos
+        configurarZoom(targetScale, effectiveMinZoom)
         configurarPan(targetPanX, targetPanY)
         focusElemento._last[el.id] = { scale: targetScale, w: bbox.w, h: bbox.h }
         scheduleRefine(sessionId, targetScale, targetPanX, targetPanY, bbox, phase)
@@ -2429,6 +2470,19 @@ const calcularCanvasAdaptativo = (elemento) => {
         zoom.value = startZoom + (targetScale - startZoom) * k
         panX.value = startPanX + (targetPanX - startPanX) * k
         panY.value = startPanY + (targetPanY - startPanY) * k
+
+        // Sincronizar con Konva durante animación
+        const stage = window.__konvaStage
+        if (stage) {
+          if (typeof stage.scale === 'function') {
+            stage.scale({ x: zoom.value, y: zoom.value })
+          }
+          if (typeof stage.position === 'function') {
+            stage.position({ x: panX.value, y: panY.value })
+          }
+          stage.batchDraw?.()
+        }
+
         if (focusElemento._currentSession !== sessionId) return // abortar animación obsoleta
         if (tt < 1) {
           focusElemento._raf = requestAnimationFrame(step)
@@ -2459,22 +2513,31 @@ const calcularCanvasAdaptativo = (elemento) => {
           // Recalcular objetivo con bounding real
           const viewportW = stage.width() || 1
             const viewportH = stage.height() || 1
-            const usableW = Math.max(1, viewportW - paddingPx * 2)
+            // Considerar el offset del panel de propiedades
+            const effectiveViewportW = Math.max(1, viewportW - offsetRight)
+            const usableW = Math.max(1, effectiveViewportW - paddingPx * 2)
             const usableH = Math.max(1, viewportH - paddingPx * 2)
             let idealScale = Math.min(usableW / rw, usableH / rh)
             if (!exact) idealScale *= fitRatio
-            idealScale = Math.max(0.05, Math.min(5, idealScale))
+
+            // El idealScale natural YA es correcto para TODOS los tamaños
+            // Solo límites globales para evitar valores extremos
+            idealScale = Math.max(0.0001, Math.min(5, idealScale))
           const diff = Math.abs(idealScale - appliedScale) / Math.max(idealScale, 0.0001)
           // Si la diferencia es significativa refinamos (pero evitar bucles infinitos: solo 1 refinamiento por invocación)
           if (diff > 0.08 && phase < 2) {
             const cx = rx + rw / 2
             const cy = ry + rh / 2
-            const newPanX = (viewportW / 2) - cx * idealScale
-            const newPanY = (viewportH / 2) - cy * idealScale
+            // Centrar en el espacio visible (desplazado a la izquierda si hay panel)
+            const centerX = (effectiveViewportW / 2)
+            const centerY = (viewportH / 2)
+            const newPanX = centerX - cx * idealScale
+            const newPanY = centerY - cy * idealScale
             // Si la corrección es muy grande, aplicar snap; si es moderada, animación breve
             const large = diff > 0.35
             if (large) {
-              configurarZoom(idealScale)
+              const effectiveMinZoom = 0.0001 // Permitir cualquier zoom
+              configurarZoom(idealScale, effectiveMinZoom)
               configurarPan(newPanX, newPanY)
               focusElemento._last[el.id] = { scale: idealScale, w: rw, h: rh }
             } else {
@@ -2492,6 +2555,19 @@ const calcularCanvasAdaptativo = (elemento) => {
                 zoom.value = startZoom + (idealScale - startZoom) * k
                 panX.value = startPanX + (newPanX - startPanX) * k
                 panY.value = startPanY + (newPanY - startPanY) * k
+
+                // Sincronizar con Konva durante animación
+                const stage = window.__konvaStage
+                if (stage) {
+                  if (typeof stage.scale === 'function') {
+                    stage.scale({ x: zoom.value, y: zoom.value })
+                  }
+                  if (typeof stage.position === 'function') {
+                    stage.position({ x: panX.value, y: panY.value })
+                  }
+                  stage.batchDraw?.()
+                }
+
                 if (tt < 1) {
                   focusElemento._raf = requestAnimationFrame(step)
                 } else {
@@ -2523,6 +2599,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     // Evitar valores absurdos
     if (!(bw > 0)) bw = 1
     if (!(bh > 0)) bh = 1
+
     // Programar refinamiento para capturar bounding real si difiere significativamente
     requestAnimationFrame(() => {
       if (focusElemento._currentSession !== sessionId) return
@@ -2539,10 +2616,14 @@ const calcularCanvasAdaptativo = (elemento) => {
           const rh = rect.height / sc
           if (Number.isFinite(rw) && rw > 0 && Number.isFinite(rh) && rh > 0) {
             const tooSmall = (rw < bw * 0.35) || (rh < bh * 0.35)
-            if (!tooSmall) { bx = rx; by = ry; bw = rw; bh = rh }
+            if (!tooSmall) {
+              bx = rx; by = ry; bw = rw; bh = rh
+            }
           }
         }
-      } catch { /* ignore */ }
+      } catch (err) {
+        // ignore refine errors
+      }
       computeAndAnimate({ x: bx, y: by, w: bw, h: bh })
     })
   }
