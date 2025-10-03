@@ -167,8 +167,8 @@
                 <div class="flex items-center">
                   <input
                     type="number"
-                    min="0"
-                    step="any"
+                    min="0.10"
+                    step="0.01"
                     v-model.number="edited.dimensiones.ancho"
                     @change="validarDimension('ancho')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
@@ -184,8 +184,8 @@
                 <div class="flex items-center">
                   <input
                     type="number"
-                    min="0"
-                    step="any"
+                    min="0.10"
+                    step="0.01"
                     v-model.number="edited.dimensiones.largo"
                     @change="validarDimension('largo')"
                     class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
@@ -202,8 +202,8 @@
               <div class="flex items-center">
                 <input
                   type="number"
-                  min="0"
-                  step="any"
+                  min="0.10"
+                  step="0.01"
                   v-model.number="edited.dimensiones.alto"
                   @change="validarDimension('alto')"
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
@@ -223,8 +223,8 @@
               <div class="flex items-center">
                 <input
                   type="number"
-                  min="1"
-                  step="any"
+                  min="0.10"
+                  step="0.01"
                   :max="maxDiametroPlanta"
                   v-model.number="edited.diametroCm"
                   @change="validarDiametro"
@@ -396,7 +396,7 @@
                 class="bg-white p-3 flex items-center justify-between rounded-md shadow-sm relative"
               >
               <div class="flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" class="text-[#1C1E4D] mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" class="text-primary mr-2">
                   <path fill="currentColor" d="M11.325 11.5q-.825 0-1.412-.587T9.325 9.5V7q0-.825.588-1.412T11.325 5H19q.825 0 1.413.588T21 7v2.5q0 .825-.587 1.413T19 11.5zm6.35 7.5q-.825 0-1.412-.587T15.675 17v-2.5q0-.825.588-1.412t1.412-.588H19q.825 0 1.413.588T21 14.5V17q0 .825-.587 1.413T19 19zm-6.35 0q-.825 0-1.412-.587T9.325 17v-2.5q0-.825.588-1.412t1.412-.588h1.35q.825 0 1.413.588t.587 1.412V17q0 .825-.587 1.413T12.675 19zM5 19q-.825 0-1.413-.587T3 17V7q0-.825.588-1.412T5 5h1.325q.825 0 1.413.588T8.325 7v10q0 .825-.587 1.413T6.325 19z"/>
                 </svg>
               <span class="text-[14px] text-[#637381]">{{ piso.nombre }}</span>

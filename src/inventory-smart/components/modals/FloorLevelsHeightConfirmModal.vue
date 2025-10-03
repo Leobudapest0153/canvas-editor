@@ -9,7 +9,7 @@
       class="relative z-10 bg-white shadow-2xl flex flex-col w-full max-w-[820px] max-h-[90vh] rounded"
     >
       <div class="px-4 sm:px-6 pt-4">
-        <h3 class="font-bold text-lg text-[#1C1E4D]">
+        <h3 class="font-bold text-lg text-primary">
           Confirmar ajustes
         </h3>
         <p class="text-xs text-gray-500">

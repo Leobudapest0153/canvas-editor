@@ -167,8 +167,8 @@
                       <input
                         v-model.number="datosGenerales.alturaRespectoAlSuelo"
                         type="number"
-                        min="0.1"
-                        step="0.1"
+                        min="0.10"
+                        step="0.01"
                         class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         :class="
                           touchedGeneral.alturaRespectoAlSuelo && !validAlturaRespectoAlSuelo
@@ -259,8 +259,8 @@
                       <input
                         v-model.number="diametro"
                         type="number"
-                        min="0.1"
-                        step="0.1"
+                        min="0.10"
+                        step="0.01"
                         class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         :class="touchedGeneral.ancho && !validAncho ? 'border-red-400' : 'border-gray-300'"
                         @input="touchedGeneral.ancho = true; touchedGeneral.largo = true"
@@ -275,8 +275,8 @@
                       <input
                         v-model.number="dimensiones.alto"
                         type="number"
-                        min="0.1"
-                        step="0.1"
+                        min="0.10"
+                        step="0.01"
                         class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         :class="touchedGeneral.alto && !validAlto ? 'border-red-400' : 'border-gray-300'"
                         @input="touchedGeneral.alto = true"
@@ -314,8 +314,8 @@
                       <input
                         v-model.number="dimensiones.largo"
                         type="number"
-                        min="0.1"
-                        step="0.1"
+                        min="0.10"
+                        step="0.01"
                         class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         :class="touchedGeneral.largo && !validLargo ? 'border-red-400' : 'border-gray-300'"
                         @input="touchedGeneral.largo = true"
@@ -328,8 +328,8 @@
                       <input
                         v-model.number="dimensiones.alto"
                         type="number"
-                        min="0.1"
-                        step="0.1"
+                        min="0.10"
+                        step="0.01"
                         class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         :class="touchedGeneral.alto && !validAlto ? 'border-red-400' : 'border-gray-300'"
                         @input="touchedGeneral.alto = true"
@@ -345,8 +345,8 @@
                       <input
                         v-model.number="dimensiones.ancho"
                         type="number"
-                        min="0.1"
-                        step="0.1"
+                        min="0.10"
+                        step="0.01"
                         class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         :class="touchedGeneral.ancho && !validAncho ? 'border-red-400' : 'border-gray-300'"
                         @input="touchedGeneral.ancho = true"
@@ -485,7 +485,7 @@
                         v-model.number="pisoNivel.largo"
                         type="number"
                         min="0.10"
-                        step="any"
+                        step="0.01"
                         class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         :class="excedeLargo(pisoNivel) ? 'border-red-400' : 'border-gray-300'"
                       />
@@ -499,7 +499,7 @@
                         v-model.number="pisoNivel.alto"
                         type="number"
                         min="0.10"
-                        step="any"
+                        step="0.01"
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -513,7 +513,7 @@
                         v-model.number="pisoNivel.ancho"
                         type="number"
                         min="0.10"
-                        step="any"
+                        step="0.01"
                         class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         :class="excedeAncho(pisoNivel) ? 'border-red-400' : 'border-gray-300'"
                       />
@@ -541,124 +541,15 @@
                       Características del {{ modo === 'cuarto' ? 'piso' : 'nivel' }}
                     </h5>
 
-                    <!-- Tipos de productos admitidos (dropdown con checkboxes) -->
-                    <div class="mb-4" :ref="(el) => setDropdownRef(pisoNivel.id, el)">
-                      <label class="block text-sm font-medium text-gray-700 mb-2"
-                        >Tipos de productos admitidos*</label
-                      >
-                      <!-- Field -->
-                      <div
-                        class="w-full px-3 py-2 border rounded-lg text-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 cursor-pointer bg-white flex items-center justify-between gap-2"
-                        :class="
-                          pisoNivel._touched?.tiposProductos &&
-                          (!pisoNivel.tiposProductos || pisoNivel.tiposProductos.length === 0)
-                            ? 'border-red-400'
-                            : 'border-gray-300'
-                        "
-                        @click.stop="
-                          ensureTouchedForLevel(pisoNivel) &&
-                          (pisoNivel._touched.tiposProductos = true) &&
-                          (openDropdownId = openDropdownId === pisoNivel.id ? null : pisoNivel.id)
-                        "
-                        @focusin="
-                          ensureTouchedForLevel(pisoNivel) &&
-                          (pisoNivel._touched.tiposProductos = true)
-                        "
-                      >
-                        <div class="flex flex-wrap items-center gap-1 min-h-[1.25rem]">
-                          <template
-                            v-if="pisoNivel.tiposProductos && pisoNivel.tiposProductos.length"
-                          >
-                            <span
-                              v-for="idSel in pisoNivel.tiposProductos"
-                              :key="idSel"
-                              class="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs"
-                            >
-                              {{ mapaTiposProducto[idSel] || idSel }}
-                            </span>
-                          </template>
-                          <span v-else class="text-gray-400">Selecciona tipos de productos</span>
-                        </div>
-                        <svg
-                          class="w-4 h-4 text-gray-500 flex-shrink-0"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M19 9l-7 7-7-7"
-                          />
-                        </svg>
-                      </div>
-                      <p
-                        v-if="
-                          pisoNivel._touched?.tiposProductos &&
-                          (!pisoNivel.tiposProductos || pisoNivel.tiposProductos.length === 0)
-                        "
-                        class="mt-1 text-xs text-red-600"
-                      >
-                        Selecciona al menos un tipo de producto.
-                      </p>
-                      <!-- Dropdown -->
-                      <div v-if="openDropdownId === pisoNivel.id" class="relative">
-                        <div
-                          class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
-                        >
-                          <div
-                            class="p-2 border-b bg-gray-50 text-xs text-gray-600 flex justify-between"
-                          >
-                            <button
-                              class="hover:text-blue-600 cursor-pointer"
-                              @click.stop="
-                                seleccionarTodosTipos(pisoNivel) &&
-                                ensureTouchedForLevel(pisoNivel) &&
-                                (pisoNivel._touched.tiposProductos = true)
-                              "
-                            >
-                              Seleccionar todos
-                            </button>
-                            <button
-                              class="hover:text-blue-600 cursor-pointer"
-                              @click.stop="
-                                limpiarTipos(pisoNivel) &&
-                                ensureTouchedForLevel(pisoNivel) &&
-                                (pisoNivel._touched.tiposProductos = true)
-                              "
-                            >
-                              Limpiar
-                            </button>
-                          </div>
-                          <ul class="p-2 space-y-1">
-                            <li
-                              v-for="opt in catalogos.tiposProductoAdmitidos"
-                              :key="opt.id"
-                              class="px-2 py-1 rounded hover:bg-gray-50"
-                            >
-                              <label
-                                :for="`tp-${pisoNivel.id}-${opt.id}`"
-                                class="flex items-center gap-2 cursor-pointer"
-                              >
-                                <input
-                                  :id="`tp-${pisoNivel.id}-${opt.id}`"
-                                  type="checkbox"
-                                  class="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                                  :value="opt.id"
-                                  v-model="pisoNivel.tiposProductos"
-                                  @click.stop
-                                  @change="
-                                    ensureTouchedForLevel(pisoNivel) &&
-                                    (pisoNivel._touched.tiposProductos = true)
-                                  "
-                                />
-                                <span class="text-sm text-gray-700">{{ opt.nombre }}</span>
-                              </label>
-                            </li>
-                          </ul>
-                        </div>
-                      </div>
+                    <!-- Tipos de productos admitidos (componente reutilizable) -->
+                    <div class="mb-4">
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Tipos de productos admitidos*</label>
+                      <ProductTypesMultiSelect
+                        v-model="pisoNivel.tiposProductos"
+                        :error="pisoNivel._touched?.tiposProductos && (!pisoNivel.tiposProductos || pisoNivel.tiposProductos.length === 0)"
+                        error-message="Selecciona al menos un tipo de producto."
+                        @changed="ensureTouchedForLevel(pisoNivel) && (pisoNivel._touched.tiposProductos = true)"
+                      />
                     </div>
 
                     <!-- Radio buttons para tipo de zona (2 opciones) -->
@@ -764,28 +655,14 @@ import {
   UBICACIONES_DISPONIBLES,
 } from '@/inventory-smart/utils/constants'
 import UiTooltip from './ui/UiTooltip.vue'
+import ProductTypesMultiSelect from './ui/ProductTypesMultiSelect.vue'
 
-const openDropdownId = ref(null)
-const dropdownRefs = new Map()
-const setDropdownRef = (id, el) => {
-  if (el) dropdownRefs.set(id, el)
-}
 
 // Catálogos dinámicos desde el store
 const canvasStore = useCanvasStore()
 const { catalogos } = storeToRefs(canvasStore)
 
-const mapaTiposProducto = computed(() => Object.fromEntries(
-  (catalogos.value.tiposProductoAdmitidos || []).map((t) => [t.id, t.nombre])
-))
 
-const handleClickOutside = (e) => {
-  if (!openDropdownId.value) return
-  const el = dropdownRefs.get(openDropdownId.value)
-  if (el && !el.contains(e.target)) {
-    openDropdownId.value = null
-  }
-}
 
 // Inline tooltip state/logic
 const tooltip = ref({ visible: false, text: '', x: 0, y: 0 })
@@ -806,32 +683,11 @@ const closeTooltip = () => {
   tooltip.value.visible = false
 }
 
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
-})
-onBeforeUnmount(() => {
-  document.removeEventListener('click', handleClickOutside)
-})
 
 // Helpers locales desde catálogos dinámicos
-const TIPOS_PRODUCTO_ADMITIDOS_LOCAL = computed(() => catalogos.value.tiposProductoAdmitidos || [])
-const TIPOS_CUARTO_LOCAL = computed(() => catalogos.value.tiposCuarto || [])
-const TIPOS_ESPACIO_LOCAL = computed(() => catalogos.value.tiposEspacio || [])
 
-const toggleTipoProducto = (pisoNivel, id) => {
-  if (!Array.isArray(pisoNivel.tiposProductos)) pisoNivel.tiposProductos = []
-  const idx = pisoNivel.tiposProductos.indexOf(id)
-  if (idx === -1) pisoNivel.tiposProductos.push(id)
-  else pisoNivel.tiposProductos.splice(idx, 1)
-}
 
-const seleccionarTodosTipos = (pisoNivel) => {
-  pisoNivel.tiposProductos = (catalogos.value.tiposProductoAdmitidos || []).map((t) => t.id)
-}
 
-const limpiarTipos = (pisoNivel) => {
-  pisoNivel.tiposProductos = []
-}
 
 // Props
 const props = defineProps({
