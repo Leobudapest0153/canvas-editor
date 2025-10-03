@@ -3,6 +3,17 @@ import { mount, config } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { pointInPolygon } from '@/inventory-smart/utils/polygonBounds'
 
+vi.mock('@/inventory-smart/composables/usePlacementSuggestionModal', () => ({
+  usePlacementSuggestionModal: () => ({
+    open: { value: false, __v_isRef: true },
+    payload: { value: null, __v_isRef: true },
+    elementLabel: { value: 'Elemento', __v_isRef: true },
+    show: () => false,
+    close: vi.fn(),
+    buildAdjustedElement: vi.fn(),
+  }),
+}))
+
 vi.mock('vue-konva', () => ({ VueKonva: {}, default: { install: () => {} } }))
 
 let mockStore
@@ -22,6 +33,7 @@ beforeEach(() => {
   setActivePinia(createPinia())
   const toastMock = { toasts: { value: [] }, show: vi.fn(), remove: vi.fn(), clearAll: vi.fn(), maxToasts: 5 }
   config.global.provide = { ...(config.global.provide || {}), [ToastSymbol]: toastMock }
+  config.global.stubs = { ...(config.global.stubs || {}), PlacementSuggestionModal: true, FloatingControls: true }
 })
 
 describe('drop outside polygon', () => {
@@ -56,12 +68,18 @@ describe('drop outside polygon', () => {
     }
 
     const wrapper = mount(CanvasView)
-    wrapper.vm.containerRef = { getBoundingClientRect: () => ({ left: 0, top: 0 }) }
-    wrapper.vm.stageRef = {
-      getNode: () => ({ x: () => 0, y: () => 0, scaleX: () => 1, scaleY: () => 1 })
+    const setupState = wrapper.vm.$.setupState || {}
+    if (setupState.containerRef) {
+      setupState.containerRef.value = { getBoundingClientRect: () => ({ left: 0, top: 0 }) }
     }
-    wrapper.vm.stageSize.width = 100
-    wrapper.vm.stageSize.height = 100
+    if (setupState.stageRef) {
+      setupState.stageRef.value = {
+        getNode: () => ({ x: () => 0, y: () => 0, scaleX: () => 1, scaleY: () => 1 })
+      }
+    }
+    if (setupState.stageSize) {
+      setupState.stageSize.value = { width: 100, height: 100 }
+    }
 
     const data = { elemento: { dimensiones: { ancho: 20, largo: 20 }, tipo: 'elementos', forma: 'rectangular', color: '#f00' } }
     const dropEvent = { clientX: 150, clientY: 50, preventDefault: () => {} }

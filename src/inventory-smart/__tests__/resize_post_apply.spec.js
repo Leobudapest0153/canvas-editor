@@ -5,6 +5,17 @@ import PlantasPanel from '@/inventory-smart/components/PlantasPanel.vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 
+vi.mock('@/inventory-smart/composables/usePlacementSuggestionModal', () => ({
+  usePlacementSuggestionModal: () => ({
+    open: { value: false, __v_isRef: true },
+    payload: { value: null, __v_isRef: true },
+    elementLabel: { value: 'Elemento', __v_isRef: true },
+    show: () => false,
+    close: vi.fn(),
+    buildAdjustedElement: vi.fn(),
+  }),
+}))
+
 const makeEl = (id, w, h, x, y, opts = {}) => ({
   id,
   plantaId: 'planta_1',
