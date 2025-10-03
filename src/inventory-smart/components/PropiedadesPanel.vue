@@ -19,7 +19,7 @@
       </button>
     </div>
 
-    <div v-if="elementoSeleccionado" class="flex-1 overflow-y-auto p-3">
+    <div v-if="elementoSeleccionado" class="flex-1 overflow-y-auto overflow-x-hidden p-3">
       <fieldset
         class="properties-fieldset"
         :disabled="propertiesDisabled"
@@ -1671,5 +1671,32 @@ onBeforeRouteLeave(async (to, from, next) => {
   cursor: not-allowed;
 }
 
-/* No custom styles */
+/* Prevenir overflow horizontal en elementos de texto */
+.properties-fieldset p,
+.properties-fieldset li,
+.properties-fieldset span {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+  white-space: normal;
+}
+
+/* Asegurar que los inputs y selects no se desborden */
+.properties-fieldset input,
+.properties-fieldset select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Prevenir overflow en barras de progreso y elementos flex */
+.properties-fieldset .flex {
+  min-width: 0;
+}
+
+/* Asegurar que los elementos con texto largo se ajusten suavemente */
+.properties-fieldset [class*="text-"] {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+}
 </style>
