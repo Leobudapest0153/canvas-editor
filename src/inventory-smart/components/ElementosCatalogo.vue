@@ -160,10 +160,10 @@
                 <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
                 <span class="spec-value text-gray-700">{{ elemento.capacidadCarga }}kg</span>
               </div>
-              <!-- <div class="spec-item flex justify-between text-xs">
-                <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
-                <span class="spec-value text-gray-700 capitalize">{{ elemento.ubicacion }}</span>
-              </div> -->
+              <div class="spec-item flex justify-between text-xs">
+                <span class="spec-label text-gray-500 font-medium">{{ 'Cantidad de ' + (elemento.tipo === 'cuartos' ? 'pisos:' : 'niveles:') }}</span>
+                <span class="spec-value text-gray-700">{{ getChildCount(elemento) }}</span>
+              </div>
             </div>
 
             <!-- Badge de tipo y categoría -->
@@ -491,6 +491,18 @@ const isKebabRestricted = (item) => {
 
 // Comportamiento actual: sin escalado, siempre dimensiones base del catálogo
 const getCardDims = (item) => item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
+
+const getChildCount = (elemento) => {
+  try {
+    if (!elemento?.payload?.rootId || !Array.isArray(elemento.payload.elements)) {
+      return 0
+    }
+    const root = elemento.payload.elements.find(e => e.id === elemento.payload.rootId)
+    return root?.hijos?.length || 0
+  } catch {
+    return 0
+  }
+}
 
 // Drag and Drop
 const iniciarArrastre = (elemento, event) => {

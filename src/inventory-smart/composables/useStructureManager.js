@@ -39,7 +39,7 @@ export function buildStructureFromForm(form) {
     tipo: modo === 'cuarto' ? 'cuartos' : 'elementos',
     categoria: datosGenerales.tipoSeleccionado || (modo === 'cuarto' ? 'cuartos' : 'elementos'),
     forma: dimensiones.forma,
-    orientacion: datosGenerales.orientacion,
+    orientacion: Number(datosGenerales.orientacion) || 0,
     color: datosGenerales.color || '#3B82F6',
     colorBase: datosGenerales.color || '#3B82F6',
     dimensiones: dimsCm,
@@ -134,7 +134,7 @@ export function toCatalogItemFromStructure({
     tipo: root?.tipo || 'elementos',
     categoria: root?.categoria,
     forma: root?.forma,
-    orientacion: root?.orientacion,
+    orientacion: Number(root?.orientacion) || 0,
     color: color || root?.color || root?.colorBase || '#3B82F6',
     colorBase: color || root?.colorBase || root?.color || '#3B82F6',
     dimensiones: { ...(root?.dimensiones || {}) },
@@ -178,7 +178,7 @@ export function toFormFromCatalogItem(item) {
       color: root.color || root.colorBase || item.color || '#3B82F6',
       tipoSeleccionado: root.categoria || '',
       descripcion: root.descripcion || item.descripcion || '',
-      orientacion: root.orientacion || '',
+      orientacion: String(root.orientacion ?? ''),
       ubicacion: modo === 'espacio' ? (root.ubicacion || item.ubicacion || '') : '',
       // Si es espacio en pared, exponer alturaRespectoAlSuelo en metros
       ...(modo === 'espacio' && (root.ubicacion || item.ubicacion) === 'pared'
@@ -234,7 +234,7 @@ export function toFormFromCatalogItem(item) {
       color: item.color || item.colorBase || '#3B82F6',
       tipoSeleccionado: item.categoria || '',
       descripcion: item.descripcion || '',
-      orientacion: item.orientacion || '',
+      orientacion: String(item.orientacion ?? ''),
       ubicacion: modo === 'espacio' ? (item.ubicacion || '') : '',
       ...(modo === 'espacio' && item.ubicacion === 'pared'
         ? { alturaRespectoAlSuelo: fromCm(item.alturaRespectoAlSuelo) }
