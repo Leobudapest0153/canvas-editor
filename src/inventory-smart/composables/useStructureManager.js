@@ -308,17 +308,12 @@ export function removeCatalogItem(itemsArray, id) {
  * Requiere el canvasStore para realizar la inserción (evitamos import directo para no circular).
  */
 export function instantiateStructureOnCanvas(canvasStore, payload, position) {
-  console.time('⏱️ instantiate: total')
   if (!canvasStore || !payload?.rootId || !Array.isArray(payload.elements)) return false
-
-  console.time('⏱️ instantiate: mapear elementos')
   // Mapear elementos por id (optimizado: usar cloneCanvasElement)
   const allElementsMap = new Map()
   for (const el of payload.elements) {
     allElementsMap.set(el.id, cloneCanvasElement(el))
   }
-  console.timeEnd('⏱️ instantiate: mapear elementos')
-
   // Regenerar IDs únicos (similar a useCanvasBuffer)
   const newIdMap = new Map()
   const newMap = new Map()
@@ -456,10 +451,8 @@ export function instantiateStructureOnCanvas(canvasStore, payload, position) {
     const shouldRegenerate = isRootWithFloors && hasFloorChildren && isFromForm
 
     if (shouldRegenerate) {
-      console.log('Regenerando pisos/niveles internos para', base.tipo || base.categoria, newId)
       regenerateFloors(canvasStore, elem, newMap, newId, base.dimensiones)
     } else if (hasChildren) {
-      console.log('Pegando hijos de', base.tipo || base.categoria, newId)
       for (const hid of elem.hijos) {
         const child = newMap.get(hid)
         if (!child) continue
@@ -597,7 +590,7 @@ export function buildStructureFromCanvasElement(canvasStore, elementoId, { offse
     cloned.y = (elem.y || 0) + offsetY
     cloned.padre = parentNewId
     cloned.hijos = []
-    
+
     // Limpiar flag fromForm: al serializar desde canvas, ya no es "directo del formulario"
     if (cloned.meta && cloned.meta.fromForm !== undefined) {
       cloned.meta = { ...cloned.meta, fromForm: false }
@@ -622,7 +615,6 @@ export function buildStructureFromCanvasElement(canvasStore, elementoId, { offse
 
 export function buildChildFromDraft(draft, parentContext, index = 0, parentChilds) {
   if (!draft || !parentContext) {
-    console.warn('buildChildFromDraft requiere un draft y un parentContext.');
     return draft; // Devuelve el draft original si faltan datos
   }
 
@@ -632,7 +624,6 @@ export function buildChildFromDraft(draft, parentContext, index = 0, parentChild
   const childCategory = esPadreEspacio ? 'nivel' : 'piso';
   const defaultName = `${esPadreEspacio ? 'Nivel' : 'Piso'} ${index + 1}`;
 
-  console.log('draft en buildChildFromDraft:', draft);
   // 2. Construir el objeto base con datos heredados y por defecto
   const baseChild = {
     id: draft.id || uid(esPadreEspacio ? 'nivel' : 'piso'),
