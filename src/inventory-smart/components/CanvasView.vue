@@ -668,6 +668,12 @@
       @zoom-out="zoomOut()"
       @fit="fitToPlanta"
     />
+    <DropSuggestionModal
+      :open="dropSuggestionState.open"
+      :suggestions="dropSuggestionState.suggestions"
+      @accept="acceptDropSuggestions"
+      @cancel="cancelDropSuggestions"
+    />
   </div>
 </template>
 
@@ -713,6 +719,9 @@ import TemplateSaveModal from '@/inventory-smart/components/TemplateSaveModal.vu
 import CanvasInfo from '@/inventory-smart/components/CanvasInfo.vue'
 import { useZoom } from '@/inventory-smart/composables/useZoom'
 import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
+import DropSuggestionModal from '@/inventory-smart/components/modals/DropSuggestionModal.vue'
+import { useDropSuggestionModal } from '@/inventory-smart/composables/useDropSuggestionModal'
+import { applyElementOverrides, generateDropSuggestions } from '@/inventory-smart/modules/drop/dropPlacementAdjustments'
 import { toPrecisionCm } from '../utils/fixedDimensions'
 import { instantiateStructureOnCanvas } from '@/inventory-smart/composables/useStructureManager'
 
@@ -777,6 +786,12 @@ const closeTemplateModal = () => {
   templateModalOpen.value = false
 }
 const dimensionValidation = useDimensionValidation()
+const {
+  state: dropSuggestionState,
+  showSuggestions,
+  accept: acceptDropSuggestions,
+  cancel: cancelDropSuggestions,
+} = useDropSuggestionModal()
 
 // Object snapping
 const { activeGuides: snapGuides, isSnapping, performSnap, clearGuides } = useObjectSnapping()
@@ -1702,10 +1717,14 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
 }
 
 // Pipeline unificado de validaciones previas al drop
-const runPreDropValidations = (elemento, dropEvent) => {
+const runPreDropValidations = (elemento, dropEvent, options = {}) => {
+  const { silent = false } = options
   if (!elemento) return { ok: false, reason: 'invalid' }
 
-  const contextoActual = canvasStore.contextoActual?.tipo || 'plantas'
+  const rawContext = canvasStore.contextoActual || {}
+  const contextoId =
+    rawContext.id || canvasStore.plantaActiva || canvasStore.plantaActivaData?.id || null
+  const contextoActual = rawContext.tipo || 'plantas'
   const tipoElemento = elemento.tipo
 
   // Reglas de jerarquía actualizadas
@@ -1727,8 +1746,9 @@ const runPreDropValidations = (elemento, dropEvent) => {
       contenedores: 'No puedes agregar elementos dentro de niveles.',
       pasillos: 'No puedes agregar elementos dentro de pasillos.',
     }
-    showToast(msgMap[contextoActual] || 'No puedes agregar este tipo aquí.', 'error')
-    return { ok: false, reason: 'hierarchy' }
+    const message = msgMap[contextoActual] || 'No puedes agregar este tipo aquí.'
+    if (!silent) showToast(message, 'error')
+    return { ok: false, reason: 'hierarchy', message }
   }
 
   // Si es pasillo, ajustar alto al de la planta ANTES de validar
@@ -1742,8 +1762,8 @@ const runPreDropValidations = (elemento, dropEvent) => {
 
   const resultadoValidacionPeso = weightValidation.validarPesoElemento(
     elementoParaPeso,
-    canvasStore.contextoActual.id,
-    canvasStore.contextoActual.tipo,
+    contextoId,
+    contextoActual,
   )
 
   if (!resultadoValidacionPeso.valido) {
@@ -1760,11 +1780,15 @@ const runPreDropValidations = (elemento, dropEvent) => {
       tipoPadre = 'el elemento'
     }
     // El elemento excedería el peso máximo permitido
-    showToast(
-      `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`,
-      'error',
-    )
-    return { ok: false, reason: 'weight' }
+    const message =
+      `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`
+    if (!silent) showToast(message, 'error')
+    return {
+      ok: false,
+      reason: 'weight',
+      message,
+      details: { weight: resultadoValidacionPeso, parentLabel: tipoPadre },
+    }
   }
 
   let { width, height } = getElementPixelDimensions(elemento)
@@ -1811,6 +1835,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
   const MIN_HEIGHT = 10
   let finalWidth = Math.max(width, MIN_WIDTH)
   let finalHeight = Math.max(height, MIN_HEIGHT)
+  const dimsSnapshot = { ancho: anchoCm, largo: largoCm, alto: altoCm }
 
   const world = getWorldCoordinatesFromPointer(dropEvent)
   let candX = world.x - finalWidth / 2
@@ -1838,8 +1863,9 @@ const runPreDropValidations = (elemento, dropEvent) => {
     let local = sess.toLocal({ x: candX, y: candY }, parent)
     local = sess.finalizeLocal(local)
     if (!sess.isValidLocal(local)) {
-      showToast('No hay espacio suficiente aquí para colocar el elemento.', 'error')
-      return { ok: false, reason: 'bounds' }
+      const message = 'No hay espacio suficiente aquí para colocar el elemento.'
+      if (!silent) showToast(message, 'error')
+      return { ok: false, reason: 'bounds', message, details: { dimsCm: dimsSnapshot } }
     }
     const worldPos = sess.toWorld(local, parent)
     candX = worldPos.x
@@ -1913,14 +1939,30 @@ const runPreDropValidations = (elemento, dropEvent) => {
   }
 
   if (!ok) {
-    showToast('No fue posible colocar el elemento dentro de los límites de la planta.', 'error')
-    return { ok: false, reason: 'bounds' }
+    const message = 'No fue posible colocar el elemento dentro de los límites de la planta.'
+    if (!silent) showToast(message, 'error')
+    return {
+      ok: false,
+      reason: 'bounds',
+      message,
+      details: {
+        dimsCm: dimsSnapshot,
+        blocking,
+        boundary,
+      },
+    }
   }
 
   // Validación final: asegurar que la posición final sea válida con la misma lógica que drag
   if (!insideAreaModel(finalPos, { ...tempEl, x: finalPos.x, y: finalPos.y }, areaBounds, 0.5)) {
-    showToast('El elemento quedaría fuera del área permitida.', 'error')
-    return { ok: false, reason: 'bounds' }
+    const message = 'El elemento quedaría fuera del área permitida.'
+    if (!silent) showToast(message, 'error')
+    return {
+      ok: false,
+      reason: 'bounds',
+      message,
+      details: { dimsCm: dimsSnapshot, boundary },
+    }
   }
 
   return {
@@ -1932,10 +1974,57 @@ const runPreDropValidations = (elemento, dropEvent) => {
   }
 }
 
-const createElementFromDrop = (data, dropEvent) => {
-  const elemento = data.elemento
-  const res = runPreDropValidations(elemento, dropEvent)
-  if (!res.ok) return
+const handleDropFailureWithSuggestions = ({
+  baseElement,
+  data,
+  dropEvent,
+  validation,
+  overrides = {},
+}) => {
+  const elementWithOverrides = applyElementOverrides(baseElement, overrides)
+  const runProbe = (overridePayload = {}) => {
+    const merged = { ...overrides, ...overridePayload }
+    const candidate = applyElementOverrides(baseElement, merged)
+    return runPreDropValidations(candidate, dropEvent, { silent: true })
+  }
+
+  const suggestions = generateDropSuggestions({
+    element: elementWithOverrides,
+    failure: validation,
+    runProbe,
+  })
+
+  if (!suggestions) return false
+
+  showSuggestions({
+    suggestions,
+    apply: () =>
+      createElementFromDrop(data, dropEvent, { ...overrides, ...suggestions.overrides }),
+    onCancel: () => {
+      if (validation.message) showToast(validation.message, 'error')
+    },
+  })
+
+  return true
+}
+
+const createElementFromDrop = (data, dropEvent, overrides = {}) => {
+  const baseElement = data.elemento
+  const elemento = applyElementOverrides(baseElement, overrides)
+  const res = runPreDropValidations(elemento, dropEvent, { silent: true })
+  if (!res.ok) {
+    const handled = handleDropFailureWithSuggestions({
+      baseElement,
+      data,
+      dropEvent,
+      validation: res,
+      overrides,
+    })
+    if (!handled && res.message) {
+      showToast(res.message, 'error')
+    }
+    return
+  }
 
   let { ancho: anchoCm, largo: largoCm, alto: altoCm } = res.dimsCm
   let finalWidth = res.width
@@ -1968,7 +2057,7 @@ const createElementFromDrop = (data, dropEvent) => {
     volumenMaximo: (anchoCm * largoCmFinal * altoCm) / 100,
     dimensionLock: false,
     systemTypeKey: elemento.id,
-    uso: { volumen: 0, peso: 0 },
+    uso: elemento.uso ? { ...elemento.uso } : { volumen: 0, peso: 0 },
     descripcion: elemento.descripcion || '',
     contenedores: elemento.contenedores ? [...elemento.contenedores] : [],
     hijos: [],
@@ -2253,8 +2342,11 @@ const createElementFromBuffer = (data, dropEvent) => {
   }
 
   // Delegar todas las validaciones a la ruta unificada
-  const res = runPreDropValidations(bufferItem.elemento, dropEvent)
-  if (!res.ok) return
+  const res = runPreDropValidations(bufferItem.elemento, dropEvent, { silent: true })
+  if (!res.ok) {
+    if (res.message) showToast(res.message, 'error')
+    return
+  }
 
   const newElementId = buffer.pasteFromBuffer(data.bufferItemId, res.position)
   if (newElementId) {
@@ -2269,8 +2361,9 @@ const createElementFromTemplate = (data, dropEvent) => {
     showToast('No se pudo insertar la plantilla', 'error')
     return
   }
-  const res = runPreDropValidations(root, dropEvent)
+  const res = runPreDropValidations(root, dropEvent, { silent: true })
   if (!res.ok) {
+    if (res.message) showToast(res.message, 'error')
     return
   }
   // Unificar instanciación de estructuras (plantillas/cuarto/espacio)
