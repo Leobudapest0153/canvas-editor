@@ -488,6 +488,28 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
       expect(res.ok).toBe(false)
     })
 
+    it('proposes capacity adjustment when weight can be reduced', () => {
+      weightValidationMock.validarPesoElemento.mockReturnValueOnce({
+        valido: false,
+        exceso: 10,
+        capacidadCarga: 120,
+        pesoActual: 60,
+      })
+      const tpl = {
+        id: 't1',
+        tipo: 'elementos',
+        dimensiones: { ancho: 100, largo: 60, alto: 20 },
+        width: 100,
+        height: 60,
+        nombre: 'Elemento prueba',
+        capacidadCarga: 80,
+      }
+      const res = wrapper.vm.runPreDropValidations(tpl, { clientX: 50, clientY: 50 })
+      expect(res.ok).toBe(false)
+      expect(res.suggestions).toHaveLength(1)
+      expect(res.suggestions[0].type).toBe('capacity')
+    })
+
     it('rejects collision', () => {
       vi.mocked(detectConflictsFor).mockReturnValueOnce([{ bloqueante: true }])
       const tpl = { id: 't1', tipo: 'elementos', dimensiones: { ancho: 100, largo: 60, alto: 20 }, width: 100, height: 60 }

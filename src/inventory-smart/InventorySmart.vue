@@ -72,6 +72,7 @@
       @close="handleIdentifyEslClose"
       @save="handleIdentifyEslSave"
     />
+    <PlacementSuggestionsModal />
 
     <!-- Alerta de contexto de navegación -->
     <ContextAlert
@@ -93,6 +94,7 @@ import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import ManagmentFloorRoomPropertiesModal from './components/modals/ManagmentFloorRoomPropertiesModal.vue'
 import IdentifyEslModal from './components/modals/IdentifyEslModal.vue'
+import PlacementSuggestionsModal from './components/modals/PlacementSuggestionsModal.vue'
 import ContextAlert from './components/ContextAlert.vue'
 import { useCanvasImportExport } from './composables/useCanvasImportExport'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
