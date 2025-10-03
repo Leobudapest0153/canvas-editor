@@ -1469,8 +1469,8 @@ const calcularCanvasAdaptativo = (elemento) => {
       console.warn('Auto-scale on create failed:', e)
     }
 
-    // Asignación unificada de 'codigo' y nombre (pasillos)
     try {
+      if (nuevoElemento.tipo === 'pasillos') opts.resetName = true
       assignCodigoNombre(nuevoElemento, elementos.value, opts)
     } catch (e) {
       console.warn('No se pudo generar codigo/nombre:', e)
