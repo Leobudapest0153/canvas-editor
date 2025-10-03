@@ -621,7 +621,7 @@
         </button>
         <button
           @click="guardar"
-          class="bg-primary cursor-pointer px-4 py-2 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          class="bg-primary cursor-pointer px-4 py-2 text-white rounded-lg hover:bg-primary-600 transition-colors"
         >
           Aceptar
         </button>

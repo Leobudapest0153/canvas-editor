@@ -259,7 +259,7 @@
           Cerrar
         </button>
         <button
-          class="px-4 py-2 rounded-lg font-medium shadow-sm focus:outline-none focus:ring-2 bg-primary text-white hover:bg-primary-800 focus:ring-primary-900 cursor-pointer"
+          class="px-4 py-2 rounded-lg font-medium shadow-sm focus:outline-none focus:ring-2 bg-primary text-white hover:bg-primary-600 focus:ring-primary-700 cursor-pointer"
           @click="onSave"
         >Guardar</button>
       </div>

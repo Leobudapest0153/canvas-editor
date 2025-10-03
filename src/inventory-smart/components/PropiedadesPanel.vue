@@ -6,7 +6,7 @@
       <button
         v-if="elementoSeleccionado"
         type="button"
-        class="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-primary text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer text-sm"
+        class="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-primary text-gray-100 hover:text-white hover:bg-primary-600 rounded-lg transition-colors cursor-pointer text-sm"
         @click="emitirIdentificador"
       >
         <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -380,7 +380,7 @@
               <button
                 :disabled="isSaving || isElementRestricted"
                 @click="canvasStore.abrirCuartoNivelesPropiedades(elementoSeleccionado.id, childrenType)"
-                class="bg-primary-700 text-white p-1 rounded-full cursor-pointer
+                class="bg-primary text-white p-1 rounded-full cursor-pointer
                 disabled:bg-gray-400 disabled:cursor-not-allowed">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/>
@@ -414,7 +414,7 @@
                   <ul class="py-1">
                     <li>
                       <button
-                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-700 cursor-pointer"
+                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-600 cursor-pointer"
                         @click="deleteAndCompact({ id: piso.id })"
                       >
                         Eliminar
@@ -426,7 +426,7 @@
                     <li>
                       <button
                         @click="canvasStore.abrirCuartoNivelesPropiedades(piso.id)"
-                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-700
+                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-600
                         w-full cursor-pointer"
                       >
                         Editar
@@ -471,7 +471,7 @@
                 <button
                   @click="abrirModalIdentificarEsl"
                   :disabled="isSaving"
-                  class="text-[#364153] text-sm bg-gray-200 px-3 py-2 cursor-pointer rounded-[6px] ml-1
+                  class="bg-secondary text-gray-600 hover:bg-secondary-600 hover:text-gray-700 text-sm px-3 py-2 cursor-pointer rounded-[6px] ml-1
                   disabled:opacity-50 hover:bg-gray-300 disabled:cursor-not-allowed">
                   Configurar
                 </button>
@@ -509,7 +509,7 @@
           Revertir
         </button>
         <button
-          class="px-3 cursor-pointer py-1 bg-primary text-white rounded text-sm hover:bg-primary-900 disabled:opacity-50"
+          class="px-3 cursor-pointer py-1 bg-primary text-white rounded text-sm hover:bg-primary-600 disabled:opacity-50"
           @click="guardar"
           :disabled="guardarDeshabilitado"
         >
@@ -518,7 +518,7 @@
       </div>
       <button
         @click="deseleccionarElemento"
-        class="w-full cursor-pointer px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors text-sm"
+        class="w-full cursor-pointer px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors text-sm"
       >
         Deseleccionar
       </button>

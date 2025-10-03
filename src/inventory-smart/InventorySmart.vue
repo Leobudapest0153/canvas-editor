@@ -145,9 +145,7 @@ const props = defineProps({
     validator: (value) => {
       if (value === null) return true
       if (typeof value !== 'object') return false
-      // Claves permitidas: colores base que se expanden a variantes Tailwind
-      // primary, secondary, success, iceBlue, danger, warning, info, neutral
-      const allowed = ['primary', 'secondary', 'success', 'iceBlue', 'danger', 'warning', 'info', 'neutral']
+      const allowed = ['primary', 'primaryGray', 'secondary', 'success', 'danger', 'warning', 'info']
       return Object.keys(value).every(k => allowed.includes(k) && typeof value[k] === 'string')
     }
   },
@@ -199,6 +197,7 @@ const updateMediaQuery = (e) => {
 // Mapea claves de la prop a los prefijos de variables del @theme actual
 const THEME_KEY_TO_PREFIX = {
   primary: 'primary',          // --color-primary[...]
+  primaryGray: 'primary-gray', // --color-primary-gray[...]
   secondary: 'secondary',      // --color-secondary[...]
   success: 'success',          // --color-success[...]
   danger: 'danger',            // --color-danger[...]
@@ -579,26 +578,43 @@ watch(
 /* Ignorar warning de unknown at rule @theme */
 @theme {
   --color-primary: #1c1e4d;
-  --color-primary-100: #f0f1f5;
-  --color-primary-200: #d9dbec;
-  --color-primary-300: #b3b6d9;
-  --color-primary-400: #8c91c6;
-  --color-primary-500: #666bb3;
-  --color-primary-600: #4d5190;
-  --color-primary-700: #33366d;
-  --color-primary-800: #1a1b4a;
-  --color-primary-900: #0d0e2a;
+  --color-primary-50: #73757f;
+  --color-primary-100: #616470;
+  --color-primary-200: #4d5061;
+  --color-primary-300: #3b3f56;
+  --color-primary-400: #2d3150;
+  --color-primary-500: #1c1e4d;
+  --color-primary-600: #101135;
+  --color-primary-700: #060425;
+  --color-primary-800: #01000f;
+  --color-primary-900: #000000;
+  --color-primary-950: #090910;
+
+  --color-primary-gray: #8b98a8;
+  --color-primary-gray-50: #f5f7fa;
+  --color-primary-gray-100: #e0e3e8;
+  --color-primary-gray-200: #c8ccd3;
+  --color-primary-gray-300: #b3bac3;
+  --color-primary-gray-400: #a0aab7;
+  --color-primary-gray-500: #8b98a8;
+  --color-primary-gray-600: #798696;
+  --color-primary-gray-700: #687484;
+  --color-primary-gray-800: #596370;
+  --color-primary-gray-900: #4a525f;
+  --color-primary-gray-950: #363c44;
 
   --color-secondary: #e5e7eb;
-  --color-secondary-100: #f9fafb;
-  --color-secondary-200: #f3f4f6;
-  --color-secondary-300: #e5e7eb;
-  --color-secondary-400: #d1d5db;
-  --color-secondary-500: #9ca3af;
-  --color-secondary-600: #6b7280;
-  --color-secondary-700: #4b5563;
-  --color-secondary-800: #374151;
-  --color-secondary-900: #1f2937;
+  --color-secondary-50: #ffffff;
+  --color-secondary-100: #ffffff;
+  --color-secondary-200: #ffffff;
+  --color-secondary-300: #ffffff;
+  --color-secondary-400: #fafbfe;
+  --color-secondary-500: #e5e7eb;
+  --color-secondary-600: #d2d3d8;
+  --color-secondary-700: #bec0c5;
+  --color-secondary-800: #abadb1;
+  --color-secondary-900: #999b9e;
+  --color-secondary-950: #818285;
 
   --color-success: #4ba345;
   --color-success-100: #ecf9f0;

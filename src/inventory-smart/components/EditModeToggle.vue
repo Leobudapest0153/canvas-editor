@@ -28,7 +28,7 @@ const buttonClasses = computed(() => [
   'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors cursor-pointer',
   isEditing.value
     ? 'bg-secondary text-gray-600 hover:bg-secondary-300 hover:text-gray-500'
-    : 'bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray',
+    : 'bg-primary text-gray-100 hover:text-white hover:bg-primary-600',
 ])
 
 const setMode = (nextValue) => {

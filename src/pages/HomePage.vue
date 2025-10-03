@@ -32,7 +32,8 @@ const tiposProductoAdmitidos = ref([
 ])
 
 const themePalette = ref({
-  primary: '#1c1e50',
+  primary: '#1c1e4d',
+  primaryGray: '#8b98a8',
   secondary: '#e5e7eb',
   success: '#4ba345',
   danger: '#ef4444',
