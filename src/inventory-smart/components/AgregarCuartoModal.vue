@@ -109,7 +109,7 @@
                   <div class="grid grid-cols-2 gap-4">
                     <!-- Orientación -->
                     <div>
-                      <label class="block text-sm font-medium text-gray-700 mb-2">Orientación*</label>
+                      <label class="block text-sm font-medium text-gray-700 mb-2">Cara frontal*</label>
                       <select
                         v-model="datosGenerales.orientacion"
                         class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -187,7 +187,7 @@
 
                 <!-- Orientación solo (para cuartos) -->
                 <div v-else>
-                  <label class="block text-sm font-medium text-gray-700 mb-2">Orientación*</label>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Cara frontal*</label>
                   <select
                     v-model="datosGenerales.orientacion"
                     class="w-full cursor-pointer px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
