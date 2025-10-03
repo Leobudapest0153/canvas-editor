@@ -82,4 +82,25 @@ describe('Reglas de solapamiento', () => {
       expect(Bx).toBe(100)
     }
   })
+  it('MTD: las colisiones circulares proyectan la separaci?n sobre la tangente', () => {
+    const other = { id: 'A', x: 100, y: 100, width: 80, height: 80, forma: 'circular' }
+    const movingX = 150
+    const movingY = 120
+    const diameter = 80
+    const radius = diameter / 2
+    const options = {
+      isCircleA: true,
+      isCircleB: true,
+      centerA: { x: movingX + radius, y: movingY + radius },
+      centerB: { x: other.x + radius, y: other.y + radius },
+      radiusA: radius,
+      radiusB: radius
+    }
+    const { dx, dy } = computeMTD(movingX, movingY, diameter, diameter, other.x, other.y, other.width, other.height, options)
+    expect(Math.abs(dx)).toBeGreaterThan(0)
+    expect(Math.abs(dy)).toBeGreaterThan(0)
+    const newCenter = { x: options.centerA.x + dx, y: options.centerA.y + dy }
+    const distance = Math.hypot(newCenter.x - options.centerB.x, newCenter.y - options.centerB.y)
+    expect(distance).toBeCloseTo(options.radiusA + options.radiusB, 4)
+  })
 })
