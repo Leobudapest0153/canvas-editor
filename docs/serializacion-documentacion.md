@@ -36,7 +36,6 @@ Convierte el estado completo del canvas a formato JSON, incluyendo todas las pla
       "id": "elem_123",
       "nombre": "Anaquel Principal",
       "tipo": "anaquel",
-      "categoria": "anaqueles",
       "plantaId": "planta_1",
       "dimensiones": {
         "ancho": 80,
