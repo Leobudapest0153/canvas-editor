@@ -232,7 +232,7 @@
           <button
             v-if="!canvasStore.modoConfigurarEsl"
             type="button"
-            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500 rounded-lg transition-colors cursor-pointer"
+            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 bg-secondary text-gray-600 hover:bg-secondary-300 hover:text-gray-500 rounded-lg transition-colors cursor-pointer"
             @click="onBack"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -659,7 +659,7 @@ const eslButtonClasses = computed(() => [
   'inline-flex items-center justify-center gap-2 px-2 py-2 rounded-lg transition-colors cursor-pointer',
   canvasStore.modoConfigurarEsl
     ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-    : 'bg-gray text-white hover:bg-ice-blue-300 hover:text-white',
+    : 'bg-gray text-white hover:bg-secondary-300 hover:text-white',
 ])
 
 // Estado local para modales

@@ -6,6 +6,14 @@
       :supportedProductTypes="tiposProductoAdmitidos"
       :externalServices="externalServices"
       :author="{ name: 'David Deras', id: '123' }"
+      :themePalette="{
+        primary: '#1c1e50',
+        secondary: '#e5e7eb',
+        success: '#4ba345',
+        danger: '#ef4444',
+        warning: '#f59e0b',
+        info: '#0ea5e9',
+      }"
       @configUpdated="handleConfigUpdated"
       @back="handleBack"
       @printIdentifiers="handlePrintIdentifiers"

@@ -1,5 +1,5 @@
 <template>
-  <div id="inventory-smart">
+<div id="inventory-smart" :style="themeStyle">
     <!-- Panel de plantas -->
   <PlantasPanel
     :author="author"
@@ -93,6 +93,7 @@ import UnsavedChangesModal from './components/UnsavedChangesModal.vue'
 import { useEditorMode } from './composables/useEditorMode'
 import { useEditorShortcuts } from './composables/useEditorShortcuts'
 import { useCatalogStore } from './stores/catalog'
+import { generatePalette } from './utils/colorPalette'
 
 const props = defineProps({
   configCanvas: {
@@ -126,6 +127,18 @@ const props = defineProps({
         typeof item.id === 'string' &&
         typeof item.nombre === 'string'
       )
+    }
+  },
+  themePalette: {
+    type: Object,
+    default: () => null,
+    validator: (value) => {
+      if (value === null) return true
+      if (typeof value !== 'object') return false
+      // Claves permitidas: colores base que se expanden a variantes Tailwind
+      // primary, secondary, success, iceBlue, danger, warning, info, neutral
+      const allowed = ['primary', 'secondary', 'success', 'iceBlue', 'danger', 'warning', 'info', 'neutral']
+      return Object.keys(value).every(k => allowed.includes(k) && typeof value[k] === 'string')
     }
   },
   author: {
@@ -162,6 +175,43 @@ const servicesStore = useServicesStore()
 const { ensureEditable } = useEditorMode()
 const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 const catalogStore = useCatalogStore()
+
+// Mapea claves de la prop a los prefijos de variables del @theme actual
+const THEME_KEY_TO_PREFIX = {
+  primary: 'primary',          // --color-primary[...]
+  secondary: 'primary-gray',   // --color-primary-gray[...]
+  success: 'success',          // --color-success[...]
+  danger: 'danger',            // --color-danger[...]
+  warning: 'warning',          // --color-warning[...]
+  info: 'info',                // --color-info[...]
+  neutral: 'primary-gray'      // alias para neutral sobre la escala gris
+}
+
+const buildThemeVars = (paletteProp) => {
+  if (!paletteProp || typeof paletteProp !== 'object') return {}
+  const vars = {}
+  for (const [key, hex] of Object.entries(paletteProp)) {
+    const prefix = THEME_KEY_TO_PREFIX[key]
+    if (!prefix || typeof hex !== 'string') continue
+    try {
+      const shades = generatePalette(hex)
+      // Establecer base (500) como --color-<prefix>
+      const base = shades.find(s => s.step === 500) || null
+      if (base) vars[`--color-${prefix}`] = base.hex
+      // Establecer rangos típicos 100-900
+      const steps = [50,100,200,300,400,500,600,700,800,900,950]
+      for (const step of steps) {
+        const item = shades.find(s => s.step === step)
+        if (item) vars[`--color-${prefix}-${step}`] = item.hex
+      }
+    } catch (e) {
+      console.warn('No se pudo generar paleta para', key, e)
+    }
+  }
+  return vars
+}
+
+const themeStyle = computed(() => buildThemeVars(props.themePalette))
 
 // ======= Gestión de Servicios Externos =======
 // Registrar servicios externos en la store cuando cambien las props
@@ -496,6 +546,8 @@ watch(
 <style>
 @import 'tailwindcss';
 
+
+/* DEFAULT THEME PALETTE */
 /* Ignorar warning de unknown at rule @theme */
 @theme {
   --color-primary: #1c1e4d;
@@ -509,27 +561,16 @@ watch(
   --color-primary-800: #1a1b4a;
   --color-primary-900: #0d0e2a;
 
-  --color-primary-gray: #202939;
-  --color-primary-gray-100: #f5f6fa;
-  --color-primary-gray-200: #e5e7eb;
-  --color-primary-gray-300: #d1d5db;
-  --color-primary-gray-400: #9ca3af;
-  --color-primary-gray-500: #6b7280;
-  --color-primary-gray-600: #4b5563;
-  --color-primary-gray-700: #374151;
-  --color-primary-gray-800: #1f2937;
-  --color-primary-gray-900: #111827;
-
-  --color-ice-blue: #e5e7eb;
-  --color-ice-blue-100: #f9fafb;
-  --color-ice-blue-200: #f3f4f6;
-  --color-ice-blue-300: #e5e7eb;
-  --color-ice-blue-400: #d1d5db;
-  --color-ice-blue-500: #9ca3af;
-  --color-ice-blue-600: #6b7280;
-  --color-ice-blue-700: #4b5563;
-  --color-ice-blue-800: #374151;
-  --color-ice-blue-900: #1f2937;
+  --color-secondary: #e5e7eb;
+  --color-secondary-100: #f9fafb;
+  --color-secondary-200: #f3f4f6;
+  --color-secondary-300: #e5e7eb;
+  --color-secondary-400: #d1d5db;
+  --color-secondary-500: #9ca3af;
+  --color-secondary-600: #6b7280;
+  --color-secondary-700: #4b5563;
+  --color-secondary-800: #374151;
+  --color-secondary-900: #1f2937;
 
   --color-success: #4ba345;
   --color-success-100: #ecf9f0;
@@ -541,6 +582,42 @@ watch(
   --color-success-700: #276b3e;
   --color-success-800: #164f27;
   --color-success-900: #0b3114;
+
+  /* Danger (rojos) */
+  --color-danger: #ef4444;
+  --color-danger-100: #fee2e2;
+  --color-danger-200: #fecaca;
+  --color-danger-300: #fca5a5;
+  --color-danger-400: #f87171;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+  --color-danger-800: #991b1b;
+  --color-danger-900: #7f1d1d;
+
+  /* Warning (ámbar) */
+  --color-warning: #f59e0b;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #fbbf24;
+  --color-warning-500: #f59e0b;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-warning-800: #92400e;
+  --color-warning-900: #78350f;
+
+  /* Info (celestes) */
+  --color-info: #0ea5e9;
+  --color-info-100: #e0f2fe;
+  --color-info-200: #bae6fd;
+  --color-info-300: #7dd3fc;
+  --color-info-400: #38bdf8;
+  --color-info-500: #0ea5e9;
+  --color-info-600: #0284c7;
+  --color-info-700: #0369a1;
+  --color-info-800: #075985;
+  --color-info-900: #0c4a6e;
 }
 
 :root {
