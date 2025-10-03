@@ -55,6 +55,7 @@
                 :frameBBox="previewFrameBBox"
                 :adding="adding"
                 :deleting="deleting"
+                :isInfinite="local.isInfinite"
                 @update:polygon="onPolygonUpdate"
                 @notice="(newNotice) => (notice = newNotice)"
                 class="h-full w-full"

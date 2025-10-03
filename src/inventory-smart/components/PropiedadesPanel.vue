@@ -19,7 +19,7 @@
       </button>
     </div>
 
-    <div v-if="elementoSeleccionado" class="flex-1 overflow-y-auto p-3">
+    <div v-if="elementoSeleccionado" class="flex-1 overflow-y-auto overflow-x-hidden p-3">
       <fieldset
         class="properties-fieldset"
         :disabled="propertiesDisabled"
@@ -116,7 +116,7 @@
 
             <!-- Orientación (oculta para pasillos y circulares) -->
             <div v-if="!esPasillo && !esCircular">
-              <label class="block text-xs font-medium text-gray-600 mb-1">Orientación</label>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Cara frontal</label>
               <select
                 v-model.number="edited.orientacion"
                 :disabled="isSaving || isElementRestricted"
@@ -124,10 +124,9 @@
                 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
                 disabled:cursor-not-allowed disabled:text-gray-500 cursor-pointer"
               >
-                <option :value="0">0°</option>
-                <option :value="90">90°</option>
-                <option :value="180">180°</option>
-                <option :value="270">270°</option>
+                <option v-for="opt in ORIENTACIONES" :key="opt.id" :value="opt.id">
+                  {{ opt.nombre }}
+                </option>
               </select>
               <p class="text-xs text-gray-500 mt-1">
                 Indica el lado de referencia del elemento para su orientación visual.
@@ -539,7 +538,7 @@ const emit = defineEmits(['showIdentifier'])
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
-import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO } from '@/inventory-smart/utils/constants'
+import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, ORIENTACIONES } from '@/inventory-smart/utils/constants'
 import { deepClone, deepEqual, makePatch } from '@/inventory-smart/utils/object'
 import { useToast } from '@/inventory-smart/composables/useToast.js'
 import ContainerProductsList from './ContainerProductsList.vue'
@@ -1672,5 +1671,32 @@ onBeforeRouteLeave(async (to, from, next) => {
   cursor: not-allowed;
 }
 
-/* No custom styles */
+/* Prevenir overflow horizontal en elementos de texto */
+.properties-fieldset p,
+.properties-fieldset li,
+.properties-fieldset span {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+  white-space: normal;
+}
+
+/* Asegurar que los inputs y selects no se desborden */
+.properties-fieldset input,
+.properties-fieldset select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Prevenir overflow en barras de progreso y elementos flex */
+.properties-fieldset .flex {
+  min-width: 0;
+}
+
+/* Asegurar que los elementos con texto largo se ajusten suavemente */
+.properties-fieldset [class*="text-"] {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+}
 </style>

@@ -354,10 +354,10 @@ export const DEFAULT_TIPOS_PISO = [{ id: 'piso', nombre: 'Piso' }]
 export const TODAS_LAS_CATEGORIAS = [...DEFAULT_TIPOS_CUARTO, ...DEFAULT_TIPOS_ESPACIO, ...DEFAULT_TIPOS_CONTENEDOR, ...DEFAULT_TIPOS_PISO]
 
 export const ORIENTACIONES = [
-  { id: '0', nombre: '0°' },
-  { id: '90', nombre: '90°' },
-  { id: '180', nombre: '180°' },
-  { id: '270', nombre: '270°' },
+  { id: '0', nombre: 'Abajo' },
+  { id: '90', nombre: 'Derecha' },
+  { id: '180', nombre: 'Arriba' },
+  { id: '270', nombre: 'Izquierda' },
 ]
 
 export const puedeContener = (tipoPadre, tipoHijo) => {

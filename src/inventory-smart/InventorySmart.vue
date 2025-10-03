@@ -72,6 +72,14 @@
       @close="handleIdentifyEslClose"
       @save="handleIdentifyEslSave"
     />
+
+    <!-- Alerta de contexto de navegación -->
+    <ContextAlert
+      :show="contextAlert.showAlert.value"
+      :message="contextAlert.alertMessage.value"
+      :duration="contextAlert.alertDuration.value"
+      @close="contextAlert.hideAlert"
+    />
   </div>
 </template>
 
@@ -85,12 +93,14 @@ import NavegacionJerarquica from './components/NavegacionJerarquica.vue'
 import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import ManagmentFloorRoomPropertiesModal from './components/modals/ManagmentFloorRoomPropertiesModal.vue'
 import IdentifyEslModal from './components/modals/IdentifyEslModal.vue'
+import ContextAlert from './components/ContextAlert.vue'
 import { useCanvasImportExport } from './composables/useCanvasImportExport'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
 import { useDeleteElement } from './composables/useDeleteElement'
 import { useAutoPaste } from './composables/useAutoPaste'
 import { useToast } from './composables/useToast'
+import { useContextAlert } from './composables/useContextAlert'
 import ToastContainer from './components/ToastContainer.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import LoaderOverlay from './components/LoaderOverlay.vue'
@@ -184,6 +194,8 @@ const { ensureEditable } = useEditorMode()
 const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 const catalogStore = useCatalogStore()
 
+// Inicializar sistema de alertas de contexto
+const contextAlert = useContextAlert()
 
 // Estado reactivo para saber si es móvil
 const isMobileDevice = ref(false)
