@@ -15,11 +15,11 @@
 
 <template>
   <div class="bg-white border-b border-gray-200 px-4 py-2 shadow-sm">
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 flex-wrap md:flex-nowrap justify-center md:justify-between">
       <!-- Contenedor de plantas y botón agregar - alineado a la izquierda -->
-      <div class="flex items-center gap-3 plantas-container">
+      <div class="flex justify-center items-center gap-3 plantas-container">
         <!-- Versión móvil: dropdown de plantas (lg y abajo) -->
-        <div class="relative w-full lg:hidden" ref="mobileDropdownRef">
+        <div class="relative w-auto lg:hidden" ref="mobileDropdownRef">
           <button
             type="button"
             class="w-full flex items-center justify-between p-3 rounded-lg border-2 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-colors cursor-pointer min-h-[56px] min-w-[280px]"
@@ -40,15 +40,16 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-          <div v-if="mobileDropdownOpen" class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto min-w-[280px]">
+          <div v-if="mobileDropdownOpen" class="absolute z-20 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto w-[280px]">
             <ul class="p-2 space-y-2">
               <li
                 v-for="planta in canvasStore.plantas"
+                class="min-h-[56px] w-[260px]"
                 :key="planta.id"
               >
                 <div
                   :class="[
-                    'w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all min-h-[56px] min-w-[280px]',
+                    'w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all',
                     planta.id === canvasStore.plantaActiva ? 'bg-primary-200 border-primary-200' : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
                   ]"
                 >
@@ -83,7 +84,7 @@
               <li v-if="canvasStore.modoEdicion">
                 <button
                   type="button"
-                  class="w-full flex items-center gap-3 p-3 rounded-lg border-2 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-colors cursor-pointer min-h-[56px] min-w-[280px]"
+                  class="flex items-center gap-3 p-3 rounded-lg border-2 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-colors cursor-pointer min-h-[56px] w-[260px]"
                   @click.prevent="handleCrearNuevoPiso; mobileDropdownOpen = false"
                 >
                   <div class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-primary">
@@ -197,12 +198,12 @@
       </div>
 
       <!-- Espacio flexible para empujar las acciones hacia la derecha -->
-      <div class="flex-1"></div>
+      <div class="flex-1 hidden md:block"></div>
 
       <!-- Separador visual -->
-      <div class="w-px h-8 bg-gray-300 separador-visual"></div>
+      <div class="w-px h-8 bg-gray-300 separador-visual hidden md:block"></div>
 
-      <div class="flex items-center gap-2 lg:gap-3 flex-wrap justify-end">
+      <div class="flex items-center gap-2 md:gap-3 flex-wrap justify-center md:justify-end">
         <!-- -- -- -->
         <!-- ACCIONES PARA PRUEBAS -- NO BORRAR -- -->
         <!-- <UiTooltip
@@ -241,10 +242,10 @@
           </button>
 
         <!-- Botón Todos los identificadores -->
-        <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Todos los identificadores" position="bottom" :delay="200">
+        <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Imprimir todos los identificadores" position="bottom" :delay="200">
           <button
             type="button"
-            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
+            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 bg-primary text-gray-100 hover:text-white hover:bg-primary rounded-lg transition-colors cursor-pointer"
             @click="emitirIdentificadores"
           >
             <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -253,7 +254,7 @@
                 d="M19 8h-1V3H6v5H5c-1.1 0-2 .9-2 2v5h3v4h12v-4h3v-5c0-1.1-.9-2-2-2zM8 5h8v3H8V5zm8 14H8v-4h8v4zm1-6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"
               />
             </svg>
-            <span class="ml-0 keep-all text-nowrap hidden lg:inline">Todos los identificadores</span>
+            <span class="ml-0 keep-all text-nowrap hidden lg:inline">Imprimir</span>
           </button>
         </UiTooltip>
 
@@ -266,7 +267,7 @@
         >
           <button
             type="button"
-:class="[...eslButtonClasses, 'p-2 lg:px-4 lg:py-2']"
+            :class="[...eslButtonClasses, 'p-2 lg:py-2']"
             @click="toggleEslMode"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -277,7 +278,7 @@
                 d="M5 5v6a2 2 0 00.586 1.414l7 7a2 2 0 002.828 0l4-4a2 2 0 000-2.828l-7-7A2 2 0 0011 5H5z"
               />
             </svg>
-            <span class="hidden lg:inline">{{ eslButtonLabel }}</span>
+            <span :class="!canvasStore.modoConfigurarEsl ? 'hidden lg:inline' : ''">{{ eslButtonLabel }}</span>
           </button>
         </UiTooltip>
 
@@ -286,10 +287,8 @@
         <UiTooltip v-if="!canvasStore.modoConfigurarEsl" :label="modoEdicionTooltip" position="bottom" :delay="200">
           <button
             type="button"
-            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 rounded-lg bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray transition-colors cursor-pointer"
+            class="inline-flex items-center justify-center gap-2 p-2 lg:py-2 rounded-lg bg-primary text-gray-100 hover:text-white hover:bg-primary transition-colors cursor-pointer"
             @click="canvasStore.toggleModoEdicion()"
-            :aria-label="modoEdicionTooltip"
-            :title="modoEdicionTooltip"
           >
             <svg v-if="!canvasStore.modoEdicion" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -305,7 +304,7 @@
         <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Historial de cambios" position="bottom" :delay="200">
           <button
             type="button"
-            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
+            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 bg-primary text-gray-100 hover:text-white hover:bg-primary rounded-lg transition-colors cursor-pointer"
             @click="openChangeHistoryModal"
           >
             <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -322,10 +321,10 @@
         <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Guardar cambios actuales" position="bottom" :delay="200">
           <button
             type="button"
-            class="inline-flex items-center gap-2 px-4 py-2 bg-success hover:bg-success-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
+            class="inline-flex items-center gap-2 px-2 py-2 bg-success hover:bg-success-600 text-white rounded-lg shadow-sm hover:shadow transition-colors cursor-pointer"
             @click="guardarCambios"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -333,7 +332,7 @@
                 d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
               />
             </svg>
-            <span class="text-nowrap">Guardar Cambios</span>
+            <span class="text-nowrap hidden lg:inline">Guardar Cambios</span>
           </button>
         </UiTooltip>
       </div>
@@ -657,7 +656,7 @@ const eslButtonLabel = computed(() =>
 )
 
 const eslButtonClasses = computed(() => [
-  'inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors cursor-pointer',
+  'inline-flex items-center justify-center gap-2 px-2 py-2 rounded-lg transition-colors cursor-pointer',
   canvasStore.modoConfigurarEsl
     ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
     : 'bg-gray text-white hover:bg-ice-blue-300 hover:text-white',
