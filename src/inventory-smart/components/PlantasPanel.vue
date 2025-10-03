@@ -18,8 +18,90 @@
     <div class="flex items-center gap-3">
       <!-- Contenedor de plantas y botón agregar - alineado a la izquierda -->
       <div class="flex items-center gap-3 plantas-container">
-        <!-- Contenedor de plantas scrolleable -->
-        <div class="flex overflow-x-auto space-x-3 plantas-scroll-container">
+        <!-- Versión móvil: dropdown de plantas (lg y abajo) -->
+        <div class="relative w-full lg:hidden" ref="mobileDropdownRef">
+          <button
+            type="button"
+            class="w-full flex items-center justify-between p-3 rounded-lg border-2 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-colors cursor-pointer min-h-[56px] min-w-[280px]"
+            @click="mobileDropdownOpen = !mobileDropdownOpen"
+          >
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-primary">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                </svg>
+              </div>
+              <div class="text-left">
+                <h3 class="text-sm font-semibold text-gray-800">{{ activePlanta?.nombre || 'Selecciona planta' }}</h3>
+                <p class="text-xs text-gray-500 m-0">{{ activePlanta ? contarElementosEnPlanta(activePlanta.id) + ' elementos' : '' }}</p>
+              </div>
+            </div>
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <div v-if="mobileDropdownOpen" class="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto min-w-[280px]">
+            <ul class="p-2 space-y-2">
+              <li
+                v-for="planta in canvasStore.plantas"
+                :key="planta.id"
+              >
+                <div
+                  :class="[
+                    'w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all min-h-[56px] min-w-[280px]',
+                    planta.id === canvasStore.plantaActiva ? 'bg-primary-200 border-primary-200' : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                  ]"
+                >
+                  <button
+                    type="button"
+                    class="flex items-center gap-3 text-left flex-1"
+                    @click="seleccionarPlanta(planta.id); mobileDropdownOpen = false"
+                  >
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-primary">
+                      <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                      </svg>
+                    </div>
+                    <div class="text-left">
+                      <h3 class="text-sm font-semibold text-gray-800">{{ planta.nombre }}</h3>
+                      <p class="text-xs text-gray-500 m-0">{{ contarElementosEnPlanta(planta.id) }} elementos</p>
+                    </div>
+                  </button>
+                  <UiTooltip class="relative ml-2" label="Opciones de planta" :delay="300" position="left">
+                    <button
+                      type="button"
+                      class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-primary-200 transition-colors cursor-pointer"
+                      @click.stop="toggleMenuPlanta(planta.id, $event)"
+                    >
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                      </svg>
+                    </button>
+                  </UiTooltip>
+                </div>
+              </li>
+              <li v-if="canvasStore.modoEdicion">
+                <button
+                  type="button"
+                  class="w-full flex items-center gap-3 p-3 rounded-lg border-2 bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 transition-colors cursor-pointer min-h-[56px] min-w-[280px]"
+                  @click.prevent="handleCrearNuevoPiso; mobileDropdownOpen = false"
+                >
+                  <div class="w-10 h-10 rounded-full flex items-center justify-center text-white bg-primary">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                  <div class="text-left">
+                    <h3 class="text-sm font-semibold text-gray-800 leading-snug">Crear nuevo piso de almacén</h3>
+                  </div>
+                </button>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Contenedor de plantas scrolleable (oculto en lg y abajo) -->
+        <div class="hidden lg:flex overflow-x-auto space-x-3 plantas-scroll-container">
           <!-- Tarjetas de plantas -->
           <div
             v-for="planta in canvasStore.plantas"
@@ -120,7 +202,7 @@
       <!-- Separador visual -->
       <div class="w-px h-8 bg-gray-300 separador-visual"></div>
 
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 lg:gap-3 flex-wrap justify-end">
         <!-- -- -- -->
         <!-- ACCIONES PARA PRUEBAS -- NO BORRAR -- -->
         <!-- <UiTooltip
@@ -149,17 +231,20 @@
           <button
             v-if="!canvasStore.modoConfigurarEsl"
             type="button"
-            class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500 rounded-lg transition-colors cursor-pointer"
+            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500 rounded-lg transition-colors cursor-pointer"
             @click="onBack"
           >
-            <span>Regresar</span>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            <span class="hidden lg:inline">Regresar</span>
           </button>
 
         <!-- Botón Todos los identificadores -->
         <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Todos los identificadores" position="bottom" :delay="200">
           <button
             type="button"
-            class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
+            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
             @click="emitirIdentificadores"
           >
             <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -168,7 +253,7 @@
                 d="M19 8h-1V3H6v5H5c-1.1 0-2 .9-2 2v5h3v4h12v-4h3v-5c0-1.1-.9-2-2-2zM8 5h8v3H8V5zm8 14H8v-4h8v4zm1-6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"
               />
             </svg>
-            <span class="ml-0 keep-all text-nowrap">Todos los identificadores</span>
+            <span class="ml-0 keep-all text-nowrap hidden lg:inline">Todos los identificadores</span>
           </button>
         </UiTooltip>
 
@@ -181,7 +266,7 @@
         >
           <button
             type="button"
-            :class="eslButtonClasses"
+:class="[...eslButtonClasses, 'p-2 lg:px-4 lg:py-2']"
             @click="toggleEslMode"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -192,23 +277,35 @@
                 d="M5 5v6a2 2 0 00.586 1.414l7 7a2 2 0 002.828 0l4-4a2 2 0 000-2.828l-7-7A2 2 0 0011 5H5z"
               />
             </svg>
-            <span>{{ eslButtonLabel }}</span>
+            <span class="hidden lg:inline">{{ eslButtonLabel }}</span>
           </button>
         </UiTooltip>
 
         <!-- Toggle modo edición -->
+        <!-- Botón Editar/Finalizar configuración con icono y estilo unificado -->
         <UiTooltip v-if="!canvasStore.modoConfigurarEsl" :label="modoEdicionTooltip" position="bottom" :delay="200">
-          <EditModeToggle
+          <button
+            type="button"
+            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 rounded-lg bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray transition-colors cursor-pointer"
+            @click="canvasStore.toggleModoEdicion()"
             :aria-label="modoEdicionTooltip"
             :title="modoEdicionTooltip"
-          />
+          >
+            <svg v-if="!canvasStore.modoEdicion" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <span class="hidden lg:inline">{{ canvasStore.modoEdicion ? 'Finalizar' : 'Editar configuración' }}</span>
+          </button>
         </UiTooltip>
 
         <!-- Botón Historial de cambios -->
         <UiTooltip v-if="!canvasStore.modoConfigurarEsl" label="Historial de cambios" position="bottom" :delay="200">
           <button
             type="button"
-            class="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
+            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 bg-primary-gray text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer"
             @click="openChangeHistoryModal"
           >
             <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -217,7 +314,7 @@
                 d="M12 21q-3.15 0-5.575-1.912T3.275 14.2q-.1-.375.15-.687t.675-.363q.4-.05.725.15t.45.6q.6 2.25 2.475 3.675T12 19q2.925 0 4.963-2.037T19 12t-2.037-4.962T12 5q-1.725 0-3.225.8T6.25 8H8q.425 0 .713.288T9 9t-.288.713T8 10H4q-.425 0-.712-.288T3 9V5q0-.425.288-.712T4 4t.713.288T5 5v1.35q1.275-1.6 3.113-2.475T12 3q1.875 0 3.513.713t2.85 1.924t1.925 2.85T21 12t-.712 3.513t-1.925 2.85t-2.85 1.925T12 21m1-9.4l2.5 2.5q.275.275.275.7t-.275.7t-.7.275t-.7-.275l-2.8-2.8q-.15-.15-.225-.337T11 11.975V8q0-.425.288-.712T12 7t.713.288T13 8z"
               />
             </svg>
-            <span class="ml-0">Historial</span>
+            <span class="ml-0 hidden lg:inline">Historial</span>
           </button>
         </UiTooltip>
 
@@ -516,14 +613,13 @@
 // Definir emits (agregado 'back' y 'showIdentifiers')
 const emit = defineEmits(['configChanged', 'back', 'showIdentifiers'])
 
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { useAutoSave } from '@/inventory-smart/composables/useAutoSave'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import ImportExportModal from './ImportExportModal.vue'
 import ChangeHistoryModal from './ChangeHistoryModal.vue'
-import EditModeToggle from './EditModeToggle.vue'
 import {
   usePlantResizeGuard,
   pack as packShelf,
@@ -725,6 +821,20 @@ const handleCrearNuevoPiso = () => {
   }
   canvasStore.abrirEditor()
 }
+
+// Dropdown móvil de plantas
+const mobileDropdownOpen = ref(false)
+const mobileDropdownRef = ref(null)
+const activePlanta = computed(() => canvasStore.plantas.find((p) => p.id === canvasStore.plantaActiva) || null)
+
+const handleDocClickMobile = (e) => {
+  if (!mobileDropdownOpen.value) return
+  const el = mobileDropdownRef.value
+  if (el && !el.contains(e.target)) mobileDropdownOpen.value = false
+}
+
+onMounted(() => document.addEventListener('click', handleDocClickMobile))
+onBeforeUnmount(() => document.removeEventListener('click', handleDocClickMobile))
 
 // Métodos para el menú desplegable
 const toggleMenuPlanta = (plantaId, event) => {
