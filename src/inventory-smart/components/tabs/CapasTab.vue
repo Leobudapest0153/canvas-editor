@@ -278,7 +278,14 @@ const showAuraElement = (elementoId) => {
     return;
   }
   // Primero enfocar (zoom+pan) para garantizar que el nodo esté en viewport
-  canvasStore.focusElemento(elementoId, { paddingPx: 60, fitRatio: 0.95, animate: true, duration: 450 });
+  // offsetRight: 320 = ancho del panel de propiedades que se abrirá después del focus
+  canvasStore.focusElemento(elementoId, {
+    paddingPx: 60,
+    fitRatio: 0.95,
+    animate: true,
+    duration: 450,
+    offsetRight: 320
+  });
   // Luego (en el siguiente frame) destacar para tomar bounding correcto tras animación inicial
   requestAnimationFrame(() => canvasStore.destacarElemento(elementoId));
   // Seleccionar
