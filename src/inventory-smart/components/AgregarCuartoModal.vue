@@ -789,6 +789,26 @@ watch(
   }
 )
 
+// Helpers numéricos seguros para 2 decimales (centésimas de metro)
+const toCents = (n) => {
+  const v = Number(n)
+  return Number.isFinite(v) ? Math.round(v * 100) : 0
+}
+const fromCents = (c) => {
+  return Math.round(c) / 100
+}
+const round2 = (n) => fromCents(toCents(n))
+
+// Distribuye un total (en unidades enteras) entre "parts" retornando un arreglo cuya suma exacta
+// coincide con el total. Útil para evitar 800/3 -> 266.67*3 = 800.01. Se hace con enteros.
+const distributeInt = (totalInt, parts) => {
+  if (!Number.isInteger(totalInt) || parts <= 0) return Array.from({ length: Math.max(0, parts) }, () => 0)
+  const base = Math.floor(totalInt / parts)
+  const rem = totalInt % parts
+  const arr = Array.from({ length: parts }, (_, i) => base + (i < rem ? 1 : 0))
+  return arr
+}
+
 const ensureTouchedForLevel = (nivel) => {
   if (!nivel._touched) nivel._touched = { tiposProductos: false, tipoZona: false, nombre: false }
   return nivel._touched
@@ -863,62 +883,83 @@ const autoCompletarDimensionesNiveles = () => {
   pisosNiveles.value.forEach((p, idx) => {
     const pref = props.modo === 'cuarto' ? 'Piso' : 'Nivel'
     if (!p.nombre || !p.nombre.trim()) p.nombre = `${pref} ${idx + 1}`
-    if (!(Number(p.largo) > 0)) p.largo = largoG
-    if (!(Number(p.ancho) > 0)) p.ancho = anchoG
+    if (!(Number(p.largo) > 0)) p.largo = round2(largoG)
+    else p.largo = round2(p.largo)
+    if (!(Number(p.ancho) > 0)) p.ancho = round2(anchoG)
+    else p.ancho = round2(p.ancho)
   })
 
-  // Distribución de alto: los definidos se respetan, los no definidos se reparten del remanente
-  let sumaAltoDefinido = 0
+  // Distribución de alto (a 2 decimales exactos): los definidos se respetan (redondeados),
+  // los no definidos se reparten del remanente usando enteros (centésimas)
+  let sumaAltoDefCents = 0
   const nivelesAltoNoDef = []
   pisosNiveles.value.forEach((p) => {
     const a = Number(p.alto)
-    if (a > 0) sumaAltoDefinido += a
-    else nivelesAltoNoDef.push(p)
+    if (a > 0) {
+      // Asegurar 2 decimales
+      p.alto = round2(a)
+      sumaAltoDefCents += toCents(p.alto)
+    } else {
+      nivelesAltoNoDef.push(p)
+    }
   })
-  const remAlto = Math.max(altoG - sumaAltoDefinido, 0)
-  const cuotaAlto = nivelesAltoNoDef.length > 0 ? remAlto / nivelesAltoNoDef.length : 0
-  nivelesAltoNoDef.forEach((p) => {
-    p.alto = cuotaAlto
-  })
+  const totalAltoCents = toCents(altoG)
+  const remAltoCents = Math.max(totalAltoCents - sumaAltoDefCents, 0)
+  const partesAlto = nivelesAltoNoDef.length
+  if (partesAlto > 0) {
+    const distribAlto = distributeInt(remAltoCents, partesAlto)
+    nivelesAltoNoDef.forEach((p, i) => {
+      p.alto = fromCents(distribAlto[i])
+    })
+  }
 
-  // Distribución de capacidad de carga: mismo criterio que alto
-  let sumaCapDefinida = 0
+  // Distribución de capacidad de carga (enteros en kg): mismo criterio que alto
+  let sumaCapDefKg = 0
   const nivelesCapNoDef = []
   pisosNiveles.value.forEach((p) => {
     const c = Number(p.capacidadCarga)
-    if (c > 0) sumaCapDefinida += c
-    else nivelesCapNoDef.push(p)
+    if (c > 0) {
+      p.capacidadCarga = Math.round(c)
+      sumaCapDefKg += p.capacidadCarga
+    } else {
+      nivelesCapNoDef.push(p)
+    }
   })
-  const remCap = Math.max(capG - sumaCapDefinida, 0)
-  const cuotaCap = nivelesCapNoDef.length > 0 ? remCap / nivelesCapNoDef.length : 0
-  nivelesCapNoDef.forEach((p) => {
-    p.capacidadCarga = cuotaCap
-  })
+  const totalCapKg = Math.max(Math.round(capG), 0)
+  const remCapKg = Math.max(totalCapKg - sumaCapDefKg, 0)
+  const partesCap = nivelesCapNoDef.length
+  if (partesCap > 0) {
+    const distribCap = distributeInt(remCapKg, partesCap)
+    nivelesCapNoDef.forEach((p, i) => {
+      p.capacidadCarga = distribCap[i]
+    })
+  }
 }
 
-// Validaciones en tiempo real para niveles
-const eps = 1e-6
+// Validaciones en tiempo real para niveles usando enteros (centésimas para m, enteros para kg)
 const excesoAltoNiveles = computed(() => {
   const altoG = Number(dimensiones.value.alto)
   if (!(altoG > 0)) return false
-  const sumaAlto = pisosNiveles.value.reduce((acc, p) => acc + Number(p.alto || 0), 0)
-  return sumaAlto > altoG + eps
+  const totalCents = toCents(altoG)
+  const sumaCents = pisosNiveles.value.reduce((acc, p) => acc + toCents(p.alto || 0), 0)
+  return sumaCents > totalCents
 })
 const excesoCapacidadNiveles = computed(() => {
   const capG = Number(dimensiones.value.capacidadCarga)
   if (!(capG > 0)) return false
-  const sumaCap = pisosNiveles.value.reduce((acc, p) => acc + Number(p.capacidadCarga || 0), 0)
-  return sumaCap > capG + eps
+  const totalKg = Math.round(capG)
+  const sumaKg = pisosNiveles.value.reduce((acc, p) => acc + Math.round(p.capacidadCarga || 0), 0)
+  return sumaKg > totalKg
 })
 const excedeLargo = (p) => {
   const largoG = Number(dimensiones.value.largo)
   if (!(largoG > 0)) return false
-  return Number(p.largo) > largoG + eps
+  return toCents(p.largo) > toCents(largoG)
 }
 const excedeAncho = (p) => {
   const anchoG = Number(dimensiones.value.ancho)
   if (!(anchoG > 0)) return false
-  return Number(p.ancho) > anchoG + eps
+  return toCents(p.ancho) > toCents(anchoG)
 }
 
 // Métodos

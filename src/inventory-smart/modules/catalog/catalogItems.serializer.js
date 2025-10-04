@@ -1,10 +1,19 @@
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 
 // Exporta solo items con payload estructurado y catalogKind distinto de 'template'
+// IMPORTANTE: Solo exporta items creados por el usuario (source='user'), no los predefinidos
 export const exportCatalogItemsToDTO = (items = []) => {
   if (!Array.isArray(items)) return []
   return items
-    .filter(i => i && i.payload && i.payload.rootId && Array.isArray(i.payload.elements) && i.catalogKind && i.catalogKind !== 'template')
+    .filter(i =>
+      i &&
+      i.payload &&
+      i.payload.rootId &&
+      Array.isArray(i.payload.elements) &&
+      i.catalogKind &&
+      i.catalogKind !== 'template' &&
+      i.props?.source === 'user' // Solo items creados por el usuario
+    )
     .map((i) => {
       const payload = i.payload
       const elements = payload.elements
@@ -50,7 +59,9 @@ export const exportCatalogItemsToDTO = (items = []) => {
 
 // Importa y reconstruye items estructurados en catalog.items
 export const importCatalogItemsFromDTO = (dtos = []) => {
-  if (!Array.isArray(dtos) || dtos.length === 0) return { imported: 0, errors: [] }
+  if (!Array.isArray(dtos) || dtos.length === 0) {
+    return { imported: 0, errors: [] }
+  }
   const catalog = useCatalogStore()
   const result = { imported: 0, errors: [] }
   for (const dto of dtos) {
@@ -102,7 +113,11 @@ export const importCatalogItemsFromDTO = (dtos = []) => {
         orientacion: rootNode?.orientacion,
         capacidadCarga: rootNode?.capacidadCarga,
         payload: { rootId, elements },
-        props: { system: true, catalogVisible: true },
+        props: {
+          system: true,
+          catalogVisible: true,
+          source: 'user' // Marcar como creado por usuario al importar
+        },
       }
       const idx = catalog.items.findIndex(i => i.id === item.id)
       if (idx !== -1) catalog.items.splice(idx, 1, item)

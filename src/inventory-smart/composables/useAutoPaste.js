@@ -75,7 +75,6 @@ export function useAutoPaste() {
         !Number.isFinite(areaBounds.maxX) ||
         !Number.isFinite(areaBounds.minY) ||
         !Number.isFinite(areaBounds.maxY)) {
-      console.error('❌ areaBounds inválido en createOccupancyGrid:', areaBounds)
       return {
         grid: [[false]],
         gridWidth: 1,
@@ -90,7 +89,6 @@ export function useAutoPaste() {
 
     // 🛡️ VALIDACIÓN: Área debe ser positiva y razonable (máximo 100,000px)
     if (areaWidth <= 0 || areaHeight <= 0 || areaWidth > 100000 || areaHeight > 100000) {
-      console.error('❌ Dimensiones de área inválidas:', { areaWidth, areaHeight })
       return {
         grid: [[false]],
         gridWidth: 1,
@@ -106,7 +104,6 @@ export function useAutoPaste() {
     // 🛡️ VALIDACIÓN: Grid no debe exceder 1000x1000 (1 millón de celdas)
     const MAX_GRID_CELLS = 1000000
     if (gridWidth * gridHeight > MAX_GRID_CELLS) {
-      console.error('❌ Grid demasiado grande:', { gridWidth, gridHeight, total: gridWidth * gridHeight })
       // Aumentar gridResolution para reducir tamaño del grid
       const newResolution = Math.ceil(Math.sqrt((areaWidth * areaHeight) / MAX_GRID_CELLS))
       return createOccupancyGrid(areaBounds, neighbors, newResolution)
@@ -498,7 +495,6 @@ export function useAutoPaste() {
         !Number.isFinite(areaBounds.maxX) ||
         !Number.isFinite(areaBounds.minY) ||
         !Number.isFinite(areaBounds.maxY)) {
-      console.error('❌ areaBounds inválido en findAvailableSpace:', areaBounds)
       return { found: false }
     }
 
@@ -510,7 +506,6 @@ export function useAutoPaste() {
     // 🛡️ VALIDACIÓN: Element dimensions deben ser válidas
     if (!Number.isFinite(elementWidth) || !Number.isFinite(elementHeight) ||
         elementWidth <= 0 || elementHeight <= 0) {
-      console.error('❌ Dimensiones de elemento inválidas:', { elementWidth, elementHeight })
       return { found: false }
     }
 
@@ -520,7 +515,6 @@ export function useAutoPaste() {
     // 🛡️ VALIDACIÓN: Área debe tener dimensiones válidas
     if (!Number.isFinite(areaWidth) || !Number.isFinite(areaHeight) ||
         areaWidth <= 0 || areaHeight <= 0) {
-      console.error('❌ Dimensiones de área inválidas:', { areaWidth, areaHeight })
       return { found: false }
     }
 
@@ -731,27 +725,24 @@ export function useAutoPaste() {
 
     // 🛡️ VALIDACIÓN: Verificar que smallGridSize no sea 0 o negativo
     if (!Number.isFinite(smallGridSize) || smallGridSize <= 0) {
-      console.error('❌ smallGridSize inválido:', smallGridSize)
       return { found: false }
     }
 
     for (let y = areaBounds.minY; y <= areaBounds.maxY - elementHeight; y += smallGridSize) {
       // 🛡️ VALIDACIÓN: Prevenir bucles infinitos si y no incrementa
       if (!Number.isFinite(y)) {
-        console.error('❌ Valor y inválido en búsqueda exhaustiva:', y)
         return { found: false }
       }
 
       for (let x = areaBounds.minX; x <= areaBounds.maxX - elementWidth; x += smallGridSize) {
         // 🛡️ VALIDACIÓN: Prevenir bucles infinitos si x no incrementa
         if (!Number.isFinite(x)) {
-          console.error('❌ Valor x inválido en búsqueda exhaustiva:', x)
           return { found: false }
         }
 
         iterations++
         if (iterations > MAX_ITERATIONS) {
-          console.warn(`⚠️ Búsqueda exhaustiva cancelada después de ${MAX_ITERATIONS} iteraciones`)
+          console.warn(`Búsqueda exhaustiva cancelada después de ${MAX_ITERATIONS} iteraciones`)
           return { found: false }
         }
 

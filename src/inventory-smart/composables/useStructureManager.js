@@ -138,7 +138,11 @@ export function toCatalogItemFromStructure({
     ubicacion: root?.ubicacion || 'suelo',
     descripcion: description || root?.descripcion || '',
     icono: root?.icono || 'box',
-    props: { system: true, catalogVisible: true },
+    props: { 
+      system: true, 
+      catalogVisible: true,
+      source: 'user' // Todos los items creados desde el sistema son de usuario
+    },
     catalogKind: kind, // 'template' | 'room' | 'space' | 'item'
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -281,8 +285,12 @@ export function buildUpdatedCatalogItem(originalItem, form) {
   updated.id = originalItem.id
   updated.createdAt = originalItem.createdAt || updated.createdAt
   updated.updatedAt = new Date().toISOString()
-  // Si el original tenía props específicas, mezclarlas
-  updated.props = { ...(updated.props || {}), ...(originalItem.props || {}) }
+  // Si el original tenía props específicas, mezclarlas (preservar source)
+  updated.props = { 
+    ...(updated.props || {}), 
+    ...(originalItem.props || {}),
+    source: originalItem.props?.source || 'user' // Garantizar que source persiste
+  }
   return updated
 }
 

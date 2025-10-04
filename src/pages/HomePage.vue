@@ -114,12 +114,10 @@ const externalServices = ref([createContainerProductsService()])
 // Manejador para cuando se actualiza la configuración desde InventorySmart
 const handleConfigUpdated = (nuevaConfig) => {
   try {
-    // Actualizar la referencia local de la configuración
     currentConfig.value = nuevaConfig
     // DEV: Guardar en localStorage para simular persistencia
     localStorage.setItem(SERIALIZE_CONFIG.STORAGE_KEY, nuevaConfig)
     initialConfig.value = nuevaConfig
-
     // Al implementar aqui se enviaría a la API
   } catch (error) {
     console.error('Error al manejar la configuración actualizada:', error)
@@ -143,12 +141,10 @@ const handlePrintIdentifier = (value) => {
 onMounted(() => {
   // DEV: Simular carga desde localStorage
   const savedConfig = localStorage.getItem(SERIALIZE_CONFIG.STORAGE_KEY)
-  if (savedConfig) {
-    try {
-      initialConfig.value = savedConfig
-    } catch (error) {
-      console.error('Error al parsear la configuración guardada:', error)
-    }
+  try {
+    initialConfig.value = savedConfig
+  } catch (error) {
+    console.error('Error al parsear la configuración guardada:', error)
   }
 })
 </script>

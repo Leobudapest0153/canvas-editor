@@ -110,7 +110,11 @@ export const useCatalogStore = defineStore('catalog', () => {
         })
         // Preservar id y props del item original
         mapped.id = it.id
-        mapped.props = { ...(mapped.props || {}), ...(it.props || {}) }
+        mapped.props = {
+          ...(mapped.props || {}),
+          ...(it.props || {}),
+          source: 'predefined' // Marcar como predefinido
+        }
         mapped.createdAt = mapped.createdAt || new Date().toISOString()
         mapped.updatedAt = mapped.updatedAt || new Date().toISOString()
         return mapped
@@ -130,12 +134,17 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   // Función para actualizar elementos predefinidos desde props
   const setPredefinedElements = (predefinedElements) => {
+    // Guardar items de usuario antes de actualizar predefinidos
+    const userItems = items.value.filter(i => i?.props?.source === 'user')
+    // Obtener nuevos predefinidos
+    let newPredefined = []
     if (predefinedElements && Array.isArray(predefinedElements)) {
-      items.value = normalizePredefined(predefinedElements)
+      newPredefined = normalizePredefined(predefinedElements)
     } else {
       // Si no se proporcionan elementos, usar los por defecto
-      items.value = normalizePredefined(ELEMENTOS_PREDEFINIDOS)
+      newPredefined = normalizePredefined(ELEMENTOS_PREDEFINIDOS)
     }
+    items.value = [...newPredefined, ...userItems]
   }
 
   const baseSystemGuard = (item) =>
@@ -190,7 +199,7 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   const loadTemplatesFromLocalStorage = () => {
     try {
-      const raw = localStorage.getItem('inventory.templates')
+      const raw = localStorage.getItem('canvas_templates')
       templates.value = raw ? JSON.parse(raw) : []
     } catch {
       templates.value = []
@@ -199,7 +208,7 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   const saveTemplatesToLocalStorage = () => {
     try {
-      localStorage.setItem('inventory.templates', JSON.stringify(templates.value))
+      localStorage.setItem('canvas_templates', JSON.stringify(templates.value))
     } catch {
       /* ignore */
     }
