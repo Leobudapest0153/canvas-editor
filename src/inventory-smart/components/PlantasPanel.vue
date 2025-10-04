@@ -288,7 +288,7 @@
           <button
             type="button"
             class="inline-flex items-center justify-center gap-2 p-2 lg:py-2 rounded-lg bg-primary text-gray-100 hover:text-white hover:bg-primary transition-colors cursor-pointer"
-            @click="canvasStore.toggleModoEdicion()"
+            @click="cambiarModoEdicion"
           >
             <svg v-if="!canvasStore.modoEdicion" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -779,9 +779,6 @@ const guardarCambios = async () => {
       showToast('No puedes guardar si hay cambios pendientes de guardar', 'warn');
       return;
     }
-    console.log('\n========== [PlantasPanel] guardarCambios ==========')    
-    
-    // Capturar snapshot para historial de cambios ANTES de serializar
     try {
       const changeHistoryStore = useChangeHistoryStore()
       changeHistoryStore.recordSave(
@@ -794,31 +791,17 @@ const guardarCambios = async () => {
     } catch (e) {
       console.warn('No se pudo registrar historial de cambios', e)
     }
-
     const configSerializada = canvasStore.serialize(true)
-    
-    // Parse para inspeccionar contenido
-    try {
-      const parsed = JSON.parse(configSerializada)
-      console.log('[PlantasPanel] Serialized config contains:')
-      console.log('  - plantas:', parsed.plantas?.length || 0)
-      console.log('  - elementos:', parsed.elementos?.length || 0)
-      console.log('  - plantillas:', parsed.plantillas?.length || 0)
-      console.log('  - catalogItems:', parsed.catalogItems?.length || 0)
-      console.log('  - changeHistory:', parsed.changeHistory ? 'YES' : 'NO')
-      console.log('  - changeHistory entries:', parsed.changeHistory?.entries?.length || 0)
-    } catch (e) {
-      console.error('[PlantasPanel] Could not parse serialized config:', e)
-    }
-    
     emit('configChanged', configSerializada)
-    console.log('[PlantasPanel] Emitted configChanged event')
-    console.log('====================================================\n')
     showToast('Cambios guardados correctamente', 'success')
   } catch (error) {
-    console.error('Error al guardar cambios:', error)
     showToast('Error al guardar los cambios', 'error')
   }
+}
+
+const cambiarModoEdicion = () => {
+  canvasStore.toggleModoEdicion()
+  guardarCambios()
 }
 
 const seleccionarPlanta = (plantaId) => {

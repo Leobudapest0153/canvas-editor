@@ -830,7 +830,6 @@ const calcularCanvasAdaptativo = (elemento) => {
   // Selección múltiple: establecer array de IDs seleccionados
   const seleccionarElementosMultiple = (ids) => {
     if (!Array.isArray(ids)) {
-      console.warn('seleccionarElementosMultiple requiere un array de IDs')
       return
     }
     elementosSeleccionadosMultiple.value = [...ids]
@@ -1425,15 +1424,11 @@ const calcularCanvasAdaptativo = (elemento) => {
 
       // Si tiene padre (está dentro de un elemento), usar el alto del padre
       if (nuevoElemento.padre) {
-        console.log('Nuevo pasillo tiene padre:', nuevoElemento.padre)
-        console.log('Asignando alto de pasillo desde padre:', nuevoElemento.padre)
         const elementoPadre = elementos.value.find((el) => el.id === nuevoElemento.padre)
         if (elementoPadre?.dimensiones?.alto) {
           nuevoElemento.dimensiones.alto = elementoPadre.dimensiones.alto
-          console.log('Alto asignado desde padre:', nuevoElemento.dimensiones.alto)
         }
       } else {
-        console.log('Nuevo pasillo NO tiene padre, asignando alto desde planta')
         // Si no tiene padre, usar el alto de la planta
         const planta = plantas.value.find((p) => p.id === (nuevoElemento.plantaId || contextoNavegacion.value.id))
         if (planta?.dimensiones?.alto) {
@@ -1548,9 +1543,7 @@ const calcularCanvasAdaptativo = (elemento) => {
 
   const agregarElementoSinValidacion = (_id, nuevoElemento, saveHistory = true, description = 'Inserción sin validación') => {
     try {
-      console.log('[insertarElementoSinValidacion] Insertando elemento:', nuevoElemento)
       if (!nuevoElemento || !nuevoElemento.id) {
-        console.warn('[insertarElementoSinValidacion] Elemento inválido o sin id:', nuevoElemento);
         return false;
       }
 
@@ -1637,7 +1630,6 @@ const calcularCanvasAdaptativo = (elemento) => {
 
       return next.id;
     } catch (err) {
-      console.error('[insertarElementoSinValidacion] Error:', err);
       return false;
     }
   };
@@ -1767,16 +1759,16 @@ const calcularCanvasAdaptativo = (elemento) => {
           parsed.meta.metrics.totalCatalogItems = itemsDTO.length
         }
       }
-      
+
       // CRÍTICO: Agregar changeHistory al JSON final (se perdió en _serialize)
       if (state.changeHistory) {
         parsed.changeHistory = state.changeHistory
         if (parsed.meta?.metrics) {
-          parsed.meta.metrics.totalChangeHistoryEntries = 
+          parsed.meta.metrics.totalChangeHistoryEntries =
             state.changeHistory.entries?.length || 0
         }
       }
-      
+
       return JSON.stringify(parsed, null, 2)
     } catch (e) {
       console.warn('No se pudo post-procesar JSON para plantillas', e)
@@ -1790,10 +1782,6 @@ const calcularCanvasAdaptativo = (elemento) => {
    * @returns {boolean} true si la deserialización fue exitosa
    */
   const deserialize = (jsonString) => {
-    // Set flag to prevent watchers from persisting incomplete state during deserialization
-    isDeserializing.value = true
-    console.log('[useCanvasStore.deserialize] Setting isDeserializing=true')
-    
     try {
       const storeActions = {
         clearState: () => {
@@ -1878,16 +1866,11 @@ const calcularCanvasAdaptativo = (elemento) => {
         } catch (e) {
           // ignore change history import errors
         }
-        console.log('[useCanvasStore.deserialize] Processing plantillas and catalogItems')
         if (Array.isArray(parsed.plantillas) && parsed.plantillas.length > 0) {
-          console.log('[useCanvasStore.deserialize] Importing', parsed.plantillas.length, 'templates')
           importTemplatesFromDTO(parsed.plantillas)
         }
         if (Array.isArray(parsed.catalogItems) && parsed.catalogItems.length > 0) {
-          console.log('[useCanvasStore.deserialize] Importing', parsed.catalogItems.length, 'catalogItems')
           importCatalogItemsFromDTO(parsed.catalogItems)
-        } else {
-          console.log('[useCanvasStore.deserialize] No catalogItems to import')
         }
       } catch (e) {
         console.warn('No se pudieron importar plantillas', e)
@@ -1900,10 +1883,9 @@ const calcularCanvasAdaptativo = (elemento) => {
       }
 
       return ok
-    } finally {
-      // Always reset the flag, even if deserialization fails
-      isDeserializing.value = false
-      console.log('[useCanvasStore.deserialize] Setting isDeserializing=false')
+    } catch (error) {
+      console.error('Error al deserializar el estado:', error)
+      return false
     }
   }
 
@@ -1938,12 +1920,10 @@ const calcularCanvasAdaptativo = (elemento) => {
     }
     // El elemento es un padre
     if (['elementos', 'cuartos'].includes(elemento.tipo)) {
-      console.log('Vamos a editar un hijo guardando el id del padre:', idElemento);
       nivelAEditar.value = { padre: idElemento, tipo }
     }
     // El elemento es un nivel hijo
     if (['pisos', 'contenedores'].includes(elemento.tipo)) {
-      console.log('Vamos a editar un nivel hijo:', idElemento);
       nivelAEditar.value = { ...elemento }
     }
     gestionPisosPropiedadesModal.value = true;
@@ -1957,7 +1937,6 @@ const calcularCanvasAdaptativo = (elemento) => {
   const guardarCuartoNivelesPropiedades = (nivelActualizado, id) => {
 
     const parent = elementos.value.find(e => e.id === nivelAEditar.value.padre);
-    console.log('Parent del nivel a editar:', parent);
     if (nivelActualizado?.dimensiones?.alto > parent?.dimensiones?.alto) {
       showToast('La altura del nivel no puede exceder la altura del cuarto', 'error');
       return;
@@ -2026,8 +2005,6 @@ const calcularCanvasAdaptativo = (elemento) => {
       return;
     }
     if (res.status === 'ok' && preFit && preFit.ok === false) {
-       console.log('Hermanos OK, pero hijos no caben. Promoviendo a needs_confirmation.');
-
        res.status = 'needs_confirmation';
 
        if (res.draft) {
@@ -2706,7 +2683,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     const success = actualizarElementoSinValidacion(elementoId, { codigoEsl: trimmed })
     if (!success) return false
 
-    setCambiosNoAplicados(true)
+    // setCambiosNoAplicados(true)
     const descriptor = elemento.nombre || elemento.codigo || elementoId
     const accion = trimmed ? 'asignado' : 'limpiado'
     saveToHistory(`Código ESL ${accion}: ${descriptor}`)
@@ -2742,20 +2719,6 @@ const calcularCanvasAdaptativo = (elemento) => {
       }
     },
     { immediate: true },
-  )
-
-  // Flag to prevent persist during deserialization
-  const isDeserializing = ref(false)
-
-  watch(
-    () => modoEdicion.value,
-    () => {
-      // DISABLED: This watcher was causing data loss by persisting incomplete state
-      // Persistence now only happens via explicit save actions ("Guardar" button)
-      // The persist() function only saves plantas, elementos, and modoEdicion,
-      // but NOT plantillas, catalogItems, or changeHistory, causing data loss.
-      console.log('[useCanvasStore] modoEdicion changed to:', modoEdicion.value, '(auto-persist disabled)')
-    },
   )
 
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto

@@ -5,12 +5,12 @@ import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 export const exportCatalogItemsToDTO = (items = []) => {
   if (!Array.isArray(items)) return []
   return items
-    .filter(i => 
-      i && 
-      i.payload && 
-      i.payload.rootId && 
-      Array.isArray(i.payload.elements) && 
-      i.catalogKind && 
+    .filter(i =>
+      i &&
+      i.payload &&
+      i.payload.rootId &&
+      Array.isArray(i.payload.elements) &&
+      i.catalogKind &&
       i.catalogKind !== 'template' &&
       i.props?.source === 'user' // Solo items creados por el usuario
     )
@@ -59,13 +59,10 @@ export const exportCatalogItemsToDTO = (items = []) => {
 
 // Importa y reconstruye items estructurados en catalog.items
 export const importCatalogItemsFromDTO = (dtos = []) => {
-  console.log('[importCatalogItemsFromDTO] Called with', dtos?.length, 'items')
   if (!Array.isArray(dtos) || dtos.length === 0) {
-    console.log('[importCatalogItemsFromDTO] No items to import')
     return { imported: 0, errors: [] }
   }
   const catalog = useCatalogStore()
-  console.log('[importCatalogItemsFromDTO] Current catalog.items count:', catalog.items.length)
   const result = { imported: 0, errors: [] }
   for (const dto of dtos) {
     try {
@@ -116,8 +113,8 @@ export const importCatalogItemsFromDTO = (dtos = []) => {
         orientacion: rootNode?.orientacion,
         capacidadCarga: rootNode?.capacidadCarga,
         payload: { rootId, elements },
-        props: { 
-          system: true, 
+        props: {
+          system: true,
           catalogVisible: true,
           source: 'user' // Marcar como creado por usuario al importar
         },
@@ -130,8 +127,5 @@ export const importCatalogItemsFromDTO = (dtos = []) => {
       result.errors.push(`Error importando item ${dto?.id}: ${e.message}`)
     }
   }
-  console.log('[importCatalogItemsFromDTO] Finished. Imported:', result.imported, 'errors:', result.errors.length)
-  console.log('[importCatalogItemsFromDTO] Final catalog.items count:', catalog.items.length)
-  console.log('[importCatalogItemsFromDTO] User items in catalog:', catalog.items.filter(i => i?.props?.source === 'user').map(i => i.id))
   return result
 }

@@ -71,13 +71,13 @@ export function useLoader() {
    */
   const stopLoading = (operationId) => {
     if (!operationId) {
-      console.warn('⚠️ No se puede detener operación: ID no proporcionado')
+      console.warn('No se puede detener operación: ID no proporcionado')
       return false
     }
 
     const operation = loadingOperations.value.get(operationId)
     if (!operation) {
-      console.warn(`⚠️ No se encontró operación con ID: ${operationId}`)
+      console.warn(`No se encontró operación con ID: ${operationId}`)
       return false
     }
 

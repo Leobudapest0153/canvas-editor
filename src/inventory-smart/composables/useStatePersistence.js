@@ -582,8 +582,8 @@ export const useStatePersistence = () => {
             updatedAt: elementoData.updatedAt || new Date().toISOString(),
 
             // Configuración de espacios/contenedores
-            tiposProductos: Array.isArray(elementoData.tiposProductos) 
-              ? elementoData.tiposProductos 
+            tiposProductos: Array.isArray(elementoData.tiposProductos)
+              ? elementoData.tiposProductos
               : [],
             tipoZona: elementoData.tipoZona || null,
             permiteFragiles: Boolean(elementoData.permiteFragiles),
@@ -619,7 +619,7 @@ export const useStatePersistence = () => {
       storeActions.setInitialNavigation(primeraPlanta.id, primeraPlanta.nombre)
 
       if (elementosOmitidos > 0) {
-        console.warn(`⚠️ ${elementosOmitidos} elementos fueron omitidos debido a datos inválidos`)
+        console.warn(`${elementosOmitidos} elementos fueron omitidos debido a datos inválidos`)
       }
 
       return true

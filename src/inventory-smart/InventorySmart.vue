@@ -1,41 +1,42 @@
 <template>
-<div id="inventory-smart" :style="themeStyle">
+  <div id="inventory-smart" :style="themeStyle">
     <!-- Mensaje para móviles -->
-    <div v-if="isMobileDevice" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary">
+    <div
+      v-if="isMobileDevice"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary"
+    >
       <div class="bg-white/95 rounded-2xl p-10 max-w-md w-full text-center shadow-2xl">
         <div class="text-7xl mb-6">📱</div>
         <h2 class="text-slate-800 text-2xl font-semibold mb-6">Dispositivo no compatible</h2>
-        <p class="text-slate-600 text-lg leading-relaxed mb-3">Esta aplicación requiere una pantalla de al menos 768px de ancho.</p>
-        <p class="text-slate-600 text-lg leading-relaxed">Por favor, usa una tablet, laptop o computadora de escritorio.</p>
+        <p class="text-slate-600 text-lg leading-relaxed mb-3">
+          Esta aplicación requiere una pantalla de al menos 768px de ancho.
+        </p>
+        <p class="text-slate-600 text-lg leading-relaxed">
+          Por favor, usa una tablet, laptop o computadora de escritorio.
+        </p>
       </div>
     </div>
 
     <!-- Panel de plantas -->
-  <PlantasPanel
-    :author="author"
-    @configChanged="handleConfigChanged"
-    @back="handleBack"
-    @showIdentifiers="handleShowIdentifiers"
-  />
+    <PlantasPanel
+      :author="author"
+      @configChanged="handleConfigChanged"
+      @back="handleBack"
+      @showIdentifiers="handleShowIdentifiers"
+    />
 
     <!-- Navegación jerárquica -->
     <NavegacionJerarquica />
 
     <main class="app-main relative">
       <!-- Sidebar con tabs -->
-      <div
-        class="app-sidebar-left"
-        v-if="canvasStore.modoEdicion"
-      >
+      <div class="app-sidebar-left" v-if="canvasStore.modoEdicion">
         <SidebarPanel />
       </div>
 
       <!-- Canvas principal -->
       <div class="app-canvas">
-        <CanvasView
-          ref="canvasViewRef"
-          :safeRight="canvasStore.mostrarPropiedades ? 320 : 20"
-        />
+        <CanvasView ref="canvasViewRef" :safeRight="canvasStore.mostrarPropiedades ? 320 : 20" />
       </div>
 
       <!-- Panel de propiedades (superpuesto para no empujar el canvas) -->
@@ -65,7 +66,7 @@
     />
 
     <!-- Gestión de pisos de cuartos desde las propiedades -->
-    <ManagmentFloorRoomPropertiesModal/>
+    <ManagmentFloorRoomPropertiesModal />
 
     <IdentifyEslModal
       v-if="isIdentifyEslModalOpen"
@@ -126,14 +127,15 @@ const props = defineProps({
     validator: (value) => {
       if (value === null) return true
       if (!Array.isArray(value)) return false
-      return value.every(item =>
-        item &&
-        typeof item === 'object' &&
-        typeof item.id === 'string' &&
-        typeof item.nombre === 'string' &&
-        typeof item.tipo === 'string'
+      return value.every(
+        (item) =>
+          item &&
+          typeof item === 'object' &&
+          typeof item.id === 'string' &&
+          typeof item.nombre === 'string' &&
+          typeof item.tipo === 'string',
       )
-    }
+    },
   },
   supportedProductTypes: {
     type: Array,
@@ -141,13 +143,14 @@ const props = defineProps({
     validator: (value) => {
       if (value === null) return true
       if (!Array.isArray(value)) return false
-      return value.every(item =>
-        item &&
-        typeof item === 'object' &&
-        typeof item.id === 'string' &&
-        typeof item.nombre === 'string'
+      return value.every(
+        (item) =>
+          item &&
+          typeof item === 'object' &&
+          typeof item.id === 'string' &&
+          typeof item.nombre === 'string',
       )
-    }
+    },
   },
   themePalette: {
     type: Object,
@@ -155,9 +158,17 @@ const props = defineProps({
     validator: (value) => {
       if (value === null) return true
       if (typeof value !== 'object') return false
-      const allowed = ['primary', 'primaryGray', 'secondary', 'success', 'danger', 'warning', 'info']
-      return Object.keys(value).every(k => allowed.includes(k) && typeof value[k] === 'string')
-    }
+      const allowed = [
+        'primary',
+        'primaryGray',
+        'secondary',
+        'success',
+        'danger',
+        'warning',
+        'info',
+      ]
+      return Object.keys(value).every((k) => allowed.includes(k) && typeof value[k] === 'string')
+    },
   },
   author: {
     type: Object,
@@ -165,22 +176,23 @@ const props = defineProps({
     validator: (a) => {
       if (a == null) return true
       return typeof a.id === 'string' && typeof a.name === 'string'
-    }
+    },
   },
   externalServices: {
     type: Array,
     default: () => [],
     validator: (services) => {
       if (!Array.isArray(services)) return false
-      return services.every(service =>
-        service &&
-        typeof service.name === 'string' &&
-        service.type === 'container_products' &&
-        typeof service.handler === 'function'
+      return services.every(
+        (service) =>
+          service &&
+          typeof service.name === 'string' &&
+          service.type === 'container_products' &&
+          typeof service.handler === 'function',
       )
-    }
-  }
-})// Definir emits para comunicar cambios al componente padre
+    },
+  },
+}) // Definir emits para comunicar cambios al componente padre
 const emit = defineEmits(['configUpdated', 'back', 'printIdentifiers', 'printIdentifier'])
 
 const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
@@ -208,13 +220,13 @@ const updateMediaQuery = (e) => {
 
 // Mapea claves de la prop a los prefijos de variables del @theme actual
 const THEME_KEY_TO_PREFIX = {
-  primary: 'primary',          // --color-primary[...]
+  primary: 'primary', // --color-primary[...]
   primaryGray: 'primary-gray', // --color-primary-gray[...]
-  secondary: 'secondary',      // --color-secondary[...]
-  success: 'success',          // --color-success[...]
-  danger: 'danger',            // --color-danger[...]
-  warning: 'warning',          // --color-warning[...]
-  info: 'info',                // --color-info[...]
+  secondary: 'secondary', // --color-secondary[...]
+  success: 'success', // --color-success[...]
+  danger: 'danger', // --color-danger[...]
+  warning: 'warning', // --color-warning[...]
+  info: 'info', // --color-info[...]
 }
 
 const buildThemeVars = (paletteProp) => {
@@ -226,12 +238,12 @@ const buildThemeVars = (paletteProp) => {
     try {
       const shades = generatePalette(hex)
       // Establecer base (500) como --color-<prefix>
-      const base = shades.find(s => s.step === 500) || null
+      const base = shades.find((s) => s.step === 500) || null
       if (base) vars[`--color-${prefix}`] = base.hex
       // Establecer rangos típicos 100-900
-      const steps = [50,100,200,300,400,500,600,700,800,900,950]
+      const steps = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]
       for (const step of steps) {
-        const item = shades.find(s => s.step === step)
+        const item = shades.find((s) => s.step === step)
         if (item) vars[`--color-${prefix}-${step}`] = item.hex
       }
     } catch (e) {
@@ -255,7 +267,7 @@ watch(
       showToast('Error al registrar servicios externos', 'error')
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 
 // Función auxiliar para llamar servicios externos
@@ -276,7 +288,7 @@ const externalServicesAPI = {
   hasServices: servicesStore.hasServices,
   clearCache: servicesStore.clearCache,
   isServiceLoading: servicesStore.isServiceLoading,
-  getServiceError: servicesStore.getServiceError
+  getServiceError: servicesStore.getServiceError,
 }
 
 const canvasViewRef = ref(null)
@@ -285,34 +297,14 @@ const canvasViewRef = ref(null)
 // Manejador para cuando PlantasPanel emite cambios de configuración
 const handleConfigChanged = (configSerializada) => {
   try {
-    console.log('\n========== [InventorySmart] handleConfigChanged ==========')    
     // Validar que se recibió una configuración
     if (!configSerializada) {
       console.warn('No se recibió configuración para actualizar')
       return
     }
-
-    // Parse para inspeccionar contenido
-    try {
-      const parsed = JSON.parse(configSerializada)
-      console.log('[InventorySmart] Config contains:')
-      console.log('  - plantas:', parsed.plantas?.length || 0)
-      console.log('  - elementos:', parsed.elementos?.length || 0)
-      console.log('  - plantillas:', parsed.plantillas?.length || 0)
-      console.log('  - catalogItems:', parsed.catalogItems?.length || 0)
-      console.log('  - changeHistory:', parsed.changeHistory ? 'YES' : 'NO')
-      console.log('  - changeHistory entries:', parsed.changeHistory?.entries?.length || 0)
-    } catch (e) {
-      console.error('[InventorySmart] Could not parse config:', e)
-    }
-
-    // Emitir al componente padre la configuración actualizada
     emit('configUpdated', configSerializada)
-    console.log('[InventorySmart] Emitted configUpdated to parent')
-    console.log('====================================================\n')
     // Registrar última config emitida para evitar rehidratación inmediata en eco del padre
     // lastAppliedConfig.value = configSerializada
-
   } catch (error) {
     console.error('Error al procesar la configuración actualizada:', error)
     showToast('Error al procesar la configuración actualizada', 'error')
@@ -333,7 +325,35 @@ const elementoEslActual = computed(() => {
   return canvasStore.elementoPorId(targetId)
 })
 
-const isIdentifyEslModalOpen = computed(() => canvasStore.modoConfigurarEsl && !!canvasStore.elementoEslObjetivo)
+const guardarCambios = async () => {
+  try {
+    if (canvasStore.cambiosNoAplicados) {
+      showToast('No puedes guardar si hay cambios pendientes de guardar', 'warn')
+      return
+    }
+    try {
+      const changeHistoryStore = useChangeHistoryStore()
+      changeHistoryStore.recordSave(
+        {
+          plantas: canvasStore.plantas,
+          elementos: canvasStore.elementos,
+        },
+        props.author,
+      )
+    } catch (e) {
+      console.warn('No se pudo registrar historial de cambios', e)
+    }
+    const configSerializada = canvasStore.serialize(true)
+    emit('configUpdated', configSerializada)
+    showToast('Cambios guardados correctamente', 'success')
+  } catch (error) {
+    showToast('Error al guardar los cambios', 'error')
+  }
+}
+
+const isIdentifyEslModalOpen = computed(
+  () => canvasStore.modoConfigurarEsl && !!canvasStore.elementoEslObjetivo,
+)
 
 const handleIdentifyEslSave = ({ codigoEsl }) => {
   if (!canvasStore.elementoEslObjetivo) return
@@ -342,6 +362,7 @@ const handleIdentifyEslSave = ({ codigoEsl }) => {
     const target = elementoEslActual.value
     const descriptor = target?.nombre || target?.codigo || target?.id || 'elemento'
     showToast(`Código ESL configurado para ${descriptor}`, 'success')
+    guardarCambios()
   } else {
     showToast('No se pudo actualizar el código ESL', 'error')
   }
@@ -354,11 +375,14 @@ const handleIdentifyEslClose = () => {
 // Propagar evento regresar
 const changeHistoryStore = useChangeHistoryStore()
 const showUnsavedModal = ref(false)
-const unsavedDiff = ref({ changes: [], summary: { created:0, updated:0, deleted:0 } })
+const unsavedDiff = ref({ changes: [], summary: { created: 0, updated: 0, deleted: 0 } })
 const pendingExitReason = ref(null)
 const bypassBeforeUnloadOnce = ref(false)
 
-const getCurrentCanvasState = () => ({ plantas: canvasStore.plantas, elementos: canvasStore.elementos })
+const getCurrentCanvasState = () => ({
+  plantas: canvasStore.plantas,
+  elementos: canvasStore.elementos,
+})
 
 const requestUnsavedConfirmation = (reason) => {
   try {
@@ -396,34 +420,15 @@ const continueUnloadFlow = () => {
 const saveAndExit = () => {
   const reason = pendingExitReason.value
   try {
-    console.log('\n========== [InventorySmart] saveAndExit ==========')    
     const json = canvasStore.serialize(true)
-    
-    // Parse para inspeccionar contenido
-    try {
-      const parsed = JSON.parse(json)
-      console.log('[InventorySmart] Serialized config contains:')
-      console.log('  - plantas:', parsed.plantas?.length || 0)
-      console.log('  - elementos:', parsed.elementos?.length || 0)
-      console.log('  - plantillas:', parsed.plantillas?.length || 0)
-      console.log('  - catalogItems:', parsed.catalogItems?.length || 0)
-      console.log('  - changeHistory:', parsed.changeHistory ? 'YES' : 'NO')
-      console.log('  - changeHistory entries:', parsed.changeHistory?.entries?.length || 0)
-    } catch (e) {
-      console.error('[InventorySmart] Could not parse serialized config:', e)
-    }
-    
     // Registrar última config emitida para evitar eco inmediato
     // lastAppliedConfig.value = json
     emit('configUpdated', json)
-    console.log('[InventorySmart] Emitted configUpdated to parent')
-    console.log('====================================================\n')
   } catch (e) {
     console.warn('Error serializando antes de salir', e)
   }
   showUnsavedModal.value = false
   pendingExitReason.value = null
-
   if (reason === 'back') {
     emit('back')
   } else if (reason === 'unload') {
@@ -534,9 +539,7 @@ useEditorShortcuts({
   onBlocked: () => showToast(VISUAL_MODE_MESSAGE, 'warning'),
 })
 
-// (Removed backup/restore/version comparison helpers)
 
-// Hidratar SIEMPRE ante cambios de la prop configCanvas (reacciona a cambios externos)
 watch(
   () => props.configCanvas,
   async (json) => {
@@ -544,47 +547,28 @@ watch(
     // Evitar reimportar exactamente la misma configuración ya aplicada
     // if (json === lastAppliedConfig.value) return
     try {
-      isDeserializing.value = true
-      console.log('[InventorySmart] Starting deserialization')
-      
       const ok = canvasStore.deserialize(json)
-      
+
       if (!ok) {
         showToast('No se pudo importar la configuración', 'error')
       } else {
         // lastAppliedConfig.value = json
-        console.log('[InventorySmart] Deserialization complete')
       }
-      
-      // Esperar un tick para que todo se estabilice
       await nextTick()
-      
-      // Ahora sí actualizar predefinidos (mezclará con los items de usuario ya importados)
-      isDeserializing.value = false
-      console.log('[InventorySmart] Calling setPredefinedElements after deserialization')
       catalogStore.setPredefinedElements(props.predefinedElements)
-      
     } catch (e) {
       console.error('Error deserializando configCanvas:', e)
       showToast('Error al importar la configuración', 'error')
-      isDeserializing.value = false
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 
 onMounted(() => {
   try {
-    // Crear media query para max-width 767px (smartphones)
     mediaQuery = window.matchMedia('(max-width: 767px)')
-
-    // Inicializar valor
     isMobileDevice.value = mediaQuery.matches
-
-    // Escuchar cambios
     mediaQuery.addEventListener('change', updateMediaQuery)
-
-    // Provide de la API de servicios externos para componentes hijos
     provide('externalServicesAPI', externalServicesAPI)
   } catch (error) {
     if (typeof window !== 'undefined') {
@@ -600,22 +584,14 @@ onUnmounted(() => {
     window.removeEventListener('beforeunload', handleBeforeUnload)
   }
 
-    if (mediaQuery) {
+  if (mediaQuery) {
     mediaQuery.removeEventListener('change', updateMediaQuery)
   }
 })
 
-// Track si estamos deserializando para evitar sobrescribir catalogItems
-const isDeserializing = ref(false)
-
 watch(
   () => props.predefinedElements,
   (newElements) => {
-    // No actualizar predefinidos mientras deserializamos
-    if (isDeserializing.value) {
-      console.log('[InventorySmart] Skipping setPredefinedElements (deserializing)')
-      return
-    }
     try {
       catalogStore.setPredefinedElements(newElements)
     } catch (error) {
@@ -623,7 +599,7 @@ watch(
       showToast('Error al configurar elementos predefinidos', 'error')
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 
 watch(
@@ -636,13 +612,12 @@ watch(
       showToast('Error al configurar tipos de producto admitidos', 'error')
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
 </script>
 
 <style>
 @import 'tailwindcss';
-
 
 /* DEFAULT THEME PALETTE */
 /* Ignorar warning de unknown at rule @theme */
@@ -789,10 +764,7 @@ watch(
   border: 1px solid var(--ui-border-dark);
 }
 
-/* ====== Estilos para el conmutador de Catálogo (Elementos | Plantillas) ======
-   Contexto: pestaña Elementos — controla catálogo visible.
-   NOTA: no mover ni duplicar en otros archivos. Mantener aquí.
-======================================================================================== */
+/* ====== Estilos para el conmutador de Catálogo (Elementos | Plantillas) ====== */
 .catalog-switch {
   display: flex;
   gap: var(--gap);
@@ -956,7 +928,6 @@ watch(
 }
 
 /* === Estilos para validaciones: arrastre desde Catálogo de Plantillas === */
-/* No crear archivos nuevos; mantener consistencia con el resto del proyecto */
 .template-drag--invalid {
   outline: 2px dashed red;
 }
