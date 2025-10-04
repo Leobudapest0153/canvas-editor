@@ -61,10 +61,10 @@ export const useCanvasStore = defineStore('canvas', () => {
       activa: true,
       dimensiones: {
         alto: 1500, // cm
-        ancho: 1500, // cm
-        largo: 1500, // cm
+        ancho: 3000, // cm
+        largo: 3000, // cm
       },
-      capacidadCargaSoportado: 5000, // kg
+      capacidadCargaSoportado: 500000, // kg
       // Nuevo flag para plantas elásticas (por defecto false)
       isInfinite: false,
       forma: 'rectangle', // Plantilla por defecto
@@ -74,16 +74,16 @@ export const useCanvasStore = defineStore('canvas', () => {
           y: 0,
         },
         {
-          x: 15000,
+          x: 30000,
           y: 0,
         },
         {
-          x: 15000,
-          y: 15000,
+          x: 30000,
+          y: 30000,
         },
         {
           x: 0,
-          y: 15000,
+          y: 30000,
         },
       ],
     },

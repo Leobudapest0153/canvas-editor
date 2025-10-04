@@ -199,7 +199,7 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   const loadTemplatesFromLocalStorage = () => {
     try {
-      const raw = localStorage.getItem('inventory.templates')
+      const raw = localStorage.getItem('canvas_templates')
       templates.value = raw ? JSON.parse(raw) : []
     } catch {
       templates.value = []
@@ -208,7 +208,7 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   const saveTemplatesToLocalStorage = () => {
     try {
-      localStorage.setItem('inventory.templates', JSON.stringify(templates.value))
+      localStorage.setItem('canvas_templates', JSON.stringify(templates.value))
     } catch {
       /* ignore */
     }

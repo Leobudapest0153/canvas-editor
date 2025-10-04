@@ -83,11 +83,11 @@ export const JERARQUIA_PERMITIDA = {
 export const CATALOGO = {
   // Tipos base visibles en el catálogo raíz (plantas)
   SISTEMA_BASE_KEYS: [
-    'pasillo_base',
-    'cuarto_frio',
-    'anaquel_metalico_grande',
-    'estante_pared_pequeno',
-    'barril_basico',
+    // 'pasillo_base',
+    // 'cuarto_frio',
+    // 'anaquel_metalico_grande',
+    // 'estante_pared_pequeno',
+    // 'barril_basico',
   ],
 }
 
@@ -101,8 +101,8 @@ export const ELEMENTOS_PREDEFINIDOS = [
     orientacion: 0,
     colorBase: '#EDEDED',
     dimensiones: {
-      ancho: 150,
-      largo: 600,
+      ancho: 300,
+      largo: 80,
       alto: 10,
     },
     capacidadCarga: 0,
@@ -120,11 +120,11 @@ export const ELEMENTOS_PREDEFINIDOS = [
     orientacion: 0,
     colorBase: '#e0f2fe',
     dimensiones: {
-      ancho: 400,
-      largo: 400,
-      alto: 250,
+      ancho: 500,
+      largo: 500,
+      alto: 750,
     },
-    capacidadCarga: 1500,
+    capacidadCarga: 150000,
     ubicacion: 'suelo',
     descripcion: 'Cuarto especial',
     icono: 'home',
@@ -366,27 +366,11 @@ export const SERIALIZE_CONFIG = {
 // === POLÍTICAS DE DIMENSIONES (escalado por eje) ===
 export const DIMENSIONS = {
   axisScaleDefault: { x: 0.2, y: 0.2, z: 0.2 },
-  // Overrides por tipo (usar keys reales del catálogo/base)
   axisScaleByType: {
-    // Elementos de sistema por defecto
-    anaquel_metalico_grande: { x: 0.2, y: 0.2, z: 0.2 },
-    // Estante de pared: w=20% ancho, d=10% largo (profundidad), h=20% alto
-    estante_pared_pequeno: { x: 0.2, y: 0.1, z: 0.2 },
-    barril_basico: { x: 0.2, y: 0.2, z: 0.2 },
-    // Nuevos predefinidos
     pasillo_base: { x: 0.2, y: 0.2, z: 1 },
-    cuarto_frio: { x: 0.3, y: 0.3, z: 0.5 },
-    piso_base: { x: 0.2, y: 0.2, z: 0.1 },
   },
-  // Límites por tipo
   minMax: {
-    anaquel_metalico_grande: { min: { w: 30, h: 50, d: 30 }, max: { w: 500, h: 500, d: 500 } },
-    estante_pared_pequeno: { min: { w: 40, h: 30, d: 20 }, max: { w: 500, h: 500, d: 500 } },
-    barril_basico: { min: { w: 30, h: 30, d: 30 }, max: { w: 500, h: 500, d: 500 } },
-    // Nuevos predefinidos
     pasillo_base: { min: { w: 10, h: 10, d: 10 }, max: { w: 2000, h: 500, d: 2000 } },
-    cuarto_frio: { min: { w: 100, h: 100, d: 100 }, max: { w: 2000, h: 500, d: 2000 } },
-    piso_base: { min: { w: 50, h: 10, d: 50 }, max: { w: 2000, h: 500, d: 2000 } },
   },
   autoResizeOnParentChange: true,
   gridPxPerCm: CM_TO_PX,
