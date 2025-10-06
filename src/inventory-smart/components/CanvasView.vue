@@ -672,7 +672,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, inject } from 'vue'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
@@ -715,6 +715,9 @@ import { useZoom } from '@/inventory-smart/composables/useZoom'
 import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
 import { toPrecisionCm } from '../utils/fixedDimensions'
 import { instantiateStructureOnCanvas } from '@/inventory-smart/composables/useStructureManager'
+
+// Inyectar el sistema de sugerencias desde el componente padre
+const placementSuggestions = inject('placementSuggestions')
 
 // Espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -1703,7 +1706,7 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
 
 // Pipeline unificado de validaciones previas al drop
 const runPreDropValidations = (elemento, dropEvent) => {
-  if (!elemento) return { ok: false, reason: 'invalid' }
+  if (!elemento) return { ok: false, reason: 'invalid', validationResult: null }
 
   const contextoActual = canvasStore.contextoActual?.tipo || 'plantas'
   const tipoElemento = elemento.tipo
@@ -1719,7 +1722,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
       pasillos: 'No puedes agregar elementos dentro de pasillos.',
     }
     showToast(msgMap[contextoActual] || 'No puedes agregar este tipo aquí.', 'error')
-    return { ok: false, reason: 'hierarchy' }
+    return { ok: false, reason: 'hierarchy', validationResult: null }
   }
 
   // Si es pasillo, ajustar alto al del contenedor padre (planta o elemento) ANTES de validar
@@ -1765,12 +1768,29 @@ const runPreDropValidations = (elemento, dropEvent) => {
     } else if (canvasStore.estaEnElemento) {
       tipoPadre = 'el elemento'
     }
-    // El elemento excedería el peso máximo permitido
-    showToast(
-      `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`,
-      'error',
-    )
-    return { ok: false, reason: 'weight' }
+    const weightReason = `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`
+
+    // Calcular areaBounds para el sistema de sugerencias
+    const boundary = computeBoundary()
+    const areaBounds = {
+      minX: 0,
+      minY: 0,
+      maxX: boundary?.W || layerConfig.value.width,
+      maxY: boundary?.H || layerConfig.value.height,
+      polygon: boundary?.points,
+    }
+
+    return {
+      ok: false,
+      reason: 'weight',
+      areaBounds: areaBounds,
+      validationResult: {
+        valid: false,
+        reason: weightReason,
+        canSuggest: true,
+        weightExcess: resultadoValidacionPeso.exceso
+      }
+    }
   }
 
   let { width, height } = getElementPixelDimensions(elemento)
@@ -1856,8 +1876,25 @@ const runPreDropValidations = (elemento, dropEvent) => {
     let local = sess.toLocal({ x: candX, y: candY }, parent)
     local = sess.finalizeLocal(local)
     if (!sess.isValidLocal(local)) {
-      showToast('No hay espacio suficiente aquí para colocar el elemento.', 'error')
-      return { ok: false, reason: 'bounds' }
+      // Calcular areaBounds para contextos internos
+      const boundary = computeBoundary()
+      const areaBounds = {
+        minX: 0,
+        minY: 0,
+        maxX: boundary?.W || layerConfig.value.width,
+        maxY: boundary?.H || layerConfig.value.height,
+        polygon: boundary?.points,
+      }
+      return {
+        ok: false,
+        reason: 'bounds',
+        areaBounds: areaBounds,
+        validationResult: {
+          valid: false,
+          reason: 'No hay espacio suficiente aquí para colocar el elemento.',
+          canSuggest: true
+        }
+      }
     }
     const worldPos = sess.toWorld(local, parent)
     candX = worldPos.x
@@ -1931,14 +1968,30 @@ const runPreDropValidations = (elemento, dropEvent) => {
   }
 
   if (!ok) {
-    showToast('No fue posible colocar el elemento dentro de los límites de la planta.', 'error')
-    return { ok: false, reason: 'bounds' }
+    return {
+      ok: false,
+      reason: 'bounds',
+      areaBounds: areaBounds,
+      validationResult: {
+        valid: false,
+        reason: 'No fue posible colocar el elemento dentro de los límites de la planta.',
+        canSuggest: true
+      }
+    }
   }
 
   // Validación final: asegurar que la posición final sea válida con la misma lógica que drag
   if (!insideAreaModel(finalPos, { ...tempEl, x: finalPos.x, y: finalPos.y }, areaBounds, 0.5)) {
-    showToast('El elemento quedaría fuera del área permitida.', 'error')
-    return { ok: false, reason: 'bounds' }
+    return {
+      ok: false,
+      reason: 'bounds',
+      areaBounds: areaBounds,
+      validationResult: {
+        valid: false,
+        reason: 'El elemento quedaría fuera del área permitida.',
+        canSuggest: true
+      }
+    }
   }
 
   return {
@@ -1947,18 +2000,120 @@ const runPreDropValidations = (elemento, dropEvent) => {
     width: finalWidth,
     height: finalHeight,
     dimsCm: { ancho: anchoCm, largo: largoCm, alto: altoCm },
+    validationResult: { valid: true },
+    tempElement: tempEl,
+    areaBounds: areaBounds
   }
 }
 
-const createElementFromDrop = (data, dropEvent) => {
+const createElementFromDrop = async (data, dropEvent) => {
   const elemento = data.elemento
   const res = runPreDropValidations(elemento, dropEvent)
-  if (!res.ok) return
 
-  let { ancho: anchoCm, largo: largoCm, alto: altoCm } = res.dimsCm
-  let finalWidth = res.width
-  let finalHeight = res.height
-  let finalPosition = res.position
+  // Si las validaciones fallan pero hay posibilidad de sugerencias, usar el sistema de sugerencias
+  if (!res.ok && res.validationResult?.canSuggest) {
+  const world = getWorldCoordinatesFromPointer(dropEvent)
+
+    // Calcular dimensiones en píxeles del elemento
+    const { width, height } = getElementPixelDimensions(elemento)
+    const finalWidth = Math.max(width, 10)
+    const finalHeight = Math.max(height, 10)
+
+
+    // Centrar el elemento respecto al puntero del mouse (esquina superior izquierda)
+    const centeredX = world.x - finalWidth / 2
+    const centeredY = world.y - finalHeight / 2
+
+
+
+
+    await placementSuggestions.tryPlaceWithSuggestions(
+      elemento,
+      { x: centeredX, y: centeredY },  // Posición ya centrada (esquina superior izquierda)
+      {
+        areaBounds: res.areaBounds,
+        neighbors: canvasStore.elementosVisibles,
+        onSuccess: async (adjustedElement, adjustedPosition) => {
+          // Crear elemento con ajustes aplicados usando la posición recalculada
+          createAdjustedElementFromDrop(adjustedElement, adjustedPosition, data)
+        },
+        onFailure: (reason) => {
+          // Mostrar mensaje final si no hay opciones viables
+          showToast(reason, 'error')
+        }
+      }
+    )
+    return
+  }
+
+  // Si no se puede colocar y no hay sugerencias, mostrar error directo
+  if (!res.ok) {
+    const reason = res.validationResult?.reason || 'No se puede colocar el elemento'
+    showToast(reason, 'error')
+    return
+  }
+
+  // Si las validaciones pasan, crear elemento normalmente
+  createNormalElementFromDrop(elemento, res, data)
+}
+
+// Función auxiliar para crear elemento con ajustes de sugerencias aplicados
+const createAdjustedElementFromDrop = (elementoAjustado, position, originalData) => {
+  const { width, height } = getElementPixelDimensions(elementoAjustado)
+  const finalWidth = Math.max(width, 10)
+  const finalHeight = Math.max(height, 10)
+
+  // La posición ya viene calculada correctamente desde tryPlaceWithSuggestions
+  // NO necesitamos centrar nuevamente, usar directamente la posición proporcionada
+  const finalX = position.x
+  const finalY = position.y
+
+  const color = elementoAjustado.color || elementoAjustado.colorBase || '#3B82F6'
+  const dims = elementoAjustado.dimensiones || {}
+
+  const nuevoElemento = {
+    id: `${elementoAjustado.tipo || elementoAjustado.categoria || 'elemento'}_${Date.now()}`,
+    tipo: elementoAjustado.tipo,
+    categoria: elementoAjustado.categoria,
+    nombre: elementoAjustado.nombre || 'Nuevo elemento',
+    dimensiones: {
+      ancho: dims.ancho || 100,
+      largo: dims.largo || 60,
+      alto: dims.alto || 20
+    },
+    x: finalX,
+    y: finalY,
+    width: finalWidth,
+    height: finalHeight,
+    color: color,
+    colorBase: color,
+    forma: elementoAjustado.forma || 'rectangular',
+    orientacion: Number(elementoAjustado.orientacion) || 0,
+    ubicacion: elementoAjustado.ubicacion || elementoAjustado.montado || 'suelo',
+    alturaRespectoAlSuelo: elementoAjustado.alturaRespectoAlSuelo || 0,
+    capacidadCarga: elementoAjustado.capacidadCarga || 0,
+    volumenMaximo: (dims.ancho * dims.largo * dims.alto) / 100,
+    dimensionLock: false,
+    systemTypeKey: originalData.elemento.id,
+    uso: { volumen: 0, peso: 0 },
+    descripcion: elementoAjustado.descripcion || '',
+    contenedores: elementoAjustado.contenedores ? [...elementoAjustado.contenedores] : [],
+    hijos: [],
+  }
+
+  canvasStore.agregarElemento(nuevoElemento)
+  canvasStore.seleccionarElemento(nuevoElemento.id)
+
+  // Mostrar toast informativo sobre los ajustes aplicados
+  showToast('Elemento colocado con ajustes automáticos aplicados', 'success')
+}
+
+// Función auxiliar para crear elemento sin ajustes (flujo normal)
+const createNormalElementFromDrop = (elemento, validationResult, originalData) => {
+  let { ancho: anchoCm, largo: largoCm, alto: altoCm } = validationResult.dimsCm
+  let finalWidth = validationResult.width
+  let finalHeight = validationResult.height
+  let finalPosition = validationResult.position
 
   const color = elemento.color || elemento.colorBase || '#3B82F6'
 
@@ -2261,7 +2416,7 @@ watch(
   },
 )
 
-const createElementFromBuffer = (data, dropEvent) => {
+const createElementFromBuffer = async (data, dropEvent) => {
   // Obtener el elemento del buffer
   const bufferItem = buffer.getBufferItem(data.bufferItemId)
   if (!bufferItem) {
@@ -2271,27 +2426,133 @@ const createElementFromBuffer = (data, dropEvent) => {
 
   // Delegar todas las validaciones a la ruta unificada
   const res = runPreDropValidations(bufferItem.elemento, dropEvent)
-  if (!res.ok) return
 
+  // Si las validaciones fallan pero hay posibilidad de sugerencias, usar el sistema de sugerencias
+  if (!res.ok && res.validationResult?.canSuggest) {
+    const world = getWorldCoordinatesFromPointer(dropEvent)
+
+    // Calcular dimensiones en píxeles del elemento
+    const { width, height } = getElementPixelDimensions(bufferItem.elemento)
+    const finalWidth = Math.max(width, 10)
+    const finalHeight = Math.max(height, 10)
+
+    // Centrar el elemento respecto al puntero del mouse (esquina superior izquierda)
+    const centeredX = world.x - finalWidth / 2
+    const centeredY = world.y - finalHeight / 2
+
+    await placementSuggestions.tryPlaceWithSuggestions(
+      bufferItem.elemento,
+      { x: centeredX, y: centeredY },  // Posición ya centrada (esquina superior izquierda)
+      {
+        areaBounds: res.areaBounds,
+        neighbors: canvasStore.elementosVisibles,
+        onSuccess: async (adjustedElement, adjustedPosition) => {
+          // Crear elemento desde buffer con ajustes aplicados usando la posición recalculada
+          const newElementId = buffer.pasteFromBufferWithAdjustments(
+            data.bufferItemId,
+            adjustedPosition,
+            adjustedElement
+          )
+          if (newElementId) {
+            canvasStore.seleccionarElemento(newElementId)
+            showToast('Elemento pegado con ajustes automáticos aplicados', 'success')
+          }
+        },
+        onFailure: (reason) => {
+          // Mostrar mensaje final si no hay opciones viables
+          showToast(reason, 'error')
+        }
+      }
+    )
+    return
+  }
+
+  // Si no se puede colocar y no hay sugerencias, mostrar error directo
+  if (!res.ok) {
+    const reason = res.validationResult?.reason || 'No se puede pegar el elemento'
+    showToast(reason, 'error')
+    return
+  }
+
+  // Si las validaciones pasan, pegar elemento normalmente
   const newElementId = buffer.pasteFromBuffer(data.bufferItemId, res.position)
   if (newElementId) {
     canvasStore.seleccionarElemento(newElementId)
   }
 }
 
-const createElementFromTemplate = (data, dropEvent) => {
+const createElementFromTemplate = async (data, dropEvent) => {
   const payload = data.payload || {}
   const root = payload.elements?.find?.((e) => e.id === payload.rootId)
   if (!root) {
     showToast('No se pudo insertar la plantilla', 'error')
     return
   }
+
   const res = runPreDropValidations(root, dropEvent)
-  if (!res.ok) {
+
+  // Si las validaciones fallan pero hay posibilidad de sugerencias, usar el sistema de sugerencias
+  if (!res.ok && res.validationResult?.canSuggest) {
+    const world = getWorldCoordinatesFromPointer(dropEvent)
+
+    // Calcular dimensiones en píxeles del elemento raíz
+    const { width, height } = getElementPixelDimensions(root)
+    const finalWidth = Math.max(width, 10)
+    const finalHeight = Math.max(height, 10)
+
+    // Centrar el elemento respecto al puntero del mouse (esquina superior izquierda)
+    const centeredX = world.x - finalWidth / 2
+    const centeredY = world.y - finalHeight / 2
+
+    await placementSuggestions.tryPlaceWithSuggestions(
+      root,
+      { x: centeredX, y: centeredY },  // Posición ya centrada (esquina superior izquierda)
+      {
+        areaBounds: res.areaBounds,
+        neighbors: canvasStore.elementosVisibles,
+        onSuccess: async (adjustedElement, adjustedPosition) => {
+          // Crear plantilla con ajustes aplicados usando la posición recalculada
+          const adjustedPayload = createAdjustedTemplatePayload(payload, adjustedElement)
+          instantiateStructureOnCanvas(canvasStore, adjustedPayload, adjustedPosition)
+          showToast('Plantilla colocada con ajustes automáticos aplicados', 'success')
+        },
+        onFailure: (reason) => {
+          // Mostrar mensaje final si no hay opciones viables
+          showToast(reason, 'error')
+        }
+      }
+    )
     return
   }
-  // Unificar instanciación de estructuras (plantillas/cuarto/espacio)
+
+  // Si no se puede colocar y no hay sugerencias, mostrar error directo
+  if (!res.ok) {
+    const reason = res.validationResult?.reason || 'No se puede colocar la plantilla'
+    showToast(reason, 'error')
+    return
+  }
+
+  // Si las validaciones pasan, crear plantilla normalmente
   instantiateStructureOnCanvas(canvasStore, payload, res.position)
+}
+
+// Función auxiliar para crear payload de plantilla con ajustes aplicados
+const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => {
+  const adjustedPayload = { ...originalPayload }
+  const elements = [...(originalPayload.elements || [])]
+
+  // Encontrar y reemplazar el elemento raíz con los ajustes
+  const rootIndex = elements.findIndex(e => e.id === originalPayload.rootId)
+  if (rootIndex >= 0) {
+    elements[rootIndex] = {
+      ...elements[rootIndex],
+      dimensiones: adjustedRootElement.dimensiones,
+      capacidadCarga: adjustedRootElement.capacidadCarga
+    }
+  }
+
+  adjustedPayload.elements = elements
+  return adjustedPayload
 }
 
 // Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
