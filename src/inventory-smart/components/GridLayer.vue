@@ -36,19 +36,25 @@ function niceStep(targetPx, pxPerUnit) {
   return best
 }
 
-const draw = (ctx) => {
+const draw = (ctx, shape) => {
   const scale = props.scale || 1
   const ppu = Number(props.pixelsPerUnit) || 100
   const bbox = props.bbox || {}
 
-  // Usar el bbox como límite de dibujo (área de la figura/planta)
-  const bboxX0 = Number(bbox.minX) || Number(bbox.x) || 0
-  const bboxY0 = Number(bbox.minY) || Number(bbox.y) || 0
-  const bboxX1 = Number(bbox.maxX) || (bboxX0 + (Number(bbox.width) || 0))
-  const bboxY1 = Number(bbox.maxY) || (bboxY0 + (Number(bbox.height) || 0))
+  // Obtener el área visible del canvas (viewport)
+  const stage = shape.getStage()
+  if (!stage) return
 
-  // Si no hay bbox válido, no dibujar nada
-  if (bboxX1 <= bboxX0 || bboxY1 <= bboxY0) return
+  const stageWidth = stage.width()
+  const stageHeight = stage.height()
+  const stageX = stage.x()
+  const stageY = stage.y()
+
+  // Calcular los límites del mundo visible (en coordenadas del canvas)
+  const worldX0 = -stageX / scale
+  const worldY0 = -stageY / scale
+  const worldX1 = worldX0 + stageWidth / scale
+  const worldY1 = worldY0 + stageHeight / scale
 
   // Paso adaptativo menores y mayores (mayores cada 1 unidad)
   const pxPerUnitOnScreen = ppu * scale
@@ -58,32 +64,36 @@ const draw = (ctx) => {
   const stepPxWorld = stepUnits * ppu
   const majorPxWorld = 1 * ppu
 
-  // Inicio alineado con paso menor, pero limitado al bbox
-  const startX = Math.floor(bboxX0 / stepPxWorld) * stepPxWorld
-  const startY = Math.floor(bboxY0 / stepPxWorld) * stepPxWorld
+  // Inicio alineado con paso menor, extendido más allá del viewport para cubrir todo
+  const startX = Math.floor(worldX0 / stepPxWorld) * stepPxWorld
+  const startY = Math.floor(worldY0 / stepPxWorld) * stepPxWorld
 
   const minorColor = '#e5e7eb'
-  const majorColor = '#d1d5db' // Ligeramente más oscuro para mejor contraste
+  const majorColor = '#d1d5db'
 
-  // Verticales - solo dentro del bbox
+  // Habilitar antialiasing para líneas más suaves
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
+  // Verticales - cubrir todo el canvas visible
   ctx.beginPath()
-  for (let xw = startX; xw <= bboxX1; xw += stepPxWorld) {
+  for (let xw = startX; xw <= worldX1; xw += stepPxWorld) {
     const isMajor = (Math.round(xw / majorPxWorld) === xw / majorPxWorld)
     ctx.strokeStyle = isMajor ? majorColor : minorColor
-    ctx.lineWidth = (isMajor ? 0.75 : 0.5) / scale
-    ctx.moveTo(xw, bboxY0)
-    ctx.lineTo(xw, bboxY1)
+    ctx.lineWidth = (isMajor ? 0.5 : 0.3) / scale // Líneas más delgadas para suavidad
+    ctx.moveTo(xw, worldY0)
+    ctx.lineTo(xw, worldY1)
   }
   ctx.stroke()
 
-  // Horizontales - solo dentro del bbox
+  // Horizontales - cubrir todo el canvas visible
   ctx.beginPath()
-  for (let yw = startY; yw <= bboxY1; yw += stepPxWorld) {
+  for (let yw = startY; yw <= worldY1; yw += stepPxWorld) {
     const isMajor = (Math.round(yw / majorPxWorld) === yw / majorPxWorld)
     ctx.strokeStyle = isMajor ? majorColor : minorColor
-    ctx.lineWidth = (isMajor ? 0.75 : 0.5) / scale
-    ctx.moveTo(bboxX0, yw)
-    ctx.lineTo(bboxX1, yw)
+    ctx.lineWidth = (isMajor ? 0.5 : 0.3) / scale
+    ctx.moveTo(worldX0, yw)
+    ctx.lineTo(worldX1, yw)
   }
   ctx.stroke()
 }
