@@ -87,12 +87,12 @@ export function usePlacementGuards({ useTopeClamp = true } = {}) {
     const res = run(el, cand, opts.validationOptions)
     if (!res.valid) {
       opts.revert?.()
-      // No mostrar warn ni toast si es una operación de transformación (se maneja silenciosamente en useTransformer)
+      console.warn('[placement-guard]', errorsPlacement[res.code] || 'Invalid position', { el, cand, code: res.code })
+      // No mostrar toast si es una operación de transformación (se maneja silenciosamente en useTransformer)
       const isTransforming = opts.validationOptions?.isTransforming === true
       if (!isTransforming) {
-        console.warn('[placement-guard]', errorsPlacement[res.code] || 'Invalid position', { el, cand, code: res.code })
         const msg = errorsPlacement[res.code] || 'Posición inválida'
-        showToast(msg, 'error')
+        showToast(msg, 'error');
       }
     }
     return res
