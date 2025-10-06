@@ -71,12 +71,12 @@ const props = defineProps({
 
 const emit = defineEmits(['confirmar', 'cerrar'])
 
-const headerBg = computed(() => (props.tipo === 'danger' ? 'bg-red-100' : 'bg-primary-100'))
+const headerBg = computed(() => (props.tipo === 'danger' ? 'bg-red-100' : 'bg-primary'))
 const confirmBtnClass = computed(() => {
   const base = 'px-4 py-2 rounded-lg text-white font-medium cursor-pointer transition-colors'
   return props.tipo === 'danger'
     ? `${base} bg-red-600 hover:bg-red-700`
-    : `${base} bg-primary hover:bg-primary-800`
+    : `${base} bg-primary hover:bg-primary-600`
 })
 const confirmarTextoComputed = computed(() => {
   if (props.modo === 'notice') return 'Aceptar'

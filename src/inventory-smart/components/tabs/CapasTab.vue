@@ -239,8 +239,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
-import { TODAS_LAS_CATEGORIAS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
-import TagFilter from '@/inventory-smart/components/TagFilter.vue'
+import { TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import CreateTagModal from '@/inventory-smart/components/CreateTagModal.vue'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
 import {useDeleteElement} from '@/inventory-smart/composables/useDeleteElement'
@@ -268,9 +267,6 @@ const textoNuevaEtiqueta = ref('')
 // Refs para la lógica de click-outside
 const filtrosBotonRef = ref(null)
 const filtrosPanelRef = ref(null)
-
-// Computed properties
-const categorias = computed(() => TODAS_LAS_CATEGORIAS)
 
 const showAuraElement = (elementoId) => {
   if (canvasStore.cambiosNoAplicados) {

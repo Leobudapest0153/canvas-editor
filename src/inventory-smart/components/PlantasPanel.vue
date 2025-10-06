@@ -110,7 +110,7 @@
             :class="[
               'relative m-2 flex items-center justify-between p-3 rounded-lg border-2 min-w-max cursor-pointer transition-all duration-200 hover:border-primary-400 flex-shrink-0',
               {
-                'bg-primary-200 border-primary-200 shadow-md':
+                'bg-secondary border-secondary-700 shadow-md':
                   planta.id === canvasStore.plantaActiva,
                 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300':
                   planta.id !== canvasStore.plantaActiva,
@@ -156,7 +156,7 @@
             >
               <button
                 @click.stop="toggleMenuPlanta(planta.id, $event)"
-                class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-primary-200 transition-colors cursor-pointer"
+                class="p-1 rounded-full text-gray-500 hover:text-gray-700 hover:bg-secondary-600 transition-colors cursor-pointer"
               >
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path
@@ -232,7 +232,7 @@
           <button
             v-if="!canvasStore.modoConfigurarEsl"
             type="button"
-            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 bg-ice-blue text-gray-600 hover:bg-ice-blue-300 hover:text-gray-500 rounded-lg transition-colors cursor-pointer"
+            class="inline-flex items-center justify-center gap-2 p-2 lg:px-4 lg:py-2 bg-secondary text-gray-600 hover:bg-secondary-600 hover:text-gray-700 rounded-lg transition-colors cursor-pointer"
             @click="onBack"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -288,7 +288,7 @@
           <button
             type="button"
             class="inline-flex items-center justify-center gap-2 p-2 lg:py-2 rounded-lg bg-primary text-gray-100 hover:text-white hover:bg-primary transition-colors cursor-pointer"
-            @click="canvasStore.toggleModoEdicion()"
+            @click="cambiarModoEdicion"
           >
             <svg v-if="!canvasStore.modoEdicion" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
@@ -489,7 +489,7 @@
             </button>
             <button
               type="submit"
-              class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white border-none rounded-lg cursor-pointer transition-colors"
+              class="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white border-none rounded-lg cursor-pointer transition-colors"
             >
               {{ mostrarModalEditar ? 'Guardar Cambios' : 'Crear Planta' }}
             </button>
@@ -658,8 +658,8 @@ const eslButtonLabel = computed(() =>
 const eslButtonClasses = computed(() => [
   'inline-flex items-center justify-center gap-2 px-2 py-2 rounded-lg transition-colors cursor-pointer',
   canvasStore.modoConfigurarEsl
-    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-    : 'bg-gray text-white hover:bg-ice-blue-300 hover:text-white',
+    ? 'bg-success hover:bg-success-600 text-white'
+    : 'bg-primary-gray text-white hover:bg-primary-gray-600 hover:text-white',
 ])
 
 // Estado local para modales
@@ -779,7 +779,6 @@ const guardarCambios = async () => {
       showToast('No puedes guardar si hay cambios pendientes de guardar', 'warn');
       return;
     }
-    // Capturar snapshot para historial de cambios ANTES de serializar
     try {
       const changeHistoryStore = useChangeHistoryStore()
       changeHistoryStore.recordSave(
@@ -792,14 +791,17 @@ const guardarCambios = async () => {
     } catch (e) {
       console.warn('No se pudo registrar historial de cambios', e)
     }
-
     const configSerializada = canvasStore.serialize(true)
     emit('configChanged', configSerializada)
     showToast('Cambios guardados correctamente', 'success')
   } catch (error) {
-    console.error('Error al guardar cambios:', error)
     showToast('Error al guardar los cambios', 'error')
   }
+}
+
+const cambiarModoEdicion = () => {
+  canvasStore.toggleModoEdicion()
+  guardarCambios()
 }
 
 const seleccionarPlanta = (plantaId) => {

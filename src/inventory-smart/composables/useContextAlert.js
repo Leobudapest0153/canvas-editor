@@ -11,7 +11,7 @@ import { useCanvasStore } from './useCanvasStore'
 export function useContextAlert() {
   const canvasStore = useCanvasStore()
   const showAlert = ref(false)
-  const alertMessage = ref(null)
+  const alertMessage = ref({ message: '', subtext: '', icon: '' })
   const alertDuration = ref(10000) // 10 segundos por defecto
 
   // Tiempo de espera antes de mostrar la alerta (para evitar mostrarla en carga inicial)

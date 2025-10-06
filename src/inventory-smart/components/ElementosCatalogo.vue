@@ -112,7 +112,7 @@
           ]"
           :style="{
             borderLeftColor:
-              elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria),
+              elemento.color || elemento.colorBase,
           }"
         >
           <!-- Botón de acciones (tres puntos) -->
@@ -134,7 +134,7 @@
           <div class="flex items-center justify-center mb-3">
             <component
               :is="getIconComponentForElement(elemento)"
-              :backgroundColor="elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria)"
+              :backgroundColor="elemento.color || elemento.colorBase"
               class="w-12 h-8"
             />
           </div>
@@ -160,26 +160,10 @@
                 <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
                 <span class="spec-value text-gray-700">{{ elemento.capacidadCarga }}kg</span>
               </div>
-              <!-- <div class="spec-item flex justify-between text-xs">
-                <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
-                <span class="spec-value text-gray-700 capitalize">{{ elemento.ubicacion }}</span>
-              </div> -->
-            </div>
-
-            <!-- Badge de tipo y categoría -->
-            <div class="mt-2 flex gap-1">
-              <span
-                class="inline-block px-2 py-1 text-xs rounded-full"
-                :style="{
-                  backgroundColor: getColorPorTipo(elemento.tipo),
-                  color: getContrastTextColor(getColorPorTipo(elemento.tipo))
-                }"
-              >
-                {{ getCategoriaName(elemento.categoria) }}
-              </span>
-              <!-- <span class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
-                {{ getCategoriaName(elemento.categoria) }}
-              </span> -->
+              <div class="spec-item flex justify-between text-xs">
+                <span class="spec-label text-gray-500 font-medium">{{ 'Cantidad de ' + (elemento.tipo === 'cuartos' ? 'pisos:' : 'niveles:') }}</span>
+                <span class="spec-value text-gray-700">{{ getChildCount(elemento) }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -249,18 +233,6 @@ import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
-import {
-  TODAS_LAS_CATEGORIAS,
-  TIPOS_ENTIDAD,
-  getColorPorTipo,
-  getColorCategoria,
-  getContrastTextColor,
-  FORMAS_DISPONIBLES,
-  UBICACIONES_DISPONIBLES,
-} from '@/inventory-smart/utils/constants'
-// import { CATALOGO, SCALE_WITH_PARENT_KEYS } from '@/inventory-smart/utils/constants'
-// import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
-
 import AgregarCuartoModal from './AgregarCuartoModal.vue'
 import {
   buildStructureFromForm,
@@ -294,7 +266,7 @@ const { canEditCanvas, canMutateCatalog } = useEditorMode()
 const catalogReadOnly = computed(() => !canMutateCatalog.value)
 const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 const catalogStore = useCatalogStore()
-const { filteredCatalogItems, catalogContext, searchText, selectedCategory, items } =
+const { filteredCatalogItems, searchText, items } =
   storeToRefs(catalogStore)
 const confirmDialog = useConfirmDialog()
 
@@ -340,38 +312,6 @@ const editingItem = ref(null) // item que se edita
 const editingForm = ref(null) // formulario derivado del item
 const kebabMenu = ref({ visible: false, x: 0, y: 0, item: null })
 
-// Formulario para nuevo elemento
-const nuevoElemento = ref({
-  nombre: '',
-  categoria: '',
-  forma: '',
-  colorBase: '#3b82f6',
-  dimensiones: {
-    ancho: 100,
-    largo: 100,
-    alto: 75,
-  },
-  capacidadCarga: 50,
-  ubicacion: 'suelo',
-  descripcion: '',
-  icono: 'box',
-})
-
-// const tituloContextual = computed(() => {
-//   if (catalogContext.value.mode === 'root') {
-//     return ''
-//   } else if (catalogContext.value.mode === 'detail-element') {
-//     return 'Catálogo de Contenedores'
-//   } else if (catalogContext.value.mode === 'detail-container') {
-//     return 'Catálogo (Elementos + Contenedores)'
-//   }
-//   return 'Catálogo de Elementos'
-// })
-
-// const puedeCrearElementosPersonalizados = computed(() => catalogContext.value.mode !== 'root')
-
-// Computed: categorías disponibles según el tab (dinámicos desde store)
-const categoriasDisponibles = computed(() => (modo.value === 'cuarto' ? canvasStore.catalogos.tiposCuarto : canvasStore.catalogos.tiposEspacio))
 // Base por modo (sin filtros de texto/categoría/ubicación) — sirve para decidir si mostrar Filtros
 const elementosBasePorModo = computed(() => {
   const base = Array.isArray(filteredCatalogItems.value)
@@ -440,16 +380,6 @@ const onGuardarEspacio = (datosEspacio) => {
   }
 }
 
-const getTipoNombre = (tipo) => {
-  const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
-  return tipoInfo?.nombre || 'Desconocido'
-}
-
-const getCategoriaName = (categoriaId) => {
-  const categoria = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
-  return categoria ? categoria.nombre : 'Sin categoría'
-}
-
 const getIconComponentForElement = (elemento) => {
   // Determinar el componente de icono basado en tipo y ubicación
   if (elemento.tipo === 'cuartos') {
@@ -491,6 +421,18 @@ const isKebabRestricted = (item) => {
 
 // Comportamiento actual: sin escalado, siempre dimensiones base del catálogo
 const getCardDims = (item) => item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
+
+const getChildCount = (elemento) => {
+  try {
+    if (!elemento?.payload?.rootId || !Array.isArray(elemento.payload.elements)) {
+      return 0
+    }
+    const root = elemento.payload.elements.find(e => e.id === elemento.payload.rootId)
+    return root?.hijos?.length || 0
+  } catch {
+    return 0
+  }
+}
 
 // Drag and Drop
 const iniciarArrastre = (elemento, event) => {

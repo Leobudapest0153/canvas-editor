@@ -17,7 +17,6 @@ export const useCatalogStore = defineStore('catalog', () => {
           id: `${it.id}__root`,
           nombre: it.nombre,
           tipo: it.tipo,
-          categoria: it.categoria,
           forma: it.forma,
           orientacion: it.orientacion,
           color: it.colorBase || it.color || '#3B82F6',
@@ -48,7 +47,6 @@ export const useCatalogStore = defineStore('catalog', () => {
               id: childId,
               nombre: niv?.nombre || (esCuarto ? `Piso ${idx + 1}` : `Nivel ${idx + 1}`),
               tipo: esCuarto ? 'pisos' : 'contenedores',
-              categoria: esCuarto ? 'piso' : 'nivel',
               padre: root.id,
               color: root.color,
               colorBase: root.colorBase,
@@ -82,7 +80,6 @@ export const useCatalogStore = defineStore('catalog', () => {
             id: childId,
             nombre: esCuarto ? 'Piso 1' : 'Nivel 1',
             tipo: esCuarto ? 'pisos' : 'contenedores',
-            categoria: esCuarto ? 'piso' : 'nivel',
             padre: root.id,
             color: root.color,
             colorBase: root.colorBase,
@@ -113,7 +110,11 @@ export const useCatalogStore = defineStore('catalog', () => {
         })
         // Preservar id y props del item original
         mapped.id = it.id
-        mapped.props = { ...(mapped.props || {}), ...(it.props || {}) }
+        mapped.props = {
+          ...(mapped.props || {}),
+          ...(it.props || {}),
+          source: 'predefined' // Marcar como predefinido
+        }
         mapped.createdAt = mapped.createdAt || new Date().toISOString()
         mapped.updatedAt = mapped.updatedAt || new Date().toISOString()
         return mapped
@@ -126,7 +127,6 @@ export const useCatalogStore = defineStore('catalog', () => {
   // Inicializar con elementos por defecto
   const items = ref(normalizePredefined(ELEMENTOS_PREDEFINIDOS))
   const searchText = ref('')
-  const selectedCategory = ref(null)
   const selectedCatalog = ref('elementos')
   const templates = ref([])
 
@@ -134,12 +134,17 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   // Función para actualizar elementos predefinidos desde props
   const setPredefinedElements = (predefinedElements) => {
+    // Guardar items de usuario antes de actualizar predefinidos
+    const userItems = items.value.filter(i => i?.props?.source === 'user')
+    // Obtener nuevos predefinidos
+    let newPredefined = []
     if (predefinedElements && Array.isArray(predefinedElements)) {
-      items.value = normalizePredefined(predefinedElements)
+      newPredefined = normalizePredefined(predefinedElements)
     } else {
       // Si no se proporcionan elementos, usar los por defecto
-      items.value = normalizePredefined(ELEMENTOS_PREDEFINIDOS)
+      newPredefined = normalizePredefined(ELEMENTOS_PREDEFINIDOS)
     }
+    items.value = [...newPredefined, ...userItems]
   }
 
   const baseSystemGuard = (item) =>
@@ -163,33 +168,11 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   const filteredCatalogItems = computed(() => {
     let result = items.value.filter(baseSystemGuard)
-
-    if (catalogContext.value.mode === 'root') {
-      // En la raíz (plantas):
-      // - Si estamos viendo Elementos, mostramos los tipos permitidos para plantas (cuartos, elementos, pasillos, ...)
-      //   en lugar de restringir solo a SISTEMA_BASE_KEYS para permitir ver elementos creados por el usuario.
-      // - Para otros catálogos, mantenemos el filtro por SISTEMA_BASE_KEYS.
-      // if (selectedCatalog.value === 'elementos') {
-        const allowed = allowedTypesForContext(catalogContext.value)
-        result = result.filter((item) => allowed.includes(item.tipo))
-      // } else {
-      //   result = result.filter((item) => CATALOGO.SISTEMA_BASE_KEYS.includes(item.id))
-      // }
-    } else {
-      const allowed = allowedTypesForContext(catalogContext.value)
-      result = result.filter((item) => allowed.includes(item.tipo))
-    }
-
+    const allowed = allowedTypesForContext(catalogContext.value)
+    result = result.filter((item) => allowed.includes(item.tipo))
     if (searchText.value) {
       result = result.filter(match(searchText.value))
     }
-
-    // Normalizar categoría seleccionada: vacío => null, y validar que exista
-    const selCat = selectedCategory.value || null
-    if (selCat) {
-      result = result.filter((item) => item.categoria === selCat)
-    }
-
     return result
   })
 
@@ -216,7 +199,7 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   const loadTemplatesFromLocalStorage = () => {
     try {
-      const raw = localStorage.getItem('inventory.templates')
+      const raw = localStorage.getItem('canvas_templates')
       templates.value = raw ? JSON.parse(raw) : []
     } catch {
       templates.value = []
@@ -225,7 +208,7 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   const saveTemplatesToLocalStorage = () => {
     try {
-      localStorage.setItem('inventory.templates', JSON.stringify(templates.value))
+      localStorage.setItem('canvas_templates', JSON.stringify(templates.value))
     } catch {
       /* ignore */
     }
@@ -251,7 +234,6 @@ export const useCatalogStore = defineStore('catalog', () => {
   return {
     items,
     searchText,
-    selectedCategory,
     selectedCatalog,
     templates,
     catalogContext,

@@ -19,7 +19,6 @@ describe('Serialización con plantillas v1.1.0', () => {
     canvas.elementos.push({
       id: 'el_1',
       tipo: 'elementos',
-      categoria: 'anaqueles',
       nombre: 'Elemento Test',
       plantaId: 'planta_1',
       x: 0,

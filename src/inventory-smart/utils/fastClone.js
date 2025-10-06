@@ -90,7 +90,6 @@ export function cloneCanvasElement(elemento) {
   const cloned = {
     id: elemento.id,
     tipo: elemento.tipo,
-    categoria: elemento.categoria,
     nombre: elemento.nombre,
     codigo: elemento.codigo,
     codigoEsl: elemento.codigoEsl,

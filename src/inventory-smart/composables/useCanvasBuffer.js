@@ -254,7 +254,7 @@ export const useCanvasBuffer = () => {
   // Pegar elemento simple (sin hijos) - generar nuevo ID único
       const uniqueTimestamp = Date.now()
       const randomSuffix = Math.random().toString(36).substr(2, 9)
-      const newId = `${elemento.tipo || elemento.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
+      const newId = `${elemento.tipo || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
 
       // Forzar altura de pasillos según planta destino
       let elementoToInsert = { ...elemento, id: newId }

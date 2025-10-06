@@ -53,7 +53,7 @@
       </section>
       <footer class="flex justify-center gap-3 p-4 bg-top">
         <button type="button" class="px-4 py-2 cursor-pointer rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary" @click="handleClose">Cancelar</button>
-        <button type="submit" class="px-4 py-2 rounded-lg font-medium shadow-sm focus:outline-none focus:ring-2 bg-primary text-white hover:bg-primary-800 focus:ring-primary-900 cursor-pointer" :disabled="!templateName.trim() || isSaving">
+        <button type="submit" class="px-4 py-2 rounded-lg font-medium shadow-sm focus:outline-none focus:ring-2 bg-primary text-white hover:bg-primary-600 focus:ring-primary-700 cursor-pointer" :disabled="!templateName.trim() || isSaving">
           Guardar
         </button>
       </footer>

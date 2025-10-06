@@ -111,17 +111,11 @@ function inferLastAisleCode(existing) {
 
 /**
  * Genera nombre por tipo.
- * - pasillos: alfabético según el último creado (A, B, C, ...)
- * - otros: si hay baseName usarlo; en su defecto, `Tipo N`
  */
 export function generateNombre(tipo, ctx = {}) {
   const tipoKey = (tipo || '').toLowerCase()
   const existing = Array.isArray(ctx.existing) ? ctx.existing : []
 
-  // if (tipoKey === 'pasillos') {
-  //   const lastNombre = ctx.lastNombre || inferLastAisleName(existing) || null
-  //   return nextAlpha(lastNombre)
-  // }
 
   // Otros tipos
   if (ctx.baseName && typeof ctx.baseName === 'string') return ctx.baseName

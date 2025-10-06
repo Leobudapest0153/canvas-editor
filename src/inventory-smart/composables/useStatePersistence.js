@@ -13,7 +13,7 @@
  * - Serialización/deserialización opcional del historial de cambios
  */
 
-import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO } from "../utils/constants"
+import { EXPORT_FORMAT_VERSION, SERIALIZE_CONFIG } from "../utils/constants"
 
 export const useStatePersistence = () => {
   let hasHydratedMode = false
@@ -51,12 +51,6 @@ export const useStatePersistence = () => {
         })
       },
 
-      // Catálogos dinámicos (pueden sobrescribir los defaults)
-      catalogos: {
-        tiposEspacio: state.catalogos?.tiposEspacio || DEFAULT_TIPOS_ESPACIO,
-        tiposCuarto: state.catalogos?.tiposCuarto || DEFAULT_TIPOS_CUARTO,
-      },
-
       modoEdicion: state.modoEdicion === true,
 
       // Estado de plantas con todas sus propiedades
@@ -81,6 +75,14 @@ export const useStatePersistence = () => {
           activa: Boolean(planta.activa),
           // Nuevo: flag de planta elástica (persistir si true; fallback false)
           isInfinite: planta.isInfinite === true,
+
+          // CRÍTICO: Código único de la planta
+          codigo: planta.codigo || null,
+
+          // Timestamps para auditoría
+          createdAt: planta.createdAt || new Date().toISOString(),
+          updatedAt: planta.updatedAt || new Date().toISOString(),
+
           propiedadesPersonalizadas: planta.propiedadesPersonalizadas || {},
         }
       }),
@@ -98,7 +100,6 @@ export const useStatePersistence = () => {
           nombre: elemento.nombre || `Elemento ${elemento.tipo || 'sin tipo'}`,
           descripcion: elemento.descripcion || '',
           tipo: elemento.tipo || 'elementos',
-          categoria: elemento.categoria || 'general',
           plantaId: elemento.plantaId,
           etiquetas: Array.isArray(elemento.etiquetas) ? elemento.etiquetas : [],
           codigoEsl: elemento.codigoEsl || '',
@@ -168,6 +169,25 @@ export const useStatePersistence = () => {
           // Jerarquía
           padre: elemento.padre || null,
           hijos: Array.isArray(elemento.hijos) ? elemento.hijos : [],
+
+          // CRÍTICO: Código único del elemento
+          codigo: elemento.codigo || null,
+
+          // CRÍTICO: Asignación de pasillo
+          pasilloId: elemento.pasilloId || null,
+
+          // Timestamps para auditoría
+          createdAt: elemento.createdAt || new Date().toISOString(),
+          updatedAt: elemento.updatedAt || new Date().toISOString(),
+
+          // Configuración de espacios/contenedores
+          tiposProductos: Array.isArray(elemento.tiposProductos) ? elemento.tiposProductos : [],
+          tipoZona: elemento.tipoZona || null,
+          permiteFragiles: Boolean(elemento.permiteFragiles),
+
+          // Props y metadatos del catálogo
+          props: elemento.props || {},
+          meta: elemento.meta || {},
 
           // Propiedades personalizadas
           propiedadesPersonalizadas: elemento.propiedadesPersonalizadas || {},
@@ -395,25 +415,6 @@ export const useStatePersistence = () => {
         hasHydratedMode = true
       }
 
-      // === RESTAURAR CATÁLOGOS ===
-      if (state.catalogos) {
-        const catalogosRestaurados = {
-          tiposEspacio: Array.isArray(state.catalogos.tiposEspacio)
-            ? state.catalogos.tiposEspacio
-            : DEFAULT_TIPOS_ESPACIO,
-          tiposCuarto: Array.isArray(state.catalogos.tiposCuarto)
-            ? state.catalogos.tiposCuarto
-            : DEFAULT_TIPOS_CUARTO,
-        }
-        storeActions.setCatalogos(catalogosRestaurados)
-      } else {
-        // Usar catálogos por defecto si no existen en el archivo
-        storeActions.setCatalogos({
-          tiposEspacio: DEFAULT_TIPOS_ESPACIO,
-          tiposCuarto: DEFAULT_TIPOS_CUARTO,
-        })
-      }
-
       // === RESTAURAR PLANTAS CON VALIDACIÓN INDIVIDUAL ===
       let plantasRestauradas = 0
       state.plantas.forEach((plantaData, index) => {
@@ -440,6 +441,14 @@ export const useStatePersistence = () => {
             activa: plantaData.activa === true,
             // Nuevo: flag de planta elástica (fallback false si no viene)
             isInfinite: plantaData.isInfinite === true,
+
+            // CRÍTICO: Código único (se regenerará si no existe)
+            codigo: plantaData.codigo || null,
+
+            // Timestamps
+            createdAt: plantaData.createdAt || new Date().toISOString(),
+            updatedAt: plantaData.updatedAt || new Date().toISOString(),
+
             propiedadesPersonalizadas: plantaData.propiedadesPersonalizadas || {},
           }
 
@@ -493,7 +502,6 @@ export const useStatePersistence = () => {
             nombre: elementoData.nombre || `Elemento ${elementoData.tipo}`,
             descripcion: elementoData.descripcion || '',
             tipo: elementoData.tipo,
-            categoria: elementoData.categoria || 'general',
             plantaId: elementoData.plantaId,
             etiquetas: Array.isArray(elementoData.etiquetas) ? elementoData.etiquetas : [],
             codigoEsl: elementoData.codigoEsl || '',
@@ -563,6 +571,27 @@ export const useStatePersistence = () => {
             padre: elementoData.padre || null,
             hijos: Array.isArray(elementoData.hijos) ? elementoData.hijos : [],
 
+            // CRÍTICO: Código único (se regenerará si no existe)
+            codigo: elementoData.codigo || null,
+
+            // CRÍTICO: Asignación de pasillo (se recalculará después)
+            pasilloId: elementoData.pasilloId || null,
+
+            // Timestamps
+            createdAt: elementoData.createdAt || new Date().toISOString(),
+            updatedAt: elementoData.updatedAt || new Date().toISOString(),
+
+            // Configuración de espacios/contenedores
+            tiposProductos: Array.isArray(elementoData.tiposProductos)
+              ? elementoData.tiposProductos
+              : [],
+            tipoZona: elementoData.tipoZona || null,
+            permiteFragiles: Boolean(elementoData.permiteFragiles),
+
+            // Props y metadatos del catálogo
+            props: elementoData.props || {},
+            meta: elementoData.meta || {},
+
             propiedadesPersonalizadas: elementoData.propiedadesPersonalizadas || {},
           }
 
@@ -586,32 +615,11 @@ export const useStatePersistence = () => {
         }
       }
 
-      // === ESTABLECER NAVEGACIÓN INICIAL ===
       const primeraPlanta = state.plantas[0]
       storeActions.setInitialNavigation(primeraPlanta.id, primeraPlanta.nombre)
 
-      // === RESUMEN DE DESERIALIZACIÓN ===
-      // const summary = {
-      //   plantas: plantasRestauradas,
-      //   elementos: elementosRestaurados,
-      //   elementosOmitidos,
-      //   plantaActiva: primeraPlanta.id,
-      //   warnings: validation.warnings?.length || 0,
-      //   changeHistory: {
-      //     restored: changeHistoryRestored,
-      //     entries: changeHistoryRestored ? state.changeHistory.entries.length : 0
-      //   },
-      //   catalogos: {
-      //     tiposEspacio: state.catalogos?.tiposEspacio?.length || DEFAULT_TIPOS_ESPACIO.length,
-      //     tiposCuarto: state.catalogos?.tiposCuarto?.length || DEFAULT_TIPOS_CUARTO.length,
-      //     tiposProductoAdmitidos: state.catalogos?.tiposProductoAdmitidos?.length || DEFAULT_TIPOS_PRODUCTO_ADMITIDOS.length,
-      //   }
-      // }
-
-      // console.log('✅ Estado deserializado exitosamente:', summary)
-
       if (elementosOmitidos > 0) {
-        console.warn(`⚠️ ${elementosOmitidos} elementos fueron omitidos debido a datos inválidos`)
+        console.warn(`${elementosOmitidos} elementos fueron omitidos debido a datos inválidos`)
       }
 
       return true
@@ -847,9 +855,6 @@ export const useStatePersistence = () => {
           if (strict) {
             if (!elemento.nombre) {
               validationResult.warnings.push(`${context}: se recomienda tener nombre`)
-            }
-            if (!elemento.categoria) {
-              validationResult.warnings.push(`${context}: se recomienda tener categoría`)
             }
             if (elemento.tipo !== 'plantas' && !elemento.ubicacion) {
               validationResult.warnings.push(`${context}: estructuras/espacios deben tener ubicación`)
@@ -1121,45 +1126,6 @@ export const useStatePersistence = () => {
     return report
   }
 
-  /**
-   * Obtiene los catálogos actuales o los defaults
-   * @param {Object} state - Estado actual del store
-   * @returns {Object} Catálogos disponibles
-   */
-  const getCatalogos = (state) => {
-    return {
-      tiposEspacio: state.catalogos?.tiposEspacio || DEFAULT_TIPOS_ESPACIO,
-      tiposCuarto: state.catalogos?.tiposCuarto || DEFAULT_TIPOS_CUARTO,
-    }
-  }
-
-  /**
-   * Valida un catálogo individual
-   * @param {Array} catalogo - Array de elementos del catálogo
-   * @param {string} nombre - Nombre del catálogo para logging
-   * @returns {boolean} true si el catálogo es válido
-   */
-  const validateCatalogo = (catalogo, nombre) => {
-    if (!Array.isArray(catalogo)) {
-      console.warn(`Catálogo ${nombre}: debe ser un array`)
-      return false
-    }
-
-    const hasValidItems = catalogo.every(item =>
-      item &&
-      typeof item === 'object' &&
-      typeof item.id === 'string' &&
-      typeof item.nombre === 'string'
-    )
-
-    if (!hasValidItems) {
-      console.warn(`Catálogo ${nombre}: algunos elementos no tienen la estructura correcta (id, nombre)`)
-      return false
-    }
-
-    return true
-  }
-
   return {
     // Funciones principales
     serialize,
@@ -1175,14 +1141,6 @@ export const useStatePersistence = () => {
     validateStructure,
     hasStateChanged,
     generateValidationReport,
-
-    // Gestión de catálogos
-    getCatalogos,
-    validateCatalogo,
-
-    // Catálogos por defecto (para referencia)
-    DEFAULT_TIPOS_ESPACIO,
-    DEFAULT_TIPOS_CUARTO,
 
     // Utilidades internas (para testing o debugging)
     validateStateBeforeSerialization,

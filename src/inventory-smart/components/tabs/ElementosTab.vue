@@ -206,18 +206,6 @@
                     <span class="spec-value text-gray-700">{{ formatTemplateWeight(tpl) }}</span>
                   </div>
                   </div>
-
-                <div class="mt-2 flex gap-1">
-                  <span
-                    class="inline-block px-2 py-1 text-xs rounded-full"
-                    :style="{
-                      backgroundColor: getTemplateColor(tpl),
-                      color: getContrastTextColor(getTemplateColor(tpl))
-                    }"
-                  >
-                    Plantillas
-                  </span>
-                  </div>
               </div>
             </div>
           </div>
@@ -269,7 +257,6 @@ import { ref, onMounted, watch, computed, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
-import { getColorCategoria, UBICACIONES_DISPONIBLES, getContrastTextColor } from '@/inventory-smart/utils/constants'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useToast } from '@/inventory-smart/composables/useToast'
@@ -370,25 +357,16 @@ const selectCuartos = () => {
   if (selectedCatalog.value !== 'elementos') selectCatalog('elementos')
 }
 
-// Opciones de filtros en Plantillas
 const canvasStore = useCanvasStore()
 
-// --- MODIFICACIÓN CLAVE ---
-// NUEVO: Computed para determinar si el contexto actual deshabilita el tab.
+// Determinar si el contexto actual deshabilita el tab.
 const isContextoInvalido = computed(() => {
   const tipoContexto = canvasStore.contextoActual?.tipo
   return tipoContexto === 'cuartos' || tipoContexto === 'elementos'
 })
-// --- FIN MODIFICACIÓN ---
 
 const isPlantaContext = computed(() => canvasStore.contextoActual?.tipo === 'plantas')
 const tabsOrder = computed(() => ['espacios', ...(isPlantaContext.value ? ['cuartos'] : []), 'plantillas'])
-const categoriasPlantillas = computed(() => {
-  const a = canvasStore.catalogos?.tiposCuarto || []
-  const b = canvasStore.catalogos?.tiposEspacio || []
-  return [...a, ...b]
-})
-const ubicacionesPlantillas = computed(() => UBICACIONES_DISPONIBLES)
 
 onMounted(() => {
   const saved = localStorage.getItem('canvas_selected_catalog')
@@ -483,7 +461,7 @@ const getTemplateRoot = (tpl) => {
 
 const getTemplateColor = (tpl) => {
   const root = getTemplateRoot(tpl)
-  return root.color || root.colorBase || getColorCategoria(root.categoria)
+  return root.color || root.colorBase
 }
 
 const getTemplateWeightVal = (tpl) => {
