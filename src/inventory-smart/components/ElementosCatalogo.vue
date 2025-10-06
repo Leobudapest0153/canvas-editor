@@ -442,13 +442,13 @@ const iniciarArrastre = (elemento, event) => {
     return
   }
   if (canvasStore.cambiosNoAplicados) {
-    showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn');
+  showToast('No puedes agregar elementos mientras hay cambios no aplicados', 'warn');
     event.preventDefault()
     return
   }
 
   if (['cuartos', 'elementos'].includes(canvasStore.contextoNavegacion.tipo)) {
-    showToast('No puedes arrastrar elementos mientras estás editando un cuarto o elemento.', 'warn');
+  showToast('No puedes arrastrar elementos mientras estás editando un cuarto o elemento', 'warn');
     event.preventDefault()
     return
   }
@@ -572,9 +572,9 @@ const handleDeleteItem = async (item) => {
     return closeKebab()
   }
   if (!item) return closeKebab()
-  const ok = await confirmDialog.confirm({
+    const ok = await confirmDialog.confirm({
     title: 'Eliminar elemento',
-    message: `Se eliminará “${item.nombre}” del catálogo. Esta acción no afectará elementos ya colocados.`,
+    message: `Se eliminará “${item.nombre}” del catálogo. Esta acción no afectará elementos ya colocados`,
     confirmLabel: 'Eliminar',
     cancelLabel: 'Cancelar',
   })
