@@ -6,6 +6,13 @@ import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 import { errorsPlacement } from '@/inventory-smart/validation/placementOrchestrator'
 
+// Mock del sistema de sugerencias
+const mockPlacementSuggestions = {
+  tryPlaceWithSuggestions: vi.fn(() => Promise.resolve(true)),
+  generatePlacementSuggestions: vi.fn(() => null),
+  applySuggestedAdjustments: vi.fn((el) => el)
+}
+
 describe('z stacking integration', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -16,7 +23,13 @@ describe('z stacking integration', () => {
   const mountWithElements = (elements) => {
     const store = useCanvasStore()
     store.elementos = elements
-    return { store, wrapper: mount(CanvasView) }
+    return { store, wrapper: mount(CanvasView, {
+      global: {
+        provide: {
+          placementSuggestions: mockPlacementSuggestions
+        }
+      }
+    }) }
   }
 
   it('reverts drag when XY and Z overlap', () => {

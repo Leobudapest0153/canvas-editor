@@ -1783,6 +1783,17 @@ const calcularCanvasAdaptativo = (elemento) => {
    * @returns {boolean} true si la deserialización fue exitosa
    */
   const deserialize = (jsonString) => {
+    // Capturar contexto y vista previos
+    const prevContext = {
+      tipo: contextoNavegacion.value?.tipo || null,
+      id: contextoNavegacion.value?.id || null,
+      path: Array.isArray(contextoNavegacion.value?.path)
+        ? contextoNavegacion.value.path.map(p => ({ tipo: p.tipo, id: p.id, nombre: p.nombre }))
+        : [],
+    }
+    const prevZoom = zoom.value
+    const prevPan = { x: panX.value, y: panY.value }
+
     try {
       const storeActions = {
         clearState: () => {
@@ -1817,9 +1828,7 @@ const calcularCanvasAdaptativo = (elemento) => {
 
           // Resetear valores temporales a sus defaults
           elementoSeleccionado.value = null
-          zoom.value = 1
-          panX.value = 0
-          panY.value = 0
+          // No resetear zoom/pan; mantener vista previa
 
           // Canvas adaptativo se recalculará automáticamente por el watcher
         }
@@ -1881,6 +1890,59 @@ const calcularCanvasAdaptativo = (elemento) => {
         recomputePasilloAssignments()
       } catch (e) {
         console.warn('No se pudieron recalcular asignaciones de pasillo tras deserializar', e)
+      }
+
+      // Intentar restaurar el mismo contexto de navegación y vista
+      try {
+        const plantaExists = (id) => !!plantaPorId.value(id)
+        const elementoExists = (id) => !!elementoPorId.value(id)
+
+        let restoredPath = []
+        let finalTipo = 'plantas'
+        let finalId = null
+
+        if (Array.isArray(prevContext.path) && prevContext.path.length > 0) {
+          const rootPlantaId = prevContext.path[0]?.id
+          if (rootPlantaId && plantaExists(rootPlantaId)) {
+            const planta = plantaPorId.value(rootPlantaId)
+            restoredPath.push({ tipo: 'plantas', id: planta.id, nombre: planta?.nombre || 'Planta' })
+            finalTipo = 'plantas'
+            finalId = planta.id
+            for (let i = 1; i < prevContext.path.length; i++) {
+              const node = prevContext.path[i]
+              if (!node || !node.id) break
+              if (elementoExists(node.id)) {
+                const el = elementoPorId.value(node.id)
+                restoredPath.push({ tipo: el.tipo, id: el.id, nombre: el?.nombre || el.id })
+                finalTipo = el.tipo
+                finalId = el.id
+              } else {
+                break
+              }
+            }
+          }
+        }
+
+        // Fallback a primera planta si no se pudo reconstruir
+        if (restoredPath.length === 0) {
+          const firstPlanta = Array.isArray(plantas.value) && plantas.value.length > 0 ? plantas.value[0] : null
+          if (firstPlanta) {
+            restoredPath = [{ tipo: 'plantas', id: firstPlanta.id, nombre: firstPlanta.nombre }]
+            finalTipo = 'plantas'
+            finalId = firstPlanta.id
+          }
+        }
+
+        if (finalId) {
+          navegarAContexto(finalTipo, finalId, restoredPath)
+          // Restaurar zoom y pan previos
+          try {
+            configurarZoom(prevZoom)
+            configurarPan(prevPan.x, prevPan.y)
+          } catch (e) { /* noop */ }
+        }
+      } catch (e) {
+        console.warn('No se pudo restaurar el contexto de navegación previo:', e)
       }
 
       return ok

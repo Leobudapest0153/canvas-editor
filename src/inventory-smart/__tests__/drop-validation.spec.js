@@ -3,6 +3,13 @@ import { mount, config } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import CanvasView from '@/inventory-smart/components/CanvasView.vue'
 import { detectConflictsFor } from '@/inventory-smart/utils/collision'
+
+// Mock del sistema de sugerencias
+const mockPlacementSuggestions = {
+  tryPlaceWithSuggestions: vi.fn(() => Promise.resolve(true)),
+  generatePlacementSuggestions: vi.fn(() => null),
+  applySuggestedAdjustments: vi.fn((el) => el)
+}
 import { snapToGrid, nudgePlace } from '@/inventory-smart/utils/geometry'
 import { GRID_SIZE } from '@/inventory-smart/utils/constants'
 
@@ -89,7 +96,10 @@ describe('Drop Validation - Bug Fix: Drop que nace bloqueado', () => {
 
     wrapper = mount(CanvasView, {
       global: {
-        plugins: [pinia]
+        plugins: [pinia],
+        provide: {
+          placementSuggestions: mockPlacementSuggestions
+        }
       }
     })
 

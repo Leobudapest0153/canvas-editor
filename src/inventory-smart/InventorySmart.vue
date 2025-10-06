@@ -93,6 +93,16 @@
       :duration="contextAlert.alertDuration.value"
       @close="contextAlert.hideAlert"
     />
+
+    <!-- Modal de sugerencias de colocación -->
+    <PlacementSuggestionsModal
+      :visible="placementSuggestions.showSuggestionsModal.value"
+      :suggestions="placementSuggestions.currentSuggestions.value"
+      :elementName="placementSuggestions.currentElement.value?.nombre || 'Elemento'"
+      :reason="placementSuggestions.currentReason.value"
+      @accept="placementSuggestions.handleAcceptSuggestions"
+      @cancel="placementSuggestions.handleCancelSuggestions"
+    />
   </div>
 </template>
 
@@ -107,6 +117,7 @@ import WorkspaceEditor from './components/WorkspaceEditor.vue'
 import ManagmentFloorRoomPropertiesModal from './components/modals/ManagmentFloorRoomPropertiesModal.vue'
 import IdentifyEslModal from './components/modals/IdentifyEslModal.vue'
 import ContextAlert from './components/ContextAlert.vue'
+import PlacementSuggestionsModal from './components/modals/PlacementSuggestionsModal.vue'
 import { useCanvasImportExport } from './composables/useCanvasImportExport'
 import { useCanvasWithHistory } from './composables/useCanvasWithHistory'
 import { useCanvasBuffer } from './composables/useCanvasBuffer'
@@ -126,6 +137,7 @@ import UnsavedChangesModal from './components/UnsavedChangesModal.vue'
 import { useEditorMode } from './composables/useEditorMode'
 import { useEditorShortcuts } from './composables/useEditorShortcuts'
 import { useCatalogStore } from './stores/catalog'
+import { usePlacementWithSuggestions } from './composables/usePlacementWithSuggestions'
 import { generatePalette } from './utils/colorPalette'
 
 const props = defineProps({
@@ -211,7 +223,11 @@ const { exportarCanvas, importarCanvas, validarJSON } = useCanvasImportExport()
 const { undo, redo, store: canvasStore } = useCanvasWithHistory()
 const buffer = useCanvasBuffer()
 const { deleteSelected } = useDeleteElement()
-const { handlePaste: autoPaste } = useAutoPaste()
+
+// Inicializar sistema de sugerencias de colocación (debe estar antes de useAutoPaste)
+const placementSuggestions = usePlacementWithSuggestions()
+
+const { handlePaste: autoPaste } = useAutoPaste(placementSuggestions)
 const { showToast } = useToast()
 const servicesStore = useServicesStore()
 const { ensureEditable } = useEditorMode()
@@ -220,6 +236,9 @@ const catalogStore = useCatalogStore()
 
 // Inicializar sistema de alertas de contexto
 const contextAlert = useContextAlert()
+
+// Provide del sistema de sugerencias para componentes hijos (debe estar en nivel superior)
+provide('placementSuggestions', placementSuggestions)
 
 // Estado reactivo para saber si es móvil
 const isMobileDevice = ref(false)
