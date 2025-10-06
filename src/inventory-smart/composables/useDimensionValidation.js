@@ -120,7 +120,7 @@ export function useDimensionValidation() {
 
     // Mostrar toast de éxito si no se ha mostrado otro toast
     if (!silencioso) {
-      toast.showSuccess('Dimensiones físicas válidas.')
+  toast.showSuccess('Dimensiones físicas válidas')
     }
 
     return {
