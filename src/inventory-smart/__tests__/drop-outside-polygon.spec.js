@@ -5,6 +5,13 @@ import { pointInPolygon } from '@/inventory-smart/utils/polygonBounds'
 
 vi.mock('vue-konva', () => ({ VueKonva: {}, default: { install: () => {} } }))
 
+// Mock del sistema de sugerencias
+const mockPlacementSuggestions = {
+  tryPlaceWithSuggestions: vi.fn(() => Promise.resolve(true)),
+  generatePlacementSuggestions: vi.fn(() => null),
+  applySuggestedAdjustments: vi.fn((el) => el)
+}
+
 let mockStore
 vi.mock('@/inventory-smart/composables/useCanvasWithHistory', () => ({
   useCanvasWithHistory: () => ({ store: mockStore })
@@ -55,7 +62,13 @@ describe('drop outside polygon', () => {
       configurarPan: vi.fn(),
     }
 
-    const wrapper = mount(CanvasView)
+    const wrapper = mount(CanvasView, {
+      global: {
+        provide: {
+          placementSuggestions: mockPlacementSuggestions
+        }
+      }
+    })
     wrapper.vm.containerRef = { getBoundingClientRect: () => ({ left: 0, top: 0 }) }
     wrapper.vm.stageRef = {
       getNode: () => ({ x: () => 0, y: () => 0, scaleX: () => 1, scaleY: () => 1 })
