@@ -398,6 +398,7 @@ const initialTouchDragState = () => ({
   longPressTimer: null,
   startX: 0,
   startY: 0,
+  offset: { x: 0, y: 0 },
   dataTransfer: null,
 })
 
@@ -440,71 +441,93 @@ const cloneCatalogElement = (elemento) => {
   }
 }
 
-const buildDragDataForElement = (elemento) => {
-  if (!elemento) return null
-  return {
-    tipo: 'elemento-catalogo',
-    elemento: cloneCatalogElement(elemento),
+const cloneCatalogPayload = (payload) => {
+  try {
+    return structuredClone(payload)
+  } catch (error) {
+    try {
+      return JSON.parse(JSON.stringify(payload))
+    } catch {
+      return payload
+    }
   }
+}
+
+const buildCatalogDragPayload = (elemento, offset = { x: 0, y: 0 }) => {
+  if (!elemento) return null
+  const isStructured = !!elemento?.payload?.rootId && Array.isArray(elemento?.payload?.elements)
+  return isStructured
+    ? {
+        tipo: 'plantilla-catalogo',
+        payload: cloneCatalogPayload(elemento.payload),
+        offset,
+      }
+    : {
+        tipo: 'elemento-catalogo',
+        elemento: cloneCatalogElement(elemento),
+        offset,
+      }
 }
 
 const getIconComponentForElement = (elemento) => {
   if (!elemento) return SpaceIcon
-  const tipo = (elemento.tipo || '').toLowerCase()
-  if (tipo === 'cuartos') return RoomIcon
+  if ((elemento.tipo || '').toLowerCase() === 'cuartos') {
+    return RoomIcon
+  }
   const ubicacion = (elemento.ubicacion || elemento.montado || '').toLowerCase()
   return ubicacion === 'pared' ? SpaceOnWallIcon : SpaceIcon
 }
 
 const getChildCount = (elemento) => {
-  if (!elemento) return 0
-  const metaCount = Number(elemento.meta?.childrenCount)
-  if (Number.isFinite(metaCount)) return metaCount
-  const payload = elemento.payload
-  if (payload?.rootId && Array.isArray(payload.elements)) {
-    return payload.elements.filter((el) => el.padre === payload.rootId).length
+  try {
+    if (!elemento?.payload?.rootId || !Array.isArray(elemento.payload.elements)) {
+      return 0
+    }
+    const root = elemento.payload.elements.find((e) => e.id === elemento.payload.rootId)
+    return root?.hijos?.length || 0
+  } catch {
+    return 0
   }
-  if (Array.isArray(elemento.hijos)) return elemento.hijos.length
-  return 0
 }
 
-const getCardDims = (elemento) => {
-  const dims = elemento?.dimensiones || {}
-  const fallback = elemento?.meta?.dimsCm || {}
-  const parse = (value) => {
-    const num = Number(value)
-    return Number.isFinite(num) ? num : null
-  }
-  return {
-    ancho: parse(dims.ancho ?? fallback.ancho) ?? 0,
-    largo: parse(dims.largo ?? fallback.largo) ?? 0,
-    alto: parse(dims.alto ?? fallback.alto) ?? 0,
-  }
-}
+const getCardDims = (item) => item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
 
 const isKebabRestricted = (item) => {
-  if (!item) return true
-  const source = item.props?.source
-  if (!source) return false
-  return source !== 'user'
+  const t = item?.tipo
+  return t === 'pasillos' || t === 'contenedores' || t === 'pisos'
 }
 
 const iniciarArrastre = (elemento, event) => {
-  if (!canEditCanvas.value) {
-    event.preventDefault()
+  if (catalogReadOnly.value || !canEditCanvas.value) {
     showToast(VISUAL_MODE_MESSAGE, 'warning')
+    event.preventDefault()
     return
   }
-  const payload = buildDragDataForElement(elemento)
-  if (!payload) return
-  try {
-    event.dataTransfer.setData('application/json', JSON.stringify(payload))
-    event.dataTransfer.effectAllowed = 'copy'
-  } catch (error) {
-    console.error('No se pudo preparar drag desde catálogo', error)
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn')
+    event.preventDefault()
+    return
   }
-  const card = event.currentTarget
-  if (card && card.classList) card.classList.add('opacity-50', 'scale-95')
+
+  if (['cuartos', 'elementos'].includes(canvasStore.contextoNavegacion.tipo)) {
+    showToast('No puedes arrastrar elementos mientras estás editando un cuarto o elemento.', 'warn')
+    event.preventDefault()
+    return
+  }
+
+  const offset = { x: event.offsetX || 0, y: event.offsetY || 0 }
+  const payload = buildCatalogDragPayload(elemento, offset)
+  if (!payload) return
+
+  try {
+    const dataString = JSON.stringify(payload)
+    event.dataTransfer.setData('application/json', dataString)
+    event.dataTransfer.effectAllowed = 'copy'
+    const card = event.currentTarget
+    if (card && card.classList) card.classList.add('opacity-50', 'scale-95')
+  } catch (error) {
+    console.error('Error en iniciarArrastre:', error)
+  }
 }
 
 const finalizarArrastre = (event) => {
@@ -513,21 +536,35 @@ const finalizarArrastre = (event) => {
 }
 
 const iniciarArrastreTouch = (elemento, event) => {
-  if (!canEditCanvas.value) {
+  if (catalogReadOnly.value || !canEditCanvas.value) {
     showToast(VISUAL_MODE_MESSAGE, 'warning')
     return
   }
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn')
+    return
+  }
+  if (['cuartos', 'elementos'].includes(canvasStore.contextoNavegacion.tipo)) {
+    showToast('No puedes arrastrar elementos mientras estás editando un cuarto o elemento.', 'warn')
+    return
+  }
+
   const touch = event.touches?.[0]
   if (!touch || !elemento) return
 
   resetTouchDragState()
 
   const cardEl = event.currentTarget
+  const cardRect = cardEl?.getBoundingClientRect?.()
+  const offset = cardRect
+    ? { x: touch.clientX - cardRect.left, y: touch.clientY - cardRect.top }
+    : { x: 0, y: 0 }
+
   const timerId = window.setTimeout(() => {
     const state = touchDragState.value
     if (state.longPressTimer !== timerId) return
 
-    const payload = buildDragDataForElement(elemento)
+    const payload = buildCatalogDragPayload(elemento, state.offset)
     if (!payload) {
       resetTouchDragState()
       return
@@ -560,6 +597,7 @@ const iniciarArrastreTouch = (elemento, event) => {
     longPressTimer: timerId,
     startX: touch.clientX,
     startY: touch.clientY,
+    offset,
     dataTransfer: null,
   }
 }
