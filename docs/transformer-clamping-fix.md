@@ -2,7 +2,7 @@
 
 ## 🐛 Problema Detectado
 
-Cuando el usuario estiraba un elemento hacia el límite del polígono, **a veces quedaba un pequeño espacio** entre el elemento y el borde (ver imágenes adjuntas). Esto requería intentar estirar 2-3 veces más para lograr que quedara completamente pegado.
+Cuando el usuario estiraba un elemento hacia el límite del polígono, **a veces quedaba un pequeño espacio** entre el elemento y el borde. Esto requería intentar estirar 2-3 veces más para lograr que quedara completamente pegado.
 
 ### Causa Raíz
 
