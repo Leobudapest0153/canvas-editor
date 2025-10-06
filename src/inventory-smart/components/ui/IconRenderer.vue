@@ -82,6 +82,16 @@ const svgContents = {
       <path stroke="currentColor" id="svg_1" stroke-linejoin="round" stroke-linecap="round" stroke-width="4" d="m35,14.07813l-22,0m22,0c0.8,0 1.6,0.24844 2.2,0.99375c0.6,0.74531 0.8,1.73906 0.8,2.73281l0,4.96875c0,0.99375 -0.2,1.9875 -0.8,2.73281c-0.6,0.74531 -1.4,0.99375 -2.2,0.99375l-22,0c-0.8,0 -1.6,-0.24844 -2.2,-0.99375c-0.6,-0.74531 -0.8,-1.73906 -0.8,-2.73281l0,-4.96875c0,-0.99375 0.2,-1.9875 0.8,-2.73281c0.6,-0.74531 1.4,-0.99375 2.2,-0.99375m22,0l0,-2.48437c0,-0.99375 -0.2,-1.9875 -0.8,-2.73281c-0.6,-0.74531 -1.4,-0.99375 -2.2,-0.99375m-19,6.21094l0,-2.48437c0,-0.99375 0.2,-1.9875 0.8,-2.73281c0.6,-0.74531 1.4,-0.99375 2.2,-0.99375m16,0l0,-2.48437c0,-0.99375 -0.2,-1.9875 -0.8,-2.73281c-0.6,-0.74531 -1.4,-0.99375 -2.2,-0.99375l-10,0c-0.8,0 -1.6,0.24844 -2.2,0.99375c-0.6,0.74531 -0.8,1.73906 -0.8,2.73281l0,2.48437m16,0l-16,0"/>
     </g>
   `,
+
+  'space-on-wall': `
+    <!-- Estante montado en pared centrado -->
+    <rect x="12" y="6" width="24" height="3" rx="1.5" fill="currentColor"/>
+    <rect x="16" y="10" width="16" height="2" rx="1" fill="currentColor" opacity="0.7"/>
+    <rect x="12" y="14" width="24" height="3" rx="1.5" fill="currentColor"/>
+    <rect x="16" y="18" width="16" height="2" rx="1" fill="currentColor" opacity="0.7"/>
+    <rect x="12" y="22" width="24" height="3" rx="1.5" fill="currentColor"/>
+    <rect x="16" y="26" width="16" height="2" rx="1" fill="currentColor" opacity="0.7"/>
+  `,
 }
 
 // Computed para obtener el contenido SVG
