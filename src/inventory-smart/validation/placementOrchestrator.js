@@ -46,10 +46,10 @@ export function rangesOverlap(a0, a1, b0, b1, tolerance = 0) {
 }
 
 export const errorsPlacement = {
-  ZBASE_REQUIRED: 'Por favor, ingresa una altura válida desde el suelo (mayor a 0).',
+  ZBASE_REQUIRED: 'Por favor, ingresa una altura válida desde el suelo (mayor a 0)',
   HEIGHT_EXCEEDS_WAREHOUSE:
-    'Su altura total excede la altura máxima de la bodega.',
-  Z_STACK_CONFLICT: 'Conflicto de altura detectado con otro elemento.',
+  'Su altura total excede la altura máxima de la bodega',
+  Z_STACK_CONFLICT: 'Conflicto de altura detectado con otro elemento',
 }
 
 export function resolveCoplanarNeighbors(element = {}, all = []) {
