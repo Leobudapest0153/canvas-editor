@@ -2,7 +2,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { throttleEveryNFrames } from '@/inventory-smart/utils/dragMath'
 import { isPlacementValid } from '@/inventory-smart/utils/isPlacementValid'
 import { CM_TO_PX, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
-import { circleInPolygon, isRectCompletelyInPolygon } from '@/inventory-smart/utils/polygonBounds'
+import { circleInPolygon, isRectCompletelyInPolygon, clampRectToPolygon, clampCircleToPolygon } from '@/inventory-smart/utils/polygonBounds'
 import { boundaryToAreaBounds } from '@/inventory-smart/utils/bounds'
 import { correctTransformValues } from '@/inventory-smart/utils/precision'
 import { toTransformerPrecision } from '../utils/fixedDimensions'
@@ -34,6 +34,27 @@ export function useTransformer({
   const editingElementId = ref(null)
   const transformInitialState = new Map()
   const transformState = new Map()
+  const lastValidTransformState = new Map() // Último estado válido durante transform
+  // Debug helpers to collect recent transform samples per element (disabled by default)
+  const transformDebug = { enabled: false }
+  const transformDebugSamples = new Map()
+  const enableTransformDebug = (enable = true) => {
+    transformDebug.enabled = !!enable
+    if (transformDebug.enabled) transformDebugSamples.clear()
+  }
+  const pushDebugSample = (elementId, sample) => {
+    if (!transformDebug.enabled) return
+    try {
+      const arr = transformDebugSamples.get(elementId) || []
+      arr.push(sample)
+      // keep recent history small
+      if (arr.length > 50) arr.shift()
+      transformDebugSamples.set(elementId, arr)
+    } catch (err) {
+      // swallow to avoid affecting UI
+      console.warn('[transform-debug] push error', err)
+    }
+  }
 
   // Cleanup automático para prevenir memory leaks
   const cleanupStaleStates = () => {
@@ -44,6 +65,7 @@ export function useTransformer({
       if (!activeIds.has(id)) {
         transformInitialState.delete(id)
         transformState.delete(id)
+        lastValidTransformState.delete(id)
       }
     }
   }
@@ -212,7 +234,170 @@ export function useTransformer({
     }
   }
 
-  // Revertir transformación visual y en el store
+  // Aplicar el último estado válido de transformación
+  const applyLastValidTransform = (elementId, reason = '') => {
+    const elemento = canvasStore.elementosVisibles.find((e) => e.id === elementId)
+    if (!elemento) {
+      console.warn('[transform-apply-valid] Elemento no encontrado:', elementId)
+      return null
+    }
+
+    // Usar el último estado válido, o el inicial si no hay ninguno válido registrado
+    let validState = lastValidTransformState.get(elementId) || transformInitialState.get(elementId) || {
+      x: elemento.x,
+      y: elemento.y,
+      width: elemento.width,
+      height: elemento.height,
+      rotation: elemento.rotation || 0,
+    }
+
+    // CLAMPING INTELIGENTE: Aplicar clamp al polígono para que quede exactamente pegado
+    try {
+      if (transformDebug.enabled) {
+        pushDebugSample(elementId, { type: 'apply-start', validState: { ...validState }, t: Date.now() })
+        console.debug('[transform-debug] apply-start', elementId, { ...validState })
+      }
+      let boundary = null
+      if (typeof computeBoundary === 'function') {
+        try {
+          boundary = computeBoundary()
+        } catch { /* ignore */ }
+      }
+
+      if (boundary && boundary.type === 'polygon' && boundary.mode !== 'elastic') {
+        const polygonForBounds = Array.isArray(boundary?.inset) && boundary.inset.length
+          ? boundary.inset
+          : (Array.isArray(boundary?.points) && boundary.points.length ? boundary.points : undefined)
+
+            if (polygonForBounds && polygonForBounds.length >= 3) {
+          if (elemento?.forma === 'circular') {
+            // Para círculos, usar clamp de círculo
+            const radius = Math.min(validState.width, validState.height) / 2
+            const centerX = validState.x + radius
+            const centerY = validState.y + radius
+            const clamped = clampCircleToPolygon({ x: centerX, y: centerY, radius }, polygonForBounds)
+            if (clamped) {
+              validState = {
+                ...validState,
+                x: clamped.x - radius,
+                y: clamped.y - radius
+              }
+            }
+            if (transformDebug.enabled) {
+              pushDebugSample(elementId, { type: 'apply-post-clamp', validState: { ...validState }, t: Date.now() })
+              console.debug('[transform-debug] apply-post-clamp', elementId, { ...validState })
+            }
+          } else {
+            // Para rectángulos: clamp de posición y ajuste progresivo de dimensiones
+            const rect = {
+              x: validState.x,
+              y: validState.y,
+              width: validState.width,
+              height: validState.height
+            }
+
+            // Paso 1: Intentar mover la posición manteniendo el tamaño
+            const clampedPos = clampRectToPolygon(rect, polygonForBounds)
+            let finalX = clampedPos.x
+            let finalY = clampedPos.y
+            let finalWidth = rect.width
+            let finalHeight = rect.height
+
+            // Paso 2: Verificar si con la posición ajustada el rectángulo cabe completamente
+            const fitsAfterClamp = isRectCompletelyInPolygon(
+              finalX,
+              finalY,
+              finalWidth,
+              finalHeight,
+              polygonForBounds
+            )
+
+            if (!fitsAfterClamp) {
+              // Paso 3: Reducir dimensiones progresivamente hasta que quepa
+              // Comenzar desde el borde que está causando el problema
+              const originalRight = validState.x + validState.width
+              const originalBottom = validState.y + validState.height
+
+              // Encontrar los límites del polígono
+              const polyBounds = {
+                minX: Math.min(...polygonForBounds.map(p => p.x)),
+                maxX: Math.max(...polygonForBounds.map(p => p.x)),
+                minY: Math.min(...polygonForBounds.map(p => p.y)),
+                maxY: Math.max(...polygonForBounds.map(p => p.y))
+              }
+
+              // Ajustar width si excede por la derecha
+              if (originalRight > polyBounds.maxX) {
+                const maxPossibleWidth = polyBounds.maxX - finalX
+                finalWidth = Math.max(10, Math.min(finalWidth, maxPossibleWidth))
+              }
+
+              // Ajustar height si excede por abajo
+              if (originalBottom > polyBounds.maxY) {
+                const maxPossibleHeight = polyBounds.maxY - finalY
+                finalHeight = Math.max(10, Math.min(finalHeight, maxPossibleHeight))
+              }
+
+              // Verificación final con muestreo (para polígonos irregulares)
+              const maxAttempts = 10
+              let attempt = 0
+              while (attempt < maxAttempts &&
+                     !isRectCompletelyInPolygon(finalX, finalY, finalWidth, finalHeight, polygonForBounds)) {
+                finalWidth *= 0.95 // Reducir 5% en cada intento
+                finalHeight *= 0.95
+                if (finalWidth < 10 || finalHeight < 10) break // Mínimo de seguridad
+                attempt++
+              }
+            }
+
+            validState = {
+              ...validState,
+              x: finalX,
+              y: finalY,
+              width: finalWidth,
+              height: finalHeight
+            }
+          }
+        }
+      }
+    } catch (clampErr) {
+      console.warn('[transform-apply-valid] Error en clamping:', clampErr)
+    }
+
+    try {
+      const node = getNode(elementId)
+      if (node) {
+        node.x(validState.x)
+        node.y(validState.y)
+        // Importante: resetear escala antes de reestablecer dimensiones para evitar drift
+        if (typeof node.scaleX === 'function') node.scaleX(1)
+        if (typeof node.scaleY === 'function') node.scaleY(1)
+        if (typeof node.width === 'function') node.width(validState.width)
+        if (typeof node.height === 'function') node.height(validState.height)
+        node.rotation && node.rotation(validState.rotation || 0)
+      } else {
+        console.warn('[transform-apply-valid] No se pudo encontrar el nodo:', elementId)
+      }
+
+      clearTransformVisualFeedback(elementId)
+    } catch (error) {
+      console.error('[transform-apply-valid-error] Error aplicando estado válido:', error)
+    }
+
+    console.debug('[transform-debug] applied last valid state', elementId, { reason, validState })
+    // Limpiar guías de snapping
+    if (typeof clearGuides === 'function') {
+      try {
+        clearGuides()
+      } catch (error) {
+        console.warn('[transform-apply-valid] Error limpiando guías:', error)
+      }
+    }
+
+    return validState
+  }
+
+  // Revertir transformación visual y en el store (mantener para casos donde realmente se necesite revertir)
   const revertTransform = (elementId, reason = '') => {
     const elemento = canvasStore.elementosVisibles.find((e) => e.id === elementId)
     if (!elemento) {
@@ -283,6 +468,8 @@ export function useTransformer({
       const height = node.height() * node.scaleY()
       const state = { x, y, width, height, rotation: node.rotation?.() || 0 }
       transformInitialState.set(elementId, state)
+      // Inicializar último estado válido con el estado inicial
+      lastValidTransformState.set(elementId, { ...state })
 
       // Mostrar guías de snapping al iniciar transform si está habilitado
       if (isSnappingEnabled?.value && typeof performSnap === 'function') {
@@ -335,6 +522,127 @@ export function useTransformer({
 
       // Actualizar cache de estado sin tocar el store
       transformState.set(elementId, { x, y, width, height })
+
+      // Validar si este estado es válido para guardarlo como último válido
+      // Esto se hace de forma ligera sin mostrar errores
+      try {
+        const elemento = canvasStore.elementosVisibles.find((e) => e.id === elementId)
+        if (elemento) {
+          // Validación rápida: dentro de límites y sin colisiones bloqueantes
+          let isValid = true
+
+          // 1. Verificar límites de polígono si aplica
+          let boundary = null
+          let polygonForBounds = undefined
+          if (typeof computeBoundary === 'function') {
+            try {
+              boundary = computeBoundary()
+            } catch { /* ignore */ }
+          }
+          if (boundary && boundary.type === 'polygon' && boundary.mode !== 'elastic') {
+            const polygonForBounds = Array.isArray(boundary?.inset) && boundary.inset.length
+              ? boundary.inset
+              : (Array.isArray(boundary?.points) && boundary.points.length ? boundary.points : undefined)
+
+            if (polygonForBounds) {
+              if (elemento?.forma === 'circular') {
+                const radius = Math.min(width, height) / 2
+                const centerX = x + radius
+                const centerY = y + radius
+                isValid = circleInPolygon({ x: centerX, y: centerY, radius }, polygonForBounds)
+              } else {
+                isValid = isRectCompletelyInPolygon(x, y, width, height, polygonForBounds)
+              }
+            }
+          }
+
+          // 2. Validación rápida de colisiones si pasó la de límites
+          if (isValid) {
+            const layerWidth = layerConfig?.value?.width ?? 0
+            const layerHeight = layerConfig?.value?.height ?? 0
+            const polygonForBounds = Array.isArray(boundary?.inset) && boundary.inset.length
+              ? boundary.inset
+              : (Array.isArray(boundary?.points) && boundary.points.length ? boundary.points : undefined)
+
+            const areaBounds = boundaryToAreaBounds(boundary, {
+              minX: 0,
+              minY: 0,
+              maxX: layerWidth,
+              maxY: layerHeight,
+              mode: boundary?.mode || 'fixed',
+              polygon: polygonForBounds ?? null,
+            })
+
+            let neighbors = []
+            try {
+              const isInfiniteFloor = canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true
+              const plantaId = canvasStore.plantaActivaData?.id
+              if (isInfiniteFloor && plantaId && typeof canvasStore.elementosEnPlanta === 'function') {
+                neighbors = (canvasStore.elementosEnPlanta(plantaId) || []).filter((e) => e && e.id !== elementId)
+              } else {
+                neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
+              }
+            } catch {
+              neighbors = canvasStore.elementosVisibles.filter((e) => e.id !== elementId)
+            }
+
+            const elementoParaValidacion = elemento?.forma === 'circular'
+              ? {
+                  ...elemento,
+                  x,
+                  y,
+                  width: Math.min(width, height),
+                  height: Math.min(width, height),
+                  forma: elemento.forma,
+                }
+              : { ...elemento, x, y, width, height }
+
+            isValid = isPlacementValid({
+              pos: { x, y },
+              movingEl: elementoParaValidacion,
+              neighbors,
+              areaBounds,
+              CM_TO_PX,
+              epsPx: 2.0, // Tolerancia aumentada para aceptar estados cercanos al límite
+            })
+          }
+
+            // Si es válido, actualizar el último estado válido
+            if (isValid) {
+              lastValidTransformState.set(elementId, {
+                x,
+                y,
+                width,
+                height,
+                rotation: node.rotation?.() || 0
+              })
+            }
+
+            // Push debug sample with gap info to help diagnose small-space issue
+            try {
+              const sample = { type: 'move', x, y, width, height, isValid, t: Date.now() }
+              if (polygonForBounds && Array.isArray(polygonForBounds) && polygonForBounds.length >= 3) {
+                const pxs = polygonForBounds.map(p => p.x)
+                const pys = polygonForBounds.map(p => p.y)
+                const minX = Math.min(...pxs)
+                const maxX = Math.max(...pxs)
+                const minY = Math.min(...pys)
+                const maxY = Math.max(...pys)
+                sample.gapLeft = Number((x - minX).toFixed(2))
+                sample.gapRight = Number((maxX - (x + width)).toFixed(2))
+                sample.gapTop = Number((y - minY).toFixed(2))
+                sample.gapBottom = Number((maxY - (y + height)).toFixed(2))
+              }
+              pushDebugSample(elementId, sample)
+              if (transformDebug.enabled) console.debug('[transform-debug] move-sample', elementId, sample)
+            } catch (e) {
+              /* noop */
+            }
+        }
+      } catch (err) {
+        // Si hay error en validación, no actualizar el estado válido
+        console.warn('[transform-move-validation]', err)
+      }
 
       // Feedback visual ligero throttleado
       throttleTransform(() => {
@@ -634,12 +942,43 @@ export function useTransformer({
           dimensiones: tempDimensiones,
         },
         {
-          revert: () => revertTransform(elementId, 'guard validation failed'),
+          revert: () => {}, // No revertir aquí, lo haremos después
           validationOptions: { isTransforming: true } // Indicar que es una validación de transformación
         },
       )
       if (!guardRes.valid) {
-        // Reconfigurar el transformer tras revertir para evitar estados visuales viejos
+        // Aplicar último estado válido en lugar de revertir al original
+        const appliedState = applyLastValidTransform(elementId, 'guard validation failed - using last valid')
+        if (appliedState) {
+          // Persistir el estado válido en el store sin mostrar toast
+          const widthCm = toTransformerPrecision(appliedState.width / CM_TO_PX)
+          const heightCm = toTransformerPrecision(appliedState.height / CM_TO_PX)
+          let finalDimensiones = elementoSnapshot?.dimensiones ? { ...elementoSnapshot.dimensiones } : undefined
+          if (finalDimensiones) {
+            if (canvasStore.vistaActiva === 'XY') {
+              finalDimensiones.ancho = widthCm
+              finalDimensiones.largo = heightCm
+            } else if (canvasStore.vistaActiva === 'XZ') {
+              finalDimensiones.ancho = widthCm
+              finalDimensiones.alto = heightCm
+            }
+          }
+          canvasStore.actualizarElemento(
+            elementId,
+            {
+              x: appliedState.x,
+              y: appliedState.y,
+              width: appliedState.width,
+              height: appliedState.height,
+              rotation: appliedState.rotation,
+              dimensiones: finalDimensiones,
+              dimensionLock: true,
+            },
+            true,
+            `Elemento ajustado a límite: ${elementoSnapshot?.nombre || elementoSnapshot?.tipo || elementId}`,
+          )
+          lastValidPositions.value.set(elementId, { x: appliedState.x, y: appliedState.y })
+        }
         nextTick(() => setupTransformer())
         return
       }
@@ -662,8 +1001,39 @@ export function useTransformer({
           }
 
           if (!isInsidePolygon) {
-            showToast('El elemento debe permanecer completamente dentro del área de la planta', 'warning')
-            revertTransform(elementId, 'elemento fuera del polígono')
+            // NO mostrar toast - aplicar último estado válido silenciosamente
+            const appliedState = applyLastValidTransform(elementId, 'elemento fuera del polígono - usando last valid')
+            if (appliedState) {
+              // Persistir el estado válido en el store
+              const widthCm = toTransformerPrecision(appliedState.width / CM_TO_PX)
+              const heightCm = toTransformerPrecision(appliedState.height / CM_TO_PX)
+              let finalDimensiones = elementoSnapshot?.dimensiones ? { ...elementoSnapshot.dimensiones } : undefined
+              if (finalDimensiones) {
+                if (canvasStore.vistaActiva === 'XY') {
+                  finalDimensiones.ancho = widthCm
+                  finalDimensiones.largo = heightCm
+                } else if (canvasStore.vistaActiva === 'XZ') {
+                  finalDimensiones.ancho = widthCm
+                  finalDimensiones.alto = heightCm
+                }
+              }
+              canvasStore.actualizarElemento(
+                elementId,
+                {
+                  x: appliedState.x,
+                  y: appliedState.y,
+                  width: appliedState.width,
+                  height: appliedState.height,
+                  rotation: appliedState.rotation,
+                  dimensiones: finalDimensiones,
+                  dimensionLock: true,
+                },
+                true,
+                `Elemento ajustado a límite: ${elementoSnapshot?.nombre || elementoSnapshot?.tipo || elementId}`,
+              )
+              lastValidPositions.value.set(elementId, { x: appliedState.x, y: appliedState.y })
+            }
+            nextTick(() => setupTransformer())
             return
           }
         }
@@ -713,7 +1083,38 @@ export function useTransformer({
       })
 
       if (!isValidNow) {
-        revertTransform(elementId, 'placement validation failed')
+        // NO mostrar toast - aplicar último estado válido silenciosamente
+        const appliedState = applyLastValidTransform(elementId, 'placement validation failed - usando last valid')
+        if (appliedState) {
+          // Persistir el estado válido en el store
+          const widthCm = toTransformerPrecision(appliedState.width / CM_TO_PX)
+          const heightCm = toTransformerPrecision(appliedState.height / CM_TO_PX)
+          let finalDimensiones = elementoSnapshot?.dimensiones ? { ...elementoSnapshot.dimensiones } : undefined
+          if (finalDimensiones) {
+            if (canvasStore.vistaActiva === 'XY') {
+              finalDimensiones.ancho = widthCm
+              finalDimensiones.largo = heightCm
+            } else if (canvasStore.vistaActiva === 'XZ') {
+              finalDimensiones.ancho = widthCm
+              finalDimensiones.alto = heightCm
+            }
+          }
+          canvasStore.actualizarElemento(
+            elementId,
+            {
+              x: appliedState.x,
+              y: appliedState.y,
+              width: appliedState.width,
+              height: appliedState.height,
+              rotation: appliedState.rotation,
+              dimensiones: finalDimensiones,
+              dimensionLock: true,
+            },
+            true,
+            `Elemento ajustado a límite: ${elementoSnapshot?.nombre || elementoSnapshot?.tipo || elementId}`,
+          )
+          lastValidPositions.value.set(elementId, { x: appliedState.x, y: appliedState.y })
+        }
         nextTick(() => setupTransformer())
         return
       }
@@ -862,6 +1263,7 @@ export function useTransformer({
     clearInterval(cleanupInterval)
     transformInitialState.clear()
     transformState.clear()
+    lastValidTransformState.clear()
   }
 
   return {
@@ -882,7 +1284,12 @@ export function useTransformer({
     handleTransformEnd,
     toggleEditingMode,
     revertTransform,
+    applyLastValidTransform,
     clearTransformVisualFeedback,
+
+  // Debug helpers
+  enableTransformDebug,
+  transformDebugSamples,
 
     // Cache management
     cleanupStaleStates,
@@ -891,3 +1298,4 @@ export function useTransformer({
     cleanup,
   }
 }
+

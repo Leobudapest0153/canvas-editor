@@ -39,19 +39,19 @@ function validateFootprintWithinRoom(newDims, currentLevel, room) {
 
   if (circle) {
     if (Number.isFinite(nextAncho) && nextAncho > roomAncho) {
-      return { ok: false, message: 'El diámetro (ancho) excede el ancho del cuarto.' };
+  return { ok: false, message: 'El diámetro (ancho) excede el ancho del cuarto' };
     }
     if (Number.isFinite(nextLargo) && nextLargo > roomLargo) {
-      return { ok: false, message: 'El diámetro (largo) excede el largo del cuarto.' };
+  return { ok: false, message: 'El diámetro (largo) excede el largo del cuarto' };
     }
     return { ok: true };
   }
 
   if (Number.isFinite(nextAncho) && nextAncho > roomAncho) {
-    return { ok: false, message: 'El ancho excede el ancho del cuarto.' };
+  return { ok: false, message: 'El ancho excede el ancho del cuarto' };
   }
   if (Number.isFinite(nextLargo) && nextLargo > roomLargo) {
-    return { ok: false, message: 'El largo excede el largo del cuarto.' };
+  return { ok: false, message: 'El largo excede el largo del cuarto' };
   }
   return { ok: true };
 }
@@ -218,7 +218,7 @@ export function proposeLevelChange(elements, levelId, levelPatch, parentId) {
   // 1) Validar footprint (ancho/largo)
   const footprintCheck = validateFootprintWithinRoom(newDims, level, room);
   if (!footprintCheck.ok) {
-    return { status: 'error', message: footprintCheck.message || 'Dimensiones exceden límites del cuarto.' };
+  return { status: 'error', message: footprintCheck.message || 'Dimensiones exceden límites del cuarto' };
   }
 
   // 2) Peso
@@ -252,7 +252,7 @@ export function proposeLevelChange(elements, levelId, levelPatch, parentId) {
   // 4) Altura del cuarto
   const Hc = Number(room?.dimensiones?.alto);
   if (!Number.isFinite(Hc) || Hc <= 0) {
-    return { status: 'error', message: 'El cuarto no tiene altura válida definida.' };
+  return { status: 'error', message: 'El cuarto no tiene altura válida definida' };
   }
 
   const others = orderIds.filter(id => id !== levelId).map(id => ({ id, h: heightsCurrent[id] }));
@@ -354,17 +354,17 @@ export function proposeLevelChange(elements, levelId, levelPatch, parentId) {
 export function applyLevelChange(elements, draft, strategy, updaters) {
   // --- SECCIÓN 1: VALIDACIÓN Y PREPARACIÓN ---
   if (!updaters || typeof updaters.add !== 'function' || typeof updaters.update !== 'function') {
-    return { ok: false, message: 'Se requieren las funciones de "add" y "update".' };
+  return { ok: false, message: 'Se requieren las funciones de "add" y "update"' };
   }
   if (!draft || !['ok', 'clamp', 'redistribute'].includes(strategy)) {
-    return { ok: false, message: 'Estrategia inválida o draft vacío.' };
+  return { ok: false, message: 'Estrategia inválida o draft vacío' };
   }
 
   // Si hay exceso de peso y el usuario eligió 'ok', bloquear
   if (draft?.weightExceeded && strategy === 'ok') {
     const total = Math.round(Number(draft?.pesoTotal || 0));
     const max = Math.round(Number(draft?.roomWeightMax || 0));
-    return { ok: false, message: `No se puede aplicar: el peso total (${total} kg) excede el máximo permitido (${max} kg).` };
+  return { ok: false, message: `No se puede aplicar: el peso total (${total} kg) excede el máximo permitido (${max} kg)` };
   }
 
   // Selección de alturas/bases
@@ -376,7 +376,7 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
   } else {
     alturas = draft.redistribute?.alturas; bases = draft.redistribute?.bases;
   }
-  if (!alturas || !bases) return { ok: false, message: 'No hay datos de alturas/bases para aplicar.' };
+  if (!alturas || !bases) return { ok: false, message: 'No hay datos de alturas/bases para aplicar' };
 
   // Selección de pesos según estrategia (si existen propuestas)
   let pesos = null;
@@ -390,7 +390,7 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
 
   // Si todavía hay exceso de peso pero no tenemos propuestas de peso, bloquear
   if (draft?.weightExceeded && !pesos) {
-    return { ok: false, message: 'No hay propuesta de peso para resolver el exceso. Elige "Limitar" o "Forzar".' };
+  return { ok: false, message: 'No hay propuesta de peso para resolver el exceso. Elige "Limitar" o "Forzar"' };
   }
 
   const cm2px = (v) => Math.round((Number(v) || 0) * CM_TO_PX);
@@ -403,7 +403,7 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
     roomHeightCm = Number(room?.dimensiones?.alto) || 0;
   }
   if (roomHeightCm <= 0) {
-    return { ok: false, message: 'No se pudo determinar la altura del cuarto.' };
+  return { ok: false, message: 'No se pudo determinar la altura del cuarto' };
   }
   const roomHeightPx = cm2px(roomHeightCm);
   const targetId = draft.targetId;
@@ -421,7 +421,7 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
 
     if (id === 'Nuevo' && id === targetId) {
       const parentContext = byId(draft.padre);
-      if (!parentContext) return { ok: false, message: 'Contexto del padre no encontrado para crear.' };
+  if (!parentContext) return { ok: false, message: 'Contexto del padre no encontrado para crear' };
 
       const index = draft.nivelesOrden.indexOf(id);
       const parentChilds = elements.filter(e => e?.padre === parentContext.id);
@@ -467,7 +467,7 @@ export function applyLevelChange(elements, draft, strategy, updaters) {
       ok = updaters.update(id, patch, true, description);
     }
 
-    if (!ok) return { ok: false, message: `Falló la operación para el nivel con id: ${id}.` };
+  if (!ok) return { ok: false, message: `Falló la operación para el nivel con id: ${id}` };
   }
 
   return { ok: true };

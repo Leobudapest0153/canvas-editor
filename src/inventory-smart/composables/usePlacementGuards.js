@@ -88,8 +88,12 @@ export function usePlacementGuards({ useTopeClamp = true } = {}) {
     if (!res.valid) {
       opts.revert?.()
       console.warn('[placement-guard]', errorsPlacement[res.code] || 'Invalid position', { el, cand, code: res.code })
-      const msg = errorsPlacement[res.code] || 'Posición inválida'
-      showToast(msg, 'error');
+      // No mostrar toast si es una operación de transformación (se maneja silenciosamente en useTransformer)
+      const isTransforming = opts.validationOptions?.isTransforming === true
+      if (!isTransforming) {
+        const msg = errorsPlacement[res.code] || 'Posición inválida'
+        showToast(msg, 'error');
+      }
     }
     return res
   }

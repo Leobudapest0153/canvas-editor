@@ -153,6 +153,7 @@
               label="Opciones de planta"
               :delay="500"
               position="left"
+              v-if="canvasStore.modoEdicion"
             >
               <button
                 @click.stop="toggleMenuPlanta(planta.id, $event)"
@@ -717,7 +718,7 @@ const onDimChange = () => {
       preview.value = {
         status: 'block',
         message:
-          'No hay suficiente espacio con las nuevas dimensiones. Ajusta el tamaño o mueve elementos.',
+          'No hay suficiente espacio con las nuevas dimensiones. Ajusta el tamaño o mueve elementos',
         placements: [],
       }
     } else if (res.status === 'auto_adjust') {
@@ -839,6 +840,9 @@ onBeforeUnmount(() => document.removeEventListener('click', handleDocClickMobile
 
 // Métodos para el menú desplegable
 const toggleMenuPlanta = (plantaId, event) => {
+  if (canvasStore.modoEdicion === false) {
+    return
+  }
   if (menuAbiertoPlanta.value === plantaId) {
     menuAbiertoPlanta.value = null
     return

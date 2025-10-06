@@ -298,6 +298,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Configuración de grilla y snap
   // Por defecto desactivamos la cuadrícula (0 = sin cuadricula visual ni snap a grilla)
   const gridSize = ref(0) // px entre líneas de grilla (0 desactiva)
+  const gridVisible = ref(true) // Visibilidad de la grilla (independiente de gridSize)
   const snapGridEps = ref(10) // px de proximidad para aplicar snap al soltar
 
   const setGridSize = (sizePx) => {
@@ -310,6 +311,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     const e = Number(epsPx)
     if (!Number.isFinite(e)) return
     snapGridEps.value = Math.max(0, Math.min(50, e))
+  }
+
+  const toggleGridVisible = () => {
+    gridVisible.value = !gridVisible.value
   }
 
   // (contextoNavegacion ya declarado arriba)
@@ -2089,7 +2094,7 @@ const calcularCanvasAdaptativo = (elemento) => {
         if (preFit.minLargoCm != null && proposed.largoCm < preFit.minLargoCm) parts.push(`largo mínimo ${(preFit.minLargoCm / 100).toFixed(2)}m`)
         if (preFit.minAltoCm != null && proposed.altoCm < preFit.minAltoCm) parts.push(`alto mínimo ${(preFit.minAltoCm / 100).toFixed(2)}m`)
         if (preFit.minCapacidad != null && proposed.capacidadCarga < preFit.minCapacidad) parts.push(`capacidad mínima ${Math.round(preFit.minCapacidad)}kg`)
-        const detalle = parts.length ? ` Requisitos: ${parts.join(', ')}.` : ''
+  const detalle = parts.length ? ` Requisitos: ${parts.join(', ')}` : ''
         showToast(`No se puede aplicar: los elementos del piso no caben con las nuevas propiedades.${detalle}`, 'error')
         return
       }
@@ -2897,6 +2902,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     panX,
     panY,
     gridSize,
+    gridVisible,
     snapGridEps,
     modoEdicion,
   sidebarActiveTab,
@@ -2954,6 +2960,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     configurarPan,
     setGridSize,
     setSnapGridEps,
+    toggleGridVisible,
     setModoEdicion,
     activarModoEdicion,
     desactivarModoEdicion,

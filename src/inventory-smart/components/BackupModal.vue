@@ -337,7 +337,7 @@ const confirmarRestauracionServidor = () => {
 const confirmarRestauracion = (backup) => {
   confirmacion.value = {
     titulo: 'Restaurar Copia de Seguridad',
-    mensaje: `¿Estás seguro de que quieres restaurar la copia del ${backup.formattedDate}? Los cambios actuales se perderán.`,
+  mensaje: `¿Estás seguro de que quieres restaurar la copia del ${backup.formattedDate}? Los cambios actuales se perderán`,
     boton: 'Restaurar',
     tipo: 'danger',
     accion: () => restaurarBackup(backup.id)
@@ -374,7 +374,7 @@ const eliminarBackup = async (backupId) => {
 const confirmarLimpiezaTotal = () => {
   confirmacion.value = {
     titulo: 'Eliminar Todas las Copias',
-    mensaje: '¿Estás seguro de que quieres eliminar todas las copias de seguridad? Esta acción no se puede deshacer.',
+  mensaje: '¿Estás seguro de que quieres eliminar todas las copias de seguridad? Esta acción no se puede deshacer',
     boton: 'Eliminar Todas',
     tipo: 'danger',
     accion: limpiarTodasLasCopias
