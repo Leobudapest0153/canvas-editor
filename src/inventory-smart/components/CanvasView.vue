@@ -455,6 +455,13 @@
         </template>
       </v-layer>
       <v-layer ref="uiLayerRef" :config="{ listening: false }">
+        <GridLayer
+          v-if="canvasStore.gridVisible"
+          :scale="canvasStore.zoom"
+          :pixels-per-unit="10 * 100"
+          :unit="'m'"
+          :bbox="floorBoundary"
+        />
         <!-- Debug: mostrar información según el contexto -->
         <v-text
           v-if="!canvasStore.estaEnPlanta || !isInfinitePlant"
@@ -621,6 +628,7 @@
       :is-element-locked="selectedElementLocked"
       :is-snapping-enabled="isSnappingEnabled"
       :is-snapping="isSnapping"
+      :is-grid-visible="canvasStore.gridVisible"
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       :is-element-restricted="isRestricted"
@@ -630,6 +638,7 @@
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
       @fill-container="() => simularLlenadoElemento(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
+      @toggle-grid="canvasStore.toggleGridVisible"
       @toggle-aisle-dash="() => (showPasillosDash = !showPasillosDash)"
       @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
     />
@@ -677,6 +686,7 @@ import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWit
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
 import RulersOverlay from '@/inventory-smart/components/RulersOverlay.vue'
+import GridLayer from '@/inventory-smart/components/GridLayer.vue'
 import { detectConflictsFor, throttle, computeMTD } from '@/inventory-smart/utils/collision'
 import { boundaryToAreaBounds } from '@/inventory-smart/utils/bounds'
 import { solveDragPosition } from '@/inventory-smart/utils/placementSolver'
@@ -1729,10 +1739,10 @@ const runPreDropValidations = (elemento, dropEvent) => {
   let elementoParaPeso = elemento
   if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
     const dims = { ...(elemento.dimensiones || {}) }
-    
+
     // Intentar obtener alto del padre según el contexto
     let altoContenedor = null
-    
+
     if (canvasStore.contextoActual?.tipo === 'plantas') {
       // Si estamos en una planta, usar alto de la planta
       altoContenedor = canvasStore.plantaActivaData?.dimensiones?.alto
@@ -1741,11 +1751,11 @@ const runPreDropValidations = (elemento, dropEvent) => {
       const elementoPadre = canvasStore.elementoPorId(canvasStore.contextoActual?.id)
       altoContenedor = elementoPadre?.dimensiones?.alto
     }
-    
+
     if (Number.isFinite(altoContenedor)) {
       dims.alto = altoContenedor
     }
-    
+
     elementoParaPeso = { ...elemento, dimensiones: dims }
   }
 
@@ -1801,14 +1811,14 @@ const runPreDropValidations = (elemento, dropEvent) => {
   // Para pasillos, usar el alto del contenedor padre (planta o elemento)
   if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
     let altoContenedor = null
-    
+
     if (canvasStore.contextoActual?.tipo === 'plantas') {
       altoContenedor = canvasStore.plantaActivaData?.dimensiones?.alto
     } else {
       const elementoPadre = canvasStore.elementoPorId(canvasStore.contextoActual?.id)
       altoContenedor = elementoPadre?.dimensiones?.alto
     }
-    
+
     if (Number.isFinite(altoContenedor)) {
       altoCm = altoContenedor
     }
