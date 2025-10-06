@@ -547,7 +547,7 @@
                       <ProductTypesMultiSelect
                         v-model="pisoNivel.tiposProductos"
                         :error="pisoNivel._touched?.tiposProductos && (!pisoNivel.tiposProductos || pisoNivel.tiposProductos.length === 0)"
-                        error-message="Selecciona al menos un tipo de producto."
+                        error-message="Selecciona al menos un tipo de producto"
                         @changed="ensureTouchedForLevel(pisoNivel) && (pisoNivel._touched.tiposProductos = true)"
                       />
                     </div>
