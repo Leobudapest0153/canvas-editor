@@ -165,7 +165,7 @@
               @dragstart="onTemplateDragStart(tpl, $event)"
               @dragend="onTemplateDragEnd"
               @contextmenu.prevent="openTemplateContextMenu($event, tpl)"
-              class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md border-l-4 hover:scale-[1.02] hover:bg-gray-50 transition duration-200"
+              class="catalog-card group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md border-l-4 hover:scale-[1.02] hover:bg-gray-50 transition duration-200"
               :style="{ borderLeftColor: getTemplateColor(tpl) }"
             >
               <button
@@ -581,5 +581,12 @@ const handleDeleteTemplate = async (tpl) => {
   opacity: 0;
   transform: translateY(-10px);
   overflow: hidden;
+}
+
+.catalog-card,
+.catalog-card * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 </style>

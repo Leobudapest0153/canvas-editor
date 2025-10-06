@@ -274,6 +274,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const modoConfigurarEsl = ref(false)
   const elementoEslObjetivo = ref(null)
   const sidebarActiveTab = ref('elementos')
+  const sidebarVisible = ref(false)
 
   const editorPermissions = computed(() => ({
     modo: modoEdicion.value ? 'edicion' : 'visualizacion',
@@ -297,6 +298,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Configuración de grilla y snap
   // Por defecto desactivamos la cuadrícula (0 = sin cuadricula visual ni snap a grilla)
   const gridSize = ref(0) // px entre líneas de grilla (0 desactiva)
+  const gridVisible = ref(true) // Visibilidad de la grilla (independiente de gridSize)
   const snapGridEps = ref(10) // px de proximidad para aplicar snap al soltar
 
   const setGridSize = (sizePx) => {
@@ -309,6 +311,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     const e = Number(epsPx)
     if (!Number.isFinite(e)) return
     snapGridEps.value = Math.max(0, Math.min(50, e))
+  }
+
+  const toggleGridVisible = () => {
+    gridVisible.value = !gridVisible.value
   }
 
   // (contextoNavegacion ya declarado arriba)
@@ -2756,6 +2762,18 @@ const calcularCanvasAdaptativo = (elemento) => {
     sidebarActiveTab.value = SIDEBAR_TAB_IDS.has(tabId) ? tabId : 'elementos'
   }
 
+  const setSidebarVisible = (visible) => {
+    sidebarVisible.value = Boolean(visible)
+  }
+
+  const toggleSidebar = () => {
+    sidebarVisible.value = !sidebarVisible.value
+  }
+
+  const initializeSidebarVisibility = (isDesktop = true) => {
+    sidebarVisible.value = isDesktop
+  }
+
   // === INTEGRACIÓN CON AUTOSAVE ===
   // Instancia del autosave - se establece desde App.vue o el componente principal
   const autoSaveInstance = ref(null)
@@ -2884,9 +2902,11 @@ const calcularCanvasAdaptativo = (elemento) => {
     panX,
     panY,
     gridSize,
+    gridVisible,
     snapGridEps,
     modoEdicion,
   sidebarActiveTab,
+    sidebarVisible,
     editorPermissions,
     crearPlanta,
     plantaEnEdicion,
@@ -2940,6 +2960,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     configurarPan,
     setGridSize,
     setSnapGridEps,
+    toggleGridVisible,
     setModoEdicion,
     activarModoEdicion,
     desactivarModoEdicion,
@@ -2952,6 +2973,9 @@ const calcularCanvasAdaptativo = (elemento) => {
     finalizarConfiguracionEsl,
     guardarCodigoEslElemento,
     setSidebarActiveTab,
+    setSidebarVisible,
+    toggleSidebar,
+    initializeSidebarVisibility,
 
     // Actions - Plantas
     seleccionarPlanta,

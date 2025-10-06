@@ -34,6 +34,11 @@
       @mousemove="handleStageMouseMove"
       @mouseup="handleStageMouseUp"
       @click="handleStageClick"
+      @touchstart="handleStageTouchStart"
+      @touchmove="handleStageTouchMove"
+      @touchend="handleStageTouchEnd"
+      @tap="handleStageTap"
+      @dbltap="handleStageDoubleTap"
     >
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
         <v-line
@@ -123,15 +128,15 @@
               y: elemento.y,
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
-              draggable: canDragElement(elemento),
+              draggable: canDragElement(elemento) && canStartDrag(elemento),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
             @dblclick="(e) => handleElementDoubleClick(e, elemento)"
-            @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
-            @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
-            @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
+            @dragstart="(e) => handleShapeDragStart(e, elemento)"
+            @dragmove="(e) => handleShapeDragMove(e, elemento)"
+            @dragend="(e) => handleShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id)"
@@ -139,6 +144,9 @@
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
             @pointerup.passive="onShapePointerUp"
             @pointercancel.passive="onShapePointerUp"
+            @touchstart="(e) => onShapeTouchStart(e, elemento)"
+            @touchmove="(e) => onShapeTouchMove(e, elemento)"
+            @touchend="(e) => onShapeTouchEnd(e, elemento)"
           >
             <v-rect
               :config="{
@@ -260,15 +268,15 @@
               y: elemento.y,
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
-              draggable: canDragElement(elemento),
+              draggable: canDragElement(elemento) && canStartDrag(elemento),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
             @dblclick="(e) => handleElementDoubleClick(e, elemento)"
-            @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
-            @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
-            @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
+            @dragstart="(e) => handleShapeDragStart(e, elemento)"
+            @dragmove="(e) => handleShapeDragMove(e, elemento)"
+            @dragend="(e) => handleShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id)"
@@ -276,6 +284,9 @@
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
             @pointerup.passive="onShapePointerUp"
             @pointercancel.passive="onShapePointerUp"
+            @touchstart="(e) => onShapeTouchStart(e, elemento)"
+            @touchmove="(e) => onShapeTouchMove(e, elemento)"
+            @touchend="(e) => onShapeTouchEnd(e, elemento)"
           >
             <v-rect
               :config="{
@@ -316,15 +327,15 @@
               y: elemento.y,
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
-              draggable: canDragElement(elemento),
+              draggable: canDragElement(elemento) && canStartDrag(elemento),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
             @dblclick="(e) => handleElementDoubleClick(e, elemento)"
-            @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
-            @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
-            @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
+            @dragstart="(e) => handleShapeDragStart(e, elemento)"
+            @dragmove="(e) => handleShapeDragMove(e, elemento)"
+            @dragend="(e) => handleShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id)"
@@ -332,6 +343,9 @@
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
             @pointerup.passive="onShapePointerUp"
             @pointercancel.passive="onShapePointerUp"
+            @touchstart="(e) => onShapeTouchStart(e, elemento)"
+            @touchmove="(e) => onShapeTouchMove(e, elemento)"
+            @touchend="(e) => onShapeTouchEnd(e, elemento)"
           >
             <v-rect
               :config="{
@@ -455,6 +469,13 @@
         </template>
       </v-layer>
       <v-layer ref="uiLayerRef" :config="{ listening: false }">
+        <GridLayer
+          v-if="canvasStore.gridVisible"
+          :scale="canvasStore.zoom"
+          :pixels-per-unit="10 * 100"
+          :unit="'m'"
+          :bbox="floorBoundary"
+        />
         <!-- Debug: mostrar información según el contexto -->
         <v-text
           v-if="!canvasStore.estaEnPlanta || !isInfinitePlant"
@@ -621,6 +642,7 @@
       :is-element-locked="selectedElementLocked"
       :is-snapping-enabled="isSnappingEnabled"
       :is-snapping="isSnapping"
+      :is-grid-visible="canvasStore.gridVisible"
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       :is-element-restricted="isRestricted"
@@ -630,6 +652,7 @@
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
       @fill-container="() => simularLlenadoElemento(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
+      @toggle-grid="canvasStore.toggleGridVisible"
       @toggle-aisle-dash="() => (showPasillosDash = !showPasillosDash)"
       @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
     />
@@ -672,11 +695,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, inject, reactive } from 'vue'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
 import RulersOverlay from '@/inventory-smart/components/RulersOverlay.vue'
+import GridLayer from '@/inventory-smart/components/GridLayer.vue'
 import { detectConflictsFor, throttle, computeMTD } from '@/inventory-smart/utils/collision'
 import { boundaryToAreaBounds } from '@/inventory-smart/utils/bounds'
 import { solveDragPosition } from '@/inventory-smart/utils/placementSolver'
@@ -1441,6 +1465,33 @@ const handleStageClick = (e) => {
   }
 }
 
+const handleStageTouchStart = (e) => {
+  // Map touchstart to mousedown
+  handleStageMouseDown(e)
+}
+
+const handleStageTouchMove = (e) => {
+  // Map touchmove to mousemove
+  handleStageMouseMove(e)
+}
+
+const handleStageTouchEnd = () => {
+  // Map touchend to mouseup
+  handleStageMouseUp()
+}
+
+const handleStageTap = (e) => {
+  // Map tap to click
+  handleStageClick(e)
+}
+
+const handleStageDoubleTap = (e) => {
+  // Double tap for zoom in
+  if (e.target === e.target.getStage()) {
+    zoomIn()
+  }
+}
+
 // === FUNCIONES DE ELEMENTOS ===
 const selectElement = (element) => {
   if (canvasStore.modoConfigurarEsl) {
@@ -1473,7 +1524,9 @@ const handleOrientationBarClick = (elemento) => {
 }
 
 const handleElementDoubleClick = (evt, elemento) => {
-  if (evt.evt.button !== 0) return // Solo botón izquierdo
+  // Para eventos de mouse, verificar botón izquierdo
+  // Para eventos de touch, no hay propiedad button, así que siempre proceder
+  if (evt.evt && evt.evt.button !== undefined && evt.evt.button !== 0) return // Solo botón izquierdo para mouse
   if (elemento?.restrictions && elemento.restrictions.includes('enter')) return
 
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
@@ -1620,6 +1673,62 @@ const handleDrop = (e) => {
   }
 }
 
+// Touch drag handlers
+const handleTouchDragStart = (e) => {
+  const { dataTransfer } = e.detail
+  isTouchDragging.value = true
+  // Trigger drag enter effect
+  handleDragEnter({ preventDefault: () => {} })
+}
+
+const handleTouchDragOver = (e) => {
+  const { clientX, clientY, dataTransfer } = e.detail
+  // Create a fake drag event for compatibility
+  const fakeEvent = {
+    preventDefault: () => {},
+    dataTransfer: dataTransfer,
+    clientX,
+    clientY
+  }
+  handleDragOver(fakeEvent)
+}
+
+const handleTouchDrop = (e) => {
+  // Solo procesar si hay un drag touch activo
+  if (!isTouchDragging.value) return
+  
+  const { clientX, clientY, dataTransfer } = e.detail
+  
+  // Verificar si las coordenadas están dentro del canvas
+  const canvasRect = containerRef.value?.getBoundingClientRect()
+  if (!canvasRect) return
+  
+  const isOverCanvas = clientX >= canvasRect.left && 
+                      clientX <= canvasRect.right && 
+                      clientY >= canvasRect.top && 
+                      clientY <= canvasRect.bottom
+  
+  // Solo procesar si el drop está sobre el canvas
+  if (!isOverCanvas) {
+    // Reset touch dragging state
+    isTouchDragging.value = false
+    return
+  }
+  
+  // Create a fake drop event for compatibility
+  const fakeEvent = {
+    preventDefault: () => {},
+    dataTransfer: dataTransfer,
+    clientX,
+    clientY
+  }
+  handleDrop(fakeEvent)
+  // Clear drag over state
+  isDragOverCanvas.value = false
+  // Reset touch dragging state
+  isTouchDragging.value = false
+}
+
 const { showToast } = useToast()
 
 const { simularLlenadoElemento } = useProductSimulation({
@@ -1692,9 +1801,13 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   const rect = containerRef.value.getBoundingClientRect()
 
   // Obtener posición del puntero considerando zoom y pan
+  // Support both mouse events and touch events
+  const clientX = dropEvent.clientX || (dropEvent.detail && dropEvent.detail.clientX)
+  const clientY = dropEvent.clientY || (dropEvent.detail && dropEvent.detail.clientY)
+  
   const pointerPos = {
-    x: dropEvent.clientX - rect.left,
-    y: dropEvent.clientY - rect.top,
+    x: clientX - rect.left,
+    y: clientY - rect.top,
   }
 
   // Convertir a coordenadas de mundo (layer) considerando transformación del stage
@@ -1729,10 +1842,10 @@ const runPreDropValidations = (elemento, dropEvent) => {
   let elementoParaPeso = elemento
   if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
     const dims = { ...(elemento.dimensiones || {}) }
-    
+
     // Intentar obtener alto del padre según el contexto
     let altoContenedor = null
-    
+
     if (canvasStore.contextoActual?.tipo === 'plantas') {
       // Si estamos en una planta, usar alto de la planta
       altoContenedor = canvasStore.plantaActivaData?.dimensiones?.alto
@@ -1741,11 +1854,11 @@ const runPreDropValidations = (elemento, dropEvent) => {
       const elementoPadre = canvasStore.elementoPorId(canvasStore.contextoActual?.id)
       altoContenedor = elementoPadre?.dimensiones?.alto
     }
-    
+
     if (Number.isFinite(altoContenedor)) {
       dims.alto = altoContenedor
     }
-    
+
     elementoParaPeso = { ...elemento, dimensiones: dims }
   }
 
@@ -1801,14 +1914,14 @@ const runPreDropValidations = (elemento, dropEvent) => {
   // Para pasillos, usar el alto del contenedor padre (planta o elemento)
   if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
     let altoContenedor = null
-    
+
     if (canvasStore.contextoActual?.tipo === 'plantas') {
       altoContenedor = canvasStore.plantaActivaData?.dimensiones?.alto
     } else {
       const elementoPadre = canvasStore.elementoPorId(canvasStore.contextoActual?.id)
       altoContenedor = elementoPadre?.dimensiones?.alto
     }
-    
+
     if (Number.isFinite(altoContenedor)) {
       altoCm = altoContenedor
     }
@@ -2680,6 +2793,8 @@ const handleGlobalClick = (e) => {
   if (!containerRef.value?.contains(e.target) && !isFormElement && !isInPropertiesPanel && !canvasStore.cambiosNoAplicados && !canvasStore.nivelAEditar) {
     canvasStore.seleccionarElemento(null)
     editingElementId.value = null
+    resetTouchGestures()
+    isTouchDragging.value = false
   }
 }
 
@@ -2739,6 +2854,7 @@ const handleKeyDown = (e) => {
 let sizeResizeObserver = null
 
 onMounted(async () => {
+  registerPointerModeWatcher()
   await nextTick()
   updateStageSize()
   if (containerRef.value) {
@@ -2751,12 +2867,36 @@ onMounted(async () => {
   fitToPlanta()
   window.addEventListener('click', handleGlobalClick)
   window.addEventListener('keydown', handleKeyDown)
+  
+  // Touch drag listeners
+  document.addEventListener('touchdragstart', handleTouchDragStart)
+  document.addEventListener('touchdragover', handleTouchDragOver)
+  document.addEventListener('touchdrop', handleTouchDrop)
 })
 
 onUnmounted(() => {
+  unregisterPointerModeWatcher()
   if (sizeResizeObserver) sizeResizeObserver.disconnect()
   window.removeEventListener('click', handleGlobalClick)
   window.removeEventListener('keydown', handleKeyDown)
+  
+  // Touch drag cleanup
+  document.removeEventListener('touchdragstart', handleTouchDragStart)
+  document.removeEventListener('touchdragover', handleTouchDragOver)
+  document.removeEventListener('touchdrop', handleTouchDrop)
+  
+  // Clear touch gesture timers
+  if (touchGestures.value.longPressTimer) {
+    clearTimeout(touchGestures.value.longPressTimer)
+  }
+  if (touchGestures.value.doubleTapTimer) {
+    clearTimeout(touchGestures.value.doubleTapTimer)
+  }
+  touchGestures.value.tapCount = 0
+  touchGestures.value.pendingDoubleTap = false
+  
+  // Reset touch dragging state
+  isTouchDragging.value = false
 })
 
 function recomputeBoundsAndIndex({ skipCenter = false } = {}) {
@@ -2958,8 +3098,24 @@ watch(
 )
 
 // Normaliza coordenadas de evento (Konva: e.evt; nativo: e)
+// Soporta tanto eventos de mouse como de touch
 const getClientXY = (e) => {
   const ev = e && e.evt ? e.evt : e
+
+  // Para eventos de touch, usar la primera posición del touch
+  if (ev && (ev.touches || ev.changedTouches)) {
+    const touch = ev.touches?.[0] || ev.changedTouches?.[0]
+    if (touch) {
+      const x = Number(touch.clientX)
+      const y = Number(touch.clientY)
+      return {
+        x: Number.isFinite(x) ? x : 0,
+        y: Number.isFinite(y) ? y : 0,
+      }
+    }
+  }
+
+  // Para eventos de mouse normales
   const x = Number(ev && (ev.clientX ?? ev.x))
   const y = Number(ev && (ev.clientY ?? ev.y))
   return {
@@ -3005,6 +3161,9 @@ const onShapePointerDown = (evt, elemento) => {
     canvasStore.seleccionarElemento(elemento.id)
   }
   // Long press (600ms) en mobile/puntero
+  if (evt?.evt?.pointerType === 'touch') {
+    return
+  }
   clearTimeout(longPressTimer)
   longPressTimer = setTimeout(() => {
     if (!isEditMode.value) return
@@ -3016,6 +3175,365 @@ const onShapePointerDown = (evt, elemento) => {
 
 const onShapePointerUp = () => {
   clearTimeout(longPressTimer)
+}
+
+const isTouchPrimaryPointer = ref(false)
+let coarsePointerMediaQuery = null
+let coarsePointerListener = null
+
+const TOUCH_MOVE_THRESHOLD = 8
+
+const enableTouchDragForCurrentShape = () => {
+  const shape = touchGestures.currentShape
+  if (!shape) return
+  try {
+    if (typeof shape.draggable === 'function') {
+      shape.draggable(true)
+    }
+    if (typeof shape.startDrag === 'function' && !shape.isDragging?.()) {
+      shape.startDrag()
+    }
+    isTouchDragging.value = true
+  } catch (err) {
+    console.warn('No se pudo habilitar el arrastre táctil del elemento:', err)
+  }
+}
+
+const updatePointerMode = (matches) => {
+  const navigatorHasTouch = typeof navigator !== 'undefined' && Number(navigator.maxTouchPoints) > 0
+  isTouchPrimaryPointer.value = !!(navigatorHasTouch || matches)
+}
+
+const registerPointerModeWatcher = () => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    updatePointerMode(false)
+    return
+  }
+  coarsePointerMediaQuery = window.matchMedia('(pointer: coarse)')
+  updatePointerMode(coarsePointerMediaQuery.matches)
+  coarsePointerListener = (event) => updatePointerMode(event.matches)
+  if (typeof coarsePointerMediaQuery.addEventListener === 'function') {
+    coarsePointerMediaQuery.addEventListener('change', coarsePointerListener)
+  } else if (typeof coarsePointerMediaQuery.addListener === 'function') {
+    coarsePointerMediaQuery.addListener(coarsePointerListener)
+  }
+}
+
+const unregisterPointerModeWatcher = () => {
+  if (!coarsePointerMediaQuery || !coarsePointerListener) return
+  if (typeof coarsePointerMediaQuery.removeEventListener === 'function') {
+    coarsePointerMediaQuery.removeEventListener('change', coarsePointerListener)
+  } else if (typeof coarsePointerMediaQuery.removeListener === 'function') {
+    coarsePointerMediaQuery.removeListener(coarsePointerListener)
+  }
+  coarsePointerMediaQuery = null
+  coarsePointerListener = null
+}
+
+// Estado para touch gestures
+const touchGestures = reactive({
+  lastTap: 0,
+  tapCount: 0,
+  longPressTimer: null,
+  elementId: null,
+  doubleTapTimer: null,
+  pendingDoubleTap: false,
+  dragEnableTimer: null,
+  currentShape: null,
+  dragAllowedById: new Map(),
+  shouldRestoreStageDrag: false,
+  startX: 0,
+  startY: 0,
+  hasMoved: false,
+})
+
+const canStartDrag = (elemento) => {
+  if (!isTouchPrimaryPointer.value) return true
+  return touchGestures.dragAllowedById.get(elemento.id) === true
+}
+
+const getEventPointerType = (evt) => {
+  if (!evt) return 'mouse'
+  const native = evt.evt || evt
+  if (!native) return 'mouse'
+  if (typeof native.pointerType === 'string') {
+    return native.pointerType
+  }
+  const type = typeof native.type === 'string' ? native.type : ''
+  if (type.startsWith('touch')) return 'touch'
+  if (type.startsWith('mouse')) return 'mouse'
+  if (type.startsWith('pointer')) {
+    return native.pointerType || 'mouse'
+  }
+  return isTouchPrimaryPointer.value ? 'touch' : 'mouse'
+}
+
+const handleShapeDragStart = (evt, elemento) => {
+  if (!canDragElement(elemento) || !canStartDrag(elemento)) return
+  const pointerType = getEventPointerType(evt)
+  const isTouch = pointerType === 'touch'
+  onShapeDragStart(evt, elemento, { select: !isTouch })
+}
+
+const handleShapeDragMove = (evt, elemento) => {
+  if (!canDragElement(elemento) || !canStartDrag(elemento)) return
+  onShapeDragMove(evt, elemento)
+}
+
+const handleShapeDragEnd = (evt, elemento) => {
+  if (!canDragElement(elemento)) return
+  onShapeDragEnd(evt, elemento)
+}
+
+// Variable para rastrear si hay un drag touch activo
+const isTouchDragging = ref(false)
+
+// Función para resetear estado de touch gestures
+const resetTouchGestures = () => {
+  if (touchGestures.longPressTimer) {
+    clearTimeout(touchGestures.longPressTimer)
+  }
+  if (touchGestures.doubleTapTimer) {
+    clearTimeout(touchGestures.doubleTapTimer)
+  }
+  if (touchGestures.dragEnableTimer) {
+    clearTimeout(touchGestures.dragEnableTimer)
+  }
+  const shapeNode = touchGestures.currentShape
+  if (shapeNode && typeof shapeNode.draggable === 'function') {
+    try {
+      shapeNode.draggable(false)
+    } catch {
+      /* ignore */
+    }
+  }
+  if (touchGestures.shouldRestoreStageDrag) {
+    stageDragEnabled.value = true
+  }
+  touchGestures.tapCount = 0
+  touchGestures.elementId = null
+  touchGestures.pendingDoubleTap = false
+  touchGestures.currentShape = null
+  touchGestures.shouldRestoreStageDrag = false
+  touchGestures.dragAllowedById.clear()
+  touchGestures.startX = 0
+  touchGestures.startY = 0
+  touchGestures.hasMoved = false
+  isTouchDragging.value = false
+}
+
+// Reset touch gestures when selection changes
+watch(() => canvasStore.elementoSeleccionado, () => {
+  resetTouchGestures()
+  isTouchDragging.value = false
+})
+
+watch(isTouchPrimaryPointer, (isTouchMode) => {
+  if (!isTouchMode) {
+    touchGestures.dragAllowedById.clear()
+  }
+})
+
+// Touch gesture handlers
+const onShapeTouchStart = (evt, elemento) => {
+  if (!elemento?.id) return
+
+  const shapeNode =
+    evt?.currentTarget || evt?.target?.getParent?.() || evt?.target || null
+  if (shapeNode && typeof shapeNode.draggable === 'function') {
+    shapeNode.draggable(false)
+  }
+  touchGestures.currentShape = shapeNode
+
+  const touchPoint = evt?.evt?.touches?.[0] || evt?.evt?.changedTouches?.[0]
+  if (touchPoint) {
+    touchGestures.startX = touchPoint.clientX
+    touchGestures.startY = touchPoint.clientY
+  } else {
+    const { x, y } = getClientXY(evt)
+    touchGestures.startX = x
+    touchGestures.startY = y
+  }
+  touchGestures.hasMoved = false
+
+  if (stageDragEnabled.value) {
+    touchGestures.shouldRestoreStageDrag = true
+    stageDragEnabled.value = false
+  } else {
+    touchGestures.shouldRestoreStageDrag = false
+  }
+
+  const now = Date.now()
+  const timeDiff = now - touchGestures.lastTap
+
+  // Clear any existing timers
+  if (touchGestures.longPressTimer) {
+    clearTimeout(touchGestures.longPressTimer)
+  }
+  if (touchGestures.doubleTapTimer) {
+    clearTimeout(touchGestures.doubleTapTimer)
+  }
+  if (touchGestures.dragEnableTimer) {
+    clearTimeout(touchGestures.dragEnableTimer)
+  }
+
+  // Reset drag allowed for this element
+  touchGestures.dragAllowedById.set(elemento.id, false)
+
+  // Reset tap count if too much time has passed (400ms window for double tap)
+  if (timeDiff > 400) {
+    touchGestures.tapCount = 0
+    touchGestures.pendingDoubleTap = false
+  }
+
+  touchGestures.tapCount++
+  touchGestures.lastTap = now
+  touchGestures.elementId = elemento.id
+
+  // Start drag enable timer (long press for drag, similar to context menu)
+  touchGestures.dragEnableTimer = setTimeout(() => {
+    if (touchGestures.elementId === elemento.id) {
+      // Allow drag for this element
+      touchGestures.dragAllowedById.set(elemento.id, true)
+      if (touchGestures.hasMoved) {
+        enableTouchDragForCurrentShape()
+      }
+    }
+  }, 600) // 600ms delay for drag (same as context menu)
+
+  // Start long press timer for context menu (longer delay now that drag is at 600ms)
+  touchGestures.longPressTimer = setTimeout(() => {
+    if (
+      touchGestures.elementId === elemento.id &&
+      isEditMode.value &&
+      !touchGestures.hasMoved &&
+      !isElementDragging.value
+    ) {
+      // Cancel drag enable if long press occurred
+      if (touchGestures.dragEnableTimer) {
+        clearTimeout(touchGestures.dragEnableTimer)
+        touchGestures.dragEnableTimer = null
+      }
+      // Reset drag allowed
+      touchGestures.dragAllowedById.set(elemento.id, false)
+
+      // Get touch coordinates for context menu positioning
+      // Use absolute viewport coordinates for context menu
+      const touch = evt.evt.touches?.[0] || evt.evt.changedTouches?.[0]
+      if (touch) {
+        ctx.openAt({ x: touch.clientX, y: touch.clientY, elementId: elemento.id })
+      }
+    }
+  }, 800) // 800ms delay for context menu (longer than drag)
+
+  // Handle double tap detection
+  if (touchGestures.tapCount === 2 && timeDiff <= 400) {
+    // Clear timers since this is a double tap
+    if (touchGestures.longPressTimer) {
+      clearTimeout(touchGestures.longPressTimer)
+      touchGestures.longPressTimer = null
+    }
+    if (touchGestures.dragEnableTimer) {
+      clearTimeout(touchGestures.dragEnableTimer)
+      touchGestures.dragEnableTimer = null
+    }
+    // Reset drag allowed
+    touchGestures.dragAllowedById.set(elemento.id, false)
+
+    // Mark as pending double tap - will be executed on touchend
+    touchGestures.pendingDoubleTap = true
+  } else if (touchGestures.tapCount === 1) {
+    // Set timer to reset tap count if no second tap comes
+    touchGestures.doubleTapTimer = setTimeout(() => {
+      touchGestures.tapCount = 0
+      touchGestures.pendingDoubleTap = false
+    }, 400)
+  }
+}
+
+const onShapeTouchMove = (evt, elemento) => {
+  if (touchGestures.elementId !== elemento.id) return
+  const touch = evt?.evt?.touches?.[0] || evt?.evt?.changedTouches?.[0]
+  if (!touch) return
+
+  const dx = touch.clientX - touchGestures.startX
+  const dy = touch.clientY - touchGestures.startY
+  const distance = Math.sqrt(dx * dx + dy * dy)
+
+  if (!touchGestures.hasMoved && distance > TOUCH_MOVE_THRESHOLD) {
+    touchGestures.hasMoved = true
+    if (touchGestures.longPressTimer) {
+      clearTimeout(touchGestures.longPressTimer)
+      touchGestures.longPressTimer = null
+    }
+  }
+
+  if (touchGestures.hasMoved && touchGestures.dragAllowedById.get(elemento.id) === true) {
+    enableTouchDragForCurrentShape()
+  }
+}
+
+const onShapeTouchEnd = (evt, elemento) => {
+  // Clear all timers
+  if (touchGestures.longPressTimer) {
+    clearTimeout(touchGestures.longPressTimer)
+    touchGestures.longPressTimer = null
+  }
+  if (touchGestures.dragEnableTimer) {
+    clearTimeout(touchGestures.dragEnableTimer)
+    touchGestures.dragEnableTimer = null
+  }
+
+  const shapeNode = touchGestures.currentShape
+  const elementId = elemento.id
+  const runCleanup = () => {
+    if (shapeNode && typeof shapeNode.draggable === 'function') {
+      try {
+        shapeNode.draggable(false)
+      } catch (err) {
+        console.warn('No se pudo desactivar el arrastre táctil del elemento:', err)
+      }
+    }
+    touchGestures.dragAllowedById.delete(elementId)
+    touchGestures.currentShape = null
+    if (touchGestures.shouldRestoreStageDrag) {
+      stageDragEnabled.value = true
+    }
+    touchGestures.shouldRestoreStageDrag = false
+    touchGestures.hasMoved = false
+    touchGestures.startX = 0
+    touchGestures.startY = 0
+    isTouchDragging.value = false
+  }
+
+  if (shapeNode?.isDragging?.()) {
+    const schedule =
+      typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
+        ? window.requestAnimationFrame.bind(window)
+        : (cb) => setTimeout(cb, 16)
+    schedule(runCleanup)
+  } else {
+    runCleanup()
+  }
+
+  // Handle double tap if pending
+  if (touchGestures.pendingDoubleTap && touchGestures.elementId === elemento.id) {
+    touchGestures.pendingDoubleTap = false
+    touchGestures.tapCount = 0
+    handleElementDoubleClick(evt, elemento)
+    return
+  }
+
+  // Handle single tap selection (only if not expecting a double tap)
+  if (touchGestures.tapCount === 1 && touchGestures.elementId === elemento.id && !touchGestures.pendingDoubleTap) {
+    // Small delay to ensure this isn't part of a double tap
+    setTimeout(() => {
+      if (touchGestures.tapCount === 1 && touchGestures.elementId === elemento.id && !touchGestures.pendingDoubleTap) {
+        selectElement(elemento)
+        touchGestures.tapCount = 0
+      }
+    }, 100)
+  }
 }
 
 // Acción bloquear/desbloquear desde el menú contextual

@@ -153,6 +153,7 @@
               label="Opciones de planta"
               :delay="500"
               position="left"
+              v-if="canvasStore.modoEdicion"
             >
               <button
                 @click.stop="toggleMenuPlanta(planta.id, $event)"
@@ -839,6 +840,9 @@ onBeforeUnmount(() => document.removeEventListener('click', handleDocClickMobile
 
 // Métodos para el menú desplegable
 const toggleMenuPlanta = (plantaId, event) => {
+  if (canvasStore.modoEdicion === false) {
+    return
+  }
   if (menuAbiertoPlanta.value === plantaId) {
     menuAbiertoPlanta.value = null
     return
