@@ -30,7 +30,7 @@ import { pointInPolygon } from '@/inventory-smart/utils/polygonBounds'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
 
 
-export function useAutoPaste() {
+export function useAutoPaste(placementSuggestionsSystem = null) {
   const canvasStore = useCanvasStore()
   const buffer = useCanvasBuffer()
   const weightValidation = useWeightValidation()
@@ -422,13 +422,15 @@ export function useAutoPaste() {
 
   /**
    * Valida si un elemento puede ser pegado en una posición específica
+   * Actualizado para ser compatible con el sistema de sugerencias
    */
   const validatePlacement = (elemento, position, areaBounds) => {
     // 1. Verificar compatibilidad de ubicación
     if (!isLocationCompatible(elemento, canvasStore.contextoActual)) {
       return {
         valid: false,
-        reason: `Elemento de ${elemento.ubicacion || 'suelo'} no compatible con el contexto actual`
+        reason: `Elemento de ${elemento.ubicacion || 'suelo'} no compatible con el contexto actual`,
+        canSuggest: false // No se pueden hacer sugerencias para incompatibilidad de ubicación
       }
     }
 
@@ -443,7 +445,8 @@ export function useAutoPaste() {
     })) {
       return {
         valid: false,
-        reason: 'El elemento no cabe en la posición o colisiona con otros elementos'
+        reason: 'El elemento no cabe en la posición o colisiona con otros elementos',
+        canSuggest: true // Se pueden sugerir ajustes de dimensiones
       }
     }
 
@@ -458,7 +461,9 @@ export function useAutoPaste() {
       if (!resultadoValidacionPeso.valido) {
         return {
           valid: false,
-          reason: `Excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso || 0} kg`
+          reason: `Excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso || 0} kg`,
+          canSuggest: true, // Se pueden sugerir ajustes de peso
+          weightExcess: resultadoValidacionPeso.exceso
         }
       }
     } catch (error) {
@@ -473,14 +478,16 @@ export function useAutoPaste() {
       if (guardResult && !guardResult.valid) {
         return {
           valid: false,
-          reason: guardResult.reason || 'Posición inválida según las reglas de colocación'
+          reason: guardResult.reason || 'Posición inválida según las reglas de colocación',
+          canSuggest: guardResult.canSuggest !== false // Por defecto true a menos que se especifique lo contrario
         }
       }
     } catch (error) {
       console.warn('Error en placement guards:', error.message)
       return {
         valid: false,
-        reason: `Error en validación de placement: ${error.message}`
+        reason: `Error en validación de placement: ${error.message}`,
+        canSuggest: false // Errores de validación no permiten sugerencias
       }
     }
 
@@ -886,6 +893,43 @@ export function useAutoPaste() {
       const validation = validatePlacement(elemento, spaceResult.position, areaBounds)
 
       if (!validation.valid) {
+        // Si hay sistema de sugerencias disponible y la validación permite sugerencias, intentar usarlo
+        if (placementSuggestionsSystem && validation.canSuggest) {
+          try {
+            const success = await placementSuggestionsSystem.tryPlaceWithSuggestions(
+              elemento,
+              spaceResult.position,
+              {
+                areaBounds,
+                neighbors: canvasStore.elementosVisibles,
+                onSuccess: async (adjustedElement, position) => {
+                  // Crear nuevo elemento con ajustes usando el buffer
+                  const elementoId = buffer.pasteFromBufferWithAdjustments(firstItem.id, position, adjustedElement)
+                  if (elementoId) {
+                    const nombreElemento = adjustedElement.nombre || adjustedElement.tipo
+                    showToast(`"${nombreElemento}" pegado con ajustes automáticos`, 'success', { timeout: 3000 })
+                    canvasStore.seleccionarElemento(elementoId)
+
+                    // Actualizar estado de pegado
+                    lastPasteAnchor = anchor
+                    lastOffsetApplied = pendingOffsetCount
+                  }
+                },
+                onFailure: (reason) => {
+                  showToast(`No se pudo pegar: ${reason}`, 'error', { timeout: 4000 })
+                },
+                autoApply: false // Mostrar modal de sugerencias
+              }
+            )
+
+            return success
+          } catch (error) {
+            console.warn('Error en sistema de sugerencias:', error)
+            // Continuar con el error original si falla el sistema de sugerencias
+          }
+        }
+
+        // Si no hay sugerencias disponibles o no se pueden aplicar, mostrar error directo
         showToast(
           `No se pudo pegar: ${validation.reason}`,
           'error', { timeout: 4000 }
