@@ -2088,7 +2088,7 @@ const calcularCanvasAdaptativo = (elemento) => {
         if (preFit.minLargoCm != null && proposed.largoCm < preFit.minLargoCm) parts.push(`largo mínimo ${(preFit.minLargoCm / 100).toFixed(2)}m`)
         if (preFit.minAltoCm != null && proposed.altoCm < preFit.minAltoCm) parts.push(`alto mínimo ${(preFit.minAltoCm / 100).toFixed(2)}m`)
         if (preFit.minCapacidad != null && proposed.capacidadCarga < preFit.minCapacidad) parts.push(`capacidad mínima ${Math.round(preFit.minCapacidad)}kg`)
-        const detalle = parts.length ? ` Requisitos: ${parts.join(', ')}.` : ''
+  const detalle = parts.length ? ` Requisitos: ${parts.join(', ')}` : ''
         showToast(`No se puede aplicar: los elementos del piso no caben con las nuevas propiedades.${detalle}`, 'error')
         return
       }
