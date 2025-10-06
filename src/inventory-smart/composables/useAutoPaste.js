@@ -771,7 +771,7 @@ export function useAutoPaste(placementSuggestionsSystem = null) {
   const handlePaste = async (options = {}) => {
     // Verificar si ya hay una operación de pegado en progreso
     if (isOperationInProgress('paste')) {
-      showToast('Ya hay una operación de pegado en curso. Espera a que termine.', 'warning')
+  showToast('Ya hay una operación de pegado en curso. Espera a que termine', 'warning')
       return false
     }
 
@@ -817,7 +817,7 @@ export function useAutoPaste(placementSuggestionsSystem = null) {
     try {
       // Verificar que hay elementos en el buffer
       if (!buffer.hasItems.value) {
-        showToast('No hay elementos en el portapapeles para pegar.', 'warning')
+  showToast('No hay elementos en el portapapeles para pegar', 'warning')
         return false
       }
 
@@ -826,7 +826,7 @@ export function useAutoPaste(placementSuggestionsSystem = null) {
       const firstItem = bufferItems[0]
 
       if (!firstItem) {
-        showToast('No fue posible leer el elemento del portapapeles.', 'error')
+  showToast('No fue posible leer el elemento del portapapeles', 'error')
         return false
       }
 
@@ -840,7 +840,7 @@ export function useAutoPaste(placementSuggestionsSystem = null) {
       )
 
       if (!loadingId) {
-        showToast('No fue posible iniciar la operación de pegado.', 'error')
+  showToast('No fue posible iniciar la operación de pegado', 'error')
         return false
       }
 
@@ -860,7 +860,7 @@ export function useAutoPaste(placementSuggestionsSystem = null) {
         !Number.isFinite(areaBounds.minY) ||
         !Number.isFinite(areaBounds.maxY)
       ) {
-        showToast('No se pudieron determinar los límites del área actual.', 'error')
+  showToast('No se pudieron determinar los límites del área actual', 'error')
         return false
       }
 
@@ -874,7 +874,7 @@ export function useAutoPaste(placementSuggestionsSystem = null) {
       if (!spaceResult.found) {
         const elementType = elemento.ubicacion === 'pared' ? 'de pared' : 'de suelo'
         showToast(
-          `No se encontró espacio disponible para ${elementType} "${elemento.nombre || elemento.tipo}". Intenta mover otros elementos o ajustar el tamaño.`,
+          `No se encontró espacio disponible para ${elementType} "${elemento.nombre || elemento.tipo}". Intenta mover otros elementos o ajustar el tamaño`,
           'error',{ timeout: 4000 }
         )
         return false
@@ -934,7 +934,7 @@ export function useAutoPaste(placementSuggestionsSystem = null) {
       if (elementoId) {
         const nombreElemento = elemento.nombre || elemento.tipo
         showToast(
-          `"${nombreElemento}" pegado correctamente.`,
+          `"${nombreElemento}" pegado correctamente`,
           'success', { timeout: 3000 }
         )
 
@@ -997,7 +997,7 @@ export function useAutoPaste(placementSuggestionsSystem = null) {
       loadingId = startLoading(
         'pasteAll',
         null,
-        `Pegando ${bufferItems.length} elementos del buffer...`
+  `Pegando ${bufferItems.length} elementos del buffer`
       )
 
       if (!loadingId) {
