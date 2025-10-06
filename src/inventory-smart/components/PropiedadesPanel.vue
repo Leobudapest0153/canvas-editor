@@ -810,7 +810,7 @@ const guardar = async () => {
   if (esCircular.value) {
     const diam = Number(edited.value?.diametroCm)
     if (!Number.isFinite(diam) || diam <= 0) {
-      dimensionError.value = 'El diámetro debe ser mayor a 0.'
+  dimensionError.value = 'El diámetro debe ser mayor a 0'
       isSaving.value = false
       return
     }
@@ -824,7 +824,7 @@ const guardar = async () => {
 
   const isValidDimension = (value) => Number.isFinite(value) && value >= 0
   if (!isValidDimension(anchoCm) || !isValidDimension(largoCm) || !isValidDimension(altoCm)) {
-    dimensionError.value = 'Las dimensiones deben ser números válidos y no negativos.'
+  dimensionError.value = 'Las dimensiones deben ser números válidos y no negativos'
     isSaving.value = false
     return
   }
@@ -1369,7 +1369,7 @@ const advertenciaPeso = computed(() => {
   if (!elementoSeleccionado.value || !edited.value) return null
 
   const newVal = Number(edited.value?.capacidadCarga || 0)
-  if (!Number.isFinite(newVal) || newVal < 0) return 'La capacidad debe ser un número válido.'
+  if (!Number.isFinite(newVal) || newVal < 0) return 'La capacidad debe ser un número válido'
 
   // 1. VALIDACIÓN DE USO REAL: capacidad ≥ uso actual del elemento
   const validacionReal = validarPesoMaximoVsUsoReal(elementoSeleccionado.value, newVal)
@@ -1397,7 +1397,7 @@ const advertenciaPeso = computed(() => {
     })
 
     if (!validacionTeorica.valido && validacionTeorica.limiteDePeso) {
-      return `Se excede la capacidad de peso teórica ${getTipoNombrePadre()}. Exceso: ${validacionTeorica.exceso.toFixed(2)} kg (Total: ${validacionTeorica.pesoTotal.toFixed(2)}/${validacionTeorica.capacidadCarga} kg).`
+  return `Se excede la capacidad de peso teórica ${getTipoNombrePadre()}. Exceso: ${validacionTeorica.exceso.toFixed(2)} kg (Total: ${validacionTeorica.pesoTotal.toFixed(2)}/${validacionTeorica.capacidadCarga} kg)`
     }
   }
 
@@ -1418,8 +1418,8 @@ const maxDiametroPlanta = computed(() => Math.min(plantaDims.value.ancho, planta
 const advertenciaDiametroLimite = computed(() => {
   if (!esCircular.value) return null
   const d = Number(edited.value?.diametroCm)
-  if (!Number.isFinite(d) || d <= 0) return 'El diámetro debe ser mayor a 0.'
-  if (d > maxDiametroPlanta.value) return 'El diámetro excede las dimensiones de la planta.'
+  if (!Number.isFinite(d) || d <= 0) return 'El diámetro debe ser mayor a 0'
+  if (d > maxDiametroPlanta.value) return 'El diámetro excede las dimensiones de la planta'
   return null
 })
 
@@ -1432,9 +1432,9 @@ const advertenciaDiametroContencion = computed(() => {
   const yPx = Number(elementoSeleccionado.value?.y || 0)
   const xCm = xPx / (CM_TO_PX || 10)
   const yCm = yPx / (CM_TO_PX || 10)
-  if (xCm < 0 || yCm < 0) return 'El círculo se sale del área de trabajo con el diámetro actual.'
+  if (xCm < 0 || yCm < 0) return 'El círculo se sale del área de trabajo con el diámetro actual'
   if (xCm + d > plantaDims.value.ancho || yCm + d > plantaDims.value.largo)
-    return 'El círculo se sale del área de trabajo con el diámetro actual.'
+  return 'El círculo se sale del área de trabajo con el diámetro actual'
   return null
 })
 

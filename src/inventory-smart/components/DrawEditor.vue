@@ -94,10 +94,10 @@
           </template>
         </template>
         <template v-if="adding">
-          <v-text :config="{ x: 8, y: 8, text: 'Clic en un borde para añadir un vértice.', fontSize: 14, fill:'#0f172a' }" />
+          <v-text :config="{ x: 8, y: 8, text: 'Clic en un borde para añadir un vértice', fontSize: 14, fill:'#0f172a' }" />
         </template>
          <template v-if="deleting">
-          <v-text :config="{ x: 8, y: 8, text: 'Clic en un vértice para eliminarlo.', fontSize: 14, fill:'#0f172a' }" />
+          <v-text :config="{ x: 8, y: 8, text: 'Clic en un vértice para eliminarlo', fontSize: 14, fill:'#0f172a' }" />
         </template>
       </v-layer>
     </v-stage>
@@ -367,7 +367,7 @@ function isEdgeCrossingElement(polygon, elements) {
       if (isPointStrictlyInsideElements(point, elements)) {
         return {
           valid: false,
-          message: 'El borde del área no puede cruzar un elemento.'
+          message: 'El borde del área no puede cruzar un elemento'
         };
       }
     }
@@ -399,7 +399,7 @@ function isPolygonValid(newPolygon, fixedElements) {
 
   if (excludedElements.size > 0) {
     const elementNames = Array.from(excludedElements).join(', ');
-    const message = `La modificación dejaría fuera a ${excludedElements.size === 1 ? 'el elemento' : 'los elementos'}: ${elementNames}.`;
+  const message = `La modificación dejaría fuera a ${excludedElements.size === 1 ? 'el elemento' : 'los elementos'}: ${elementNames}`;
     return { valid: false, message };
   }
 
@@ -447,7 +447,7 @@ function onPointDrag(idx, e) {
   const newPoint = { x: Math.round(clampedX), y: Math.round(clampedY) };
 
   if (isPointInsideElements(newPoint, elements.value)) {
-    emit('notice', 'No se puede colocar un vértice sobre un elemento.');
+  emit('notice', 'No se puede colocar un vértice sobre un elemento')
     const lastValidPoint = polygon.value[idx];
     e.target.x(lastValidPoint.x); e.target.y(lastValidPoint.y);
     return;
@@ -522,7 +522,7 @@ function onCanvasClick(e){
     };
 
     if (isPointInsideElements(clampedPoint, elements.value)) {
-      emit('notice', 'No se puede añadir un vértice sobre un elemento.');
+  emit('notice', 'No se puede añadir un vértice sobre un elemento')
       return;
     }
 
@@ -558,7 +558,7 @@ function onVertexClick(idx, evt) {
 
   if (deleting.value) {
     if ((polygon.value?.length || 0) <= 3) {
-      emit('notice', 'No se puede eliminar: el polígono debe tener al menos 3 vértices.')
+  emit('notice', 'No se puede eliminar: el polígono debe tener al menos 3 vértices')
       return
     }
     const newPolygon = [...polygon.value];

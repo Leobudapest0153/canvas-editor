@@ -119,7 +119,7 @@ export function useDeleteElement() {
     for (const id of idsABorrar) {
       const el = idToEl.get(id)
       if (isLocked(el)) {
-        showInfo('No se puede eliminar porque hay elemento(s) bloqueado(s). Desbloquéelos primero.')
+  showInfo('No se puede eliminar porque hay elemento(s) bloqueado(s). Desbloquéelos primero')
         return false
       }
     }
@@ -199,7 +199,7 @@ export function useDeleteElement() {
     if (protectedEls.length > 0) {
       await confirmDialog.confirm({
         title: 'Acción no permitida',
-        message: `${protectedEls.length} elemento(s) están protegidos y no pueden eliminarse.`,
+  message: `${protectedEls.length} elemento(s) están protegidos y no pueden eliminarse`,
         confirmLabel: 'Entendido',
         cancelLabel: 'Cerrar',
       })
@@ -209,7 +209,7 @@ export function useDeleteElement() {
     // Verificar elementos bloqueados
     const lockedEls = elements.filter(el => isLocked(el))
     if (lockedEls.length > 0) {
-      showInfo(`${lockedEls.length} elemento(s) están bloqueados. Desbloquéelos primero.`)
+  showInfo(`${lockedEls.length} elemento(s) están bloqueados. Desbloquéelos primero`)
       return false
     }
 
@@ -300,7 +300,7 @@ export function useDeleteElement() {
     if (isProtected(selected)) {
       await confirmDialog.confirm({
         title: 'Acción no permitida',
-        message: 'Este elemento está protegido y no puede eliminarse.',
+  message: 'Este elemento está protegido y no puede eliminarse',
         confirmLabel: 'Entendido',
         cancelLabel: 'Cerrar',
       })
@@ -309,7 +309,7 @@ export function useDeleteElement() {
 
     // Bloqueo: impedir borrar elementos bloqueados (selección)
     if (isLocked(selected)) {
-      showInfo('No se puede eliminar porque el elemento está bloqueado. Desbloquéelo primero.')
+  showInfo('No se puede eliminar porque el elemento está bloqueado. Desbloquéelo primero')
       return false
     }
 
@@ -326,7 +326,7 @@ export function useDeleteElement() {
       return isLocked(el)
     })
     if (hasLockedDescendants) {
-      showInfo('No se puede eliminar porque hay elemento(s) bloqueado(s) dentro. Desbloquéelos primero.')
+  showInfo('No se puede eliminar porque hay elemento(s) bloqueado(s) dentro. Desbloquéelos primero')
       return false
     }
 
@@ -374,7 +374,7 @@ export function useDeleteElement() {
     if (childElementsWithUsage()) {
       confirmDialog.open({
         title: 'Acción no permitida',
-        message: 'El elemento ya tiene productos ingresados. No se puede eliminar.',
+  message: 'El elemento ya tiene productos ingresados. No se puede eliminar',
         confirmLabel: 'Entendido',
         background: '#568fec',
         color: '#FFFFFF',
@@ -611,7 +611,7 @@ const deleteAndCompact = async ({ id = null, withConfirm = true } = {}) => {
   if (target?.tipo === 'suelo' || target?.esRaizPlanta === true) {
     await confirmDialog.confirm({
       title: 'Acción no permitida',
-      message: 'Este elemento está protegido y no puede eliminarse.',
+  message: 'Este elemento está protegido y no puede eliminarse',
       confirmLabel: 'Entendido',
       cancelLabel: 'Cerrar',
     })
@@ -622,7 +622,7 @@ const deleteAndCompact = async ({ id = null, withConfirm = true } = {}) => {
   if (target?.locked === true || target?.bloqueado === true) {
     await confirmDialog.confirm({
       title: 'Acción no permitida',
-      message: 'No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero.',
+  message: 'No se puede eliminar: hay elemento(s) bloqueado(s). Desbloquéelos primero',
       confirmLabel: 'Entendido',
       cancelLabel: 'Cerrar',
     })
@@ -703,7 +703,7 @@ const deleteAndCompact = async ({ id = null, withConfirm = true } = {}) => {
   if (hasUsage) {
     confirmDialog.open({
       title: 'Acción no permitida',
-      message: 'El elemento ya tiene productos ingresados. No se puede eliminar.',
+  message: 'El elemento ya tiene productos ingresados. No se puede eliminar',
       confirmLabel: 'Entendido',
       background: '#568fec',
       color: '#FFFFFF',

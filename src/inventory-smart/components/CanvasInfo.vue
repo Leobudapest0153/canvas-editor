@@ -4,7 +4,7 @@
     <span>{{ t('views.label') }}: {{ t(`views.${store.vistaActiva}`) }}</span>
     <template v-if="store.estaEnPlanta && store.plantaActivaData?.isInfinite === true">
       <UiTooltip
-        label="Modo elástico: no hay límites de planta. Usa la grilla y el minimapa para orientarte."
+  label="Modo elástico: no hay límites de planta. Usa la grilla y el minimapa para orientarte"
         position="bottom"
         :delay="300"
       >

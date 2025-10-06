@@ -282,7 +282,7 @@ const onSave = () => {
   const padre = canvasStore.elementos.find((el) => el.id === canvasStore.nivelAEditar.padre)
 
   if (!padre) {
-    showToast('Error Crítico: No se pudo encontrar el cuarto padre para las validaciones.')
+    showToast('Error Crítico: No se pudo encontrar el cuarto padre para las validaciones')
     return
   }
 
@@ -311,14 +311,14 @@ const onSave = () => {
   // 3. Validar Ancho y Largo del nivel contra el cuarto padre
   if (anchoFormularioCm > padre.dimensiones.ancho) {
     showToast(
-      `El ancho del nivel (${anchoFormularioCm / 100}m) no puede exceder el del cuarto (${padre.dimensiones.ancho / 100}m).`,
+      `El ancho del nivel (${anchoFormularioCm / 100}m) no puede exceder el del cuarto (${padre.dimensiones.ancho / 100}m)`,
     )
     return
   }
 
   if (largoFormularioCm > padre.dimensiones.largo) {
     showToast(
-      `El largo del nivel (${largoFormularioCm / 100}m) no puede exceder el del cuarto (${padre.dimensiones.largo / 100}m).`,
+      `El largo del nivel (${largoFormularioCm / 100}m) no puede exceder el del cuarto (${padre.dimensiones.largo / 100}m)`,
     )
     return
   }
@@ -328,7 +328,7 @@ const onSave = () => {
   const maximoAltoDisponibleCm = padre.dimensiones.alto - minimoAltoRequeridoPorHermanosCm
   if (altoFormularioCm > maximoAltoDisponibleCm) {
     showToast(
-      `La altura máxima permitida es ${maximoAltoDisponibleCm / 100}m para dejar espacio a los otros ${hermanos.length} niveles.`,
+      `La altura máxima permitida es ${maximoAltoDisponibleCm / 100}m para dejar espacio a los otros ${hermanos.length} niveles`,
     )
     return
   }
@@ -339,7 +339,7 @@ const onSave = () => {
 
   if (capacidadCargaFormulario > maximaCapacidadDisponible) {
     showToast(
-      `La capacidad de carga máxima permitida es ${maximaCapacidadDisponible.toFixed(2)}kg para no sobrecargar el cuarto.`,
+      `La capacidad de carga máxima permitida es ${maximaCapacidadDisponible.toFixed(2)}kg para no sobrecargar el cuarto`,
     )
     return
   }

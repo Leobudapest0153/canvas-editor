@@ -751,9 +751,9 @@ const handleDeleteItem = async (item) => {
     return closeKebab()
   }
   if (!item) return closeKebab()
-  const ok = await confirmDialog.confirm({
+    const ok = await confirmDialog.confirm({
     title: 'Eliminar elemento',
-    message: `Se eliminará “${item.nombre}” del catálogo. Esta acción no afectará elementos ya colocados.`,
+    message: `Se eliminará “${item.nombre}” del catálogo. Esta acción no afectará elementos ya colocados`,
     confirmLabel: 'Eliminar',
     cancelLabel: 'Cancelar',
   })

@@ -91,7 +91,7 @@
               class="mt-1 text-sm h-5 flex-shrink-0"
               :class="notice ? 'text-rose-600' : 'text-transparent'"
             >
-              {{ notice || '.' }}
+              {{ notice || '' }}
             </div>
           </div>
         </div>
@@ -144,7 +144,7 @@
               <input type="checkbox" v-model="local.isInfinite" />
               <span class="font-semibold">Planta infinita</span>
               <UiTooltip
-                label="Al activar este modo no hay límite de dimensiones en el piso."
+                label="Al activar este modo no hay límite de dimensiones en el piso"
                 position="right"
                 :delay="300"
               >
@@ -969,7 +969,7 @@ function validatePolygonAndContainment(newPolygon, newWorldWidth, newWorldLength
     const nombres = fuera.map((e) => e?.nombre || `ID ${e?.id}`).join(', ')
     return {
       ok: false,
-      message: `Con estas dimensiones, ${fuera.length === 1 ? 'el elemento' : 'los elementos'} ${nombres} quedarían fuera del área.`,
+  message: `Con estas dimensiones, ${fuera.length === 1 ? 'el elemento' : 'los elementos'} ${nombres} quedarían fuera del área`,
     }
   }
 
@@ -995,7 +995,7 @@ function validateElementsHeight(newY_cm) {
     const nombresElementos = elementosQueNoCaben.join(', ')
     return {
       ok: false,
-      message: `Altura insuficiente. Se requiere ${alturaMinimaEnMetros} m. Elementos afectados: ${nombresElementos}.`,
+  message: `Altura insuficiente. Se requiere ${alturaMinimaEnMetros} m. Elementos afectados: ${nombresElementos}`,
     }
   }
   return { ok: true }
@@ -1145,7 +1145,7 @@ function onSave() {
     const res = tryApplyDimensionsCM(newW_cm, newL_cm, newY_cm, { apply: true, fit: false, changedDimension: null })
     if (!res.ok) {
       notice.value = res.message
-      showToast('Por favor corrige los errores antes de guardar.', 'error')
+  showToast('Por favor corrige los errores antes de guardar', 'error')
       return
     }
   }
@@ -1160,7 +1160,7 @@ function onSave() {
   errors.dimensions = !validDims.value
   errors.maxWeight = !validMaxWeight.value
   if (errors.name || errors.codigo || errors.shape || errors.dimensions || errors.maxWeight) {
-    if (!notice.value) notice.value = 'Corrige los campos marcados.'
+  if (!notice.value) notice.value = 'Corrige los campos marcados'
     return
   }
 
@@ -1185,7 +1185,7 @@ function onSave() {
     if (plantaData.id) {
       canvasStore.editarPlanta(plantaData.id, plantaData)
       canvasStore.calcularCanvasAdaptativoPlanta(plantaData)
-      showToast('Modo elástico aplicado a la planta.', 'success')
+  showToast('Modo elástico aplicado a la planta', 'success')
     } else {
       delete plantaData.id
       canvasStore.agregarPlanta(plantaData)
@@ -1199,7 +1199,7 @@ function onSave() {
 
   // Rama Modo Limitado (validaciones completas)
   if (notice.value) {
-    showToast('Por favor corrige los errores antes de guardar.', 'error')
+  showToast('Por favor corrige los errores antes de guardar', 'error')
     return
   }
 
@@ -1207,7 +1207,7 @@ function onSave() {
     // Validar contra las refs directamente
     if ((Number(localRectWMeters.value) || 0) <= 0 || (Number(localRectLMeters.value) || 0) <= 0 || (Number(localRectYMeters.value) || 0) <= 0) {
       errors.dimensions = true
-      notice.value = 'Las dimensiones deben ser mayores a cero.'
+  notice.value = 'Las dimensiones deben ser mayores a cero'
       return
     }
   }
@@ -1215,7 +1215,7 @@ function onSave() {
   // Validación extra: capacidad no negativa (solo si visible)
   if (!Number.isFinite(Number(local.maxWeight)) || Number(local.maxWeight) < 0) {
     errors.maxWeight = true
-    notice.value = 'La capacidad máxima (kg) no puede ser negativa.'
+  notice.value = 'La capacidad máxima (kg) no puede ser negativa'
     return
   }
 
@@ -1236,12 +1236,12 @@ function onSave() {
     const alturaMinimaEnMetros = (alturaMinimaRequerida_cm / 100).toFixed(2)
     const nombresElementos = elementosQueNoCaben.join(', ')
     errors.dimensions = true
-    notice.value = `Altura insuficiente. Se requiere ${alturaMinimaEnMetros} m. Elementos afectados: ${nombresElementos}.`
+  notice.value = `Altura insuficiente. Se requiere ${alturaMinimaEnMetros} m. Elementos afectados: ${nombresElementos}`
     return
   }
 
   if ((local.polygon?.length || 0) < 3) {
-    notice.value = 'El polígono debe tener al menos 3 vértices.'
+  notice.value = 'El polígono debe tener al menos 3 vértices'
     return
   }
 
@@ -1260,7 +1260,7 @@ function onSave() {
   if (fuera.length > 0) {
     const nombres = fuera.map((e) => e?.nombre || `ID ${e?.id}`).join(', ')
     errors.dimensions = true
-    notice.value = `No se puede guardar: ${fuera.length === 1 ? 'el elemento' : 'los elementos'} ${nombres} quedan fuera del área.`
+  notice.value = `No se puede guardar: ${fuera.length === 1 ? 'el elemento' : 'los elementos'} ${nombres} quedan fuera del área`
     return
   }
 
@@ -1271,7 +1271,7 @@ function onSave() {
 
     if (local.maxWeight > 0 && pesoTotalHijos > local.maxWeight) {
       showToast(
-        `La capacidad de carga de la planta (${local.maxWeight} kg) es menor a la capacidad de carga total requerida por los elementos contenidos (${Math.round(pesoTotalHijos * 100) / 100} kg).`,
+  `La capacidad de carga de la planta (${local.maxWeight} kg) es menor a la capacidad de carga total requerida por los elementos contenidos (${Math.round(pesoTotalHijos * 100) / 100} kg)`,
         'error',
       )
       return
@@ -1297,7 +1297,7 @@ function onSave() {
   if (plantaData.id) {
     canvasStore.editarPlanta(plantaData.id, plantaData)
     canvasStore.calcularCanvasAdaptativoPlanta(plantaData)
-    showToast('Planta actualizada correctamente.', 'success')
+  showToast('Planta actualizada correctamente', 'success')
   } else {
     delete plantaData.id
     canvasStore.agregarPlanta(plantaData)
