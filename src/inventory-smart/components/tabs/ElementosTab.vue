@@ -549,7 +549,7 @@ const handleDeleteTemplate = async (tpl) => {
 
   const ok = await confirmDialog.confirm({
     title: 'Eliminar plantilla',
-    message: `Se eliminará la plantilla “${tpl.name}”. Esta acción no afectará los elementos ya colocados en el lienzo.`,
+    message: `Se eliminará la plantilla “${tpl.name}”. Esta acción no afectará los elementos ya colocados en el lienzo`,
     confirmLabel: 'Eliminar',
     cancelLabel: 'Cancelar',
     // Usamos los mismos estilos de botón peligro que el flujo de eliminar elemento (valores por defecto ya son rojo)
