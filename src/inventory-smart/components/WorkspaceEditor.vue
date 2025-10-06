@@ -733,8 +733,8 @@ watch(
       local.isInfinite = !!planta.isInfinite
       local.codigo = planta.codigo || ''
 
-  const todosLosElementos = canvasStore.elementos || []
-  local.elements = todosLosElementos.filter((el) => el.plantaId === planta.id && !el.padre)
+      const todosLosElementos = canvasStore.elementos || []
+      local.elements = todosLosElementos.filter((el) => el.plantaId === planta.id && !el.padre)
 
       rectW.value = planta.dimensiones.ancho
       rectL.value = planta.dimensiones.largo
@@ -743,7 +743,7 @@ watch(
       localRectYMeters.value = planta.dimensiones.alto / 100
 
       // local.height = planta.dimensiones.alto;
-      // local.maxWeight = planta.capacidadCargaSoportado;
+      local.maxWeight = planta.capacidadCargaSoportado;
       isManuallyEdited.value = true
       resetValidationState()
     } else {
