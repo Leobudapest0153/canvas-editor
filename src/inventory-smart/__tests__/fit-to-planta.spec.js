@@ -5,6 +5,13 @@ import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 
 vi.mock('vue-konva', () => ({ VueKonva: {}, default: { install: () => {} } }))
 
+// Mock del sistema de sugerencias
+const mockPlacementSuggestions = {
+  tryPlaceWithSuggestions: vi.fn(() => Promise.resolve(true)),
+  generatePlacementSuggestions: vi.fn(() => null),
+  applySuggestedAdjustments: vi.fn((el) => el)
+}
+
 let mockStore
 vi.mock('@/inventory-smart/composables/useCanvasWithHistory', () => ({
   useCanvasWithHistory: () => ({ store: mockStore })
@@ -42,7 +49,13 @@ describe('fitToPlanta', () => {
     }
     mockStore.contextoNavegacion = { tipo: 'plantas', id: 'p1', path: [{ tipo: 'plantas', id: 'p1' }] }
 
-    const wrapper = mount(CanvasView)
+    const wrapper = mount(CanvasView, {
+      global: {
+        provide: {
+          placementSuggestions: mockPlacementSuggestions
+        }
+      }
+    })
     const stageStub = {
       scale: vi.fn(),
       position: vi.fn(),
@@ -107,7 +120,13 @@ describe('fitToPlanta', () => {
       ],
     }
 
-    const wrapper = mount(CanvasView)
+    const wrapper = mount(CanvasView, {
+      global: {
+        provide: {
+          placementSuggestions: mockPlacementSuggestions
+        }
+      }
+    })
     const stageStub = {
       scale: vi.fn(),
       position: vi.fn(),
