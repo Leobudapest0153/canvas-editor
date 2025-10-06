@@ -118,7 +118,7 @@
           <!-- Botón de acciones (tres puntos) -->
           <button
             type="button"
-            class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded cursor-pointer"
+            class="absolute top-2 right-2 text-gray-500 hover:text-gray-700 p-1 rounded cursor-pointer"
             aria-haspopup="menu"
             :aria-expanded="kebabMenu.visible && kebabMenu.item?.id === elemento.id ? 'true' : 'false'"
             :aria-controls="`el-menu-${elemento.id}`"
