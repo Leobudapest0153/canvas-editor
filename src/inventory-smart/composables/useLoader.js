@@ -55,7 +55,7 @@ export function useLoader() {
     const operation = {
       id,
       type: operationType,
-      description: description || `Ejecutando ${operationType}...`,
+  description: description || `Ejecutando ${operationType}...`,
       startTime: Date.now(),
       preventDuplicates: true // Por defecto, prevenir duplicados
     }
