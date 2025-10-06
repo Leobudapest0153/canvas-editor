@@ -274,6 +274,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const modoConfigurarEsl = ref(false)
   const elementoEslObjetivo = ref(null)
   const sidebarActiveTab = ref('elementos')
+  const sidebarVisible = ref(false)
 
   const editorPermissions = computed(() => ({
     modo: modoEdicion.value ? 'edicion' : 'visualizacion',
@@ -2694,6 +2695,18 @@ const calcularCanvasAdaptativo = (elemento) => {
     sidebarActiveTab.value = SIDEBAR_TAB_IDS.has(tabId) ? tabId : 'elementos'
   }
 
+  const setSidebarVisible = (visible) => {
+    sidebarVisible.value = Boolean(visible)
+  }
+
+  const toggleSidebar = () => {
+    sidebarVisible.value = !sidebarVisible.value
+  }
+
+  const initializeSidebarVisibility = (isDesktop = true) => {
+    sidebarVisible.value = isDesktop
+  }
+
   // === INTEGRACIÓN CON AUTOSAVE ===
   // Instancia del autosave - se establece desde App.vue o el componente principal
   const autoSaveInstance = ref(null)
@@ -2825,6 +2838,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     snapGridEps,
     modoEdicion,
   sidebarActiveTab,
+    sidebarVisible,
     editorPermissions,
     crearPlanta,
     plantaEnEdicion,
@@ -2890,6 +2904,9 @@ const calcularCanvasAdaptativo = (elemento) => {
     finalizarConfiguracionEsl,
     guardarCodigoEslElemento,
     setSidebarActiveTab,
+    setSidebarVisible,
+    toggleSidebar,
+    initializeSidebarVisibility,
 
     // Actions - Plantas
     seleccionarPlanta,

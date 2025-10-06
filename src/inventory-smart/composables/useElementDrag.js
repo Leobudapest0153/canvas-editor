@@ -155,7 +155,8 @@ export function useElementDrag({
     r.value = node
   }
 
-  const startElementDrag = (elementId) => {
+  const startElementDrag = (elementId, options = {}) => {
+    const { select = true } = options
     if (isElementLocked(elementId)) {
       // Si está bloqueado, no iniciar drag ni mover el layer
       isElementDragging.value = false
@@ -176,8 +177,10 @@ export function useElementDrag({
     isElementDragging.value = true
     stageDragEnabled.value = false // Deshabilitar arrastre del canvas
 
-    // Seleccionar elemento automáticamente al arrastrarlo
-    canvasStore.seleccionarElemento(elementId)
+    // Seleccionar elemento automáticamente al arrastrarlo (si aplica)
+    if (select) {
+      canvasStore.seleccionarElemento(elementId)
+    }
 
     const elemento = canvasStore.elementosVisibles.find((el) => el.id === elementId)
     if (elemento) {
@@ -784,7 +787,8 @@ export function useElementDrag({
     }
   }
 
-  const onShapeDragStart = (e, el) => {
+  const onShapeDragStart = (e, el, options = {}) => {
+    const { select = true } = options
     if (!canvasStore.estaEnPlanta) {
       const shape = e.target
       const parent =
@@ -807,8 +811,11 @@ export function useElementDrag({
       })
       isElementDragging.value = true
       stageDragEnabled.value = false
+      if (select) {
+        canvasStore.seleccionarElemento(el.id)
+      }
     } else {
-      startElementDrag(el.id)
+      startElementDrag(el.id, { select })
     }
     onDragStartGuard(e.target, el)
   }

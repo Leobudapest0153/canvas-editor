@@ -103,11 +103,15 @@
         <div
           v-for="elemento in elementosFiltrados"
           :key="elemento.id"
-          :draggable="canEditCanvas"
+          :draggable="allowNativeDrag"
           @dragstart="iniciarArrastre(elemento, $event)"
           @dragend="finalizarArrastre"
+          @touchstart.stop="iniciarArrastreTouch(elemento, $event)"
+          @touchmove.stop="moverArrastreTouch($event)"
+          @touchend.stop="finalizarArrastreTouch($event)"
+          @touchcancel.stop="handleTouchCancel"
           :class="[
-            'group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]',
+            'catalog-card group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]',
             catalogReadOnly ? 'catalog-item--disabled cursor-not-allowed hover:scale-100' : ''
           ]"
           :style="{
@@ -270,6 +274,9 @@ const { filteredCatalogItems, searchText, items } =
   storeToRefs(catalogStore)
 const confirmDialog = useConfirmDialog()
 
+const isCoarsePointer = ref(false)
+const allowNativeDrag = computed(() => canEditCanvas.value && !isCoarsePointer.value)
+
 // Estado local
 const filtroTexto = searchText
 // Filtros UI
@@ -345,6 +352,281 @@ const elementosFiltrados = computed(() => {
   return out
 })
 
+let coarsePointerMediaQuery = null
+let coarsePointerListener = null
+
+const updateCoarsePointerState = (matches) => {
+  const navigatorHasTouch = typeof navigator !== 'undefined' && Number(navigator.maxTouchPoints) > 0
+  const coarse = typeof matches === 'boolean' ? matches : navigatorHasTouch
+  isCoarsePointer.value = coarse || navigatorHasTouch
+}
+
+const registerCoarsePointerWatcher = () => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    updateCoarsePointerState(false)
+    return
+  }
+  coarsePointerMediaQuery = window.matchMedia('(pointer: coarse)')
+  updateCoarsePointerState(coarsePointerMediaQuery.matches)
+  coarsePointerListener = (event) => updateCoarsePointerState(event.matches)
+  if (typeof coarsePointerMediaQuery.addEventListener === 'function') {
+    coarsePointerMediaQuery.addEventListener('change', coarsePointerListener)
+  } else if (typeof coarsePointerMediaQuery.addListener === 'function') {
+    coarsePointerMediaQuery.addListener(coarsePointerListener)
+  }
+}
+
+const unregisterCoarsePointerWatcher = () => {
+  if (!coarsePointerMediaQuery || !coarsePointerListener) return
+  if (typeof coarsePointerMediaQuery.removeEventListener === 'function') {
+    coarsePointerMediaQuery.removeEventListener('change', coarsePointerListener)
+  } else if (typeof coarsePointerMediaQuery.removeListener === 'function') {
+    coarsePointerMediaQuery.removeListener(coarsePointerListener)
+  }
+  coarsePointerMediaQuery = null
+  coarsePointerListener = null
+}
+
+const LONG_PRESS_DELAY_MS = 260
+const LONG_PRESS_MOVE_TOLERANCE = 8
+
+const initialTouchDragState = () => ({
+  elemento: null,
+  cardEl: null,
+  isDragging: false,
+  longPressActivated: false,
+  longPressTimer: null,
+  startX: 0,
+  startY: 0,
+  dataTransfer: null,
+})
+
+const touchDragState = ref(initialTouchDragState())
+
+const resetTouchDragState = () => {
+  const state = touchDragState.value
+  if (state.longPressTimer) {
+    clearTimeout(state.longPressTimer)
+  }
+  if (state.cardEl?.classList) {
+    state.cardEl.classList.remove('opacity-50', 'scale-95')
+  }
+  touchDragState.value = initialTouchDragState()
+}
+
+const createMockDataTransfer = () => {
+  const store = new Map()
+  return {
+    dropEffect: 'copy',
+    effectAllowed: 'copy',
+    setData: (type, value) => store.set(type, value),
+    getData: (type) => store.get(type) ?? '',
+    clearData: (type) => {
+      if (!type) store.clear()
+      else store.delete(type)
+    },
+  }
+}
+
+const cloneCatalogElement = (elemento) => {
+  try {
+    return structuredClone(elemento)
+  } catch (error) {
+    try {
+      return JSON.parse(JSON.stringify(elemento))
+    } catch {
+      return elemento
+    }
+  }
+}
+
+const buildDragDataForElement = (elemento) => {
+  if (!elemento) return null
+  return {
+    tipo: 'elemento-catalogo',
+    elemento: cloneCatalogElement(elemento),
+  }
+}
+
+const getIconComponentForElement = (elemento) => {
+  if (!elemento) return SpaceIcon
+  const tipo = (elemento.tipo || '').toLowerCase()
+  if (tipo === 'cuartos') return RoomIcon
+  const ubicacion = (elemento.ubicacion || elemento.montado || '').toLowerCase()
+  return ubicacion === 'pared' ? SpaceOnWallIcon : SpaceIcon
+}
+
+const getChildCount = (elemento) => {
+  if (!elemento) return 0
+  const metaCount = Number(elemento.meta?.childrenCount)
+  if (Number.isFinite(metaCount)) return metaCount
+  const payload = elemento.payload
+  if (payload?.rootId && Array.isArray(payload.elements)) {
+    return payload.elements.filter((el) => el.padre === payload.rootId).length
+  }
+  if (Array.isArray(elemento.hijos)) return elemento.hijos.length
+  return 0
+}
+
+const getCardDims = (elemento) => {
+  const dims = elemento?.dimensiones || {}
+  const fallback = elemento?.meta?.dimsCm || {}
+  const parse = (value) => {
+    const num = Number(value)
+    return Number.isFinite(num) ? num : null
+  }
+  return {
+    ancho: parse(dims.ancho ?? fallback.ancho) ?? 0,
+    largo: parse(dims.largo ?? fallback.largo) ?? 0,
+    alto: parse(dims.alto ?? fallback.alto) ?? 0,
+  }
+}
+
+const isKebabRestricted = (item) => {
+  if (!item) return true
+  const source = item.props?.source
+  if (!source) return false
+  return source !== 'user'
+}
+
+const iniciarArrastre = (elemento, event) => {
+  if (!canEditCanvas.value) {
+    event.preventDefault()
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
+  const payload = buildDragDataForElement(elemento)
+  if (!payload) return
+  try {
+    event.dataTransfer.setData('application/json', JSON.stringify(payload))
+    event.dataTransfer.effectAllowed = 'copy'
+  } catch (error) {
+    console.error('No se pudo preparar drag desde catálogo', error)
+  }
+  const card = event.currentTarget
+  if (card && card.classList) card.classList.add('opacity-50', 'scale-95')
+}
+
+const finalizarArrastre = (event) => {
+  const card = event.currentTarget
+  if (card && card.classList) card.classList.remove('opacity-50', 'scale-95')
+}
+
+const iniciarArrastreTouch = (elemento, event) => {
+  if (!canEditCanvas.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
+  const touch = event.touches?.[0]
+  if (!touch || !elemento) return
+
+  resetTouchDragState()
+
+  const cardEl = event.currentTarget
+  const timerId = window.setTimeout(() => {
+    const state = touchDragState.value
+    if (state.longPressTimer !== timerId) return
+
+    const payload = buildDragDataForElement(elemento)
+    if (!payload) {
+      resetTouchDragState()
+      return
+    }
+
+    const dataTransfer = createMockDataTransfer()
+    dataTransfer.setData('application/json', JSON.stringify(payload))
+
+    touchDragState.value = {
+      ...state,
+      isDragging: true,
+      longPressActivated: true,
+      dataTransfer,
+      longPressTimer: null,
+    }
+
+    if (cardEl && cardEl.classList) cardEl.classList.add('opacity-50', 'scale-95')
+
+    const dragStartEvent = new CustomEvent('touchdragstart', {
+      detail: { dataTransfer },
+    })
+    document.dispatchEvent(dragStartEvent)
+  }, LONG_PRESS_DELAY_MS)
+
+  touchDragState.value = {
+    elemento,
+    cardEl,
+    isDragging: false,
+    longPressActivated: false,
+    longPressTimer: timerId,
+    startX: touch.clientX,
+    startY: touch.clientY,
+    dataTransfer: null,
+  }
+}
+
+const moverArrastreTouch = (event) => {
+  const state = touchDragState.value
+  if (!state.elemento) return
+
+  const touch = event.touches?.[0]
+  if (!touch) return
+
+  const deltaX = Math.abs(touch.clientX - state.startX)
+  const deltaY = Math.abs(touch.clientY - state.startY)
+
+  if (!state.longPressActivated) {
+    if (deltaX > LONG_PRESS_MOVE_TOLERANCE || deltaY > LONG_PRESS_MOVE_TOLERANCE) {
+      resetTouchDragState()
+    }
+    return
+  }
+
+  if (!state.isDragging || !state.dataTransfer) return
+  event.preventDefault()
+
+  const dragOverEvent = new CustomEvent('touchdragover', {
+    detail: {
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      dataTransfer: state.dataTransfer,
+    },
+  })
+  document.dispatchEvent(dragOverEvent)
+}
+
+const finalizarArrastreTouch = (event) => {
+  const state = touchDragState.value
+  if (!state.elemento) {
+    resetTouchDragState()
+    return
+  }
+
+  if (state.longPressTimer) {
+    clearTimeout(state.longPressTimer)
+  }
+
+  if (state.longPressActivated && state.dataTransfer) {
+    const touch = event.changedTouches?.[0] || event.touches?.[0]
+    if (touch) {
+      event.preventDefault()
+      const dropEvent = new CustomEvent('touchdrop', {
+        detail: {
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+          dataTransfer: state.dataTransfer,
+        },
+      })
+      document.dispatchEvent(dropEvent)
+    }
+  }
+
+  resetTouchDragState()
+}
+
+const handleTouchCancel = () => {
+  resetTouchDragState()
+}
+
 // Cerrar panel de filtros si el tab queda sin elementos base
 watch(hayElementosEnTab, (val) => {
   if (!val) filtrosVisibles.value = false
@@ -378,109 +660,6 @@ const onGuardarEspacio = (datosEspacio) => {
     editingItem.value = null
     editingForm.value = null
   }
-}
-
-const getIconComponentForElement = (elemento) => {
-  // Determinar el componente de icono basado en tipo y ubicación
-  if (elemento.tipo === 'cuartos') {
-    return RoomIcon
-  } else if (elemento.ubicacion === 'pared') {
-    return SpaceOnWallIcon
-  } else {
-    return SpaceIcon
-  }
-}
-
-// Tipos para los que se oculta el menú de acciones
-const isKebabRestricted = (item) => {
-  const t = item?.tipo
-  return t === 'pasillos' || t === 'contenedores' || t === 'pisos'
-}
-
-// const isSystemDefaultItem = (item) =>
-//   !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
-
-// const getCardDims = (item) => {
-//   try {
-//     if (!item?.dimensiones) return { ancho: 0, largo: 0, alto: 0 }
-//     // Solo escalar para tipos explícitos (pasillo/cuarto/piso). Para elementos regulares
-//     // como estantes o anaqueles, mostrar dimensiones base del catálogo.
-//     if (!(isSystemDefaultItem(item) && SCALE_WITH_PARENT_KEYS.includes(item.id))) {
-//       return item.dimensiones
-//     }
-//     const planta = canvasStore.plantaActivaData
-//     const dimsPlanta = planta?.dimensiones
-//     if (!dimsPlanta) return item.dimensiones
-//     const parentDims = { w: dimsPlanta.ancho, h: dimsPlanta.largo, d: dimsPlanta.alto }
-//     const dims = computeDimsByAxisScale(item.id, parentDims, { snap: true })
-//     return dims || item.dimensiones
-//   } catch {
-//     return item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
-//   }
-// }
-
-// Comportamiento actual: sin escalado, siempre dimensiones base del catálogo
-const getCardDims = (item) => item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
-
-const getChildCount = (elemento) => {
-  try {
-    if (!elemento?.payload?.rootId || !Array.isArray(elemento.payload.elements)) {
-      return 0
-    }
-    const root = elemento.payload.elements.find(e => e.id === elemento.payload.rootId)
-    return root?.hijos?.length || 0
-  } catch {
-    return 0
-  }
-}
-
-// Drag and Drop
-const iniciarArrastre = (elemento, event) => {
-  if (catalogReadOnly.value || !canEditCanvas.value) {
-    showToast(VISUAL_MODE_MESSAGE, 'warning')
-    event.preventDefault()
-    return
-  }
-  if (canvasStore.cambiosNoAplicados) {
-    showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn');
-    event.preventDefault()
-    return
-  }
-
-  if (['cuartos', 'elementos'].includes(canvasStore.contextoNavegacion.tipo)) {
-    showToast('No puedes arrastrar elementos mientras estás editando un cuarto o elemento.', 'warn');
-    event.preventDefault()
-    return
-  }
-  // Si el item trae payload de estructura (plantilla/room/space), arrastrar como 'plantilla-catalogo'
-  const isStructured = !!elemento?.payload?.rootId && Array.isArray(elemento?.payload?.elements)
-  const datosArrastre = isStructured
-    ? {
-        tipo: 'plantilla-catalogo',
-        payload: elemento.payload,
-        offset: { x: event.offsetX || 0, y: event.offsetY || 0 },
-      }
-    : {
-        tipo: 'elemento-catalogo',
-        elemento: elemento,
-        offset: { x: event.offsetX || 0, y: event.offsetY || 0 },
-      }
-
-  try {
-    const dataString = JSON.stringify(datosArrastre)
-    event.dataTransfer.setData('application/json', dataString)
-    event.dataTransfer.effectAllowed = 'copy'
-    // Efecto visual de arrastre con Tailwind (sin clases en <style>)
-    const card = event.currentTarget
-    if (card && card.classList) card.classList.add('opacity-50', 'scale-95')
-  } catch (error) {
-    console.error('Error en iniciarArrastre:', error)
-  }
-}
-
-const finalizarArrastre = (event) => {
-  const card = event.currentTarget
-  if (card && card.classList) card.classList.remove('opacity-50', 'scale-95')
 }
 
 onUnmounted(() => {
@@ -601,10 +780,15 @@ const onGlobalClickKebab = (e) => {
 }
 
 onMounted(() => {
+  registerCoarsePointerWatcher()
   window.addEventListener('click', onGlobalClickKebab, { capture: true })
+  document.addEventListener('touchcancel', handleTouchCancel, { passive: true })
 })
 onUnmounted(() => {
   window.removeEventListener('click', onGlobalClickKebab, { capture: true })
+  document.removeEventListener('touchcancel', handleTouchCancel)
+  unregisterCoarsePointerWatcher()
+  resetTouchDragState()
 })
 </script>
 
@@ -626,5 +810,12 @@ onUnmounted(() => {
   opacity: 0;
   transform: translateY(-10px);
   overflow: hidden;
+}
+
+.catalog-card,
+.catalog-card * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 </style>

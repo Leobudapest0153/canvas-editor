@@ -30,7 +30,7 @@
 
     <main class="app-main relative">
       <!-- Sidebar con tabs -->
-      <div class="app-sidebar-left" v-if="canvasStore.modoEdicion">
+      <div class="app-sidebar-left" v-if="canvasStore.modoEdicion && canvasStore.sidebarVisible">
         <SidebarPanel />
       </div>
 
@@ -38,6 +38,18 @@
       <div class="app-canvas">
         <CanvasView ref="canvasViewRef" :safeRight="canvasStore.mostrarPropiedades ? 320 : 20" />
       </div>
+
+      <!-- Botón flotante para mostrar sidebar cuando está oculto -->
+      <button
+        v-if="!isMobileDevice && canvasStore.modoEdicion && !canvasStore.sidebarVisible"
+        class="sidebar-show-btn"
+        @click="canvasStore.toggleSidebar()"
+        title="Mostrar panel lateral"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </button>
 
       <!-- Panel de propiedades (superpuesto para no empujar el canvas) -->
       <div
@@ -570,6 +582,9 @@ onMounted(() => {
     isMobileDevice.value = mediaQuery.matches
     mediaQuery.addEventListener('change', updateMediaQuery)
     provide('externalServicesAPI', externalServicesAPI)
+
+    // Inicializar visibilidad del sidebar basado en el dispositivo
+    canvasStore.initializeSidebarVisibility(!isMobileDevice.value)
   } catch (error) {
     if (typeof window !== 'undefined') {
       window.removeEventListener('beforeunload', handleBeforeUnload)
@@ -587,6 +602,11 @@ onUnmounted(() => {
   if (mediaQuery) {
     mediaQuery.removeEventListener('change', updateMediaQuery)
   }
+})
+
+// Watcher para actualizar sidebar cuando cambia el dispositivo
+watch(isMobileDevice, (isMobile) => {
+  canvasStore.initializeSidebarVisibility(!isMobile)
 })
 
 watch(
@@ -1048,5 +1068,36 @@ watch(
 .main-canvas {
   width: 100%;
   height: 100%;
+}
+
+.sidebar-show-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 40px;
+  height: 40px;
+  background: var(--ui-bg);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  box-shadow: var(--ui-shadow);
+  backdrop-filter: saturate(140%) blur(10px);
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 100;
+}
+
+.sidebar-show-btn:hover {
+  background: #f1f5f9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.sidebar-show-btn svg {
+  width: 16px;
+  height: 16px;
 }
 </style>
