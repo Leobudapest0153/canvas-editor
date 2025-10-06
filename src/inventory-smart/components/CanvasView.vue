@@ -41,46 +41,25 @@
       @dbltap="handleStageDoubleTap"
     >
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
+        <!-- GridLayer DEBAJO de todo para que los elementos lo tapen -->
+        <GridLayer
+          v-if="canvasStore.gridVisible"
+          :scale="canvasStore.zoom"
+          :pixels-per-unit="10 * 100"
+          :unit="'m'"
+          :bbox="floorBoundary"
+        />
         <v-line
           v-if="plantPolygon.length && !isInfinitePlant"
           :config="{
             points: plantPolygonFlat,
             closed: true,
             stroke: '#0ea5e9',
-            fill: 'rgba(255,265,255,1)',
+            fill: 'transparent',
             strokeWidth: 2 / canvasStore.zoom,
             listening: false,
           }"
         />
-        <!-- Dibujar grid solo si gridSize > 0 -->
-        <template v-if="(canvasStore.gridSize || 0) > 0">
-          <v-line
-            v-for="x in gridLines.vertical"
-            :key="`v-${Math.round(x * 1000)}`"
-            :config="{
-              points: isInfinitePlant
-                ? [x, 0, x, floorBoundary.height]
-                : [x, floorBoundary.y, x, floorBoundary.y + floorBoundary.height],
-              stroke: '#e5e7eb',
-              strokeWidth: 1,
-              opacity: 0.5,
-              listening: false,
-            }"
-          />
-          <v-line
-            v-for="y in gridLines.horizontal"
-            :key="`h-${Math.round(y * 1000)}`"
-            :config="{
-              points: isInfinitePlant
-                ? [0, y, floorBoundary.width, y]
-                : [floorBoundary.x, y, floorBoundary.x + floorBoundary.width, y],
-              stroke: '#e5e7eb',
-              strokeWidth: 1,
-              opacity: 0.5,
-              listening: false,
-            }"
-          />
-        </template>
       </v-layer>
       <v-layer ref="layerRef">
         <template v-if="canvasStore.elementoAura">
@@ -469,13 +448,6 @@
         </template>
       </v-layer>
       <v-layer ref="uiLayerRef" :config="{ listening: false }">
-        <GridLayer
-          v-if="canvasStore.gridVisible"
-          :scale="canvasStore.zoom"
-          :pixels-per-unit="10 * 100"
-          :unit="'m'"
-          :bbox="floorBoundary"
-        />
         <!-- Debug: mostrar información según el contexto -->
         <v-text
           v-if="!canvasStore.estaEnPlanta || !isInfinitePlant"
@@ -1141,47 +1113,6 @@ const hasPasillos = computed(() =>
 )
 const showPasillosDash = ref(true)
 
-// Grid de referencia - BASADO EN LAS DIMENSIONES DEL LAYER
-const gridLines = computed(() => {
-  const gridSizePx = Number(canvasStore.gridSize || 0)
-  const vertical = []
-  const horizontal = []
-
-  // Si gridSize <= 0, no generar líneas
-  if (!gridSizePx || gridSizePx <= 0) {
-    return { vertical, horizontal }
-  }
-
-  // Usar las dimensiones del layer (planta) para el grid
-  const boundary = floorBoundary.value
-  const layerWidth = Number(boundary.width) || 0
-  const layerHeight = Number(boundary.height) || 0
-
-  if (!isInfinitePlant.value) {
-    const startX = Number(boundary.x) || 0
-    const endX = startX + layerWidth
-    for (let x = startX; x <= endX + 0.5; x += gridSizePx) {
-      vertical.push(x)
-    }
-
-    const startY = Number(boundary.y) || 0
-    const endY = startY + layerHeight
-    for (let y = startY; y <= endY + 0.5; y += gridSizePx) {
-      horizontal.push(y)
-    }
-  } else {
-    for (let x = 0; x <= layerWidth; x += gridSizePx) {
-      vertical.push(x)
-    }
-
-    for (let y = 0; y <= layerHeight; y += gridSizePx) {
-      horizontal.push(y)
-    }
-  }
-
-  return { vertical, horizontal }
-})
-
 watch(
   [plantPolygon, isInfinitePlant],
   ([poly, infinite]) => {
@@ -1749,7 +1680,7 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   // Support both mouse events and touch events
   const clientX = dropEvent.clientX || (dropEvent.detail && dropEvent.detail.clientX)
   const clientY = dropEvent.clientY || (dropEvent.detail && dropEvent.detail.clientY)
-  
+
   const pointerPos = {
     x: clientX - rect.left,
     y: clientY - rect.top,
@@ -2812,7 +2743,7 @@ onMounted(async () => {
   fitToPlanta()
   window.addEventListener('click', handleGlobalClick)
   window.addEventListener('keydown', handleKeyDown)
-  
+
   // Touch drag listeners
   document.addEventListener('touchdragstart', handleTouchDragStart)
   document.addEventListener('touchdragover', handleTouchDragOver)
@@ -2824,11 +2755,12 @@ onUnmounted(() => {
   if (sizeResizeObserver) sizeResizeObserver.disconnect()
   window.removeEventListener('click', handleGlobalClick)
   window.removeEventListener('keydown', handleKeyDown)
-  
+
   // Touch drag cleanup
   document.removeEventListener('touchdragstart', handleTouchDragStart)
   document.removeEventListener('touchdragover', handleTouchDragOver)
   document.removeEventListener('touchdrop', handleTouchDrop)
+
   resetTouchGestures()
 })
 
