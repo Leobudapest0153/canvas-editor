@@ -1714,14 +1714,14 @@ const runPreDropValidations = (elemento, dropEvent) => {
   const permitidos = JERARQUIA_PERMITIDA[contextoActual] || []
   if (!permitidos.includes(tipoElemento)) {
     const msgMap = {
-      plantas: 'Aquí solo puedes agregar cuartos, elementos o pasillos.',
-      cuartos: 'Aquí solo puedes agregar pisos.',
-      pisos: 'Aquí solo puedes agregar elementos y pasillos.',
-      elementos: 'Dentro de elementos solo se permiten niveles.',
-      contenedores: 'No puedes agregar elementos dentro de niveles.',
-      pasillos: 'No puedes agregar elementos dentro de pasillos.',
+  plantas: 'Aquí solo puedes agregar cuartos, elementos o pasillos',
+  cuartos: 'Aquí solo puedes agregar pisos',
+  pisos: 'Aquí solo puedes agregar elementos y pasillos',
+  elementos: 'Dentro de elementos solo se permiten niveles',
+  contenedores: 'No puedes agregar elementos dentro de niveles',
+  pasillos: 'No puedes agregar elementos dentro de pasillos',
     }
-    showToast(msgMap[contextoActual] || 'No puedes agregar este tipo aquí.', 'error')
+  showToast(msgMap[contextoActual] || 'No puedes agregar este tipo aquí', 'error')
     return { ok: false, reason: 'hierarchy', validationResult: null }
   }
 
@@ -1891,7 +1891,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
         areaBounds: areaBounds,
         validationResult: {
           valid: false,
-          reason: 'No hay espacio suficiente aquí para colocar el elemento.',
+          reason: 'No hay espacio suficiente aquí para colocar el elemento',
           canSuggest: true
         }
       }
@@ -1974,7 +1974,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
       areaBounds: areaBounds,
       validationResult: {
         valid: false,
-        reason: 'No fue posible colocar el elemento dentro de los límites de la planta.',
+  reason: 'No fue posible colocar el elemento dentro de los límites de la planta',
         canSuggest: true
       }
     }
@@ -1988,7 +1988,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
       areaBounds: areaBounds,
       validationResult: {
         valid: false,
-        reason: 'El elemento quedaría fuera del área permitida.',
+  reason: 'El elemento quedaría fuera del área permitida',
         canSuggest: true
       }
     }
