@@ -315,7 +315,7 @@ export function useProductSimulation({ canvasStore, showToast, forceRedraw }) {
 
     // Permitir solo al estar en contexto planta
     if (canvasStore.contextoActual.tipo !== 'plantas') {
-      showToast('La simulación solo está disponible desde las plantas.', 'warning');
+  showToast('La simulación solo está disponible desde las plantas', 'warning');
       return;
     }
 
@@ -325,7 +325,7 @@ export function useProductSimulation({ canvasStore, showToast, forceRedraw }) {
     // RESTRICCIÓN: No permitir simulación en pasillos
     if (!puedeSimularUso(elementoId)) {
       showToast(
-        `No se puede simular: ${elemento.nombre} es un pasillo.`,
+  `No se puede simular: ${elemento.nombre} es un pasillo`,
         'warning'
       );
       return;
@@ -407,7 +407,7 @@ export function useProductSimulation({ canvasStore, showToast, forceRedraw }) {
 
       const hijosValidosCount = hijos.filter(hijo => puedeSimularUso(hijo.id)).length;
       showToast(
-        `Simulación completada para ${elemento.nombre} y ${hijosValidosCount} elementos hijos.`,
+  `Simulación completada para ${elemento.nombre} y ${hijosValidosCount} elementos hijos`,
         'success'
       );
     } else {
@@ -431,7 +431,7 @@ export function useProductSimulation({ canvasStore, showToast, forceRedraw }) {
           : 0;
       }
 
-      showToast(`Simulación completada para ${elemento.nombre}.`, 'success');
+  showToast(`Simulación completada para ${elemento.nombre}`, 'success');
     }
 
     // Actualizar el elemento principal con el valor real calculado
