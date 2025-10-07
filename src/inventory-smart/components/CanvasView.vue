@@ -2047,7 +2047,7 @@ const createElementFromDrop = async (data, dropEvent) => {
 }
 
 // Función auxiliar para crear elemento con ajustes de sugerencias aplicados
-const createAdjustedElementFromDrop = (elementoAjustado, position, originalData) => {
+const createAdjustedElementFromDrop = async (elementoAjustado, position, originalData) => {
   const { width, height } = getElementPixelDimensions(elementoAjustado)
   const finalWidth = Math.max(width, 10)
   const finalHeight = Math.max(height, 10)
@@ -2093,8 +2093,44 @@ const createAdjustedElementFromDrop = (elementoAjustado, position, originalData)
   canvasStore.agregarElemento(nuevoElemento)
   canvasStore.seleccionarElemento(nuevoElemento.id)
 
+  // Si hay ajustes de hijos, aplicarlos después de crear el elemento padre
+  if (elementoAjustado._childrenAdjustments && elementoAjustado._childrenAdjustments.length > 0) {
+    // Esperar un tick para que el elemento padre esté completamente registrado
+    await nextTick()
+    
+    // Aplicar ajustes a cada hijo
+    for (const childAdjustment of elementoAjustado._childrenAdjustments) {
+      const hijoEnStore = canvasStore.elementoPorId(childAdjustment.id)
+      if (hijoEnStore) {
+        // Actualizar dimensiones
+        canvasStore.actualizarElemento(childAdjustment.id, {
+          dimensiones: childAdjustment.dimensiones,
+          capacidadCarga: childAdjustment.capacidadCarga,
+          x: childAdjustment.x,
+          y: childAdjustment.y,
+        })
+      }
+    }
+  }
+
   // Mostrar toast informativo sobre los ajustes aplicados
-  showToast('Elemento colocado con ajustes automáticos aplicados', 'success')
+  const storeChildrenCount = elementoAjustado._childrenAdjustments?.length || 0
+  const containerCount = elementoAjustado.contenedores?.length || 0
+  const totalAdjusted = storeChildrenCount + containerCount
+  
+  let message = 'Elemento colocado con ajustes automáticos aplicados'
+  if (totalAdjusted > 0) {
+    const parts = []
+    if (containerCount > 0) {
+      parts.push(`${containerCount} contenedor${containerCount > 1 ? 'es' : ''}`)
+    }
+    if (storeChildrenCount > 0) {
+      parts.push(`${storeChildrenCount} hijo${storeChildrenCount > 1 ? 's' : ''}`)
+    }
+    message = `Elemento colocado con ajustes automáticos (${parts.join(' y ')} escalado${totalAdjusted > 1 ? 's' : ''})`
+  }
+  
+  showToast(message, 'success')
 }
 
 // Función auxiliar para crear elemento sin ajustes (flujo normal)
@@ -2502,8 +2538,18 @@ const createElementFromTemplate = async (data, dropEvent) => {
         onSuccess: async (adjustedElement, adjustedPosition) => {
           // Crear plantilla con ajustes aplicados usando la posición recalculada
           const adjustedPayload = createAdjustedTemplatePayload(payload, adjustedElement)
+          
+          // Contar cuántos hijos fueron escalados
+          const childrenCount = (adjustedPayload.elements || []).filter(
+            e => e.id !== adjustedPayload.rootId && e.padre === adjustedPayload.rootId
+          ).length
+          
           instantiateStructureOnCanvas(canvasStore, adjustedPayload, adjustedPosition)
-          showToast('Plantilla colocada con ajustes automáticos aplicados', 'success')
+          
+          const message = childrenCount > 0
+            ? `Plantilla colocada con ajustes automáticos (${childrenCount} hijo${childrenCount > 1 ? 's' : ''} escalado${childrenCount > 1 ? 's' : ''})`
+            : 'Plantilla colocada con ajustes automáticos aplicados'
+          showToast(message, 'success')
         },
         onFailure: (reason) => {
           // Mostrar mensaje final si no hay opciones viables
@@ -2530,13 +2576,120 @@ const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => 
   const adjustedPayload = { ...originalPayload }
   const elements = [...(originalPayload.elements || [])]
 
+  console.log('📦 [createAdjustedTemplatePayload] Ajustando payload:', {
+    rootId: originalPayload.rootId,
+    totalElements: elements.length,
+    adjustedRoot: adjustedRootElement
+  })
+
   // Encontrar y reemplazar el elemento raíz con los ajustes
   const rootIndex = elements.findIndex(e => e.id === originalPayload.rootId)
   if (rootIndex >= 0) {
+    const originalRoot = elements[rootIndex]
+    const originalDims = originalRoot.dimensiones || {}
+    const adjustedDims = adjustedRootElement.dimensiones || {}
+    const originalCapacity = Number(originalRoot.capacidadCarga || 0)
+    const adjustedCapacity = Number(adjustedRootElement.capacidadCarga || 0)
+
+    // Calcular factores de escala dimensionales
+    let scaleFactorAncho = adjustedDims.ancho / (originalDims.ancho || adjustedDims.ancho || 1)
+    let scaleFactorLargo = adjustedDims.largo / (originalDims.largo || adjustedDims.largo || 1)
+    let scaleFactorAlto = adjustedDims.alto / (originalDims.alto || adjustedDims.alto || 1)
+    
+    // Si las dimensiones no cambiaron pero sí la capacidad, calcular factor de escala desde la capacidad
+    let scaleFactorWeight = scaleFactorAncho * scaleFactorLargo * scaleFactorAlto
+    
+    if (scaleFactorWeight === 1 && originalCapacity > 0 && adjustedCapacity !== originalCapacity) {
+      // Solo se ajustó peso, calcular factor de escala cúbico desde la relación de capacidades
+      scaleFactorWeight = adjustedCapacity / originalCapacity
+      // Aplicar raíz cúbica para obtener el factor lineal uniforme
+      const linearScale = Math.cbrt(scaleFactorWeight)
+      scaleFactorAncho = linearScale
+      scaleFactorLargo = linearScale
+      scaleFactorAlto = linearScale
+      
+      console.log('⚖️ Ajuste solo de capacidad detectado. Calculando escala dimensional desde capacidad:', {
+        originalCapacity,
+        adjustedCapacity,
+        capacityRatio: scaleFactorWeight,
+        linearScale
+      })
+    }
+
+    console.log('📊 Factores de escala calculados:', {
+      ancho: scaleFactorAncho,
+      largo: scaleFactorLargo,
+      alto: scaleFactorAlto,
+      weight: scaleFactorWeight
+    })
+
+    // Actualizar elemento raíz
     elements[rootIndex] = {
       ...elements[rootIndex],
       dimensiones: adjustedRootElement.dimensiones,
       capacidadCarga: adjustedRootElement.capacidadCarga
+    }
+
+    console.log('✅ Elemento raíz actualizado')
+
+    // Solo escalar hijos si hay un cambio real (factor diferente de 1)
+    if (scaleFactorWeight !== 1) {
+      // Escalar todos los hijos (elementos que tienen padre === rootId)
+      const rootId = originalPayload.rootId
+      let childrenScaled = 0
+
+      for (let i = 0; i < elements.length; i++) {
+        const elem = elements[i]
+        
+        // Si es hijo del root (directamente o indirectamente)
+        if (elem.id !== rootId && elem.padre === rootId) {
+          const originalChildDims = elem.dimensiones || {}
+          const originalChildCapacity = Number(elem.capacidadCarga || 0)
+
+          console.log(`  👶 Escalando hijo: ${elem.nombre || elem.id}`, {
+            dimensionesOriginales: originalChildDims,
+            capacidadOriginal: originalChildCapacity
+          })
+
+          // Escalar dimensiones
+          const newAncho = Math.max(1, Math.floor((originalChildDims.ancho || 0) * scaleFactorAncho))
+          const newLargo = Math.max(1, Math.floor((originalChildDims.largo || 0) * scaleFactorLargo))
+          const newAlto = Math.max(1, Math.floor((originalChildDims.alto || 0) * scaleFactorAlto))
+
+          // Escalar capacidad
+          const newCapacidad = originalChildCapacity > 0 
+            ? Math.max(1, Math.floor(originalChildCapacity * scaleFactorWeight))
+            : 0
+
+          // Escalar posición (si tiene)
+          const newX = (elem.x || 0) * scaleFactorAncho
+          const newY = (elem.y || 0) * scaleFactorLargo
+
+          // Aplicar escalado al hijo
+          elements[i] = {
+            ...elem,
+            dimensiones: {
+              ancho: newAncho,
+              largo: newLargo,
+              alto: newAlto
+            },
+            capacidadCarga: newCapacidad,
+            x: newX,
+            y: newY
+          }
+
+          console.log(`  ✨ Hijo escalado:`, {
+            nuevasDimensiones: elements[i].dimensiones,
+            nuevaCapacidad: elements[i].capacidadCarga
+          })
+
+          childrenScaled++
+        }
+      }
+
+      console.log(`🎯 Total de hijos escalados: ${childrenScaled}`)
+    } else {
+      console.log('ℹ️ No hay cambios de escala, hijos mantienen dimensiones originales')
     }
   }
 
