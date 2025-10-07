@@ -40,7 +40,7 @@
       @tap="handleStageTap"
       @dbltap="handleStageDoubleTap"
     >
-      <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
+      <v-layer ref="backgroundLayerRef" :config="backgroundLayerConfig">
         <!-- GridLayer DEBAJO de todo para que los elementos lo tapen -->
         <GridLayer
           v-if="canvasStore.gridVisible"
@@ -61,7 +61,7 @@
           }"
         />
       </v-layer>
-      <v-layer ref="layerRef">
+      <v-layer ref="layerRef" :config="layerConfig">
         <template v-if="canvasStore.elementoAura">
           <v-rect
             v-if="
@@ -529,7 +529,7 @@
           }"
         />
       </v-layer>
-      <v-layer ref="overlaysLayerRef">
+      <v-layer ref="overlaysLayerRef" :config="overlayLayerConfig">
         <!-- Líneas guía de object snapping -->
         <SnapGuides
           :guides="snapGuides"
@@ -578,7 +578,7 @@
         />
       </v-layer>
       <!-- Capa de indicadores de uso (por encima del transformer) -->
-      <v-layer ref="indicatorsLayerRef" :config="{ listening: false }">
+      <v-layer ref="indicatorsLayerRef" :config="indicatorLayerConfig">
         <!-- Indicadores de uso para todos los elementos visibles -->
         <template v-for="elemento in elementosVisiblesEnCanvas" :key="`indicator-${elemento.id}`">
           <v-circle
@@ -598,15 +598,17 @@
       </v-layer>
     </v-stage>
 
-    <rulers-overlay
-      :width="stageSize.width"
-      :height="stageSize.height"
-      :scale="canvasStore.zoom"
-      :stage-x="canvasStore.panX"
-      :stage-y="canvasStore.panY"
-      :pixels-per-unit="10 * 100"
-      :unit="'m'"
-    />
+      <rulers-overlay
+        :width="stageSize.width"
+        :height="stageSize.height"
+        :scale="canvasStore.zoom"
+        :stage-x="canvasStore.panX"
+        :stage-y="canvasStore.panY"
+        :pixels-per-unit="10 * 100"
+        :unit="'m'"
+        :origin-x="floatingOrigin.x"
+        :origin-y="floatingOrigin.y"
+      />
 
     <FloatingToolbar
       v-if="isEditMode"
@@ -667,7 +669,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, watchEffect, inject } from 'vue'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
@@ -892,6 +894,33 @@ const stageConfig = computed(() => {
   }
 })
 
+const floatingOrigin = computed(() => ({
+  x: canvasStore.floatingOrigin?.x || 0,
+  y: canvasStore.floatingOrigin?.y || 0,
+}))
+
+const worldOffsetConfig = computed(() => ({
+  x: -floatingOrigin.value.x,
+  y: -floatingOrigin.value.y,
+}))
+
+const backgroundLayerConfig = computed(() => ({
+  listening: false,
+  x: worldOffsetConfig.value.x,
+  y: worldOffsetConfig.value.y,
+}))
+
+const overlayLayerConfig = computed(() => ({
+  x: worldOffsetConfig.value.x,
+  y: worldOffsetConfig.value.y,
+}))
+
+const indicatorLayerConfig = computed(() => ({
+  x: worldOffsetConfig.value.x,
+  y: worldOffsetConfig.value.y,
+  listening: false,
+}))
+
 const activeBounds = computed(() => getActiveBounds(canvasStore))
 const isInfinitePlant = computed(() => canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true)
 
@@ -995,8 +1024,9 @@ const floorBoundary = computed(() => {
 const layerConfig = computed(() => {
   const baseWidth = canvasStore.canvasAdaptativo?.width || 0
   const baseHeight = canvasStore.canvasAdaptativo?.height || 0
+  const offset = worldOffsetConfig.value
   if (!isInfinitePlant.value || !canvasStore.estaEnPlanta) {
-    return { width: baseWidth, height: baseHeight }
+    return { width: baseWidth, height: baseHeight, x: offset.x, y: offset.y }
   }
   const zoom = canvasStore.zoom || 1
   const viewWidth = stageSize.value.width / (zoom || 1)
@@ -1004,6 +1034,8 @@ const layerConfig = computed(() => {
   return {
     width: Math.max(baseWidth, viewWidth || 0),
     height: Math.max(baseHeight, viewHeight || 0),
+    x: offset.x,
+    y: offset.y,
   }
 })
 
@@ -1072,8 +1104,9 @@ const elementosVisiblesEnCanvas = computed(() => {
     return visibles
   }
 
-  const viewX = -canvasStore.panX / zoom
-  const viewY = -canvasStore.panY / zoom
+  const origin = floatingOrigin.value
+  const viewX = origin.x - canvasStore.panX / zoom
+  const viewY = origin.y - canvasStore.panY / zoom
   const viewW = stageWidth / zoom
   const viewH = stageHeight / zoom
   const padding = 200 / zoom
@@ -1113,34 +1146,121 @@ const hasPasillos = computed(() =>
 )
 const showPasillosDash = ref(true)
 
-watch(
-  [plantPolygon, isInfinitePlant],
-  ([poly, infinite]) => {
-    const layer = layerRef.value?.getNode?.()
-    if (!layer) return
+const applyDynamicLayerClip = () => {
+  const layer = layerRef.value?.getNode?.()
+  if (!layer) return
 
-    if (infinite || !poly?.length) {
-      try {
-        layer.clipFunc(null)
-        if (typeof layer.clipWidth === 'function') layer.clipWidth(null)
-        if (typeof layer.clipHeight === 'function') layer.clipHeight(null)
-        if (typeof layer.clipX === 'function') layer.clipX(0)
-        if (typeof layer.clipY === 'function') layer.clipY(0)
-      } catch {
-        /* ignore */
+  const zoom = canvasStore.zoom || 1
+  const origin = floatingOrigin.value
+  const padding = Math.max(2000 / (zoom || 1), 200)
+  const viewWidth = stageSize.value.width / (zoom || 1)
+  const viewHeight = stageSize.value.height / (zoom || 1)
+  const renderViewX = -canvasStore.panX / (zoom || 1)
+  const renderViewY = -canvasStore.panY / (zoom || 1)
+
+  let clipMinX = renderViewX - padding
+  let clipMinY = renderViewY - padding
+  let clipMaxX = renderViewX + viewWidth + padding
+  let clipMaxY = renderViewY + viewHeight + padding
+
+  if (!isInfinitePlant.value) {
+    const poly = plantPolygon.value
+    if (Array.isArray(poly) && poly.length) {
+      for (const point of poly) {
+        const px = Number(point?.x)
+        const py = Number(point?.y)
+        if (!Number.isFinite(px) || !Number.isFinite(py)) continue
+        const rx = px - origin.x
+        const ry = py - origin.y
+        clipMinX = Math.min(clipMinX, rx - padding)
+        clipMinY = Math.min(clipMinY, ry - padding)
+        clipMaxX = Math.max(clipMaxX, rx + padding)
+        clipMaxY = Math.max(clipMaxY, ry + padding)
       }
-      layer.batchDraw?.()
-      return
     }
+  }
 
-    layer.clipFunc((ctx) => {
-      ctx.beginPath()
-      poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-      ctx.closePath()
-    })
-    layer.batchDraw?.()
+  const width = Math.max(0, clipMaxX - clipMinX)
+  const height = Math.max(0, clipMaxY - clipMinY)
+
+  try {
+    layer.clipFunc(null)
+    if (typeof layer.clip === 'function') {
+      layer.clip({ x: clipMinX, y: clipMinY, width, height })
+    } else {
+      if (typeof layer.clipX === 'function') layer.clipX(clipMinX)
+      if (typeof layer.clipY === 'function') layer.clipY(clipMinY)
+      if (typeof layer.clipWidth === 'function') layer.clipWidth(width)
+      if (typeof layer.clipHeight === 'function') layer.clipHeight(height)
+    }
+  } catch {
+    /* ignore */
+  }
+
+  layer.batchDraw?.()
+}
+
+watchEffect(() => {
+  applyDynamicLayerClip()
+})
+
+let floatingRebasePending = false
+const maybeRecenterFloatingOrigin = () => {
+  if (!isInfinitePlant.value) return
+
+  const zoom = canvasStore.zoom || 1
+  if (!Number.isFinite(zoom) || zoom === 0) return
+
+  const width = stageSize.value.width || 0
+  const height = stageSize.value.height || 0
+  if (!width || !height) return
+
+  const origin = floatingOrigin.value
+  const panX = canvasStore.panX || 0
+  const panY = canvasStore.panY || 0
+  const centerWorldX = origin.x + (width / 2 - panX) / zoom
+  const centerWorldY = origin.y + (height / 2 - panY) / zoom
+  const threshold = canvasStore.floatingRebaseThreshold || 50000
+
+  let shiftX = 0
+  let shiftY = 0
+  if (Math.abs(centerWorldX) > threshold) shiftX = centerWorldX
+  if (Math.abs(centerWorldY) > threshold) shiftY = centerWorldY
+
+  if (!shiftX && !shiftY) return
+  if (floatingRebasePending) return
+
+  floatingRebasePending = true
+  const applyShift = () => {
+    try {
+      canvasStore.shiftFloatingOrigin(shiftX, shiftY)
+    } finally {
+      floatingRebasePending = false
+    }
+  }
+
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(applyShift)
+  } else {
+    applyShift()
+  }
+}
+
+watch(
+  [
+    () => canvasStore.panX,
+    () => canvasStore.panY,
+    () => canvasStore.zoom,
+    () => stageSize.value.width,
+    () => stageSize.value.height,
+    () => floatingOrigin.value.x,
+    () => floatingOrigin.value.y,
+    () => isInfinitePlant.value,
+  ],
+  () => {
+    maybeRecenterFloatingOrigin()
   },
-  { immediate: true, deep: true },
+  { immediate: true },
 )
 
 // Contorno activo siempre expresado como polígono
@@ -1490,15 +1610,20 @@ const handleElementDoubleClick = (evt, elemento) => {
 const toLayerCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
-  const x = (pos.x - stage.x()) / scale
-  const y = (pos.y - stage.y()) / scale
+  const origin = floatingOrigin.value
+  const x = (pos.x - stage.x()) / scale + origin.x
+  const y = (pos.y - stage.y()) / scale + origin.y
   return { x, y }
 }
 
 const toStageCoords = (pos) => {
   const stage = stageRef.value.getNode()
   const scale = stage.scaleX() || 1
-  return { x: pos.x * scale + stage.x(), y: pos.y * scale + stage.y() }
+  const origin = floatingOrigin.value
+  return {
+    x: (pos.x - origin.x) * scale + stage.x(),
+    y: (pos.y - origin.y) * scale + stage.y(),
+  }
 }
 
 // Drag bound para cada elemento y forma (clamp mínimo al contorno)
@@ -1687,8 +1812,9 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   }
 
   // Convertir a coordenadas de mundo (layer) considerando transformación del stage
-  const worldX = (pointerPos.x - stage.x()) / stage.scaleX()
-  const worldY = (pointerPos.y - stage.y()) / stage.scaleY()
+  const origin = floatingOrigin.value
+  const worldX = (pointerPos.x - stage.x()) / stage.scaleX() + origin.x
+  const worldY = (pointerPos.y - stage.y()) / stage.scaleY() + origin.y
 
   return { x: worldX, y: worldY }
 }
@@ -3295,11 +3421,12 @@ const getViewportWorldRect = () => {
   if (!Number.isFinite(scale) || scale === 0) return null
   const stageX = typeof stage.x === 'function' ? stage.x() || 0 : 0
   const stageY = typeof stage.y === 'function' ? stage.y() || 0 : 0
+  const origin = floatingOrigin.value
   return {
-    minX: (0 - stageX) / scale,
-    minY: (0 - stageY) / scale,
-    maxX: (stageSize.value.width - stageX) / scale,
-    maxY: (stageSize.value.height - stageY) / scale,
+    minX: origin.x + (0 - stageX) / scale,
+    minY: origin.y + (0 - stageY) / scale,
+    maxX: origin.x + (stageSize.value.width - stageX) / scale,
+    maxY: origin.y + (stageSize.value.height - stageY) / scale,
   }
 }
 

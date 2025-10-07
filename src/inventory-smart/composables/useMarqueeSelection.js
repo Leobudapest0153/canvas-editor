@@ -131,8 +131,11 @@ export function useMarqueeSelection({ canvasStore, stageRef }) {
 
     const transform = stage.getAbsoluteTransform().copy()
     transform.invert()
-
-    return transform.point(stagePoint)
+    const point = transform.point(stagePoint)
+    const origin = canvasStore?.floatingOrigin || { x: 0, y: 0 }
+    const offsetX = Number(origin.x) || 0
+    const offsetY = Number(origin.y) || 0
+    return { x: point.x + offsetX, y: point.y + offsetY }
   }
 
   return {
