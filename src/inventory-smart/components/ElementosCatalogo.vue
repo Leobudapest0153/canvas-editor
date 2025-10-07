@@ -196,29 +196,25 @@
     </div>
 
     <!-- Menú contextual para elementos (kebab) -->
-    <div
-      v-if="kebabMenu.visible"
-      class="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-1"
-      :style="{ left: kebabMenu.x + 'px', top: kebabMenu.y + 'px' }"
-      role="menu"
-      :id="`el-menu-${kebabMenu.item?.id || 'ctx'}`"
-      @keydown.esc.stop.prevent="closeKebab"
+    <ContextMenu
+      :visible="kebabMenu.visible"
+      :x="kebabMenu.x"
+      :y="kebabMenu.y"
+      aria-label="Opciones del elemento"
+      @close="closeKebab"
     >
-      <button
-        class="block cursor-pointer w-full text-left px-3 py-2 rounded hover:bg-gray-50"
-        role="menuitem"
-        @click.stop="startEdit(kebabMenu.item)"
-      >
-        Editar
-      </button>
-      <button
-        class="block cursor-pointer w-full text-left px-3 py-2 rounded text-red-600 hover:bg-red-50"
-        role="menuitem"
-        @click.stop="handleDeleteItem(kebabMenu.item)"
-      >
-        Eliminar
-      </button>
-    </div>
+      <MenuItem
+        :icon="EditIcon"
+        label="Editar"
+        @click="handleEditClick"
+      />
+      <MenuItem
+        :icon="DeleteIcon"
+        label="Eliminar"
+        variant="danger"
+        @click="handleDeleteClick"
+      />
+    </ContextMenu>
 
     <AgregarCuartoModal
       :visible="mostrarModalAgregarEspacio"
@@ -237,6 +233,10 @@ import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
+import ContextMenu from '@/inventory-smart/components/ui/ContextMenu.vue'
+import MenuItem from '@/inventory-smart/components/ui/MenuItem.vue'
+import EditIcon from '@/inventory-smart/components/ui/icons/EditIcon.vue'
+import DeleteIcon from '@/inventory-smart/components/ui/icons/DeleteIcon.vue'
 import AgregarCuartoModal from './AgregarCuartoModal.vue'
 import {
   buildStructureFromForm,
@@ -747,6 +747,7 @@ watch(
 
 // --- Lógica del menú kebab y edición/eliminación ---
 const toggleKebab = (evt, item) => {
+  evt.stopPropagation()
   evt.preventDefault()
   if (catalogReadOnly.value) {
     showToast(VISUAL_MODE_MESSAGE, 'warning')
@@ -761,6 +762,14 @@ const toggleKebab = (evt, item) => {
 
 const closeKebab = () => {
   kebabMenu.value = { visible: false, x: 0, y: 0, item: null }
+}
+
+const handleEditClick = () => {
+  startEdit(kebabMenu.value.item)
+}
+
+const handleDeleteClick = () => {
+  handleDeleteItem(kebabMenu.value.item)
 }
 
 const startEdit = (item) => {
@@ -791,7 +800,7 @@ const handleDeleteItem = async (item) => {
   if (!item) return closeKebab()
     const ok = await confirmDialog.confirm({
     title: 'Eliminar elemento',
-    message: `Se eliminará “${item.nombre}” del catálogo. Esta acción no afectará elementos ya colocados`,
+    message: `Se eliminará "${item.nombre}" del catálogo. Esta acción no afectará elementos ya colocados`,
     confirmLabel: 'Eliminar',
     cancelLabel: 'Cancelar',
   })

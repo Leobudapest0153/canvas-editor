@@ -557,48 +557,27 @@
 
   <!-- Teleport del menú a body para evitar overflow de contenedores -->
   <teleport to="body">
-    <div
-      v-if="menuAbiertoPlanta"
-      ref="menuEl"
-      class="fixed bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-32 flex flex-col"
-      :style="{ top: menuPosY + 'px', left: menuPosX + 'px' }"
-      v-click-outside="() => cerrarMenuPlanta()"
+    <ContextMenu
+      :visible="!!menuAbiertoPlanta"
+      :x="menuPosX"
+      :y="menuPosY"
+      aria-label="Opciones de planta"
+      @close="cerrarMenuPlanta"
     >
-      <UiTooltip label="Editar planta" position="right">
-        <button
-          @click="editarPlanta(menuAbiertoPlanta)"
-          :disabled="!canvasStore.modoEdicion"
-          class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all border-none bg-transparent cursor-pointer"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-            />
-          </svg>
-          <span>Editar</span>
-        </button>
-      </UiTooltip>
-      <UiTooltip label="Eliminar planta" position="right">
-        <button
-          @click="confirmarEliminarPlantaMenu(menuAbiertoPlanta)"
-          :disabled="!canvasStore.modoEdicion || canvasStore.plantas.length <= 1"
-          class="flex items-center space-x-2 w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all border-none bg-transparent cursor-pointer"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-            />
-          </svg>
-          <span>Eliminar</span>
-        </button>
-      </UiTooltip>
-    </div>
+      <MenuItem
+        :icon="EditIcon"
+        label="Editar"
+        :disabled="!canvasStore.modoEdicion"
+        @click="editarPlanta(menuAbiertoPlanta)"
+      />
+      <MenuItem
+        :icon="DeleteIcon"
+        label="Eliminar"
+        variant="danger"
+        :disabled="!canvasStore.modoEdicion || canvasStore.plantas.length <= 1"
+        @click="confirmarEliminarPlantaMenu(menuAbiertoPlanta)"
+      />
+    </ContextMenu>
   </teleport>
 
   <!-- Modal de historial de cambios (diff) -->
@@ -620,6 +599,10 @@ import { useAutoSave } from '@/inventory-smart/composables/useAutoSave'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import ImportExportModal from './ImportExportModal.vue'
 import ChangeHistoryModal from './ChangeHistoryModal.vue'
+import ContextMenu from '@/inventory-smart/components/ui/ContextMenu.vue'
+import MenuItem from '@/inventory-smart/components/ui/MenuItem.vue'
+import EditIcon from '@/inventory-smart/components/ui/icons/EditIcon.vue'
+import DeleteIcon from '@/inventory-smart/components/ui/icons/DeleteIcon.vue'
 import {
   usePlantResizeGuard,
   pack as packShelf,
