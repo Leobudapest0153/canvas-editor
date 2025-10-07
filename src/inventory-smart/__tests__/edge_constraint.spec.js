@@ -27,6 +27,13 @@ describe('edgeConstraint: clamp puro y histéresis', () => {
     expect(r.pos.y).toBe(90) // maxY - h
   })
 
+  it('con modo elastic no aplica clamp a los bordes', () => {
+    const elasticArea = { ...area, mode: 'elastic' }
+    const r = applyEdgeConstraint({ x: -500, y: 200 }, el, elasticArea)
+    expect(r.pos.x).toBe(-500)
+    expect(r.pos.y).toBe(200)
+  })
+
   it('al salir del borde hacia adentro no se queda pegado (histéresis con velocidad)', () => {
     // Entrar en borde izquierdo
     let r = applyEdgeConstraint({ x: -10, y: 10 }, el, area)
