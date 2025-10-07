@@ -392,42 +392,12 @@
               </div>
 
               <div>
-                <button @click="toggleMenu(index)" class="p-1 rounded-full hover:bg-gray-100
+                <button @click.stop="toggleMenu(index, $event)" class="p-1 rounded-full hover:bg-gray-100
                   menu-trigger-button cursor-pointer">
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
                     <path fill="currentColor" d="M12 3a2 2 0 1 0 0 4a2 2 0 0 0 0-4m-2 9a2 2 0 1 1 4 0a2 2 0 0 1-4 0m0 7a2 2 0 1 1 4 0a2 2 0 0 1-4 0"/>
                   </svg>
                 </button>
-
-                <div v-if="openMenuIndex === index" class="absolute right-0 mt-2 bg-white rounded-md shadow-lg z-20 border border-gray-100 dropdown-menu">
-                  <ul class="py-1">
-                    <li>
-                      <button
-                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-600 cursor-pointer"
-                        @click="deleteAndCompact({ id: piso.id })"
-                      >
-                        Eliminar
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="ml-2">
-                          <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/>
-                        </svg>
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        @click="canvasStore.abrirCuartoNivelesPropiedades(piso.id)"
-                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-600
-                        w-full cursor-pointer"
-                      >
-                        Editar
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" class="ml-2">
-                          <path
-                            fill="currentColor"
-                            d="m14.06 9l.94.94L5.92 19H5v-.92zM17.66 3c-.26 0-.51.1-.7.29l-1.83 1.83l3.75 3.75l1.83-1.83c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29m-3.6 3.19L3 17.25V21h3.75L17.81 9.94z"/>
-                        </svg>
-                      </button>
-                    </li>
-                  </ul>
-                </div>
               </div>
             </div>
             </template>
@@ -519,6 +489,29 @@
     @close="cerrarModalIdentificarEsl"
     @save="guardarCodigoEsl"
   />
+
+  <!-- Menú contextual de niveles -->
+  <teleport to="body">
+    <ContextMenu
+      :visible="openMenuIndex !== null"
+      :x="menuPosition.x"
+      :y="menuPosition.y"
+      aria-label="Opciones del nivel"
+      @close="closeMenu"
+    >
+      <MenuItem
+        :icon="EditIcon"
+        label="Editar"
+        @click="handleEditLevel(currentPisoId)"
+      />
+      <MenuItem
+        :icon="DeleteIcon"
+        label="Eliminar"
+        variant="danger"
+        @click="handleDeleteLevel(currentPisoId)"
+      />
+    </ContextMenu>
+  </teleport>
 </template>
 
 <script setup>
@@ -541,6 +534,10 @@ import { t } from '@/inventory-smart/utils/translator'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import { toPrecisionCm } from '../utils/fixedDimensions'
 import IdentifyEslModal from './modals/IdentifyEslModal.vue'
+import ContextMenu from '@/inventory-smart/components/ui/ContextMenu.vue'
+import MenuItem from '@/inventory-smart/components/ui/MenuItem.vue'
+import EditIcon from '@/inventory-smart/components/ui/icons/EditIcon.vue'
+import DeleteIcon from '@/inventory-smart/components/ui/icons/DeleteIcon.vue'
 import { useDeleteElement } from '@/inventory-smart/composables/useDeleteElement';
 import { useEditorMode } from '@/inventory-smart/composables/useEditorMode';
 
@@ -569,7 +566,9 @@ const isSaving = ref(false)
 const dimensionError = ref(null)
 const dimensionSugerencias = ref([])
 
-const openMenuIndex = ref(null);
+const openMenuIndex = ref(null)
+const menuPosition = ref({ x: 0, y: 0 })
+const currentPisoId = ref(null)
 
 
 // Forzar el catálogo de elementos cuando se abre el detalle (monta el panel)
@@ -786,28 +785,54 @@ const revertir = () => {
   dimensionSugerencias.value = []
 }
 
-const toggleMenu = (index) => {
-  // El .stop en @click.stop previene que el clic se propague y active
-  // el listener de cierre inmediatamente.
-  openMenuIndex.value = openMenuIndex.value === index ? null : index;
-};
-
-// 4. Función que se ejecuta en cada clic en la página
-const handleClickOutside = (event) => {
-  if (openMenuIndex.value === null) return;
-
-  const target = event.target;
-
-  // Verificamos si el clic fue en un botón que abre menús O dentro de un menú abierto.
-  // El método .closest() busca el elemento o sus padres hasta encontrar el selector.
-  const isClickOnTrigger = target.closest('.menu-trigger-button');
-  const isClickInMenu = target.closest('.dropdown-menu');
-
-  // Si el clic NO fue en un trigger Y TAMPOCO fue dentro del menú, lo cerramos.
-  if (!isClickOnTrigger && !isClickInMenu) {
-    openMenuIndex.value = null;
+const toggleMenu = (index, event) => {
+  // Prevenir propagación del evento
+  if (event) {
+    event.stopPropagation()
   }
-};
+  
+  // Si ya está abierto el mismo menú, cerrarlo
+  if (openMenuIndex.value === index) {
+    openMenuIndex.value = null
+    return
+  }
+  
+  // Capturar posición del clic para posicionar el menú
+  if (event) {
+    const rect = event.target.getBoundingClientRect()
+    menuPosition.value = {
+      x: rect.right + 5, // Un poco a la derecha del botón
+      y: rect.top // A la misma altura del botón
+    }
+  }
+  
+  // Abrir el menú y guardar el ID del piso actual
+  openMenuIndex.value = index
+  currentPisoId.value = index
+  console.log('Menu opened for index:', index, 'at position:', menuPosition.value)
+}
+
+const closeMenu = () => {
+  console.log('Closing menu')
+  openMenuIndex.value = null
+  currentPisoId.value = null
+}
+
+const handleEditLevel = (pisoId) => {
+  canvasStore.abrirCuartoNivelesPropiedades(pisoId)
+  closeMenu()
+}
+
+const handleDeleteLevel = (pisoId) => {
+  deleteAndCompact({ id: pisoId })
+  closeMenu()
+}
+
+// 4. Función que se ejecuta en cada clic en la página (ya no necesaria con ContextMenu)
+const handleClickOutside = (event) => {
+  // El nuevo ContextMenu maneja automáticamente el click outside
+  // Esta función se mantiene para compatibilidad pero ya no es necesaria
+}
 
 const guardar = async () => {
   if (!elementoSeleccionado.value) return
