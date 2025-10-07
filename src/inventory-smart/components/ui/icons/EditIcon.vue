@@ -9,25 +9,16 @@
     xmlns="http://www.w3.org/2000/svg"
   >
     <path
-      v-if="locked"
       stroke-linecap="round"
       stroke-linejoin="round"
       :stroke-width="strokeWidth"
-      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-    />
-    <path
-      v-else
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      :stroke-width="strokeWidth"
-      d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
+      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
     />
   </svg>
 </template>
 
 <script setup>
 defineProps({
-  locked: { type: Boolean, default: false },
   size: { type: [String, Number], default: 16 },
   strokeWidth: { type: [String, Number], default: 2 },
   iconClass: { type: String, default: '' }
