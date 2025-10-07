@@ -111,7 +111,7 @@ export function useDimensionValidation() {
     // Validar volumen mínimo
     // const validacionVolumen = validarVolumenMinimo(elementoTemporal)
     // if (!validacionVolumen.valida) {
-    //   console.log('❌ VALIDACIÓN DE VOLUMEN FALLIDA:', validacionVolumen.razon)
+    //   console.log('VALIDACIÓN DE VOLUMEN FALLIDA:', validacionVolumen.razon)
     //   if (!silencioso) {
     //     toast.showError(validacionVolumen.razon)
     //   }
@@ -120,7 +120,7 @@ export function useDimensionValidation() {
 
     // Mostrar toast de éxito si no se ha mostrado otro toast
     if (!silencioso) {
-      toast.showSuccess('Dimensiones físicas válidas.')
+  toast.showSuccess('Dimensiones físicas válidas')
     }
 
     return {
@@ -133,11 +133,11 @@ export function useDimensionValidation() {
 
   /**
    * Valida que las nuevas dimensiones del elemento sean suficientes para contener a sus elementos hijos
-   * 
+   *
    * Usa el contextView del elemento padre para determinar qué dimensiones validar:
    * - Si contextView es 'XZ': valida que los hijos quepan en ancho × alto
    * - Si contextView es 'XY': valida que los hijos quepan en ancho × largo
-   * 
+   *
    * @param {Object} elemento - Elemento con las nuevas dimensiones a validar
    * @returns {Object} Resultado de la validación
    */
@@ -251,11 +251,11 @@ export function useDimensionValidation() {
 
   /**
    * Valida que el elemento con sus nuevas dimensiones quepa dentro de su contenedor padre
-   * 
+   *
    * Usa el contextView del padre para determinar qué dimensiones validar:
    * - Si el padre tiene contextView 'XZ': valida que el elemento quepa en ancho × alto
    * - Si el padre tiene contextView 'XY': valida que el elemento quepa en ancho × largo
-   * 
+   *
    * @param {Object} elemento - Elemento con las nuevas dimensiones a validar
    * @returns {Object} Resultado de la validación
    */

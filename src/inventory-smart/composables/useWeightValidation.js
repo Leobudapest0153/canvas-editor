@@ -361,7 +361,7 @@ export function useWeightValidation() {
       sinLimite: false,
       mensaje: esValido
         ? 'La capacidad es suficiente para los elementos que contiene'
-        : `La capacidad máxima (${capacidadCargaPropuesto}kg) es insuficiente para el máximo que pueden soportar los hijos (${pesoHijos}kg). Falta: ${deficit.toFixed(2)}kg.`
+  : `La capacidad máxima (${capacidadCargaPropuesto}kg) es insuficiente para el máximo que pueden soportar los hijos (${pesoHijos}kg). Falta: ${deficit.toFixed(2)}kg`
     }
   }
 

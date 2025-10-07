@@ -71,7 +71,7 @@
               <button
                 @click="realizarBackupManual"
                 :disabled="autoSave.isLoading.value"
-                class="px-4 py-2 cursor-pointer bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                class="px-4 py-2 cursor-pointer bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {{ autoSave.isLoading.value ? 'Guardando...' : 'Crear nueva copia' }}
               </button>
@@ -169,7 +169,7 @@
           'mt-4 p-3 rounded-lg flex items-center gap-2',
           mensaje.tipo === 'exito' ? 'bg-green-100 text-green-800' :
           mensaje.tipo === 'error' ? 'bg-red-100 text-red-800' :
-          'bg-primary-100 text-primary-800'
+          'bg-primary-100 text-primary-600'
         ]">
           <svg v-if="mensaje.tipo === 'exito'" class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
@@ -337,7 +337,7 @@ const confirmarRestauracionServidor = () => {
 const confirmarRestauracion = (backup) => {
   confirmacion.value = {
     titulo: 'Restaurar Copia de Seguridad',
-    mensaje: `¿Estás seguro de que quieres restaurar la copia del ${backup.formattedDate}? Los cambios actuales se perderán.`,
+  mensaje: `¿Estás seguro de que quieres restaurar la copia del ${backup.formattedDate}? Los cambios actuales se perderán`,
     boton: 'Restaurar',
     tipo: 'danger',
     accion: () => restaurarBackup(backup.id)
@@ -374,7 +374,7 @@ const eliminarBackup = async (backupId) => {
 const confirmarLimpiezaTotal = () => {
   confirmacion.value = {
     titulo: 'Eliminar Todas las Copias',
-    mensaje: '¿Estás seguro de que quieres eliminar todas las copias de seguridad? Esta acción no se puede deshacer.',
+  mensaje: '¿Estás seguro de que quieres eliminar todas las copias de seguridad? Esta acción no se puede deshacer',
     boton: 'Eliminar Todas',
     tipo: 'danger',
     accion: limpiarTodasLasCopias

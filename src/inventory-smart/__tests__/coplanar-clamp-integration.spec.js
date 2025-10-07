@@ -7,6 +7,13 @@ import { errorsPlacement } from '@/inventory-smart/validation/placementOrchestra
 import { ToastSymbol } from '@/inventory-smart/plugins/toast'
 import { usePlacementGuards } from '@/inventory-smart/composables/usePlacementGuards'
 
+// Mock del sistema de sugerencias
+const mockPlacementSuggestions = {
+  tryPlaceWithSuggestions: vi.fn(() => Promise.resolve(true)),
+  generatePlacementSuggestions: vi.fn(() => null),
+  applySuggestedAdjustments: vi.fn((el) => el)
+}
+
 let CanvasView
 
 const mountWithElements = async (elements) => {
@@ -15,7 +22,13 @@ const mountWithElements = async (elements) => {
   if (!CanvasView) {
     CanvasView = (await import('@/inventory-smart/components/CanvasView.vue')).default
   }
-  const wrapper = mount(CanvasView)
+  const wrapper = mount(CanvasView, {
+    global: {
+      provide: {
+        placementSuggestions: mockPlacementSuggestions
+      }
+    }
+  })
   return { store, wrapper }
 }
 

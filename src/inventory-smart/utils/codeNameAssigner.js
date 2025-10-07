@@ -11,38 +11,40 @@ export function scopeForElement(elemento, allElements = []) {
   })
 }
 
-// Asigna codigo y, en el caso de pasillos, también nombre. Para otros tipos, respeta nombre existente.
 export function assignCodigoNombre(elemento, allElements = [], opts = {}) {
   if (!elemento || typeof elemento !== 'object') return elemento
   const tipoKey = (elemento?.tipo || '').toLowerCase()
   const existing = scopeForElement(elemento, allElements)
-  // const preserve = opts?.preserveExistingCode === true
 
-  // Pasillos: siempre regenerar nombre y código según secuencia alfabética
-  // if (tipoKey === 'pasillos') {
-  //   if (preserve && elemento.codigo) {
-  //     // Preservar código (y nombre si existe)
-  //     return elemento
-  //   }
-  //   const nombre = generateNombre(tipoKey, { existing })
-  //   // Clonar existing y simular que ya existe 'nombre' para que el próximo código sea la siguiente letra
-  //   const codigo = generateCodigo(tipoKey, { existing })
-  //   elemento.nombre = nombre
-  //   elemento.codigo = codigo
-  //   return elemento
-  // }
-
-  // Otros tipos: generar código; si resetName, regenerar nombre genérico
-  if (opts?.resetName) {
-    try {
-      elemento.nombre = generateNombre(tipoKey, { existing, baseName: undefined })
-    } catch { /* ignore name regeneration errors */ }
-  }
+  // Generar o regenerar código
   if (opts?.regenerateCode) {
     elemento.codigo = generateCodigo(tipoKey, { existing, baseName: elemento?.nombre })
   } else if (!elemento.codigo) {
     elemento.codigo = generateCodigo(tipoKey, { existing, baseName: elemento?.nombre })
   }
+
+  // Para pasillos: siempre reasignar nombre basado en el código
+
+  if (opts?.resetName) {
+    try {
+      if (tipoKey === 'pasillos' && elemento.codigo) {
+        elemento.nombre = `Pasillo ${elemento.codigo}`
+      } else {
+        // Para otros tipos, solo regenerar si se solicita explícitamente
+        elemento.nombre = generateNombre(tipoKey, { existing, baseName: undefined })
+      }
+    } catch {
+      console.warn('No se pudo regenerar nombre para', elemento)
+    }
+  } else if (!elemento.nombre) {
+    // Si no tiene nombre, generar uno
+    try {
+      elemento.nombre = generateNombre(tipoKey, { existing, baseName: undefined })
+    } catch {
+      elemento.nombre = tipoKey ? `${tipoKey} 1` : 'Elemento 1'
+    }
+  }
+
   return elemento
 }
 

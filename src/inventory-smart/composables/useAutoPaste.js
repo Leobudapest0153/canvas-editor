@@ -30,7 +30,7 @@ import { pointInPolygon } from '@/inventory-smart/utils/polygonBounds'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
 
 
-export function useAutoPaste() {
+export function useAutoPaste(placementSuggestionsSystem = null) {
   const canvasStore = useCanvasStore()
   const buffer = useCanvasBuffer()
   const weightValidation = useWeightValidation()
@@ -75,7 +75,6 @@ export function useAutoPaste() {
         !Number.isFinite(areaBounds.maxX) ||
         !Number.isFinite(areaBounds.minY) ||
         !Number.isFinite(areaBounds.maxY)) {
-      console.error('❌ areaBounds inválido en createOccupancyGrid:', areaBounds)
       return {
         grid: [[false]],
         gridWidth: 1,
@@ -90,7 +89,6 @@ export function useAutoPaste() {
 
     // 🛡️ VALIDACIÓN: Área debe ser positiva y razonable (máximo 100,000px)
     if (areaWidth <= 0 || areaHeight <= 0 || areaWidth > 100000 || areaHeight > 100000) {
-      console.error('❌ Dimensiones de área inválidas:', { areaWidth, areaHeight })
       return {
         grid: [[false]],
         gridWidth: 1,
@@ -106,7 +104,6 @@ export function useAutoPaste() {
     // 🛡️ VALIDACIÓN: Grid no debe exceder 1000x1000 (1 millón de celdas)
     const MAX_GRID_CELLS = 1000000
     if (gridWidth * gridHeight > MAX_GRID_CELLS) {
-      console.error('❌ Grid demasiado grande:', { gridWidth, gridHeight, total: gridWidth * gridHeight })
       // Aumentar gridResolution para reducir tamaño del grid
       const newResolution = Math.ceil(Math.sqrt((areaWidth * areaHeight) / MAX_GRID_CELLS))
       return createOccupancyGrid(areaBounds, neighbors, newResolution)
@@ -422,13 +419,15 @@ export function useAutoPaste() {
 
   /**
    * Valida si un elemento puede ser pegado en una posición específica
+   * Actualizado para ser compatible con el sistema de sugerencias
    */
   const validatePlacement = (elemento, position, areaBounds) => {
     // 1. Verificar compatibilidad de ubicación
     if (!isLocationCompatible(elemento, canvasStore.contextoActual)) {
       return {
         valid: false,
-        reason: `Elemento de ${elemento.ubicacion || 'suelo'} no compatible con el contexto actual`
+        reason: `Elemento de ${elemento.ubicacion || 'suelo'} no compatible con el contexto actual`,
+        canSuggest: false // No se pueden hacer sugerencias para incompatibilidad de ubicación
       }
     }
 
@@ -443,7 +442,8 @@ export function useAutoPaste() {
     })) {
       return {
         valid: false,
-        reason: 'El elemento no cabe en la posición o colisiona con otros elementos'
+        reason: 'El elemento no cabe en la posición o colisiona con otros elementos',
+        canSuggest: true // Se pueden sugerir ajustes de dimensiones
       }
     }
 
@@ -458,7 +458,9 @@ export function useAutoPaste() {
       if (!resultadoValidacionPeso.valido) {
         return {
           valid: false,
-          reason: `Excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso || 0} kg`
+          reason: `Excedería el peso máximo soportado por ${resultadoValidacionPeso.exceso || 0} kg`,
+          canSuggest: true, // Se pueden sugerir ajustes de peso
+          weightExcess: resultadoValidacionPeso.exceso
         }
       }
     } catch (error) {
@@ -473,14 +475,16 @@ export function useAutoPaste() {
       if (guardResult && !guardResult.valid) {
         return {
           valid: false,
-          reason: guardResult.reason || 'Posición inválida según las reglas de colocación'
+          reason: guardResult.reason || 'Posición inválida según las reglas de colocación',
+          canSuggest: guardResult.canSuggest !== false // Por defecto true a menos que se especifique lo contrario
         }
       }
     } catch (error) {
       console.warn('Error en placement guards:', error.message)
       return {
         valid: false,
-        reason: `Error en validación de placement: ${error.message}`
+        reason: `Error en validación de placement: ${error.message}`,
+        canSuggest: false // Errores de validación no permiten sugerencias
       }
     }
 
@@ -498,7 +502,6 @@ export function useAutoPaste() {
         !Number.isFinite(areaBounds.maxX) ||
         !Number.isFinite(areaBounds.minY) ||
         !Number.isFinite(areaBounds.maxY)) {
-      console.error('❌ areaBounds inválido en findAvailableSpace:', areaBounds)
       return { found: false }
     }
 
@@ -510,7 +513,6 @@ export function useAutoPaste() {
     // 🛡️ VALIDACIÓN: Element dimensions deben ser válidas
     if (!Number.isFinite(elementWidth) || !Number.isFinite(elementHeight) ||
         elementWidth <= 0 || elementHeight <= 0) {
-      console.error('❌ Dimensiones de elemento inválidas:', { elementWidth, elementHeight })
       return { found: false }
     }
 
@@ -520,7 +522,6 @@ export function useAutoPaste() {
     // 🛡️ VALIDACIÓN: Área debe tener dimensiones válidas
     if (!Number.isFinite(areaWidth) || !Number.isFinite(areaHeight) ||
         areaWidth <= 0 || areaHeight <= 0) {
-      console.error('❌ Dimensiones de área inválidas:', { areaWidth, areaHeight })
       return { found: false }
     }
 
@@ -731,27 +732,24 @@ export function useAutoPaste() {
 
     // 🛡️ VALIDACIÓN: Verificar que smallGridSize no sea 0 o negativo
     if (!Number.isFinite(smallGridSize) || smallGridSize <= 0) {
-      console.error('❌ smallGridSize inválido:', smallGridSize)
       return { found: false }
     }
 
     for (let y = areaBounds.minY; y <= areaBounds.maxY - elementHeight; y += smallGridSize) {
       // 🛡️ VALIDACIÓN: Prevenir bucles infinitos si y no incrementa
       if (!Number.isFinite(y)) {
-        console.error('❌ Valor y inválido en búsqueda exhaustiva:', y)
         return { found: false }
       }
 
       for (let x = areaBounds.minX; x <= areaBounds.maxX - elementWidth; x += smallGridSize) {
         // 🛡️ VALIDACIÓN: Prevenir bucles infinitos si x no incrementa
         if (!Number.isFinite(x)) {
-          console.error('❌ Valor x inválido en búsqueda exhaustiva:', x)
           return { found: false }
         }
 
         iterations++
         if (iterations > MAX_ITERATIONS) {
-          console.warn(`⚠️ Búsqueda exhaustiva cancelada después de ${MAX_ITERATIONS} iteraciones`)
+          console.warn(`Búsqueda exhaustiva cancelada después de ${MAX_ITERATIONS} iteraciones`)
           return { found: false }
         }
 
@@ -773,7 +771,7 @@ export function useAutoPaste() {
   const handlePaste = async (options = {}) => {
     // Verificar si ya hay una operación de pegado en progreso
     if (isOperationInProgress('paste')) {
-      showToast('Ya hay una operación de pegado en curso. Espera a que termine.', 'warning')
+  showToast('Ya hay una operación de pegado en curso. Espera a que termine', 'warning')
       return false
     }
 
@@ -819,7 +817,7 @@ export function useAutoPaste() {
     try {
       // Verificar que hay elementos en el buffer
       if (!buffer.hasItems.value) {
-        showToast('No hay elementos en el portapapeles para pegar.', 'warning')
+  showToast('No hay elementos en el portapapeles para pegar', 'warning')
         return false
       }
 
@@ -828,7 +826,7 @@ export function useAutoPaste() {
       const firstItem = bufferItems[0]
 
       if (!firstItem) {
-        showToast('No fue posible leer el elemento del portapapeles.', 'error')
+  showToast('No fue posible leer el elemento del portapapeles', 'error')
         return false
       }
 
@@ -842,7 +840,7 @@ export function useAutoPaste() {
       )
 
       if (!loadingId) {
-        showToast('No fue posible iniciar la operación de pegado.', 'error')
+  showToast('No fue posible iniciar la operación de pegado', 'error')
         return false
       }
 
@@ -862,7 +860,7 @@ export function useAutoPaste() {
         !Number.isFinite(areaBounds.minY) ||
         !Number.isFinite(areaBounds.maxY)
       ) {
-        showToast('No se pudieron determinar los límites del área actual.', 'error')
+  showToast('No se pudieron determinar los límites del área actual', 'error')
         return false
       }
 
@@ -876,7 +874,7 @@ export function useAutoPaste() {
       if (!spaceResult.found) {
         const elementType = elemento.ubicacion === 'pared' ? 'de pared' : 'de suelo'
         showToast(
-          `No se encontró espacio disponible para ${elementType} "${elemento.nombre || elemento.tipo}". Intenta mover otros elementos o ajustar el tamaño.`,
+          `No se encontró espacio disponible para ${elementType} "${elemento.nombre || elemento.tipo}". Intenta mover otros elementos o ajustar el tamaño`,
           'error',{ timeout: 4000 }
         )
         return false
@@ -886,6 +884,43 @@ export function useAutoPaste() {
       const validation = validatePlacement(elemento, spaceResult.position, areaBounds)
 
       if (!validation.valid) {
+        // Si hay sistema de sugerencias disponible y la validación permite sugerencias, intentar usarlo
+        if (placementSuggestionsSystem && validation.canSuggest) {
+          try {
+            const success = await placementSuggestionsSystem.tryPlaceWithSuggestions(
+              elemento,
+              spaceResult.position,
+              {
+                areaBounds,
+                neighbors: canvasStore.elementosVisibles,
+                onSuccess: async (adjustedElement, position) => {
+                  // Crear nuevo elemento con ajustes usando el buffer
+                  const elementoId = buffer.pasteFromBufferWithAdjustments(firstItem.id, position, adjustedElement)
+                  if (elementoId) {
+                    const nombreElemento = adjustedElement.nombre || adjustedElement.tipo
+                    showToast(`"${nombreElemento}" pegado con ajustes automáticos`, 'success', { timeout: 3000 })
+                    canvasStore.seleccionarElemento(elementoId)
+
+                    // Actualizar estado de pegado
+                    lastPasteAnchor = anchor
+                    lastOffsetApplied = pendingOffsetCount
+                  }
+                },
+                onFailure: (reason) => {
+                  showToast(`No se pudo pegar: ${reason}`, 'error', { timeout: 4000 })
+                },
+                autoApply: false // Mostrar modal de sugerencias
+              }
+            )
+
+            return success
+          } catch (error) {
+            console.warn('Error en sistema de sugerencias:', error)
+            // Continuar con el error original si falla el sistema de sugerencias
+          }
+        }
+
+        // Si no hay sugerencias disponibles o no se pueden aplicar, mostrar error directo
         showToast(
           `No se pudo pegar: ${validation.reason}`,
           'error', { timeout: 4000 }
@@ -899,7 +934,7 @@ export function useAutoPaste() {
       if (elementoId) {
         const nombreElemento = elemento.nombre || elemento.tipo
         showToast(
-          `"${nombreElemento}" pegado correctamente.`,
+          `"${nombreElemento}" pegado correctamente`,
           'success', { timeout: 3000 }
         )
 
@@ -962,7 +997,7 @@ export function useAutoPaste() {
       loadingId = startLoading(
         'pasteAll',
         null,
-        `Pegando ${bufferItems.length} elementos del buffer...`
+  `Pegando ${bufferItems.length} elementos del buffer`
       )
 
       if (!loadingId) {

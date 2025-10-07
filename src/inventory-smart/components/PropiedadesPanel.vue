@@ -1,12 +1,25 @@
 <template>
   <div class="h-full flex flex-col bg-white border-l border-gray-200" data-properties-panel>
-    <div class="p-4 border-b border-gray-200 flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-gray-800">Propiedades</h2>
+    <div class="p-3 border-b border-gray-200 flex items-center justify-between">
+      <div class="flex items-center gap-1">
+        <button
+          type="button"
+          class="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+          @click="canvasStore.togglePropertiesPanel()"
+          aria-label="Ocultar panel de propiedades"
+          title="Ocultar panel de propiedades"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
+        <h2 class="text-lg font-semibold text-gray-800">Propiedades</h2>
+      </div>
       <!-- Botón Identificador -->
       <button
         v-if="elementoSeleccionado"
         type="button"
-        class="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-primary text-gray-100 hover:text-white hover:bg-primary-gray rounded-lg transition-colors cursor-pointer text-sm"
+        class="inline-flex items-center justify-center gap-2 px-3 py-1.5 bg-primary text-gray-100 hover:text-white hover:bg-primary-600 rounded-lg transition-colors cursor-pointer text-sm"
         @click="emitirIdentificador"
       >
         <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
@@ -56,29 +69,6 @@
                 :disabled="isSaving || isElementRestricted"
               />
             </div>
-            <div class="grid grid-cols-1 gap-3">
-              <!-- <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-                <input
-                  :value="getTipoNombre(elementoSeleccionado.tipo)"
-                  type="text"
-                  disabled
-                  class="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-500 cursor-not-allowed"
-                />
-              </div> -->
-              <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-                <select
-                  v-model="edited.categoria"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm capitalize"
-                >
-                  <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                    {{ cat.nombre }}
-                  </option>
-                </select>
-              </div>
-            </div>
-
             <div v-if="!esPasillo">
               <label class="block text-xs font-medium text-gray-600 mb-1">Color</label>
               <div class="flex items-center gap-3">
@@ -196,7 +186,7 @@
                 </div>
               </div>
             </div>
-            <div v-if="!esCircular">
+            <div>
               <label class="text-sm text-gray-500">Alto</label>
               <div class="flex items-center">
                 <input
@@ -208,7 +198,7 @@
                   class="w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm
                   focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100
                   disabled:cursor-not-allowed disabled:text-gray-500"
-                  :disabled="isSaving || isElementRestricted"
+                  :disabled="isSaving || isElementRestricted || esPasillo"
                 />
                 <span class="ml-1 text-sm text-gray-500">{{ t('units.cm') }}</span>
               </div>
@@ -379,7 +369,7 @@
               <button
                 :disabled="isSaving || isElementRestricted"
                 @click="canvasStore.abrirCuartoNivelesPropiedades(elementoSeleccionado.id, childrenType)"
-                class="bg-primary-700 text-white p-1 rounded-full cursor-pointer
+                class="bg-primary text-white p-1 rounded-full cursor-pointer
                 disabled:bg-gray-400 disabled:cursor-not-allowed">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/>
@@ -413,7 +403,7 @@
                   <ul class="py-1">
                     <li>
                       <button
-                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-700 cursor-pointer"
+                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-600 cursor-pointer"
                         @click="deleteAndCompact({ id: piso.id })"
                       >
                         Eliminar
@@ -425,7 +415,7 @@
                     <li>
                       <button
                         @click="canvasStore.abrirCuartoNivelesPropiedades(piso.id)"
-                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-700
+                        class="flex items-center justify-center px-4 py-2 text-sm text-primary-600
                         w-full cursor-pointer"
                       >
                         Editar
@@ -470,7 +460,7 @@
                 <button
                   @click="abrirModalIdentificarEsl"
                   :disabled="isSaving"
-                  class="text-[#364153] text-sm bg-gray-200 px-3 py-2 cursor-pointer rounded-[6px] ml-1
+                  class="bg-secondary text-gray-600 hover:bg-secondary-600 hover:text-gray-700 text-sm px-3 py-2 cursor-pointer rounded-[6px] ml-1
                   disabled:opacity-50 hover:bg-gray-300 disabled:cursor-not-allowed">
                   Configurar
                 </button>
@@ -508,7 +498,7 @@
           Revertir
         </button>
         <button
-          class="px-3 cursor-pointer py-1 bg-primary text-white rounded text-sm hover:bg-primary-900 disabled:opacity-50"
+          class="px-3 cursor-pointer py-1 bg-primary text-white rounded text-sm hover:bg-primary-600 disabled:opacity-50"
           @click="guardar"
           :disabled="guardarDeshabilitado"
         >
@@ -517,7 +507,7 @@
       </div>
       <button
         @click="deseleccionarElemento"
-        class="w-full cursor-pointer px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors text-sm"
+        class="w-full cursor-pointer px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-600 transition-colors text-sm"
       >
         Deseleccionar
       </button>
@@ -538,7 +528,7 @@ const emit = defineEmits(['showIdentifier'])
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore.js'
-import { TIPOS_ENTIDAD, TODAS_LAS_CATEGORIAS, CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, ORIENTACIONES } from '@/inventory-smart/utils/constants'
+import { TIPOS_ENTIDAD, CM_TO_PX, ORIENTACIONES } from '@/inventory-smart/utils/constants'
 import { deepClone, deepEqual, makePatch } from '@/inventory-smart/utils/object'
 import { useToast } from '@/inventory-smart/composables/useToast.js'
 import ContainerProductsList from './ContainerProductsList.vue'
@@ -613,7 +603,6 @@ const cargarDesdeStore = (el) =>
     tags: Array.isArray(el.etiquetas) ? [...el.etiquetas] : [],
     // Propiedad ESL
     codigoEsl: el.codigoEsl || '',
-    categoria: el.categoria
   })// Estado para trackear valores previos y evitar validaciones innecesarias
 const valorDimensionAnterior = ref({})
 const valorPesoAnterior = ref(0)
@@ -834,7 +823,7 @@ const guardar = async () => {
   if (esCircular.value) {
     const diam = Number(edited.value?.diametroCm)
     if (!Number.isFinite(diam) || diam <= 0) {
-      dimensionError.value = 'El diámetro debe ser mayor a 0.'
+  dimensionError.value = 'El diámetro debe ser mayor a 0'
       isSaving.value = false
       return
     }
@@ -848,7 +837,7 @@ const guardar = async () => {
 
   const isValidDimension = (value) => Number.isFinite(value) && value >= 0
   if (!isValidDimension(anchoCm) || !isValidDimension(largoCm) || !isValidDimension(altoCm)) {
-    dimensionError.value = 'Las dimensiones deben ser números válidos y no negativos.'
+  dimensionError.value = 'Las dimensiones deben ser números válidos y no negativos'
     isSaving.value = false
     return
   }
@@ -1218,16 +1207,6 @@ const getTipoNombre = (tipo) => {
   return TIPOS_ENTIDAD.find((t) => t.id === tipo)?.nombre || tipo
 }
 
-const categories = computed(() => {
-  if (elementoSeleccionado.value.tipo === 'cuartos') {
-    return DEFAULT_TIPOS_CUARTO;
-  }
-  if (elementoSeleccionado.value.tipo === 'elementos') {
-    return DEFAULT_TIPOS_ESPACIO;
-  }
-  return [];
-});
-
 const getTipoNombrePadre = () => {
   const { padreId, padreType } = padreContext.value
   if (!padreId || !padreType) return 'elemento'
@@ -1265,12 +1244,8 @@ const getTipoNombreActual = () => {
   return `del ${getTipoNombre(tipo)}`
 }
 
-const getCategoriaDisplay = (categoria) => {
-  return TODAS_LAS_CATEGORIAS.find((c) => c.id === categoria)?.nombre || categoria
-}
-
 const esEstructura = computed(() => {
-  const cat = elementoSeleccionado.value?.categoria
+  const cat = elementoSeleccionado.value?.tipo
   return cat !== 'contenedores' && cat !== 'pasillos'
 })
 
@@ -1407,7 +1382,7 @@ const advertenciaPeso = computed(() => {
   if (!elementoSeleccionado.value || !edited.value) return null
 
   const newVal = Number(edited.value?.capacidadCarga || 0)
-  if (!Number.isFinite(newVal) || newVal < 0) return 'La capacidad debe ser un número válido.'
+  if (!Number.isFinite(newVal) || newVal < 0) return 'La capacidad debe ser un número válido'
 
   // 1. VALIDACIÓN DE USO REAL: capacidad ≥ uso actual del elemento
   const validacionReal = validarPesoMaximoVsUsoReal(elementoSeleccionado.value, newVal)
@@ -1435,7 +1410,7 @@ const advertenciaPeso = computed(() => {
     })
 
     if (!validacionTeorica.valido && validacionTeorica.limiteDePeso) {
-      return `Se excede la capacidad de peso teórica ${getTipoNombrePadre()}. Exceso: ${validacionTeorica.exceso.toFixed(2)} kg (Total: ${validacionTeorica.pesoTotal.toFixed(2)}/${validacionTeorica.capacidadCarga} kg).`
+  return `Se excede la capacidad de peso teórica ${getTipoNombrePadre()}. Exceso: ${validacionTeorica.exceso.toFixed(2)} kg (Total: ${validacionTeorica.pesoTotal.toFixed(2)}/${validacionTeorica.capacidadCarga} kg)`
     }
   }
 
@@ -1456,8 +1431,8 @@ const maxDiametroPlanta = computed(() => Math.min(plantaDims.value.ancho, planta
 const advertenciaDiametroLimite = computed(() => {
   if (!esCircular.value) return null
   const d = Number(edited.value?.diametroCm)
-  if (!Number.isFinite(d) || d <= 0) return 'El diámetro debe ser mayor a 0.'
-  if (d > maxDiametroPlanta.value) return 'El diámetro excede las dimensiones de la planta.'
+  if (!Number.isFinite(d) || d <= 0) return 'El diámetro debe ser mayor a 0'
+  if (d > maxDiametroPlanta.value) return 'El diámetro excede las dimensiones de la planta'
   return null
 })
 
@@ -1470,9 +1445,9 @@ const advertenciaDiametroContencion = computed(() => {
   const yPx = Number(elementoSeleccionado.value?.y || 0)
   const xCm = xPx / (CM_TO_PX || 10)
   const yCm = yPx / (CM_TO_PX || 10)
-  if (xCm < 0 || yCm < 0) return 'El círculo se sale del área de trabajo con el diámetro actual.'
+  if (xCm < 0 || yCm < 0) return 'El círculo se sale del área de trabajo con el diámetro actual'
   if (xCm + d > plantaDims.value.ancho || yCm + d > plantaDims.value.largo)
-    return 'El círculo se sale del área de trabajo con el diámetro actual.'
+  return 'El círculo se sale del área de trabajo con el diámetro actual'
   return null
 })
 

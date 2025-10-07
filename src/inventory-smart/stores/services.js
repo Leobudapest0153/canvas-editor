@@ -23,7 +23,7 @@ function validateServiceFunction(serviceFunction) {
 
   if (!['container_products', 'change_history'].includes(type)) {
     console.error(
-      `El tipo de función del servicio "${type}" no está soportado. Permitidos: 'container_products', 'change_history'.`,
+      `El tipo de función del servicio "${type}" no está soportado. Permitidos: 'container_products', 'change_history'`,
     )
     return false
   }

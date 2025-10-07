@@ -6,24 +6,19 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  // Tamaño del lienzo/stage en px (pantalla)
-  width: { type: Number, required: true },
-  height: { type: Number, required: true },
   // Escala actual del Stage
   scale: { type: Number, required: true },
-  // Posición actual del Stage (en px pantalla)
-  stageX: { type: Number, required: true },
-  stageY: { type: Number, required: true },
   // Unidades y escala
   pixelsPerUnit: { type: Number, required: true }, // px por unidad (m o cm)
   unit: { type: String, default: 'm' }, // 'm' | 'cm'
-  // Bounding box del polígono: { minX, minY, maxX, maxY }
+  // Bounding box del polígono: { minX, minY, maxX, maxY } o { x, y, width, height }
   bbox: { type: Object, default: () => ({ minX: 0, minY: 0, maxX: 0, maxY: 0 }) },
 })
 
 const versionKey = computed(() => [
   props.bbox?.minX, props.bbox?.minY, props.bbox?.maxX, props.bbox?.maxY,
-  props.scale, props.stageX, props.stageY, props.pixelsPerUnit, props.unit
+  props.bbox?.x, props.bbox?.y, props.bbox?.width, props.bbox?.height,
+  props.scale, props.pixelsPerUnit, props.unit
 ].join('|'))
 
 function niceStep(targetPx, pxPerUnit) {
@@ -41,21 +36,25 @@ function niceStep(targetPx, pxPerUnit) {
   return best
 }
 
-const draw = (ctx) => {
-  const w = props.width
-  const h = props.height
+const draw = (ctx, shape) => {
   const scale = props.scale || 1
-  const stageX = props.stageX || 0
-  const stageY = props.stageY || 0
   const ppu = Number(props.pixelsPerUnit) || 100
+  const bbox = props.bbox || {}
 
-  // Viewport visible (coords mundo)
-  const viewW = w / scale
-  const viewH = h / scale
+  // Obtener el área visible del canvas (viewport)
+  const stage = shape.getStage()
+  if (!stage) return
+
+  const stageWidth = stage.width()
+  const stageHeight = stage.height()
+  const stageX = stage.x()
+  const stageY = stage.y()
+
+  // Calcular los límites del mundo visible (en coordenadas del canvas)
   const worldX0 = -stageX / scale
   const worldY0 = -stageY / scale
-  const worldX1 = worldX0 + viewW
-  const worldY1 = worldY0 + viewH
+  const worldX1 = worldX0 + stageWidth / scale
+  const worldY1 = worldY0 + stageHeight / scale
 
   // Paso adaptativo menores y mayores (mayores cada 1 unidad)
   const pxPerUnitOnScreen = ppu * scale
@@ -65,32 +64,34 @@ const draw = (ctx) => {
   const stepPxWorld = stepUnits * ppu
   const majorPxWorld = 1 * ppu
 
-  // Inicio alineado con paso menor
+  // Inicio alineado con paso menor, extendido más allá del viewport para cubrir todo
   const startX = Math.floor(worldX0 / stepPxWorld) * stepPxWorld
   const startY = Math.floor(worldY0 / stepPxWorld) * stepPxWorld
 
   const minorColor = '#e5e7eb'
-  const majorColor = '#d1d5db' // Ligeramente más oscuro para mejor contraste
+  const majorColor = '#d1d5db'
 
-  // Verticales
+  // Habilitar antialiasing para líneas más suaves
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
+  // Verticales - cubrir todo el canvas visible
   ctx.beginPath()
   for (let xw = startX; xw <= worldX1; xw += stepPxWorld) {
     const isMajor = (Math.round(xw / majorPxWorld) === xw / majorPxWorld)
     ctx.strokeStyle = isMajor ? majorColor : minorColor
-    // --- ¡CAMBIO CLAVE AQUÍ! ---
-    ctx.lineWidth = (isMajor ? 0.75 : 0.5) / scale
+    ctx.lineWidth = (isMajor ? 0.5 : 0.3) / scale // Líneas más delgadas para suavidad
     ctx.moveTo(xw, worldY0)
     ctx.lineTo(xw, worldY1)
   }
   ctx.stroke()
 
-  // Horizontales
+  // Horizontales - cubrir todo el canvas visible
   ctx.beginPath()
   for (let yw = startY; yw <= worldY1; yw += stepPxWorld) {
     const isMajor = (Math.round(yw / majorPxWorld) === yw / majorPxWorld)
     ctx.strokeStyle = isMajor ? majorColor : minorColor
-    // --- ¡Y CAMBIO CLAVE AQUÍ! ---
-    ctx.lineWidth = (isMajor ? 0.75 : 0.5) / scale
+    ctx.lineWidth = (isMajor ? 0.5 : 0.3) / scale
     ctx.moveTo(worldX0, yw)
     ctx.lineTo(worldX1, yw)
   }

@@ -254,7 +254,7 @@ export const useCanvasBuffer = () => {
   // Pegar elemento simple (sin hijos) - generar nuevo ID único
       const uniqueTimestamp = Date.now()
       const randomSuffix = Math.random().toString(36).substr(2, 9)
-      const newId = `${elemento.tipo || elemento.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
+      const newId = `${elemento.tipo || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
 
       // Forzar altura de pasillos según planta destino
       let elementoToInsert = { ...elemento, id: newId }
@@ -375,6 +375,108 @@ export const useCanvasBuffer = () => {
     }
   }
 
+  /**
+   * Pegar estructura completa desde buffer al canvas actual con ajustes aplicados
+   */
+  const pasteFromBufferWithAdjustments = (bufferItemId, position = { x: 100, y: 100 }, adjustedElement) => {
+    const bufferItem = bufferItems.value.find((item) => item.id === bufferItemId)
+    if (!bufferItem) {
+      console.warn('Item no encontrado en buffer:', bufferItemId)
+      return false
+    }
+
+    const { elemento, sourceInfo } = bufferItem
+
+    // Aplicar ajustes al elemento
+    const elementoAjustado = {
+      ...elemento,
+      dimensiones: adjustedElement.dimensiones || elemento.dimensiones,
+      capacidadCarga: adjustedElement.capacidadCarga || elemento.capacidadCarga
+    }
+
+    // Verificar si es una estructura con elementos hijos
+    if (sourceInfo.isStructure && sourceInfo.allElements) {
+      // Para estructuras, aplicar ajustes al elemento raíz
+      const elements = Array.from(sourceInfo.allElements.values())
+      const clonedElements = new Array(elements.length)
+
+      for (let i = 0; i < elements.length; i++) {
+        let cloned = cloneCanvasElement(elements[i])
+
+        // Si es el elemento raíz, aplicar ajustes
+        if (cloned.id === elemento.id) {
+          cloned = {
+            ...cloned,
+            dimensiones: adjustedElement.dimensiones || cloned.dimensiones,
+            capacidadCarga: adjustedElement.capacidadCarga || cloned.capacidadCarga
+          }
+        }
+
+        cleanUsageDataInPlace(cloned)
+        clonedElements[i] = cloned
+      }
+
+      const payload = {
+        rootId: elemento.id,
+        elements: clonedElements,
+      }
+      const rootElementId = instantiateStructureOnCanvas(canvasStore, payload, position)
+      if (rootElementId) {
+        const nombreElemento = elementoAjustado.nombre || elementoAjustado.tipo
+        const totalElements = payload.elements.length
+        const mensaje = totalElements > 1
+          ? `Estructura "${nombreElemento}" pegada con ajustes (${totalElements} elementos)`
+          : `Elemento "${nombreElemento}" pegado con ajustes`
+        showToast(mensaje, 'info')
+        return rootElementId
+      }
+      return false
+    } else {
+      // Pegar elemento simple con ajustes aplicados
+      const uniqueTimestamp = Date.now()
+      const randomSuffix = Math.random().toString(36).substr(2, 9)
+      const newId = `${elementoAjustado.tipo || elementoAjustado.categoria || 'elemento'}_${uniqueTimestamp}_${randomSuffix}`
+
+      // Aplicar ajustes especiales para pasillos si es necesario
+      let elementoToInsert = { ...elementoAjustado, id: newId }
+      try {
+        if ((elementoAjustado?.tipo || '').toLowerCase() === 'pasillos') {
+          const planta = canvasStore.plantaPorId(canvasStore.plantaActiva)
+          const altoPlanta = planta?.dimensiones?.alto
+          const dims = { ...elementoToInsert.dimensiones }
+          if (Number.isFinite(altoPlanta)) dims.alto = altoPlanta
+          elementoToInsert = { ...elementoToInsert, dimensiones: dims }
+        }
+      } catch { /* ignore */ }
+
+      const newElement = {
+        ...elementoToInsert,
+        id: newId,
+        x: position.x,
+        y: position.y,
+      }
+
+      // Si es pasillo, permitir que el store genere el nombre alfabético
+      if ((elementoAjustado?.tipo || '').toLowerCase() === 'pasillos') {
+        delete newElement.nombre
+      }
+
+      // Limpiar propiedades que el store manejará
+      delete newElement.plantaId
+      delete newElement.padre
+
+      const finalElementId = canvasStore.agregarElemento(newElement, { preserveExistingCode: false, resetName: false, regenerateCode: true })
+
+      if (finalElementId) {
+        const nombreElemento = elementoAjustado.nombre || elementoAjustado.tipo
+        showToast(`Elemento "${nombreElemento}" pegado con ajustes`, 'info')
+        return finalElementId
+      }
+    }
+
+    return false
+  }
+
   return {
     // Estado
     bufferItems: computed(() =>
@@ -387,6 +489,7 @@ export const useCanvasBuffer = () => {
     addToBuffer,
     copyToBuffer,
     pasteFromBuffer,
+    pasteFromBufferWithAdjustments,
     pasteFromSerialized,
     removeFromBuffer,
     clearBuffer,

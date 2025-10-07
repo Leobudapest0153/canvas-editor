@@ -3,6 +3,13 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import CanvasView from '@/inventory-smart/components/CanvasView.vue'
 
+// Mock del sistema de sugerencias
+const mockPlacementSuggestions = {
+  tryPlaceWithSuggestions: vi.fn(() => Promise.resolve(true)),
+  generatePlacementSuggestions: vi.fn(() => null),
+  applySuggestedAdjustments: vi.fn((el) => el)
+}
+
 let mockStore
 vi.mock('@/inventory-smart/composables/useCanvasWithHistory', () => ({
   useCanvasWithHistory: () => ({ store: mockStore })
@@ -37,7 +44,13 @@ beforeEach(() => {
 
 describe('canvas layers order', () => {
   it('background below content and overlays without clip', () => {
-    const wrapper = mount(CanvasView)
+    const wrapper = mount(CanvasView, {
+      global: {
+        provide: {
+          placementSuggestions: mockPlacementSuggestions
+        }
+      }
+    })
     expect(wrapper.vm.backgroundLayerRef).toBeTruthy()
     expect(wrapper.vm.layerRef).toBeTruthy()
     expect(wrapper.vm.overlaysLayerRef).toBeTruthy()

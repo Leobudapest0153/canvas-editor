@@ -103,22 +103,26 @@
         <div
           v-for="elemento in elementosFiltrados"
           :key="elemento.id"
-          :draggable="canEditCanvas"
+          :draggable="allowNativeDrag"
           @dragstart="iniciarArrastre(elemento, $event)"
           @dragend="finalizarArrastre"
+          @touchstart.stop="iniciarArrastreTouch(elemento, $event)"
+          @touchmove.stop="moverArrastreTouch($event)"
+          @touchend.stop="finalizarArrastreTouch($event)"
+          @touchcancel.stop="handleTouchCancel"
           :class="[
-            'group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]',
+            'catalog-card group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md transition-all duration-200 border-l-4 hover:scale-[1.02]',
             catalogReadOnly ? 'catalog-item--disabled cursor-not-allowed hover:scale-100' : ''
           ]"
           :style="{
             borderLeftColor:
-              elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria),
+              elemento.color || elemento.colorBase,
           }"
         >
           <!-- Botón de acciones (tres puntos) -->
           <button
             type="button"
-            class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700 p-1 rounded cursor-pointer"
+            class="absolute top-2 right-2 text-gray-500 hover:text-gray-700 p-1 rounded cursor-pointer"
             aria-haspopup="menu"
             :aria-expanded="kebabMenu.visible && kebabMenu.item?.id === elemento.id ? 'true' : 'false'"
             :aria-controls="`el-menu-${elemento.id}`"
@@ -134,7 +138,7 @@
           <div class="flex items-center justify-center mb-3">
             <component
               :is="getIconComponentForElement(elemento)"
-              :backgroundColor="elemento.color || elemento.colorBase || getColorCategoria(elemento.categoria)"
+              :backgroundColor="elemento.color || elemento.colorBase"
               class="w-12 h-8"
             />
           </div>
@@ -160,26 +164,10 @@
                 <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
                 <span class="spec-value text-gray-700">{{ elemento.capacidadCarga }}kg</span>
               </div>
-              <!-- <div class="spec-item flex justify-between text-xs">
-                <span class="spec-label text-gray-500 font-medium">Ubicación:</span>
-                <span class="spec-value text-gray-700 capitalize">{{ elemento.ubicacion }}</span>
-              </div> -->
-            </div>
-
-            <!-- Badge de tipo y categoría -->
-            <div class="mt-2 flex gap-1">
-              <span
-                class="inline-block px-2 py-1 text-xs rounded-full"
-                :style="{
-                  backgroundColor: getColorPorTipo(elemento.tipo),
-                  color: getContrastTextColor(getColorPorTipo(elemento.tipo))
-                }"
-              >
-                {{ getCategoriaName(elemento.categoria) }}
-              </span>
-              <!-- <span class="inline-block px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
-                {{ getCategoriaName(elemento.categoria) }}
-              </span> -->
+              <div class="spec-item flex justify-between text-xs">
+                <span class="spec-label text-gray-500 font-medium">{{ 'Cantidad de ' + (elemento.tipo === 'cuartos' ? 'pisos:' : 'niveles:') }}</span>
+                <span class="spec-value text-gray-700">{{ getChildCount(elemento) }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -249,18 +237,6 @@ import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useEditorMode } from '@/inventory-smart/composables/useEditorMode'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import UiTooltip from '@/inventory-smart/components/ui/UiTooltip.vue'
-import {
-  TODAS_LAS_CATEGORIAS,
-  TIPOS_ENTIDAD,
-  getColorPorTipo,
-  getColorCategoria,
-  getContrastTextColor,
-  FORMAS_DISPONIBLES,
-  UBICACIONES_DISPONIBLES,
-} from '@/inventory-smart/utils/constants'
-// import { CATALOGO, SCALE_WITH_PARENT_KEYS } from '@/inventory-smart/utils/constants'
-// import { computeDimsByAxisScale } from '@/inventory-smart/utils/dimensionPolicy'
-
 import AgregarCuartoModal from './AgregarCuartoModal.vue'
 import {
   buildStructureFromForm,
@@ -294,9 +270,12 @@ const { canEditCanvas, canMutateCatalog } = useEditorMode()
 const catalogReadOnly = computed(() => !canMutateCatalog.value)
 const VISUAL_MODE_MESSAGE = 'No disponible en modo visualización'
 const catalogStore = useCatalogStore()
-const { filteredCatalogItems, catalogContext, searchText, selectedCategory, items } =
+const { filteredCatalogItems, searchText, items } =
   storeToRefs(catalogStore)
 const confirmDialog = useConfirmDialog()
+
+const isCoarsePointer = ref(false)
+const allowNativeDrag = computed(() => canEditCanvas.value && !isCoarsePointer.value)
 
 // Estado local
 const filtroTexto = searchText
@@ -340,38 +319,6 @@ const editingItem = ref(null) // item que se edita
 const editingForm = ref(null) // formulario derivado del item
 const kebabMenu = ref({ visible: false, x: 0, y: 0, item: null })
 
-// Formulario para nuevo elemento
-const nuevoElemento = ref({
-  nombre: '',
-  categoria: '',
-  forma: '',
-  colorBase: '#3b82f6',
-  dimensiones: {
-    ancho: 100,
-    largo: 100,
-    alto: 75,
-  },
-  capacidadCarga: 50,
-  ubicacion: 'suelo',
-  descripcion: '',
-  icono: 'box',
-})
-
-// const tituloContextual = computed(() => {
-//   if (catalogContext.value.mode === 'root') {
-//     return ''
-//   } else if (catalogContext.value.mode === 'detail-element') {
-//     return 'Catálogo de Contenedores'
-//   } else if (catalogContext.value.mode === 'detail-container') {
-//     return 'Catálogo (Elementos + Contenedores)'
-//   }
-//   return 'Catálogo de Elementos'
-// })
-
-// const puedeCrearElementosPersonalizados = computed(() => catalogContext.value.mode !== 'root')
-
-// Computed: categorías disponibles según el tab (dinámicos desde store)
-const categoriasDisponibles = computed(() => (modo.value === 'cuarto' ? canvasStore.catalogos.tiposCuarto : canvasStore.catalogos.tiposEspacio))
 // Base por modo (sin filtros de texto/categoría/ubicación) — sirve para decidir si mostrar Filtros
 const elementosBasePorModo = computed(() => {
   const base = Array.isArray(filteredCatalogItems.value)
@@ -404,6 +351,319 @@ const elementosFiltrados = computed(() => {
 
   return out
 })
+
+let coarsePointerMediaQuery = null
+let coarsePointerListener = null
+
+const updateCoarsePointerState = (matches) => {
+  const navigatorHasTouch = typeof navigator !== 'undefined' && Number(navigator.maxTouchPoints) > 0
+  const coarse = typeof matches === 'boolean' ? matches : navigatorHasTouch
+  isCoarsePointer.value = coarse || navigatorHasTouch
+}
+
+const registerCoarsePointerWatcher = () => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    updateCoarsePointerState(false)
+    return
+  }
+  coarsePointerMediaQuery = window.matchMedia('(pointer: coarse)')
+  updateCoarsePointerState(coarsePointerMediaQuery.matches)
+  coarsePointerListener = (event) => updateCoarsePointerState(event.matches)
+  if (typeof coarsePointerMediaQuery.addEventListener === 'function') {
+    coarsePointerMediaQuery.addEventListener('change', coarsePointerListener)
+  } else if (typeof coarsePointerMediaQuery.addListener === 'function') {
+    coarsePointerMediaQuery.addListener(coarsePointerListener)
+  }
+}
+
+const unregisterCoarsePointerWatcher = () => {
+  if (!coarsePointerMediaQuery || !coarsePointerListener) return
+  if (typeof coarsePointerMediaQuery.removeEventListener === 'function') {
+    coarsePointerMediaQuery.removeEventListener('change', coarsePointerListener)
+  } else if (typeof coarsePointerMediaQuery.removeListener === 'function') {
+    coarsePointerMediaQuery.removeListener(coarsePointerListener)
+  }
+  coarsePointerMediaQuery = null
+  coarsePointerListener = null
+}
+
+const LONG_PRESS_DELAY_MS = 260
+const LONG_PRESS_MOVE_TOLERANCE = 8
+
+const initialTouchDragState = () => ({
+  elemento: null,
+  cardEl: null,
+  isDragging: false,
+  longPressActivated: false,
+  longPressTimer: null,
+  startX: 0,
+  startY: 0,
+  offset: { x: 0, y: 0 },
+  dataTransfer: null,
+})
+
+const touchDragState = ref(initialTouchDragState())
+
+const resetTouchDragState = () => {
+  const state = touchDragState.value
+  if (state.longPressTimer) {
+    clearTimeout(state.longPressTimer)
+  }
+  if (state.cardEl?.classList) {
+    state.cardEl.classList.remove('opacity-50', 'scale-95')
+  }
+  touchDragState.value = initialTouchDragState()
+}
+
+const createMockDataTransfer = () => {
+  const store = new Map()
+  return {
+    dropEffect: 'copy',
+    effectAllowed: 'copy',
+    setData: (type, value) => store.set(type, value),
+    getData: (type) => store.get(type) ?? '',
+    clearData: (type) => {
+      if (!type) store.clear()
+      else store.delete(type)
+    },
+  }
+}
+
+const cloneCatalogElement = (elemento) => {
+  try {
+    return structuredClone(elemento)
+  } catch (error) {
+    try {
+      return JSON.parse(JSON.stringify(elemento))
+    } catch {
+      return elemento
+    }
+  }
+}
+
+const cloneCatalogPayload = (payload) => {
+  try {
+    return structuredClone(payload)
+  } catch (error) {
+    try {
+      return JSON.parse(JSON.stringify(payload))
+    } catch {
+      return payload
+    }
+  }
+}
+
+const buildCatalogDragPayload = (elemento, offset = { x: 0, y: 0 }) => {
+  if (!elemento) return null
+  const isStructured = !!elemento?.payload?.rootId && Array.isArray(elemento?.payload?.elements)
+  return isStructured
+    ? {
+        tipo: 'plantilla-catalogo',
+        payload: cloneCatalogPayload(elemento.payload),
+        offset,
+      }
+    : {
+        tipo: 'elemento-catalogo',
+        elemento: cloneCatalogElement(elemento),
+        offset,
+      }
+}
+
+const getIconComponentForElement = (elemento) => {
+  if (!elemento) return SpaceIcon
+  if ((elemento.tipo || '').toLowerCase() === 'cuartos') {
+    return RoomIcon
+  }
+  const ubicacion = (elemento.ubicacion || elemento.montado || '').toLowerCase()
+  return ubicacion === 'pared' ? SpaceOnWallIcon : SpaceIcon
+}
+
+const getChildCount = (elemento) => {
+  try {
+    if (!elemento?.payload?.rootId || !Array.isArray(elemento.payload.elements)) {
+      return 0
+    }
+    const root = elemento.payload.elements.find((e) => e.id === elemento.payload.rootId)
+    return root?.hijos?.length || 0
+  } catch {
+    return 0
+  }
+}
+
+const getCardDims = (item) => item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
+
+const isKebabRestricted = (item) => {
+  const t = item?.tipo
+  return t === 'pasillos' || t === 'contenedores' || t === 'pisos'
+}
+
+const iniciarArrastre = (elemento, event) => {
+  if (catalogReadOnly.value || !canEditCanvas.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    event.preventDefault()
+    return
+  }
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn')
+    event.preventDefault()
+    return
+  }
+
+  if (['cuartos', 'elementos'].includes(canvasStore.contextoNavegacion.tipo)) {
+    showToast('No puedes arrastrar elementos mientras estás editando un cuarto o elemento.', 'warn')
+    event.preventDefault()
+    return
+  }
+
+  const offset = { x: event.offsetX || 0, y: event.offsetY || 0 }
+  const payload = buildCatalogDragPayload(elemento, offset)
+  if (!payload) return
+
+  try {
+    const dataString = JSON.stringify(payload)
+    event.dataTransfer.setData('application/json', dataString)
+    event.dataTransfer.effectAllowed = 'copy'
+    const card = event.currentTarget
+    if (card && card.classList) card.classList.add('opacity-50', 'scale-95')
+  } catch (error) {
+    console.error('Error en iniciarArrastre:', error)
+  }
+}
+
+const finalizarArrastre = (event) => {
+  const card = event.currentTarget
+  if (card && card.classList) card.classList.remove('opacity-50', 'scale-95')
+}
+
+const iniciarArrastreTouch = (elemento, event) => {
+  if (catalogReadOnly.value || !canEditCanvas.value) {
+    showToast(VISUAL_MODE_MESSAGE, 'warning')
+    return
+  }
+  if (canvasStore.cambiosNoAplicados) {
+    showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn')
+    return
+  }
+  if (['cuartos', 'elementos'].includes(canvasStore.contextoNavegacion.tipo)) {
+    showToast('No puedes arrastrar elementos mientras estás editando un cuarto o elemento.', 'warn')
+    return
+  }
+
+  const touch = event.touches?.[0]
+  if (!touch || !elemento) return
+
+  resetTouchDragState()
+
+  const cardEl = event.currentTarget
+  const cardRect = cardEl?.getBoundingClientRect?.()
+  const offset = cardRect
+    ? { x: touch.clientX - cardRect.left, y: touch.clientY - cardRect.top }
+    : { x: 0, y: 0 }
+
+  const timerId = window.setTimeout(() => {
+    const state = touchDragState.value
+    if (state.longPressTimer !== timerId) return
+
+    const payload = buildCatalogDragPayload(elemento, state.offset)
+    if (!payload) {
+      resetTouchDragState()
+      return
+    }
+
+    const dataTransfer = createMockDataTransfer()
+    dataTransfer.setData('application/json', JSON.stringify(payload))
+
+    touchDragState.value = {
+      ...state,
+      isDragging: true,
+      longPressActivated: true,
+      dataTransfer,
+      longPressTimer: null,
+    }
+
+    if (cardEl && cardEl.classList) cardEl.classList.add('opacity-50', 'scale-95')
+
+    const dragStartEvent = new CustomEvent('touchdragstart', {
+      detail: { dataTransfer },
+    })
+    document.dispatchEvent(dragStartEvent)
+  }, LONG_PRESS_DELAY_MS)
+
+  touchDragState.value = {
+    elemento,
+    cardEl,
+    isDragging: false,
+    longPressActivated: false,
+    longPressTimer: timerId,
+    startX: touch.clientX,
+    startY: touch.clientY,
+    offset,
+    dataTransfer: null,
+  }
+}
+
+const moverArrastreTouch = (event) => {
+  const state = touchDragState.value
+  if (!state.elemento) return
+
+  const touch = event.touches?.[0]
+  if (!touch) return
+
+  const deltaX = Math.abs(touch.clientX - state.startX)
+  const deltaY = Math.abs(touch.clientY - state.startY)
+
+  if (!state.longPressActivated) {
+    if (deltaX > LONG_PRESS_MOVE_TOLERANCE || deltaY > LONG_PRESS_MOVE_TOLERANCE) {
+      resetTouchDragState()
+    }
+    return
+  }
+
+  if (!state.isDragging || !state.dataTransfer) return
+  event.preventDefault()
+
+  const dragOverEvent = new CustomEvent('touchdragover', {
+    detail: {
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      dataTransfer: state.dataTransfer,
+    },
+  })
+  document.dispatchEvent(dragOverEvent)
+}
+
+const finalizarArrastreTouch = (event) => {
+  const state = touchDragState.value
+  if (!state.elemento) {
+    resetTouchDragState()
+    return
+  }
+
+  if (state.longPressTimer) {
+    clearTimeout(state.longPressTimer)
+  }
+
+  if (state.longPressActivated && state.dataTransfer) {
+    const touch = event.changedTouches?.[0] || event.touches?.[0]
+    if (touch) {
+      event.preventDefault()
+      const dropEvent = new CustomEvent('touchdrop', {
+        detail: {
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+          dataTransfer: state.dataTransfer,
+        },
+      })
+      document.dispatchEvent(dropEvent)
+    }
+  }
+
+  resetTouchDragState()
+}
+
+const handleTouchCancel = () => {
+  resetTouchDragState()
+}
 
 // Cerrar panel de filtros si el tab queda sin elementos base
 watch(hayElementosEnTab, (val) => {
@@ -438,107 +698,6 @@ const onGuardarEspacio = (datosEspacio) => {
     editingItem.value = null
     editingForm.value = null
   }
-}
-
-const getTipoNombre = (tipo) => {
-  const tipoInfo = TIPOS_ENTIDAD.find((t) => t.id === tipo)
-  return tipoInfo?.nombre || 'Desconocido'
-}
-
-const getCategoriaName = (categoriaId) => {
-  const categoria = TODAS_LAS_CATEGORIAS.find((c) => c.id === categoriaId)
-  return categoria ? categoria.nombre : 'Sin categoría'
-}
-
-const getIconComponentForElement = (elemento) => {
-  // Determinar el componente de icono basado en tipo y ubicación
-  if (elemento.tipo === 'cuartos') {
-    return RoomIcon
-  } else if (elemento.ubicacion === 'pared') {
-    return SpaceOnWallIcon
-  } else {
-    return SpaceIcon
-  }
-}
-
-// Tipos para los que se oculta el menú de acciones
-const isKebabRestricted = (item) => {
-  const t = item?.tipo
-  return t === 'pasillos' || t === 'contenedores' || t === 'pisos'
-}
-
-// const isSystemDefaultItem = (item) =>
-//   !!(item?.props?.system === true && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(item.id))
-
-// const getCardDims = (item) => {
-//   try {
-//     if (!item?.dimensiones) return { ancho: 0, largo: 0, alto: 0 }
-//     // Solo escalar para tipos explícitos (pasillo/cuarto/piso). Para elementos regulares
-//     // como estantes o anaqueles, mostrar dimensiones base del catálogo.
-//     if (!(isSystemDefaultItem(item) && SCALE_WITH_PARENT_KEYS.includes(item.id))) {
-//       return item.dimensiones
-//     }
-//     const planta = canvasStore.plantaActivaData
-//     const dimsPlanta = planta?.dimensiones
-//     if (!dimsPlanta) return item.dimensiones
-//     const parentDims = { w: dimsPlanta.ancho, h: dimsPlanta.largo, d: dimsPlanta.alto }
-//     const dims = computeDimsByAxisScale(item.id, parentDims, { snap: true })
-//     return dims || item.dimensiones
-//   } catch {
-//     return item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
-//   }
-// }
-
-// Comportamiento actual: sin escalado, siempre dimensiones base del catálogo
-const getCardDims = (item) => item?.dimensiones || { ancho: 0, largo: 0, alto: 0 }
-
-// Drag and Drop
-const iniciarArrastre = (elemento, event) => {
-  if (catalogReadOnly.value || !canEditCanvas.value) {
-    showToast(VISUAL_MODE_MESSAGE, 'warning')
-    event.preventDefault()
-    return
-  }
-  if (canvasStore.cambiosNoAplicados) {
-    showToast('No puedes agregar elementos mientras hay cambios no aplicados.', 'warn');
-    event.preventDefault()
-    return
-  }
-
-  if (['cuartos', 'elementos'].includes(canvasStore.contextoNavegacion.tipo)) {
-    showToast('No puedes arrastrar elementos mientras estás editando un cuarto o elemento.', 'warn');
-    event.preventDefault()
-    return
-  }
-  // Si el item trae payload de estructura (plantilla/room/space), arrastrar como 'plantilla-catalogo'
-  const isStructured = !!elemento?.payload?.rootId && Array.isArray(elemento?.payload?.elements)
-  const datosArrastre = isStructured
-    ? {
-        tipo: 'plantilla-catalogo',
-        payload: elemento.payload,
-        offset: { x: event.offsetX || 0, y: event.offsetY || 0 },
-      }
-    : {
-        tipo: 'elemento-catalogo',
-        elemento: elemento,
-        offset: { x: event.offsetX || 0, y: event.offsetY || 0 },
-      }
-
-  try {
-    const dataString = JSON.stringify(datosArrastre)
-    event.dataTransfer.setData('application/json', dataString)
-    event.dataTransfer.effectAllowed = 'copy'
-    // Efecto visual de arrastre con Tailwind (sin clases en <style>)
-    const card = event.currentTarget
-    if (card && card.classList) card.classList.add('opacity-50', 'scale-95')
-  } catch (error) {
-    console.error('Error en iniciarArrastre:', error)
-  }
-}
-
-const finalizarArrastre = (event) => {
-  const card = event.currentTarget
-  if (card && card.classList) card.classList.remove('opacity-50', 'scale-95')
 }
 
 onUnmounted(() => {
@@ -630,9 +789,9 @@ const handleDeleteItem = async (item) => {
     return closeKebab()
   }
   if (!item) return closeKebab()
-  const ok = await confirmDialog.confirm({
+    const ok = await confirmDialog.confirm({
     title: 'Eliminar elemento',
-    message: `Se eliminará “${item.nombre}” del catálogo. Esta acción no afectará elementos ya colocados.`,
+    message: `Se eliminará “${item.nombre}” del catálogo. Esta acción no afectará elementos ya colocados`,
     confirmLabel: 'Eliminar',
     cancelLabel: 'Cancelar',
   })
@@ -659,10 +818,15 @@ const onGlobalClickKebab = (e) => {
 }
 
 onMounted(() => {
+  registerCoarsePointerWatcher()
   window.addEventListener('click', onGlobalClickKebab, { capture: true })
+  document.addEventListener('touchcancel', handleTouchCancel, { passive: true })
 })
 onUnmounted(() => {
   window.removeEventListener('click', onGlobalClickKebab, { capture: true })
+  document.removeEventListener('touchcancel', handleTouchCancel)
+  unregisterCoarsePointerWatcher()
+  resetTouchDragState()
 })
 </script>
 
@@ -684,5 +848,12 @@ onUnmounted(() => {
   opacity: 0;
   transform: translateY(-10px);
   overflow: hidden;
+}
+
+.catalog-card,
+.catalog-card * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 </style>

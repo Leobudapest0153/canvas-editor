@@ -34,14 +34,14 @@
         <div class="flex justify-center space-x-3">
           <button
             @click="cancelar"
-            class="px-4 py-2 rounded-md text-[#364153] text-sm bg-gray-200 cursor-pointer ml-1 disabled:opacity-50 hover:bg-gray-300"
+            class="px-4 py-2 rounded-md bg-secondary text-gray-600 hover:bg-secondary-600 hover:text-gray-700 text-sm cursor-pointer ml-1 disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             @click="guardar"
             :disabled="!codigoBarras.trim()"
-            class="px-4 py-2 cursor-pointer bg-primary text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-4 py-2 cursor-pointer bg-primary text-white rounded-md hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Guardar
           </button>

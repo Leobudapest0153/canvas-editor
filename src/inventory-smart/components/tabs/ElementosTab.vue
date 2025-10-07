@@ -165,7 +165,7 @@
               @dragstart="onTemplateDragStart(tpl, $event)"
               @dragend="onTemplateDragEnd"
               @contextmenu.prevent="openTemplateContextMenu($event, tpl)"
-              class="group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md border-l-4 hover:scale-[1.02] hover:bg-gray-50 transition duration-200"
+              class="catalog-card group relative bg-white border border-gray-200 rounded-lg p-3 cursor-grab mb-3 hover:shadow-md border-l-4 hover:scale-[1.02] hover:bg-gray-50 transition duration-200"
               :style="{ borderLeftColor: getTemplateColor(tpl) }"
             >
               <button
@@ -205,18 +205,6 @@
                     <span class="spec-label text-gray-500 font-medium">Capacidad de carga:</span>
                     <span class="spec-value text-gray-700">{{ formatTemplateWeight(tpl) }}</span>
                   </div>
-                  </div>
-
-                <div class="mt-2 flex gap-1">
-                  <span
-                    class="inline-block px-2 py-1 text-xs rounded-full"
-                    :style="{
-                      backgroundColor: getTemplateColor(tpl),
-                      color: getContrastTextColor(getTemplateColor(tpl))
-                    }"
-                  >
-                    Plantillas
-                  </span>
                   </div>
               </div>
             </div>
@@ -269,7 +257,6 @@ import { ref, onMounted, watch, computed, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
-import { getColorCategoria, UBICACIONES_DISPONIBLES, getContrastTextColor } from '@/inventory-smart/utils/constants'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useToast } from '@/inventory-smart/composables/useToast'
@@ -370,25 +357,16 @@ const selectCuartos = () => {
   if (selectedCatalog.value !== 'elementos') selectCatalog('elementos')
 }
 
-// Opciones de filtros en Plantillas
 const canvasStore = useCanvasStore()
 
-// --- MODIFICACIÓN CLAVE ---
-// NUEVO: Computed para determinar si el contexto actual deshabilita el tab.
+// Determinar si el contexto actual deshabilita el tab.
 const isContextoInvalido = computed(() => {
   const tipoContexto = canvasStore.contextoActual?.tipo
   return tipoContexto === 'cuartos' || tipoContexto === 'elementos'
 })
-// --- FIN MODIFICACIÓN ---
 
 const isPlantaContext = computed(() => canvasStore.contextoActual?.tipo === 'plantas')
 const tabsOrder = computed(() => ['espacios', ...(isPlantaContext.value ? ['cuartos'] : []), 'plantillas'])
-const categoriasPlantillas = computed(() => {
-  const a = canvasStore.catalogos?.tiposCuarto || []
-  const b = canvasStore.catalogos?.tiposEspacio || []
-  return [...a, ...b]
-})
-const ubicacionesPlantillas = computed(() => UBICACIONES_DISPONIBLES)
 
 onMounted(() => {
   const saved = localStorage.getItem('canvas_selected_catalog')
@@ -483,7 +461,7 @@ const getTemplateRoot = (tpl) => {
 
 const getTemplateColor = (tpl) => {
   const root = getTemplateRoot(tpl)
-  return root.color || root.colorBase || getColorCategoria(root.categoria)
+  return root.color || root.colorBase
 }
 
 const getTemplateWeightVal = (tpl) => {
@@ -571,7 +549,7 @@ const handleDeleteTemplate = async (tpl) => {
 
   const ok = await confirmDialog.confirm({
     title: 'Eliminar plantilla',
-    message: `Se eliminará la plantilla “${tpl.name}”. Esta acción no afectará los elementos ya colocados en el lienzo.`,
+    message: `Se eliminará la plantilla “${tpl.name}”. Esta acción no afectará los elementos ya colocados en el lienzo`,
     confirmLabel: 'Eliminar',
     cancelLabel: 'Cancelar',
     // Usamos los mismos estilos de botón peligro que el flujo de eliminar elemento (valores por defecto ya son rojo)
@@ -603,5 +581,12 @@ const handleDeleteTemplate = async (tpl) => {
   opacity: 0;
   transform: translateY(-10px);
   overflow: hidden;
+}
+
+.catalog-card,
+.catalog-card * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 </style>

@@ -11,9 +11,9 @@
       <!-- Header -->
       <div class="flex items-center justify-between p-6 border-b border-slate-200">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+          <div class="w-10 h-10 bg-secondary-500 rounded-lg flex items-center justify-center">
             <svg
-              class="w-6 h-6 text-primary-600"
+              class="w-6 h-6 text-primary"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
             >
@@ -42,37 +42,6 @@
           </svg>
         </button>
       </div>
-
-      <!-- Filters -->
-      <!-- <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
-        <div class="flex flex-wrap items-center gap-4">
-          <div class="flex items-center gap-2">
-            <label class="text-sm font-medium text-slate-700">Planta:</label>
-            <select v-model="selectedPlanta" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-              <option value="">Todas las plantas</option>
-              <option v-for="p in plantas" :key="p.id" :value="p.id">{{ p.nombre }}</option>
-            </select>
-          </div>
-          <div class="flex-1"></div>
-          <div class="flex items-center gap-4">
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-slate-700">Página:</label>
-              <select v-model.number="page" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-                <option v-for="n in totalPages" :key="n" :value="n">{{ n }}</option>
-              </select>
-            </div>
-            <div class="flex items-center gap-2">
-              <label class="text-sm font-medium text-slate-700">Por página:</label>
-              <select v-model.number="pageSize" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-                <option :value="5">5</option>
-                <option :value="10">10</option>
-                <option :value="20">20</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div> -->
-
       <!-- Content -->
       <div class="p-6">
         <!-- Loading State -->
@@ -375,7 +344,7 @@ const formatValue = (v, path) => {
   }
 
   // Caso especial para tipos: mostrar nombre amigable
-  if (last === 'categoria' || last === 'tipo' && typeof v === 'string') {
+  if (last === 'tipo' && typeof v === 'string') {
     return formatTipoValue(v)
   }
 

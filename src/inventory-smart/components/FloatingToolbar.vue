@@ -93,6 +93,25 @@
       </div>
     </UiTooltip>
 
+    <!-- Grid -->
+    <UiTooltip label="Mostrar/Ocultar cuadrícula (G)" :delay="200">
+      <div class="relative group">
+        <UiIconButton
+          class="relative z-10 grid h-[36px] w-[36px] place-items-center rounded-[12px] bg-transparent hover:bg-white/[.06] text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary,theme(colors.blue.600))]/40 data-[state=on]:bg-white/10 data-[state=on]:ring-1 data-[state=on]:ring-white/15 data-[state=off]:opacity-70"
+          @click.stop="$emit('toggle-grid')"
+          :state="isGridVisible ? 'on' : 'off'"
+          aria-label="Mostrar/Ocultar cuadrícula (G)"
+          :aria-pressed="isGridVisible ? 'true' : 'false'"
+        >
+          <!-- Icono Grid -->
+          <svg viewBox="0 0 24 24" class="pointer-events-none h-[20px] w-[20px] fill-current data-[state=on]:text-white data-[state=off]:text-slate-300" aria-hidden="true">
+            <path fill="currentColor" d="M10,4V8H14V4H10M16,4V8H20V4H16M16,10V14H20V10H16M16,16V20H20V16H16M14,20V16H10V20H14M8,20V16H4V20H8M8,14V10H4V14H8M8,8V4H4V8H8M10,14H14V10H10V14M4,2H20A2,2 0 0,1 22,4V20A2,2 0 0,1 20,22H4C2.92,22 2,21.1 2,20V4A2,2 0 0,1 4,2Z" />
+          </svg>
+        </UiIconButton>
+        <span v-if="isGridVisible" class="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--primary,theme(colors.blue.600))] ring-2 ring-slate-900/60"></span>
+      </div>
+    </UiTooltip>
+
     <!-- Toggle borde punteado para Pasillos (solo visible si existen pasillos) -->
     <UiTooltip v-if="hasAisles" :label="isAisleDashOn ? 'Quitar borde punteado de pasillos' : 'Mostrar borde punteado de pasillos'" :delay="200">
       <div class="relative group">
@@ -191,6 +210,7 @@ defineProps({
   isContainer: { type: Boolean, default: false },
   isSnappingEnabled: { type: Boolean, default: true },
   isSnapping: { type: Boolean, default: false },
+  isGridVisible: { type: Boolean, default: true },
   avoidOverlap: { type: Boolean, default: false },
   isElementRestricted: { type: Boolean, default: false },
   // Nuevo: control de pasillos
@@ -198,7 +218,7 @@ defineProps({
   isAisleDashOn: { type: Boolean, default: true },
 })
 
-defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'toggle-aisle-dash', 'fill-container', 'delete'])
+defineEmits(['set-mode', 'toggle-lock', 'toggle-snapping', 'toggle-grid', 'toggle-aisle-dash', 'fill-container', 'delete'])
 </script>
 
 <style>

@@ -94,7 +94,7 @@
             {{ canvasStore.elementosVisibles.length }} pisos
           </span>
           <span v-else-if="canvasStore.estaEnPiso">
-            {{ canvasStore.elementosVisibles.length }} espacios
+            {{ canvasStore.elementosVisibles.length }} espacios o pasillos
           </span>
           <span v-else-if="canvasStore.estaEnElemento">
             {{ canvasStore.elementosVisibles.length }} niveles
@@ -203,8 +203,8 @@ const previousCrumb = computed(() => {
 
 /* Estilos para el botón "Regresar" dentro de las breadcrumbs */
 .breadcrumb-back {
-  background: var(--color-primary-100);
-  border: 1px solid var(--color-primary-300);
+  background: var(--color-secondary-400);
+  border: 1px solid var(--color-secondary-500);
   color: #1d1e4c;
   font-weight: 600;
   box-shadow: 0 2px 6px rgba(6, 95, 70, 0.08);

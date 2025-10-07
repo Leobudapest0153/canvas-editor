@@ -34,48 +34,32 @@
       @mousemove="handleStageMouseMove"
       @mouseup="handleStageMouseUp"
       @click="handleStageClick"
+      @touchstart="handleStageTouchStart"
+      @touchmove="handleStageTouchMove"
+      @touchend="handleStageTouchEnd"
+      @tap="handleStageTap"
+      @dbltap="handleStageDoubleTap"
     >
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
+        <!-- GridLayer DEBAJO de todo para que los elementos lo tapen -->
+        <GridLayer
+          v-if="canvasStore.gridVisible"
+          :scale="canvasStore.zoom"
+          :pixels-per-unit="10 * 100"
+          :unit="'m'"
+          :bbox="floorBoundary"
+        />
         <v-line
           v-if="plantPolygon.length && !isInfinitePlant"
           :config="{
             points: plantPolygonFlat,
             closed: true,
             stroke: '#0ea5e9',
-            fill: 'rgba(255,265,255,1)',
+            fill: 'transparent',
             strokeWidth: 2 / canvasStore.zoom,
             listening: false,
           }"
         />
-        <!-- Dibujar grid solo si gridSize > 0 -->
-        <template v-if="(canvasStore.gridSize || 0) > 0">
-          <v-line
-            v-for="x in gridLines.vertical"
-            :key="`v-${Math.round(x * 1000)}`"
-            :config="{
-              points: isInfinitePlant
-                ? [x, 0, x, floorBoundary.height]
-                : [x, floorBoundary.y, x, floorBoundary.y + floorBoundary.height],
-              stroke: '#e5e7eb',
-              strokeWidth: 1,
-              opacity: 0.5,
-              listening: false,
-            }"
-          />
-          <v-line
-            v-for="y in gridLines.horizontal"
-            :key="`h-${Math.round(y * 1000)}`"
-            :config="{
-              points: isInfinitePlant
-                ? [0, y, floorBoundary.width, y]
-                : [floorBoundary.x, y, floorBoundary.x + floorBoundary.width, y],
-              stroke: '#e5e7eb',
-              strokeWidth: 1,
-              opacity: 0.5,
-              listening: false,
-            }"
-          />
-        </template>
       </v-layer>
       <v-layer ref="layerRef">
         <template v-if="canvasStore.elementoAura">
@@ -123,15 +107,15 @@
               y: elemento.y,
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
-              draggable: canDragElement(elemento),
+              draggable: canDragElement(elemento) && canStartDrag(elemento),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
             @dblclick="(e) => handleElementDoubleClick(e, elemento)"
-            @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
-            @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
-            @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
+            @dragstart="(e) => handleShapeDragStart(e, elemento)"
+            @dragmove="(e) => handleShapeDragMove(e, elemento)"
+            @dragend="(e) => handleShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id)"
@@ -139,6 +123,9 @@
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
             @pointerup.passive="onShapePointerUp"
             @pointercancel.passive="onShapePointerUp"
+            @touchstart="(e) => onShapeTouchStart(e, elemento)"
+            @touchmove="(e) => onShapeTouchMove(e, elemento)"
+            @touchend="(e) => onShapeTouchEnd(e, elemento)"
           >
             <v-rect
               :config="{
@@ -260,15 +247,15 @@
               y: elemento.y,
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
-              draggable: canDragElement(elemento),
+              draggable: canDragElement(elemento) && canStartDrag(elemento),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
             @dblclick="(e) => handleElementDoubleClick(e, elemento)"
-            @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
-            @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
-            @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
+            @dragstart="(e) => handleShapeDragStart(e, elemento)"
+            @dragmove="(e) => handleShapeDragMove(e, elemento)"
+            @dragend="(e) => handleShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id)"
@@ -276,6 +263,9 @@
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
             @pointerup.passive="onShapePointerUp"
             @pointercancel.passive="onShapePointerUp"
+            @touchstart="(e) => onShapeTouchStart(e, elemento)"
+            @touchmove="(e) => onShapeTouchMove(e, elemento)"
+            @touchend="(e) => onShapeTouchEnd(e, elemento)"
           >
             <v-rect
               :config="{
@@ -316,15 +306,15 @@
               y: elemento.y,
               width: getDrawWidth(elemento),
               height: getDrawHeight(elemento),
-              draggable: canDragElement(elemento),
+              draggable: canDragElement(elemento) && canStartDrag(elemento),
               dragBoundFunc: (pos) => dragBoundForElement(pos, elemento),
             }"
             :ref="(n) => registerDraggableRef(elemento.id, n)"
             @click="() => selectElement(elemento)"
             @dblclick="(e) => handleElementDoubleClick(e, elemento)"
-            @dragstart="(e) => canDragElement(elemento) && onShapeDragStart(e, elemento)"
-            @dragmove="(e) => canDragElement(elemento) && onShapeDragMove(e, elemento)"
-            @dragend="(e) => canDragElement(elemento) && onShapeDragEnd(e, elemento)"
+            @dragstart="(e) => handleShapeDragStart(e, elemento)"
+            @dragmove="(e) => handleShapeDragMove(e, elemento)"
+            @dragend="(e) => handleShapeDragEnd(e, elemento)"
             @transformstart="(e) => handleTransformStart(e, elemento.id)"
             @transform="(e) => handleTransformMove(e, elemento.id)"
             @transformend="(e) => handleTransformEnd(e, elemento.id)"
@@ -332,6 +322,9 @@
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
             @pointerup.passive="onShapePointerUp"
             @pointercancel.passive="onShapePointerUp"
+            @touchstart="(e) => onShapeTouchStart(e, elemento)"
+            @touchmove="(e) => onShapeTouchMove(e, elemento)"
+            @touchend="(e) => onShapeTouchEnd(e, elemento)"
           >
             <v-rect
               :config="{
@@ -621,6 +614,7 @@
       :is-element-locked="selectedElementLocked"
       :is-snapping-enabled="isSnappingEnabled"
       :is-snapping="isSnapping"
+      :is-grid-visible="canvasStore.gridVisible"
       :active-mode="isDragModeActive ? 'edit' : 'drag'"
       :is-container="canvasStore.elementoSeleccionadoCompleto?.padre ? true : false"
       :is-element-restricted="isRestricted"
@@ -630,6 +624,7 @@
       @toggle-lock="toggleLockAndPreserveDrag(canvasStore.elementoSeleccionado)"
       @fill-container="() => simularLlenadoElemento(canvasStore.elementoSeleccionado)"
       @toggle-snapping="toggleSnapping"
+      @toggle-grid="canvasStore.toggleGridVisible"
       @toggle-aisle-dash="() => (showPasillosDash = !showPasillosDash)"
       @delete="() => onDelete(canvasStore.elementoSeleccionadoCompleto.id)"
     />
@@ -672,11 +667,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, inject } from 'vue'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
 import RulersOverlay from '@/inventory-smart/components/RulersOverlay.vue'
+import GridLayer from '@/inventory-smart/components/GridLayer.vue'
 import { detectConflictsFor, throttle, computeMTD } from '@/inventory-smart/utils/collision'
 import { boundaryToAreaBounds } from '@/inventory-smart/utils/bounds'
 import { solveDragPosition } from '@/inventory-smart/utils/placementSolver'
@@ -687,7 +683,7 @@ import { insideAreaModel } from '@/inventory-smart/utils/isPlacementValid'
 import { dimsCmFor, clampInsideArea } from '@/inventory-smart/utils/bounds'
 import { handleCanvasHotkeys } from '@/inventory-smart/utils/canvasHotkeys'
 import { polygonInset } from '@/inventory-smart/utils/polygonInset'
-import { GRID_SIZE, CM_TO_PX, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
+import { JERARQUIA_PERMITIDA, GRID_SIZE, CM_TO_PX, CATALOGO, OFFSETS } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { cmToPx, pxToCm, fmtCm, formatLengthsCm } from '@/inventory-smart/utils/units'
 import { useViewportStore } from '@/inventory-smart/stores/viewport'
@@ -708,6 +704,7 @@ import SnapGuides from '@/inventory-smart/components/SnapGuides.vue'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useTransformer } from '@/inventory-smart/composables/useTransformer'
 import { useElementDrag } from '@/inventory-smart/composables/useElementDrag'
+import { useCanvasTouchEvents } from '@/inventory-smart/composables/useCanvasTouchEvents'
 import { useMarqueeSelection } from '@/inventory-smart/composables/useMarqueeSelection'
 import TemplateSaveModal from '@/inventory-smart/components/TemplateSaveModal.vue'
 import CanvasInfo from '@/inventory-smart/components/CanvasInfo.vue'
@@ -715,6 +712,9 @@ import { useZoom } from '@/inventory-smart/composables/useZoom'
 import FloatingControls from '@/inventory-smart/components/FloatingControls.vue'
 import { toPrecisionCm } from '../utils/fixedDimensions'
 import { instantiateStructureOnCanvas } from '@/inventory-smart/composables/useStructureManager'
+
+// Inyectar el sistema de sugerencias desde el componente padre
+const placementSuggestions = inject('placementSuggestions')
 
 // Espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
@@ -1113,47 +1113,6 @@ const hasPasillos = computed(() =>
 )
 const showPasillosDash = ref(true)
 
-// Grid de referencia - BASADO EN LAS DIMENSIONES DEL LAYER
-const gridLines = computed(() => {
-  const gridSizePx = Number(canvasStore.gridSize || 0)
-  const vertical = []
-  const horizontal = []
-
-  // Si gridSize <= 0, no generar líneas
-  if (!gridSizePx || gridSizePx <= 0) {
-    return { vertical, horizontal }
-  }
-
-  // Usar las dimensiones del layer (planta) para el grid
-  const boundary = floorBoundary.value
-  const layerWidth = Number(boundary.width) || 0
-  const layerHeight = Number(boundary.height) || 0
-
-  if (!isInfinitePlant.value) {
-    const startX = Number(boundary.x) || 0
-    const endX = startX + layerWidth
-    for (let x = startX; x <= endX + 0.5; x += gridSizePx) {
-      vertical.push(x)
-    }
-
-    const startY = Number(boundary.y) || 0
-    const endY = startY + layerHeight
-    for (let y = startY; y <= endY + 0.5; y += gridSizePx) {
-      horizontal.push(y)
-    }
-  } else {
-    for (let x = 0; x <= layerWidth; x += gridSizePx) {
-      vertical.push(x)
-    }
-
-    for (let y = 0; y <= layerHeight; y += gridSizePx) {
-      horizontal.push(y)
-    }
-  }
-
-  return { vertical, horizontal }
-})
-
 watch(
   [plantPolygon, isInfinitePlant],
   ([poly, infinite]) => {
@@ -1438,6 +1397,33 @@ const handleStageClick = (e) => {
   }
 }
 
+const handleStageTouchStart = (e) => {
+  // Map touchstart to mousedown
+  handleStageMouseDown(e)
+}
+
+const handleStageTouchMove = (e) => {
+  // Map touchmove to mousemove
+  handleStageMouseMove(e)
+}
+
+const handleStageTouchEnd = () => {
+  // Map touchend to mouseup
+  handleStageMouseUp()
+}
+
+const handleStageTap = (e) => {
+  // Map tap to click
+  handleStageClick(e)
+}
+
+const handleStageDoubleTap = (e) => {
+  // Double tap for zoom in
+  if (e.target === e.target.getStage()) {
+    zoomIn()
+  }
+}
+
 // === FUNCIONES DE ELEMENTOS ===
 const selectElement = (element) => {
   if (canvasStore.modoConfigurarEsl) {
@@ -1470,7 +1456,9 @@ const handleOrientationBarClick = (elemento) => {
 }
 
 const handleElementDoubleClick = (evt, elemento) => {
-  if (evt.evt.button !== 0) return // Solo botón izquierdo
+  // Para eventos de mouse, verificar botón izquierdo
+  // Para eventos de touch, no hay propiedad button, así que siempre proceder
+  if (evt.evt && evt.evt.button !== undefined && evt.evt.button !== 0) return // Solo botón izquierdo para mouse
   if (elemento?.restrictions && elemento.restrictions.includes('enter')) return
 
   if (canvasStore.cambiosNoAplicados && canvasStore.elementoSeleccionado) {
@@ -1689,9 +1677,13 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   const rect = containerRef.value.getBoundingClientRect()
 
   // Obtener posición del puntero considerando zoom y pan
+  // Support both mouse events and touch events
+  const clientX = dropEvent.clientX || (dropEvent.detail && dropEvent.detail.clientX)
+  const clientY = dropEvent.clientY || (dropEvent.detail && dropEvent.detail.clientY)
+
   const pointerPos = {
-    x: dropEvent.clientX - rect.left,
-    y: dropEvent.clientY - rect.top,
+    x: clientX - rect.left,
+    y: clientY - rect.top,
   }
 
   // Convertir a coordenadas de mundo (layer) considerando transformación del stage
@@ -1703,40 +1695,46 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
 
 // Pipeline unificado de validaciones previas al drop
 const runPreDropValidations = (elemento, dropEvent) => {
-  if (!elemento) return { ok: false, reason: 'invalid' }
+  if (!elemento) return { ok: false, reason: 'invalid', validationResult: null }
 
   const contextoActual = canvasStore.contextoActual?.tipo || 'plantas'
   const tipoElemento = elemento.tipo
 
-  // Reglas de jerarquía actualizadas
-  const allowedByContext = {
-    plantas: ['cuartos', 'elementos', 'pasillos'],
-    cuartos: ['pisos'],
-    pisos: ['elementos'],
-    elementos: ['contenedores'],
-    contenedores: [],
-    pasillos: [],
-  }
-  const permitidos = allowedByContext[contextoActual] || []
+  const permitidos = JERARQUIA_PERMITIDA[contextoActual] || []
   if (!permitidos.includes(tipoElemento)) {
     const msgMap = {
-      plantas: 'Aquí solo puedes agregar cuartos, elementos o pasillos.',
-      cuartos: 'Aquí solo puedes agregar pisos.',
-      pisos: 'Aquí solo puedes agregar elementos.',
-      elementos: 'Dentro de elementos solo se permiten niveles.',
-      contenedores: 'No puedes agregar elementos dentro de niveles.',
-      pasillos: 'No puedes agregar elementos dentro de pasillos.',
+  plantas: 'Aquí solo puedes agregar cuartos, elementos o pasillos',
+  cuartos: 'Aquí solo puedes agregar pisos',
+  pisos: 'Aquí solo puedes agregar elementos y pasillos',
+  elementos: 'Dentro de elementos solo se permiten niveles',
+  contenedores: 'No puedes agregar elementos dentro de niveles',
+  pasillos: 'No puedes agregar elementos dentro de pasillos',
     }
-    showToast(msgMap[contextoActual] || 'No puedes agregar este tipo aquí.', 'error')
-    return { ok: false, reason: 'hierarchy' }
+  showToast(msgMap[contextoActual] || 'No puedes agregar este tipo aquí', 'error')
+    return { ok: false, reason: 'hierarchy', validationResult: null }
   }
 
-  // Si es pasillo, ajustar alto al de la planta ANTES de validar
+  // Si es pasillo, ajustar alto al del contenedor padre (planta o elemento) ANTES de validar
   let elementoParaPeso = elemento
-  const plantaAlto = canvasStore.plantaActivaData?.dimensiones?.alto
   if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
     const dims = { ...(elemento.dimensiones || {}) }
-    if (Number.isFinite(plantaAlto)) dims.alto = plantaAlto
+
+    // Intentar obtener alto del padre según el contexto
+    let altoContenedor = null
+
+    if (canvasStore.contextoActual?.tipo === 'plantas') {
+      // Si estamos en una planta, usar alto de la planta
+      altoContenedor = canvasStore.plantaActivaData?.dimensiones?.alto
+    } else {
+      // Si estamos dentro de un elemento (cuarto, piso, etc), usar su alto
+      const elementoPadre = canvasStore.elementoPorId(canvasStore.contextoActual?.id)
+      altoContenedor = elementoPadre?.dimensiones?.alto
+    }
+
+    if (Number.isFinite(altoContenedor)) {
+      dims.alto = altoContenedor
+    }
+
     elementoParaPeso = { ...elemento, dimensiones: dims }
   }
 
@@ -1759,12 +1757,29 @@ const runPreDropValidations = (elemento, dropEvent) => {
     } else if (canvasStore.estaEnElemento) {
       tipoPadre = 'el elemento'
     }
-    // El elemento excedería el peso máximo permitido
-    showToast(
-      `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`,
-      'error',
-    )
-    return { ok: false, reason: 'weight' }
+    const weightReason = `No se puede agregar: excedería el peso máximo soportado de ${tipoPadre} (${resultadoValidacionPeso.exceso} kg más)`
+
+    // Calcular areaBounds para el sistema de sugerencias
+    const boundary = computeBoundary()
+    const areaBounds = {
+      minX: 0,
+      minY: 0,
+      maxX: boundary?.W || layerConfig.value.width,
+      maxY: boundary?.H || layerConfig.value.height,
+      polygon: boundary?.points,
+    }
+
+    return {
+      ok: false,
+      reason: 'weight',
+      areaBounds: areaBounds,
+      validationResult: {
+        valid: false,
+        reason: weightReason,
+        canSuggest: true,
+        weightExcess: resultadoValidacionPeso.exceso
+      }
+    }
   }
 
   let { width, height } = getElementPixelDimensions(elemento)
@@ -1772,8 +1787,20 @@ const runPreDropValidations = (elemento, dropEvent) => {
   let largoCm = elemento.dimensiones?.largo || 60
   let altoCm = elemento.dimensiones?.alto || 20
 
-  if ((elemento?.tipo || '').toLowerCase() === 'pasillos' && Number.isFinite(plantaAlto)) {
-    altoCm = plantaAlto
+  // Para pasillos, usar el alto del contenedor padre (planta o elemento)
+  if ((elemento?.tipo || '').toLowerCase() === 'pasillos') {
+    let altoContenedor = null
+
+    if (canvasStore.contextoActual?.tipo === 'plantas') {
+      altoContenedor = canvasStore.plantaActivaData?.dimensiones?.alto
+    } else {
+      const elementoPadre = canvasStore.elementoPorId(canvasStore.contextoActual?.id)
+      altoContenedor = elementoPadre?.dimensiones?.alto
+    }
+
+    if (Number.isFinite(altoContenedor)) {
+      altoCm = altoContenedor
+    }
   }
 
   const isSystemDefault = !!(
@@ -1838,8 +1865,25 @@ const runPreDropValidations = (elemento, dropEvent) => {
     let local = sess.toLocal({ x: candX, y: candY }, parent)
     local = sess.finalizeLocal(local)
     if (!sess.isValidLocal(local)) {
-      showToast('No hay espacio suficiente aquí para colocar el elemento.', 'error')
-      return { ok: false, reason: 'bounds' }
+      // Calcular areaBounds para contextos internos
+      const boundary = computeBoundary()
+      const areaBounds = {
+        minX: 0,
+        minY: 0,
+        maxX: boundary?.W || layerConfig.value.width,
+        maxY: boundary?.H || layerConfig.value.height,
+        polygon: boundary?.points,
+      }
+      return {
+        ok: false,
+        reason: 'bounds',
+        areaBounds: areaBounds,
+        validationResult: {
+          valid: false,
+          reason: 'No hay espacio suficiente aquí para colocar el elemento',
+          canSuggest: true
+        }
+      }
     }
     const worldPos = sess.toWorld(local, parent)
     candX = worldPos.x
@@ -1854,7 +1898,7 @@ const runPreDropValidations = (elemento, dropEvent) => {
     width: finalWidth,
     height: finalHeight,
     ubicacion: elemento.ubicacion || elemento.montado || 'suelo',
-    tipo: elemento.tipo || elemento.categoria || 'elemento',
+    tipo: elemento.tipo || 'elementos',
     forma: elemento.forma || 'rectangular',
   }
 
@@ -1913,14 +1957,30 @@ const runPreDropValidations = (elemento, dropEvent) => {
   }
 
   if (!ok) {
-    showToast('No fue posible colocar el elemento dentro de los límites de la planta.', 'error')
-    return { ok: false, reason: 'bounds' }
+    return {
+      ok: false,
+      reason: 'bounds',
+      areaBounds: areaBounds,
+      validationResult: {
+        valid: false,
+  reason: 'No fue posible colocar el elemento dentro de los límites de la planta',
+        canSuggest: true
+      }
+    }
   }
 
   // Validación final: asegurar que la posición final sea válida con la misma lógica que drag
   if (!insideAreaModel(finalPos, { ...tempEl, x: finalPos.x, y: finalPos.y }, areaBounds, 0.5)) {
-    showToast('El elemento quedaría fuera del área permitida.', 'error')
-    return { ok: false, reason: 'bounds' }
+    return {
+      ok: false,
+      reason: 'bounds',
+      areaBounds: areaBounds,
+      validationResult: {
+        valid: false,
+  reason: 'El elemento quedaría fuera del área permitida',
+        canSuggest: true
+      }
+    }
   }
 
   return {
@@ -1929,27 +1989,164 @@ const runPreDropValidations = (elemento, dropEvent) => {
     width: finalWidth,
     height: finalHeight,
     dimsCm: { ancho: anchoCm, largo: largoCm, alto: altoCm },
+    validationResult: { valid: true },
+    tempElement: tempEl,
+    areaBounds: areaBounds
   }
 }
 
-const createElementFromDrop = (data, dropEvent) => {
+const createElementFromDrop = async (data, dropEvent) => {
   const elemento = data.elemento
   const res = runPreDropValidations(elemento, dropEvent)
-  if (!res.ok) return
 
-  let { ancho: anchoCm, largo: largoCm, alto: altoCm } = res.dimsCm
-  let finalWidth = res.width
-  let finalHeight = res.height
-  let finalPosition = res.position
+  // Si las validaciones fallan pero hay posibilidad de sugerencias, usar el sistema de sugerencias
+  if (!res.ok && res.validationResult?.canSuggest) {
+  const world = getWorldCoordinatesFromPointer(dropEvent)
+
+    // Calcular dimensiones en píxeles del elemento
+    const { width, height } = getElementPixelDimensions(elemento)
+    const finalWidth = Math.max(width, 10)
+    const finalHeight = Math.max(height, 10)
+
+
+    // Centrar el elemento respecto al puntero del mouse (esquina superior izquierda)
+    const centeredX = world.x - finalWidth / 2
+    const centeredY = world.y - finalHeight / 2
+
+
+
+
+    await placementSuggestions.tryPlaceWithSuggestions(
+      elemento,
+      { x: centeredX, y: centeredY },  // Posición ya centrada (esquina superior izquierda)
+      {
+        areaBounds: res.areaBounds,
+        neighbors: canvasStore.elementosVisibles,
+        onSuccess: async (adjustedElement, adjustedPosition) => {
+          // Crear elemento con ajustes aplicados usando la posición recalculada
+          createAdjustedElementFromDrop(adjustedElement, adjustedPosition, data)
+        },
+        onFailure: (reason) => {
+          // Mostrar mensaje final si no hay opciones viables
+          showToast(reason, 'error')
+        }
+      }
+    )
+    return
+  }
+
+  // Si no se puede colocar y no hay sugerencias, mostrar error directo
+  if (!res.ok) {
+    const reason = res.validationResult?.reason || 'No se puede colocar el elemento'
+    showToast(reason, 'error')
+    return
+  }
+
+  // Si las validaciones pasan, crear elemento normalmente
+  createNormalElementFromDrop(elemento, res, data)
+}
+
+// Función auxiliar para crear elemento con ajustes de sugerencias aplicados
+const createAdjustedElementFromDrop = async (elementoAjustado, position, originalData) => {
+  const { width, height } = getElementPixelDimensions(elementoAjustado)
+  const finalWidth = Math.max(width, 10)
+  const finalHeight = Math.max(height, 10)
+
+  // La posición ya viene calculada correctamente desde tryPlaceWithSuggestions
+  // NO necesitamos centrar nuevamente, usar directamente la posición proporcionada
+  const finalX = position.x
+  const finalY = position.y
+
+  const color = elementoAjustado.color || elementoAjustado.colorBase || '#3B82F6'
+  const dims = elementoAjustado.dimensiones || {}
+
+  const nuevoElemento = {
+    id: `${elementoAjustado.tipo || elementoAjustado.categoria || 'elemento'}_${Date.now()}`,
+    tipo: elementoAjustado.tipo,
+    categoria: elementoAjustado.categoria,
+    nombre: elementoAjustado.nombre || 'Nuevo elemento',
+    dimensiones: {
+      ancho: dims.ancho || 100,
+      largo: dims.largo || 60,
+      alto: dims.alto || 20
+    },
+    x: finalX,
+    y: finalY,
+    width: finalWidth,
+    height: finalHeight,
+    color: color,
+    colorBase: color,
+    forma: elementoAjustado.forma || 'rectangular',
+    orientacion: Number(elementoAjustado.orientacion) || 0,
+    ubicacion: elementoAjustado.ubicacion || elementoAjustado.montado || 'suelo',
+    alturaRespectoAlSuelo: elementoAjustado.alturaRespectoAlSuelo || 0,
+    capacidadCarga: elementoAjustado.capacidadCarga || 0,
+    volumenMaximo: (dims.ancho * dims.largo * dims.alto) / 100,
+    dimensionLock: false,
+    systemTypeKey: originalData.elemento.id,
+    uso: { volumen: 0, peso: 0 },
+    descripcion: elementoAjustado.descripcion || '',
+    contenedores: elementoAjustado.contenedores ? [...elementoAjustado.contenedores] : [],
+    hijos: [],
+  }
+
+  canvasStore.agregarElemento(nuevoElemento)
+  canvasStore.seleccionarElemento(nuevoElemento.id)
+
+  // Si hay ajustes de hijos, aplicarlos después de crear el elemento padre
+  if (elementoAjustado._childrenAdjustments && elementoAjustado._childrenAdjustments.length > 0) {
+    // Esperar un tick para que el elemento padre esté completamente registrado
+    await nextTick()
+    
+    // Aplicar ajustes a cada hijo
+    for (const childAdjustment of elementoAjustado._childrenAdjustments) {
+      const hijoEnStore = canvasStore.elementoPorId(childAdjustment.id)
+      if (hijoEnStore) {
+        // Actualizar dimensiones
+        canvasStore.actualizarElemento(childAdjustment.id, {
+          dimensiones: childAdjustment.dimensiones,
+          capacidadCarga: childAdjustment.capacidadCarga,
+          x: childAdjustment.x,
+          y: childAdjustment.y,
+        })
+      }
+    }
+  }
+
+  // Mostrar toast informativo sobre los ajustes aplicados
+  const storeChildrenCount = elementoAjustado._childrenAdjustments?.length || 0
+  const containerCount = elementoAjustado.contenedores?.length || 0
+  const totalAdjusted = storeChildrenCount + containerCount
+  
+  let message = 'Elemento colocado con ajustes automáticos aplicados'
+  if (totalAdjusted > 0) {
+    const parts = []
+    if (containerCount > 0) {
+      parts.push(`${containerCount} contenedor${containerCount > 1 ? 'es' : ''}`)
+    }
+    if (storeChildrenCount > 0) {
+      parts.push(`${storeChildrenCount} hijo${storeChildrenCount > 1 ? 's' : ''}`)
+    }
+    message = `Elemento colocado con ajustes automáticos (${parts.join(' y ')} escalado${totalAdjusted > 1 ? 's' : ''})`
+  }
+  
+  showToast(message, 'success')
+}
+
+// Función auxiliar para crear elemento sin ajustes (flujo normal)
+const createNormalElementFromDrop = (elemento, validationResult, originalData) => {
+  let { ancho: anchoCm, largo: largoCm, alto: altoCm } = validationResult.dimsCm
+  let finalWidth = validationResult.width
+  let finalHeight = validationResult.height
+  let finalPosition = validationResult.position
 
   const color = elemento.color || elemento.colorBase || '#3B82F6'
 
   let largoCmFinal = largoCm
   let finalHeightFinal = finalHeight
   const nuevoElemento = {
-    id: `${elemento.tipo || elemento.categoria || 'elemento'}_${Date.now()}`,
+    id: `${elemento.tipo || 'elemento'}_${Date.now()}`,
     tipo: elemento.tipo,
-    categoria: elemento.categoria,
     // Para pasillos: si vienen con nombre desde el catálogo, preservarlo;
     // si no, dejar que el store genere el nombre por defecto.
     nombre: elemento.nombre || 'Nuevo elemento',
@@ -2244,7 +2441,7 @@ watch(
   },
 )
 
-const createElementFromBuffer = (data, dropEvent) => {
+const createElementFromBuffer = async (data, dropEvent) => {
   // Obtener el elemento del buffer
   const bufferItem = buffer.getBufferItem(data.bufferItemId)
   if (!bufferItem) {
@@ -2254,27 +2451,250 @@ const createElementFromBuffer = (data, dropEvent) => {
 
   // Delegar todas las validaciones a la ruta unificada
   const res = runPreDropValidations(bufferItem.elemento, dropEvent)
-  if (!res.ok) return
 
+  // Si las validaciones fallan pero hay posibilidad de sugerencias, usar el sistema de sugerencias
+  if (!res.ok && res.validationResult?.canSuggest) {
+    const world = getWorldCoordinatesFromPointer(dropEvent)
+
+    // Calcular dimensiones en píxeles del elemento
+    const { width, height } = getElementPixelDimensions(bufferItem.elemento)
+    const finalWidth = Math.max(width, 10)
+    const finalHeight = Math.max(height, 10)
+
+    // Centrar el elemento respecto al puntero del mouse (esquina superior izquierda)
+    const centeredX = world.x - finalWidth / 2
+    const centeredY = world.y - finalHeight / 2
+
+    await placementSuggestions.tryPlaceWithSuggestions(
+      bufferItem.elemento,
+      { x: centeredX, y: centeredY },  // Posición ya centrada (esquina superior izquierda)
+      {
+        areaBounds: res.areaBounds,
+        neighbors: canvasStore.elementosVisibles,
+        onSuccess: async (adjustedElement, adjustedPosition) => {
+          // Crear elemento desde buffer con ajustes aplicados usando la posición recalculada
+          const newElementId = buffer.pasteFromBufferWithAdjustments(
+            data.bufferItemId,
+            adjustedPosition,
+            adjustedElement
+          )
+          if (newElementId) {
+            canvasStore.seleccionarElemento(newElementId)
+            showToast('Elemento pegado con ajustes automáticos aplicados', 'success')
+          }
+        },
+        onFailure: (reason) => {
+          // Mostrar mensaje final si no hay opciones viables
+          showToast(reason, 'error')
+        }
+      }
+    )
+    return
+  }
+
+  // Si no se puede colocar y no hay sugerencias, mostrar error directo
+  if (!res.ok) {
+    const reason = res.validationResult?.reason || 'No se puede pegar el elemento'
+    showToast(reason, 'error')
+    return
+  }
+
+  // Si las validaciones pasan, pegar elemento normalmente
   const newElementId = buffer.pasteFromBuffer(data.bufferItemId, res.position)
   if (newElementId) {
     canvasStore.seleccionarElemento(newElementId)
   }
 }
 
-const createElementFromTemplate = (data, dropEvent) => {
+const createElementFromTemplate = async (data, dropEvent) => {
   const payload = data.payload || {}
   const root = payload.elements?.find?.((e) => e.id === payload.rootId)
   if (!root) {
     showToast('No se pudo insertar la plantilla', 'error')
     return
   }
+
   const res = runPreDropValidations(root, dropEvent)
-  if (!res.ok) {
+
+  // Si las validaciones fallan pero hay posibilidad de sugerencias, usar el sistema de sugerencias
+  if (!res.ok && res.validationResult?.canSuggest) {
+    const world = getWorldCoordinatesFromPointer(dropEvent)
+
+    // Calcular dimensiones en píxeles del elemento raíz
+    const { width, height } = getElementPixelDimensions(root)
+    const finalWidth = Math.max(width, 10)
+    const finalHeight = Math.max(height, 10)
+
+    // Centrar el elemento respecto al puntero del mouse (esquina superior izquierda)
+    const centeredX = world.x - finalWidth / 2
+    const centeredY = world.y - finalHeight / 2
+
+    await placementSuggestions.tryPlaceWithSuggestions(
+      root,
+      { x: centeredX, y: centeredY },  // Posición ya centrada (esquina superior izquierda)
+      {
+        areaBounds: res.areaBounds,
+        neighbors: canvasStore.elementosVisibles,
+        onSuccess: async (adjustedElement, adjustedPosition) => {
+          // Crear plantilla con ajustes aplicados usando la posición recalculada
+          const adjustedPayload = createAdjustedTemplatePayload(payload, adjustedElement)
+          
+          // Contar cuántos hijos fueron escalados
+          const childrenCount = (adjustedPayload.elements || []).filter(
+            e => e.id !== adjustedPayload.rootId && e.padre === adjustedPayload.rootId
+          ).length
+          
+          instantiateStructureOnCanvas(canvasStore, adjustedPayload, adjustedPosition)
+          
+          const message = childrenCount > 0
+            ? `Plantilla colocada con ajustes automáticos (${childrenCount} hijo${childrenCount > 1 ? 's' : ''} escalado${childrenCount > 1 ? 's' : ''})`
+            : 'Plantilla colocada con ajustes automáticos aplicados'
+          showToast(message, 'success')
+        },
+        onFailure: (reason) => {
+          // Mostrar mensaje final si no hay opciones viables
+          showToast(reason, 'error')
+        }
+      }
+    )
     return
   }
-  // Unificar instanciación de estructuras (plantillas/cuarto/espacio)
+
+  // Si no se puede colocar y no hay sugerencias, mostrar error directo
+  if (!res.ok) {
+    const reason = res.validationResult?.reason || 'No se puede colocar la plantilla'
+    showToast(reason, 'error')
+    return
+  }
+
+  // Si las validaciones pasan, crear plantilla normalmente
   instantiateStructureOnCanvas(canvasStore, payload, res.position)
+}
+
+// Función auxiliar para crear payload de plantilla con ajustes aplicados
+const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => {
+  const adjustedPayload = { ...originalPayload }
+  const elements = [...(originalPayload.elements || [])]
+
+  console.log('📦 [createAdjustedTemplatePayload] Ajustando payload:', {
+    rootId: originalPayload.rootId,
+    totalElements: elements.length,
+    adjustedRoot: adjustedRootElement
+  })
+
+  // Encontrar y reemplazar el elemento raíz con los ajustes
+  const rootIndex = elements.findIndex(e => e.id === originalPayload.rootId)
+  if (rootIndex >= 0) {
+    const originalRoot = elements[rootIndex]
+    const originalDims = originalRoot.dimensiones || {}
+    const adjustedDims = adjustedRootElement.dimensiones || {}
+    const originalCapacity = Number(originalRoot.capacidadCarga || 0)
+    const adjustedCapacity = Number(adjustedRootElement.capacidadCarga || 0)
+
+    // Calcular factores de escala dimensionales
+    let scaleFactorAncho = adjustedDims.ancho / (originalDims.ancho || adjustedDims.ancho || 1)
+    let scaleFactorLargo = adjustedDims.largo / (originalDims.largo || adjustedDims.largo || 1)
+    let scaleFactorAlto = adjustedDims.alto / (originalDims.alto || adjustedDims.alto || 1)
+    
+    // Si las dimensiones no cambiaron pero sí la capacidad, calcular factor de escala desde la capacidad
+    let scaleFactorWeight = scaleFactorAncho * scaleFactorLargo * scaleFactorAlto
+    
+    if (scaleFactorWeight === 1 && originalCapacity > 0 && adjustedCapacity !== originalCapacity) {
+      // Solo se ajustó peso, calcular factor de escala cúbico desde la relación de capacidades
+      scaleFactorWeight = adjustedCapacity / originalCapacity
+      // Aplicar raíz cúbica para obtener el factor lineal uniforme
+      const linearScale = Math.cbrt(scaleFactorWeight)
+      scaleFactorAncho = linearScale
+      scaleFactorLargo = linearScale
+      scaleFactorAlto = linearScale
+      
+      console.log('⚖️ Ajuste solo de capacidad detectado. Calculando escala dimensional desde capacidad:', {
+        originalCapacity,
+        adjustedCapacity,
+        capacityRatio: scaleFactorWeight,
+        linearScale
+      })
+    }
+
+    console.log('📊 Factores de escala calculados:', {
+      ancho: scaleFactorAncho,
+      largo: scaleFactorLargo,
+      alto: scaleFactorAlto,
+      weight: scaleFactorWeight
+    })
+
+    // Actualizar elemento raíz
+    elements[rootIndex] = {
+      ...elements[rootIndex],
+      dimensiones: adjustedRootElement.dimensiones,
+      capacidadCarga: adjustedRootElement.capacidadCarga
+    }
+
+    console.log('✅ Elemento raíz actualizado')
+
+    // Solo escalar hijos si hay un cambio real (factor diferente de 1)
+    if (scaleFactorWeight !== 1) {
+      // Escalar todos los hijos (elementos que tienen padre === rootId)
+      const rootId = originalPayload.rootId
+      let childrenScaled = 0
+
+      for (let i = 0; i < elements.length; i++) {
+        const elem = elements[i]
+        
+        // Si es hijo del root (directamente o indirectamente)
+        if (elem.id !== rootId && elem.padre === rootId) {
+          const originalChildDims = elem.dimensiones || {}
+          const originalChildCapacity = Number(elem.capacidadCarga || 0)
+
+          console.log(`  👶 Escalando hijo: ${elem.nombre || elem.id}`, {
+            dimensionesOriginales: originalChildDims,
+            capacidadOriginal: originalChildCapacity
+          })
+
+          // Escalar dimensiones
+          const newAncho = Math.max(1, Math.floor((originalChildDims.ancho || 0) * scaleFactorAncho))
+          const newLargo = Math.max(1, Math.floor((originalChildDims.largo || 0) * scaleFactorLargo))
+          const newAlto = Math.max(1, Math.floor((originalChildDims.alto || 0) * scaleFactorAlto))
+
+          // Escalar capacidad
+          const newCapacidad = originalChildCapacity > 0 
+            ? Math.max(1, Math.floor(originalChildCapacity * scaleFactorWeight))
+            : 0
+
+          // Escalar posición (si tiene)
+          const newX = (elem.x || 0) * scaleFactorAncho
+          const newY = (elem.y || 0) * scaleFactorLargo
+
+          // Aplicar escalado al hijo
+          elements[i] = {
+            ...elem,
+            dimensiones: {
+              ancho: newAncho,
+              largo: newLargo,
+              alto: newAlto
+            },
+            capacidadCarga: newCapacidad,
+            x: newX,
+            y: newY
+          }
+
+          console.log(`  ✨ Hijo escalado:`, {
+            nuevasDimensiones: elements[i].dimensiones,
+            nuevaCapacidad: elements[i].capacidadCarga
+          })
+
+          childrenScaled++
+        }
+      }
+
+      console.log(`🎯 Total de hijos escalados: ${childrenScaled}`)
+    } else {
+      console.log('ℹ️ No hay cambios de escala, hijos mantienen dimensiones originales')
+    }
+  }
+
+  adjustedPayload.elements = elements
+  return adjustedPayload
 }
 
 // Modo arrastre global: si true, permite arrastrar cualquier elemento (salvo si está bloqueado)
@@ -2402,6 +2822,8 @@ const handleGlobalClick = (e) => {
   if (!containerRef.value?.contains(e.target) && !isFormElement && !isInPropertiesPanel && !canvasStore.cambiosNoAplicados && !canvasStore.nivelAEditar) {
     canvasStore.seleccionarElemento(null)
     editingElementId.value = null
+    resetTouchGestures()
+    isTouchDragging.value = false
   }
 }
 
@@ -2461,6 +2883,7 @@ const handleKeyDown = (e) => {
 let sizeResizeObserver = null
 
 onMounted(async () => {
+  registerPointerModeWatcher()
   await nextTick()
   updateStageSize()
   if (containerRef.value) {
@@ -2473,12 +2896,25 @@ onMounted(async () => {
   fitToPlanta()
   window.addEventListener('click', handleGlobalClick)
   window.addEventListener('keydown', handleKeyDown)
+
+  // Touch drag listeners
+  document.addEventListener('touchdragstart', handleTouchDragStart)
+  document.addEventListener('touchdragover', handleTouchDragOver)
+  document.addEventListener('touchdrop', handleTouchDrop)
 })
 
 onUnmounted(() => {
+  unregisterPointerModeWatcher()
   if (sizeResizeObserver) sizeResizeObserver.disconnect()
   window.removeEventListener('click', handleGlobalClick)
   window.removeEventListener('keydown', handleKeyDown)
+
+  // Touch drag cleanup
+  document.removeEventListener('touchdragstart', handleTouchDragStart)
+  document.removeEventListener('touchdragover', handleTouchDragOver)
+  document.removeEventListener('touchdrop', handleTouchDrop)
+
+  resetTouchGestures()
 })
 
 function recomputeBoundsAndIndex({ skipCenter = false } = {}) {
@@ -2680,8 +3116,24 @@ watch(
 )
 
 // Normaliza coordenadas de evento (Konva: e.evt; nativo: e)
+// Soporta tanto eventos de mouse como de touch
 const getClientXY = (e) => {
   const ev = e && e.evt ? e.evt : e
+
+  // Para eventos de touch, usar la primera posición del touch
+  if (ev && (ev.touches || ev.changedTouches)) {
+    const touch = ev.touches?.[0] || ev.changedTouches?.[0]
+    if (touch) {
+      const x = Number(touch.clientX)
+      const y = Number(touch.clientY)
+      return {
+        x: Number.isFinite(x) ? x : 0,
+        y: Number.isFinite(y) ? y : 0,
+      }
+    }
+  }
+
+  // Para eventos de mouse normales
   const x = Number(ev && (ev.clientX ?? ev.x))
   const y = Number(ev && (ev.clientY ?? ev.y))
   return {
@@ -2727,6 +3179,9 @@ const onShapePointerDown = (evt, elemento) => {
     canvasStore.seleccionarElemento(elemento.id)
   }
   // Long press (600ms) en mobile/puntero
+  if (evt?.evt?.pointerType === 'touch') {
+    return
+  }
   clearTimeout(longPressTimer)
   longPressTimer = setTimeout(() => {
     if (!isEditMode.value) return
@@ -2738,6 +3193,54 @@ const onShapePointerDown = (evt, elemento) => {
 
 const onShapePointerUp = () => {
   clearTimeout(longPressTimer)
+}
+
+const {
+  isTouchPrimaryPointer,
+  isTouchDragging,
+  canStartDrag,
+  getEventPointerType,
+  enableTouchDragForCurrentShape,
+  onShapeTouchStart,
+  onShapeTouchMove,
+  onShapeTouchEnd,
+  registerPointerModeWatcher,
+  unregisterPointerModeWatcher,
+  handleTouchDragStart,
+  handleTouchDragOver,
+  handleTouchDrop,
+  resetTouchGestures,
+} = useCanvasTouchEvents({
+  canvasStore,
+  stageDragEnabled,
+  isElementDragging,
+  isEditMode,
+  ctx,
+  selectElement,
+  handleElementDoubleClick,
+  containerRef,
+  handleDrop,
+  handleDragEnter,
+  handleDragOver,
+  getClientXY,
+  isDragOverCanvas,
+})
+
+const handleShapeDragStart = (evt, elemento) => {
+  if (!canDragElement(elemento) || !canStartDrag(elemento)) return
+  const pointerType = getEventPointerType(evt)
+  const isTouch = pointerType === 'touch'
+  onShapeDragStart(evt, elemento, { select: !isTouch })
+}
+
+const handleShapeDragMove = (evt, elemento) => {
+  if (!canDragElement(elemento) || !canStartDrag(elemento)) return
+  onShapeDragMove(evt, elemento)
+}
+
+const handleShapeDragEnd = (evt, elemento) => {
+  if (!canDragElement(elemento)) return
+  onShapeDragEnd(evt, elemento)
 }
 
 // Acción bloquear/desbloquear desde el menú contextual

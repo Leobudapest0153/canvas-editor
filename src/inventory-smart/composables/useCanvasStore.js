@@ -19,7 +19,7 @@ import { resolvePasilloAssignment, PASILLO_ASSIGNMENT_DEFAULTS } from '@/invento
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { CM_TO_PX, DEFAULT_TIPOS_ESPACIO, DEFAULT_TIPOS_CUARTO, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
+import { CM_TO_PX, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
 import { useStatePersistence } from '@/inventory-smart/composables/useStatePersistence'
@@ -61,10 +61,10 @@ export const useCanvasStore = defineStore('canvas', () => {
       activa: true,
       dimensiones: {
         alto: 1500, // cm
-        ancho: 1500, // cm
-        largo: 1500, // cm
+        ancho: 3000, // cm
+        largo: 3000, // cm
       },
-      capacidadCargaSoportado: 5000, // kg
+      capacidadCargaSoportado: 500000, // kg
       // Nuevo flag para plantas elásticas (por defecto false)
       isInfinite: false,
       forma: 'rectangle', // Plantilla por defecto
@@ -74,16 +74,16 @@ export const useCanvasStore = defineStore('canvas', () => {
           y: 0,
         },
         {
-          x: 15000,
+          x: 30000,
           y: 0,
         },
         {
-          x: 15000,
-          y: 15000,
+          x: 30000,
+          y: 30000,
         },
         {
           x: 0,
-          y: 15000,
+          y: 30000,
         },
       ],
     },
@@ -274,6 +274,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   const modoConfigurarEsl = ref(false)
   const elementoEslObjetivo = ref(null)
   const sidebarActiveTab = ref('elementos')
+  const sidebarVisible = ref(false)
+  const propertiesPanelVisible = ref(true)
 
   const editorPermissions = computed(() => ({
     modo: modoEdicion.value ? 'edicion' : 'visualizacion',
@@ -285,28 +287,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     menusEdicion: modoEdicion.value,
   }))
 
-  // === CATÁLOGOS DINÁMICOS (persistidos via useStatePersistence) ===
-  const catalogos = ref({
-    tiposEspacio: DEFAULT_TIPOS_ESPACIO,
-    tiposCuarto: DEFAULT_TIPOS_CUARTO,
-  })
-
   const tiposProductoAdmitidos = ref(DEFAULT_TIPOS_PRODUCTO_ADMITIDOS)
-
-  const setCatalogos = (cats) => {
-    try {
-      const safe = {
-        tiposEspacio: Array.isArray(cats?.tiposEspacio) ? cats.tiposEspacio : DEFAULT_TIPOS_ESPACIO,
-        tiposCuarto: Array.isArray(cats?.tiposCuarto) ? cats.tiposCuarto : DEFAULT_TIPOS_CUARTO,
-      }
-      catalogos.value = safe
-    } catch {
-      catalogos.value = {
-        tiposEspacio: DEFAULT_TIPOS_ESPACIO,
-        tiposCuarto: DEFAULT_TIPOS_CUARTO,
-      }
-    }
-  }
 
   const setTiposProductoAdmitidos = (tipos) => {
     try {
@@ -318,6 +299,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   // Configuración de grilla y snap
   // Por defecto desactivamos la cuadrícula (0 = sin cuadricula visual ni snap a grilla)
   const gridSize = ref(0) // px entre líneas de grilla (0 desactiva)
+  const gridVisible = ref(true) // Visibilidad de la grilla (independiente de gridSize)
   const snapGridEps = ref(10) // px de proximidad para aplicar snap al soltar
 
   const setGridSize = (sizePx) => {
@@ -330,6 +312,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     const e = Number(epsPx)
     if (!Number.isFinite(e)) return
     snapGridEps.value = Math.max(0, Math.min(50, e))
+  }
+
+  const toggleGridVisible = () => {
+    gridVisible.value = !gridVisible.value
   }
 
   // (contextoNavegacion ya declarado arriba)
@@ -378,7 +364,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       if (padre?.hijos) {
         return padre.hijos
           .map((hid) => elementos.value.find((e) => e.id === hid))
-          .filter((h) => h && h.tipo === 'elementos').map(withRestrinctions);
+          .filter((h) => ['elementos', 'pasillos'].includes(h.tipo)).map(withRestrinctions);
       }
     }
 
@@ -414,6 +400,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!elementoSeleccionado.value) return null
     return elementos.value.find((el) => el.id === elementoSeleccionado.value)
   })
+
+  const mostrarPropiedades = computed(() => propertiesPanelVisible.value && Boolean(elementoSeleccionado.value))
 
   // === COMPUTED PARA NAVEGACIÓN JERÁRQUICA ===
   const contextoActual = computed(() => {
@@ -489,7 +477,7 @@ export const useCanvasStore = defineStore('canvas', () => {
             tipo: pathItem.tipo,
             id: elemento.id,
             nombre: elemento.nombre,
-            icono: getIconoElemento(elemento.tipo, elemento.categoria),
+            icono: getIconoElemento(elemento.tipo, elemento.ubicacion),
           })
         }
       }
@@ -503,28 +491,19 @@ export const useCanvasStore = defineStore('canvas', () => {
   })
 
   // Helper function para iconos
-  const getIconoElemento = (tipo, categoria) => {
+  const getIconoElemento = (tipo, ubicacion) => {
     // Iconos por tipo - usando nombres de SVG
     if (tipo === 'pasillos') return 'space'
     if (tipo === 'cuartos') return 'room'
     if (tipo === 'pisos') return 'mezzanine'
-    if (tipo === 'contenedores') {
-      const iconosContenedores = {
-        cajas: 'space',
-        bins: 'space',
-        bandejas: 'space',
-      }
-      return iconosContenedores[categoria] || 'space'
-    }
+    if (tipo === 'contenedores') return 'space'
 
     if (tipo === 'elementos') {
       const iconosElementos = {
-        anaqueles: 'space-on-wall',
-        estantes: 'space-on-wall',
-        mesas: 'space',
-        armarios: 'space',
+        pared: 'space-on-wall',
+        suelo: 'space',
       }
-      return iconosElementos[categoria] || 'space'
+      return iconosElementos[ubicacion] || 'space'
     }
 
     return 'space'
@@ -860,7 +839,6 @@ const calcularCanvasAdaptativo = (elemento) => {
   // Selección múltiple: establecer array de IDs seleccionados
   const seleccionarElementosMultiple = (ids) => {
     if (!Array.isArray(ids)) {
-      console.warn('seleccionarElementosMultiple requiere un array de IDs')
       return
     }
     elementosSeleccionadosMultiple.value = [...ids]
@@ -1102,7 +1080,6 @@ const calcularCanvasAdaptativo = (elemento) => {
       const state = {
         plantas: plantas.value,
         elementos: elementos.value,
-        catalogos: catalogos.value,
         modoEdicion: modoEdicion.value,
       }
       const data = _serialize(state)
@@ -1289,7 +1266,7 @@ const calcularCanvasAdaptativo = (elemento) => {
         //   }
         // }
 
-        // Ajuste SIEMPRE aplicado: altura de pasillos = alto de la planta
+        // Ajuste SIEMPRE aplicado: altura de pasillos = alto de la planta (solo para pasillos directos en planta)
         const plantaAlto = planta?.dimensiones?.alto
         if (Number.isFinite(plantaAlto)) {
           const pasillos = elementos.value.filter((e) => e.plantaId === plantaId && !e.padre && e.tipo === 'pasillos')
@@ -1401,8 +1378,8 @@ const calcularCanvasAdaptativo = (elemento) => {
       showToast('En cuartos solo se pueden agregar pisos')
       return null
     }
-    if (contextoActual === 'pisos' && tipoElemento !== 'elementos') {
-      showToast('En pisos solo se pueden agregar elementos')
+    if (contextoActual === 'pisos' && !['elementos', 'pasillos'].includes(tipoElemento)) {
+      showToast('En pisos solo se pueden agregar elementos o pasillos')
       return null
     }
     if (contextoActual === 'elementos' && tipoElemento !== 'contenedores') {
@@ -1450,58 +1427,68 @@ const calcularCanvasAdaptativo = (elemento) => {
       }
     }
 
-    // Política especial: altura de pasillos = planta.alto al crear
+    // Política especial: altura de pasillos = alto del contenedor padre (planta o elemento padre)
     if (nuevoElemento.tipo === 'pasillos') {
-      const planta = plantas.value.find((p) => p.id === (nuevoElemento.plantaId || contextoNavegacion.value.id))
-      if (planta) {
-        if (!nuevoElemento.dimensiones) nuevoElemento.dimensiones = { ancho: 0, largo: 0, alto: 0 }
-        nuevoElemento.dimensiones.alto = planta.dimensiones.alto
+      if (!nuevoElemento.dimensiones) nuevoElemento.dimensiones = { ancho: 0, largo: 0, alto: 0 }
+
+      // Si tiene padre (está dentro de un elemento), usar el alto del padre
+      if (nuevoElemento.padre) {
+        const elementoPadre = elementos.value.find((el) => el.id === nuevoElemento.padre)
+        if (elementoPadre?.dimensiones?.alto) {
+          nuevoElemento.dimensiones.alto = elementoPadre.dimensiones.alto
+        }
+      } else {
+        // Si no tiene padre, usar el alto de la planta
+        const planta = plantas.value.find((p) => p.id === (nuevoElemento.plantaId || contextoNavegacion.value.id))
+        if (planta?.dimensiones?.alto) {
+          nuevoElemento.dimensiones.alto = planta.dimensiones.alto
+        }
       }
     }
 
     // Política de dimensiones al crear en planta para elementos de sistema
-    try {
-      const shouldAuto = true
-      if (shouldAuto && ['cuartos','pisos','elementos','pasillos'].includes(nuevoElemento.tipo)) {
-        const typeKey = nuevoElemento.systemTypeKey || nuevoElemento.id
-        const isSystemDefault = !!(typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey))
-        const isLocked = nuevoElemento.dimensionLock === true
-        if (isSystemDefault && !isLocked) {
-          const planta = plantas.value.find((p) => p.id === nuevoElemento.plantaId)
-          if (planta && planta.dimensiones) {
-            const parentDims = {
-              w: planta.dimensiones.ancho,
-              h: planta.dimensiones.largo,
-              d: planta.dimensiones.alto,
-            }
-            const dims = computeDimsByAxisScale(typeKey, parentDims, { snap: true, gridPx: gridSize.value })
-            if (dims) {
-              // Ajustar dimensiones de modelo
-              nuevoElemento.dimensiones = { ...nuevoElemento.dimensiones, ...dims }
-              // Ajustar canvas en px según la vista ACTUAL (fix Option A: evita forzar 'XZ' en elementos cuando estamos en planta/XY)
-              let view = vistaActiva.value
-              // Si la vista calculada es XZ pero estamos creando en contexto planta (tipo 'plantas'), forzar XY para footprint inicial.
-              if (view === 'XZ' && contextoNavegacion.value?.tipo === 'plantas') {
-                view = 'XY'
-              }
-              const { width, height } = toCanvasSizePx(dims, view)
-              if (Number.isFinite(width)) nuevoElemento.width = width
-              if (Number.isFinite(height)) nuevoElemento.height = height
-            }
-            // Offset vertical configurable (por tipo)
-            const off = OFFSETS?.offsetByType?.[typeKey]?.zOffsetShare
-            if (typeof off === 'number' && isFinite(off)) {
-              nuevoElemento.alturaRespectoAlSuelo = Math.round((planta.dimensiones.alto || 0) * off)
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Auto-scale on create failed:', e)
-    }
+    // try {
+    //   const shouldAuto = true
+    //   if (shouldAuto && ['cuartos','pisos','elementos','pasillos'].includes(nuevoElemento.tipo)) {
+    //     const typeKey = nuevoElemento.systemTypeKey || nuevoElemento.id
+    //     const isSystemDefault = !!(typeKey && CATALOGO?.SISTEMA_BASE_KEYS?.includes?.(typeKey))
+    //     const isLocked = nuevoElemento.dimensionLock === true
+    //     if (isSystemDefault && !isLocked) {
+    //       const planta = plantas.value.find((p) => p.id === nuevoElemento.plantaId)
+    //       if (planta && planta.dimensiones) {
+    //         const parentDims = {
+    //           w: planta.dimensiones.ancho,
+    //           h: planta.dimensiones.largo,
+    //           d: planta.dimensiones.alto,
+    //         }
+    //         const dims = computeDimsByAxisScale(typeKey, parentDims, { snap: true, gridPx: gridSize.value })
+    //         if (dims) {
+    //           // Ajustar dimensiones de modelo
+    //           nuevoElemento.dimensiones = { ...nuevoElemento.dimensiones, ...dims }
+    //           // Ajustar canvas en px según la vista ACTUAL (fix Option A: evita forzar 'XZ' en elementos cuando estamos en planta/XY)
+    //           let view = vistaActiva.value
+    //           // Si la vista calculada es XZ pero estamos creando en contexto planta (tipo 'plantas'), forzar XY para footprint inicial.
+    //           if (view === 'XZ' && contextoNavegacion.value?.tipo === 'plantas') {
+    //             view = 'XY'
+    //           }
+    //           const { width, height } = toCanvasSizePx(dims, view)
+    //           if (Number.isFinite(width)) nuevoElemento.width = width
+    //           if (Number.isFinite(height)) nuevoElemento.height = height
+    //         }
+    //         // Offset vertical configurable (por tipo)
+    //         const off = OFFSETS?.offsetByType?.[typeKey]?.zOffsetShare
+    //         if (typeof off === 'number' && isFinite(off)) {
+    //           nuevoElemento.alturaRespectoAlSuelo = Math.round((planta.dimensiones.alto || 0) * off)
+    //         }
+    //       }
+    //     }
+    //   }
+    // } catch (e) {
+    //   console.warn('Auto-scale on create failed:', e)
+    // }
 
-    // Asignación unificada de 'codigo' y nombre (pasillos)
     try {
+      if (nuevoElemento.tipo === 'pasillos') opts.resetName = true
       assignCodigoNombre(nuevoElemento, elementos.value, opts)
     } catch (e) {
       console.warn('No se pudo generar codigo/nombre:', e)
@@ -1565,9 +1552,7 @@ const calcularCanvasAdaptativo = (elemento) => {
 
   const agregarElementoSinValidacion = (_id, nuevoElemento, saveHistory = true, description = 'Inserción sin validación') => {
     try {
-      console.log('[insertarElementoSinValidacion] Insertando elemento:', nuevoElemento)
       if (!nuevoElemento || !nuevoElemento.id) {
-        console.warn('[insertarElementoSinValidacion] Elemento inválido o sin id:', nuevoElemento);
         return false;
       }
 
@@ -1654,7 +1639,6 @@ const calcularCanvasAdaptativo = (elemento) => {
 
       return next.id;
     } catch (err) {
-      console.error('[insertarElementoSinValidacion] Error:', err);
       return false;
     }
   };
@@ -1755,7 +1739,6 @@ const calcularCanvasAdaptativo = (elemento) => {
       elementos: elementos.value.map(e => e?._custom?.value || e),
       templates: catalogStore.templates?.map?.(t => t?._custom?.value || t) || [],
       catalogItems: catalogStore.items?.map?.(i => i?._custom?.value || i) || [],
-      catalogos: catalogos.value,
       modoEdicion: modoEdicion.value,
     }
     // Incluir historial de cambios si existe
@@ -1785,6 +1768,16 @@ const calcularCanvasAdaptativo = (elemento) => {
           parsed.meta.metrics.totalCatalogItems = itemsDTO.length
         }
       }
+
+      // CRÍTICO: Agregar changeHistory al JSON final (se perdió en _serialize)
+      if (state.changeHistory) {
+        parsed.changeHistory = state.changeHistory
+        if (parsed.meta?.metrics) {
+          parsed.meta.metrics.totalChangeHistoryEntries =
+            state.changeHistory.entries?.length || 0
+        }
+      }
+
       return JSON.stringify(parsed, null, 2)
     } catch (e) {
       console.warn('No se pudo post-procesar JSON para plantillas', e)
@@ -1798,109 +1791,184 @@ const calcularCanvasAdaptativo = (elemento) => {
    * @returns {boolean} true si la deserialización fue exitosa
    */
   const deserialize = (jsonString) => {
-    const storeActions = {
-      clearState: () => {
-        plantas.value = []
-        elementos.value = []
-      },
-      addPlanta: (plantaData) => {
-        plantas.value.push(plantaData)
-      },
-      addElemento: (elementoData) => {
-        elementos.value.push(elementoData)
-      },
-      setCatalogos: (cats) => {
-        setCatalogos(cats)
-      },
-      setModoEdicion: (value) => {
-        setModoEdicion(value)
-      },
-      setInitialNavigation: (plantaId, plantaNombre) => {
-        // Establecer la primera planta como activa siempre
-        plantaActiva.value = plantaId
+    // Capturar contexto y vista previos
+    const prevContext = {
+      tipo: contextoNavegacion.value?.tipo || null,
+      id: contextoNavegacion.value?.id || null,
+      path: Array.isArray(contextoNavegacion.value?.path)
+        ? contextoNavegacion.value.path.map(p => ({ tipo: p.tipo, id: p.id, nombre: p.nombre }))
+        : [],
+    }
+    const prevZoom = zoom.value
+    const prevPan = { x: panX.value, y: panY.value }
 
-        // Establecer contexto de navegación siempre en la primera planta
-        contextoNavegacion.value = {
-          tipo: 'plantas',
-          id: plantaId,
-          path: [
-            {
+    try {
+      const storeActions = {
+        clearState: () => {
+          plantas.value = []
+          elementos.value = []
+        },
+        addPlanta: (plantaData) => {
+          plantas.value.push(plantaData)
+        },
+        addElemento: (elementoData) => {
+          elementos.value.push(elementoData)
+        },
+        setModoEdicion: (value) => {
+          setModoEdicion(value)
+        },
+        setInitialNavigation: (plantaId, plantaNombre) => {
+          // Si ya existe un contexto de navegación válido, preservarlo
+          const currentContext = contextoNavegacion.value
+          const isValidCurrentContext = currentContext?.tipo === 'plantas' &&
+                                      currentContext?.id &&
+                                      plantas.value.some(p => p.id === currentContext.id)
+
+          if (isValidCurrentContext) {
+            // Preservar el contexto actual si es válido
+            plantaActiva.value = currentContext.id
+            // No modificar contextoNavegacion.value para mantener el contexto actual
+          } else {
+            // Solo establecer la primera planta si no hay contexto válido (importación inicial)
+            plantaActiva.value = plantaId
+
+            contextoNavegacion.value = {
               tipo: 'plantas',
               id: plantaId,
-              nombre: plantaNombre,
-            },
-          ],
+              path: [
+                {
+                  tipo: 'plantas',
+                  id: plantaId,
+                  nombre: plantaNombre,
+                },
+              ],
+            }
+          }
+
+          // Resetear valores temporales a sus defaults
+          elementoSeleccionado.value = null
+          // No resetear zoom/pan; mantener vista previa
+
+          // Canvas adaptativo se recalculará automáticamente por el watcher
         }
-
-        // Resetear valores temporales a sus defaults
-        elementoSeleccionado.value = null
-        zoom.value = 1
-        panX.value = 0
-        panY.value = 0
-
-        // Canvas adaptativo se recalculará automáticamente por el watcher
       }
-    }
 
-  const ok = _deserialize(jsonString, storeActions)
+      const ok = _deserialize(jsonString, storeActions)
 
-    if (modoEdicion.value !== true) {
-      modoEdicion.value = false
-    }
+      if (modoEdicion.value !== true) {
+        modoEdicion.value = false
+      }
 
-    // Post-procesar: garantizar que todas las plantas y elementos tengan 'codigo'
-    try {
-      // Plantas: asignar códigos únicos incrementando la lista existente a medida que asignamos
-      if (Array.isArray(plantas.value)) {
-        const existentes = plantas.value.filter(p => !!p)
-        const existentesConCodigo = existentes.filter(p => !!p.codigo)
-        for (const p of existentes) {
-          if (!p.codigo) {
-            p.codigo = generateCodigo('plantas', { existing: existentesConCodigo })
-            existentesConCodigo.push(p)
+      // Post-procesar: garantizar que todas las plantas y elementos tengan 'codigo'
+      try {
+        // Plantas: asignar códigos únicos incrementando la lista existente a medida que asignamos
+        if (Array.isArray(plantas.value)) {
+          const existentes = plantas.value.filter(p => !!p)
+          const existentesConCodigo = existentes.filter(p => !!p.codigo)
+          for (const p of existentes) {
+            if (!p.codigo) {
+              p.codigo = generateCodigo('plantas', { existing: existentesConCodigo })
+              existentesConCodigo.push(p)
+            }
           }
         }
-      }
-      // Elementos
-      if (Array.isArray(elementos.value)) {
-        for (const el of elementos.value) {
-          try { assignCodigoNombre(el, elementos.value) } catch { /* ignore */ }
-        }
-      }
-    } catch (e) {
-      console.warn('Post-procesamiento de codigo/nombre tras deserializar falló:', e)
-    }
-
-    // Importar plantillas si existen (retrocompatible)
-    try {
-      const parsed = JSON.parse(jsonString)
-      // Importar historial de cambios si viene
-      try {
-        if (parsed.changeHistory) {
-          const ch = useChangeHistoryStore?.()
-          ch?.deserialize?.(parsed.changeHistory)
-          ch?.setBaseline?.({ plantas: plantas.value, elementos: elementos.value })
+        // Elementos
+        if (Array.isArray(elementos.value)) {
+          for (const el of elementos.value) {
+            try { assignCodigoNombre(el, elementos.value) } catch { /* ignore */ }
+          }
         }
       } catch (e) {
-        // ignore change history import errors
+        console.warn('Post-procesamiento de codigo/nombre tras deserializar falló:', e)
       }
-      if (Array.isArray(parsed.plantillas) && parsed.plantillas.length > 0) {
-        importTemplatesFromDTO(parsed.plantillas)
-      }
-      if (Array.isArray(parsed.catalogItems) && parsed.catalogItems.length > 0) {
-        importCatalogItemsFromDTO(parsed.catalogItems)
-      }
-    } catch (e) {
-      console.warn('No se pudieron importar plantillas', e)
-    }
 
-    try {
-      recomputePasilloAssignments()
-    } catch (e) {
-      console.warn('No se pudieron recalcular asignaciones de pasillo tras deserializar', e)
-    }
+      // Importar plantillas si existen (retrocompatible)
+      try {
+        const parsed = JSON.parse(jsonString)
+        // Importar historial de cambios si viene
+        try {
+          if (parsed.changeHistory) {
+            const ch = useChangeHistoryStore?.()
+            ch?.deserialize?.(parsed.changeHistory)
+            ch?.setBaseline?.({ plantas: plantas.value, elementos: elementos.value })
+          }
+        } catch (e) {
+          // ignore change history import errors
+        }
+        if (Array.isArray(parsed.plantillas) && parsed.plantillas.length > 0) {
+          importTemplatesFromDTO(parsed.plantillas)
+        }
+        if (Array.isArray(parsed.catalogItems) && parsed.catalogItems.length > 0) {
+          importCatalogItemsFromDTO(parsed.catalogItems)
+        }
+      } catch (e) {
+        console.warn('No se pudieron importar plantillas', e)
+      }
 
-    return ok
+      try {
+        recomputePasilloAssignments()
+      } catch (e) {
+        console.warn('No se pudieron recalcular asignaciones de pasillo tras deserializar', e)
+      }
+
+      // Intentar restaurar el mismo contexto de navegación y vista
+      try {
+        const plantaExists = (id) => !!plantaPorId.value(id)
+        const elementoExists = (id) => !!elementoPorId.value(id)
+
+        let restoredPath = []
+        let finalTipo = 'plantas'
+        let finalId = null
+
+        if (Array.isArray(prevContext.path) && prevContext.path.length > 0) {
+          const rootPlantaId = prevContext.path[0]?.id
+          if (rootPlantaId && plantaExists(rootPlantaId)) {
+            const planta = plantaPorId.value(rootPlantaId)
+            restoredPath.push({ tipo: 'plantas', id: planta.id, nombre: planta?.nombre || 'Planta' })
+            finalTipo = 'plantas'
+            finalId = planta.id
+            for (let i = 1; i < prevContext.path.length; i++) {
+              const node = prevContext.path[i]
+              if (!node || !node.id) break
+              if (elementoExists(node.id)) {
+                const el = elementoPorId.value(node.id)
+                restoredPath.push({ tipo: el.tipo, id: el.id, nombre: el?.nombre || el.id })
+                finalTipo = el.tipo
+                finalId = el.id
+              } else {
+                break
+              }
+            }
+          }
+        }
+
+        // Fallback a primera planta si no se pudo reconstruir
+        if (restoredPath.length === 0) {
+          const firstPlanta = Array.isArray(plantas.value) && plantas.value.length > 0 ? plantas.value[0] : null
+          if (firstPlanta) {
+            restoredPath = [{ tipo: 'plantas', id: firstPlanta.id, nombre: firstPlanta.nombre }]
+            finalTipo = 'plantas'
+            finalId = firstPlanta.id
+          }
+        }
+
+        if (finalId) {
+          navegarAContexto(finalTipo, finalId, restoredPath)
+          // Restaurar zoom y pan previos
+          try {
+            configurarZoom(prevZoom)
+            configurarPan(prevPan.x, prevPan.y)
+          } catch (e) { /* noop */ }
+        }
+      } catch (e) {
+        console.warn('No se pudo restaurar el contexto de navegación previo:', e)
+      }
+
+      return ok
+    } catch (error) {
+      console.error('Error al deserializar el estado:', error)
+      return false
+    }
   }
 
   // === FIN FUNCIONES DE SERIALIZACIÓN ===
@@ -1934,12 +2002,10 @@ const calcularCanvasAdaptativo = (elemento) => {
     }
     // El elemento es un padre
     if (['elementos', 'cuartos'].includes(elemento.tipo)) {
-      console.log('Vamos a editar un hijo guardando el id del padre:', idElemento);
       nivelAEditar.value = { padre: idElemento, tipo }
     }
     // El elemento es un nivel hijo
     if (['pisos', 'contenedores'].includes(elemento.tipo)) {
-      console.log('Vamos a editar un nivel hijo:', idElemento);
       nivelAEditar.value = { ...elemento }
     }
     gestionPisosPropiedadesModal.value = true;
@@ -1953,7 +2019,6 @@ const calcularCanvasAdaptativo = (elemento) => {
   const guardarCuartoNivelesPropiedades = (nivelActualizado, id) => {
 
     const parent = elementos.value.find(e => e.id === nivelAEditar.value.padre);
-    console.log('Parent del nivel a editar:', parent);
     if (nivelActualizado?.dimensiones?.alto > parent?.dimensiones?.alto) {
       showToast('La altura del nivel no puede exceder la altura del cuarto', 'error');
       return;
@@ -2022,8 +2087,6 @@ const calcularCanvasAdaptativo = (elemento) => {
       return;
     }
     if (res.status === 'ok' && preFit && preFit.ok === false) {
-       console.log('Hermanos OK, pero hijos no caben. Promoviendo a needs_confirmation.');
-
        res.status = 'needs_confirmation';
 
        if (res.draft) {
@@ -2045,7 +2108,7 @@ const calcularCanvasAdaptativo = (elemento) => {
         if (preFit.minLargoCm != null && proposed.largoCm < preFit.minLargoCm) parts.push(`largo mínimo ${(preFit.minLargoCm / 100).toFixed(2)}m`)
         if (preFit.minAltoCm != null && proposed.altoCm < preFit.minAltoCm) parts.push(`alto mínimo ${(preFit.minAltoCm / 100).toFixed(2)}m`)
         if (preFit.minCapacidad != null && proposed.capacidadCarga < preFit.minCapacidad) parts.push(`capacidad mínima ${Math.round(preFit.minCapacidad)}kg`)
-        const detalle = parts.length ? ` Requisitos: ${parts.join(', ')}.` : ''
+  const detalle = parts.length ? ` Requisitos: ${parts.join(', ')}` : ''
         showToast(`No se puede aplicar: los elementos del piso no caben con las nuevas propiedades.${detalle}`, 'error')
         return
       }
@@ -2702,7 +2765,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     const success = actualizarElementoSinValidacion(elementoId, { codigoEsl: trimmed })
     if (!success) return false
 
-    setCambiosNoAplicados(true)
+    // setCambiosNoAplicados(true)
     const descriptor = elemento.nombre || elemento.codigo || elementoId
     const accion = trimmed ? 'asignado' : 'limpiado'
     saveToHistory(`Código ESL ${accion}: ${descriptor}`)
@@ -2711,6 +2774,26 @@ const calcularCanvasAdaptativo = (elemento) => {
 
   const setSidebarActiveTab = (tabId) => {
     sidebarActiveTab.value = SIDEBAR_TAB_IDS.has(tabId) ? tabId : 'elementos'
+  }
+
+  const setSidebarVisible = (visible) => {
+    sidebarVisible.value = Boolean(visible)
+  }
+
+  const toggleSidebar = () => {
+    sidebarVisible.value = !sidebarVisible.value
+  }
+
+  const initializeSidebarVisibility = (isDesktop = true) => {
+    sidebarVisible.value = isDesktop
+  }
+
+  const setPropertiesPanelVisible = (visible) => {
+    propertiesPanelVisible.value = Boolean(visible)
+  }
+
+  const togglePropertiesPanel = () => {
+    propertiesPanelVisible.value = !propertiesPanelVisible.value
   }
 
   // === INTEGRACIÓN CON AUTOSAVE ===
@@ -2738,17 +2821,6 @@ const calcularCanvasAdaptativo = (elemento) => {
       }
     },
     { immediate: true },
-  )
-
-  watch(
-    () => modoEdicion.value,
-    () => {
-      try {
-        persist()
-      } catch (error) {
-        console.warn('No se pudo persistir el modo de edición', error)
-      }
-    },
   )
 
   // Watcher para recalcular canvas adaptativo cuando cambia el contexto
@@ -2852,9 +2924,12 @@ const calcularCanvasAdaptativo = (elemento) => {
     panX,
     panY,
     gridSize,
+    gridVisible,
     snapGridEps,
     modoEdicion,
-  sidebarActiveTab,
+    sidebarActiveTab,
+    sidebarVisible,
+    propertiesPanelVisible,
     editorPermissions,
     crearPlanta,
     plantaEnEdicion,
@@ -2868,9 +2943,6 @@ const calcularCanvasAdaptativo = (elemento) => {
     cambiosNoAplicados,
     modoConfigurarEsl,
     elementoEslObjetivo,
-    // Catálogos dinámicos
-    catalogos,
-    setCatalogos,
     tiposProductoAdmitidos,
     setTiposProductoAdmitidos,
     gestionPisosPropiedadesModal,
@@ -2883,6 +2955,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     plantaActivaData,
     elementosEnPlanta,
     elementoSeleccionadoCompleto,
+    mostrarPropiedades,
 
     // Navegación jerárquica - Getters
     contextoActual,
@@ -2911,6 +2984,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     configurarPan,
     setGridSize,
     setSnapGridEps,
+    toggleGridVisible,
     setModoEdicion,
     activarModoEdicion,
     desactivarModoEdicion,
@@ -2923,6 +2997,11 @@ const calcularCanvasAdaptativo = (elemento) => {
     finalizarConfiguracionEsl,
     guardarCodigoEslElemento,
     setSidebarActiveTab,
+    setSidebarVisible,
+    toggleSidebar,
+    initializeSidebarVisibility,
+    setPropertiesPanelVisible,
+    togglePropertiesPanel,
 
     // Actions - Plantas
     seleccionarPlanta,

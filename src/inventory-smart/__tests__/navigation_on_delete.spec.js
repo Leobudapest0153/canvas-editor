@@ -19,7 +19,6 @@ const addElement = (store, data) => {
     id: data.id,
     nombre: data.nombre || data.id,
     tipo: data.tipo,
-    categoria: data.categoria || data.tipo,
     plantaId: data.plantaId || 'planta_1',
     padre: data.padre || null,
     hijos: Array.isArray(data.hijos) ? data.hijos.slice() : [],
@@ -76,7 +75,6 @@ describe('navigation fallbacks after deletions', () => {
     addElement(store, {
       id: 'cuarto_1',
       tipo: 'cuartos',
-      categoria: 'cuartos',
       nombre: 'Cuarto Principal',
       hijos: ['piso_a', 'piso_b'],
     })
@@ -84,7 +82,6 @@ describe('navigation fallbacks after deletions', () => {
     addElement(store, {
       id: 'piso_a',
       tipo: 'pisos',
-      categoria: 'pisos',
       nombre: 'Piso A',
       padre: 'cuarto_1',
     })
@@ -92,7 +89,6 @@ describe('navigation fallbacks after deletions', () => {
     addElement(store, {
       id: 'piso_b',
       tipo: 'pisos',
-      categoria: 'pisos',
       nombre: 'Piso B',
       padre: 'cuarto_1',
     })
@@ -122,7 +118,6 @@ describe('navigation fallbacks after deletions', () => {
     addElement(store, {
       id: 'cuarto_2',
       tipo: 'cuartos',
-      categoria: 'cuartos',
       nombre: 'Cuarto Secundario',
       hijos: ['piso_unico'],
     })
@@ -130,7 +125,6 @@ describe('navigation fallbacks after deletions', () => {
     addElement(store, {
       id: 'piso_unico',
       tipo: 'pisos',
-      categoria: 'pisos',
       nombre: 'Piso Unico',
       padre: 'cuarto_2',
     })

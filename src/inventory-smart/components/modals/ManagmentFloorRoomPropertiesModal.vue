@@ -19,7 +19,7 @@
             width="16"
             height="16"
             viewBox="0 0 20 20"
-            class="p-0.5 rounded-full bg-primary-700 text-white ml-8"
+            class="p-0.5 rounded-full bg-primary-600 text-white ml-8"
           >
             <g fill="currentColor">
               <path
@@ -103,7 +103,7 @@
             class="border-[1px] border-[#9CA3AF] rounded-[6px] py-2 px-4"
           />
         </div>
-        <h3 class="font-semibold text-medium text-primary-800 col-span-2">
+        <h3 class="font-semibold text-medium text-primary-600 col-span-2">
           Características del piso
         </h3>
         <div class="flex">
@@ -120,7 +120,7 @@
               class="w-4 h-4 peer-checked:w-[8px] peer-checked:h-[8px] absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 rounded-full bg-white z-10"
             ></div>
 
-            <div class="w-5 h-5 rounded-full bg-primary-700"></div>
+            <div class="w-5 h-5 rounded-full bg-primary-600"></div>
           </div>
           <label for="zona-almacenaje" class="font-light text-medium text-[#111928]">
             Zona de almacenaje
@@ -140,14 +140,14 @@
               class="w-4 h-4 peer-checked:w-[8px] peer-checked:h-[8px] absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 rounded-full bg-white z-10"
             ></div>
 
-            <div class="w-5 h-5 rounded-full bg-primary-700"></div>
+            <div class="w-5 h-5 rounded-full bg-primary-600"></div>
           </div>
           <label for="zona-cross-docking" class="font-light text-medium text-[#111928]">
             Zona de Cross-docking
           </label>
         </div>
         <div class="flex items-center">
-          <div class="relative mr-2 border-primary-700 border-[1px] rounded-sm">
+          <div class="relative mr-2 border-primary-600 border-[1px] rounded-sm">
             <input
               type="checkbox"
               id="materiales-fragiles"
@@ -157,7 +157,7 @@
             />
             <label
               for="materiales-fragiles"
-              class="w-4 h-4 border-2 border-gray-300 cursor-pointer flex opacity-0 peer-checked:opacity-100 justify-center items-center bg-primary-700 border-primary-700"
+              class="w-4 h-4 border-2 border-gray-300 cursor-pointer flex opacity-0 peer-checked:opacity-100 justify-center items-center bg-primary-600 border-primary-700"
             >
               <svg
                 class="w-4 h-4 text-white"
@@ -200,7 +200,7 @@
           :class="
             disableSaveButton
               ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-primary hover:bg-primary-700 cursor-pointer'
+              : 'bg-primary hover:bg-primary-600 cursor-pointer'
           "
         >
           Guardar
@@ -282,7 +282,7 @@ const onSave = () => {
   const padre = canvasStore.elementos.find((el) => el.id === canvasStore.nivelAEditar.padre)
 
   if (!padre) {
-    showToast('Error Crítico: No se pudo encontrar el cuarto padre para las validaciones.')
+    showToast('Error Crítico: No se pudo encontrar el cuarto padre para las validaciones')
     return
   }
 
@@ -311,14 +311,14 @@ const onSave = () => {
   // 3. Validar Ancho y Largo del nivel contra el cuarto padre
   if (anchoFormularioCm > padre.dimensiones.ancho) {
     showToast(
-      `El ancho del nivel (${anchoFormularioCm / 100}m) no puede exceder el del cuarto (${padre.dimensiones.ancho / 100}m).`,
+      `El ancho del nivel (${anchoFormularioCm / 100}m) no puede exceder el del cuarto (${padre.dimensiones.ancho / 100}m)`,
     )
     return
   }
 
   if (largoFormularioCm > padre.dimensiones.largo) {
     showToast(
-      `El largo del nivel (${largoFormularioCm / 100}m) no puede exceder el del cuarto (${padre.dimensiones.largo / 100}m).`,
+      `El largo del nivel (${largoFormularioCm / 100}m) no puede exceder el del cuarto (${padre.dimensiones.largo / 100}m)`,
     )
     return
   }
@@ -328,7 +328,7 @@ const onSave = () => {
   const maximoAltoDisponibleCm = padre.dimensiones.alto - minimoAltoRequeridoPorHermanosCm
   if (altoFormularioCm > maximoAltoDisponibleCm) {
     showToast(
-      `La altura máxima permitida es ${maximoAltoDisponibleCm / 100}m para dejar espacio a los otros ${hermanos.length} niveles.`,
+      `La altura máxima permitida es ${maximoAltoDisponibleCm / 100}m para dejar espacio a los otros ${hermanos.length} niveles`,
     )
     return
   }
@@ -339,7 +339,7 @@ const onSave = () => {
 
   if (capacidadCargaFormulario > maximaCapacidadDisponible) {
     showToast(
-      `La capacidad de carga máxima permitida es ${maximaCapacidadDisponible.toFixed(2)}kg para no sobrecargar el cuarto.`,
+      `La capacidad de carga máxima permitida es ${maximaCapacidadDisponible.toFixed(2)}kg para no sobrecargar el cuarto`,
     )
     return
   }
