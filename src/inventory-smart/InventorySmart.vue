@@ -1,15 +1,15 @@
 <template>
   <div id="inventory-smart" :style="themeStyle">
-    <!-- Mensaje para móviles -->
+    <!-- Mensaje para dispositivos móviles pequeños -->
     <div
       v-if="isMobileDevice"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary"
     >
       <div class="bg-white/95 rounded-2xl p-10 max-w-md w-full text-center shadow-2xl">
         <div class="text-7xl mb-6">📱</div>
-        <h2 class="text-slate-800 text-2xl font-semibold mb-6">Dispositivo no compatible</h2>
+        <h2 class="text-slate-800 text-2xl font-semibold mb-6">Pantalla muy pequeña</h2>
         <p class="text-slate-600 text-lg leading-relaxed mb-3">
-          Esta aplicación requiere una pantalla de al menos 768px de ancho.
+          Esta aplicación requiere una pantalla más grande para funcionar correctamente.
         </p>
         <p class="text-slate-600 text-lg leading-relaxed">
           Por favor, usa una tablet, laptop o computadora de escritorio.
@@ -36,7 +36,11 @@
 
       <!-- Canvas principal -->
       <div class="app-canvas">
-        <CanvasView ref="canvasViewRef" :safeRight="safeRightOffset" />
+        <CanvasView
+          ref="canvasViewRef"
+          :safeRight="safeRightOffset"
+          :showFloatingControls="!isMobileDevice"
+        />
       </div>
 
       <!-- Botón flotante para mostrar sidebar cuando está oculto -->
@@ -261,11 +265,13 @@ const contextAlert = useContextAlert()
 // Provide del sistema de sugerencias para componentes hijos (debe estar en nivel superior)
 provide('placementSuggestions', placementSuggestions)
 
-// Estado reactivo para saber si es móvil
+// Estado reactivo para saber si es móvil (true = móvil, false = tablet/laptop/desktop)
 const isMobileDevice = ref(false)
 
 const PROPERTIES_PANEL_WIDTH = 300
 const SAFE_RIGHT_MARGIN = 12
+const MOBILE_MAX_WIDTH = 768
+const MOBILE_MAX_HEIGHT = 600
 
 const safeRightOffset = computed(() =>
   canvasStore.mostrarPropiedades ? PROPERTIES_PANEL_WIDTH + SAFE_RIGHT_MARGIN : 20,
@@ -275,10 +281,29 @@ const propertiesButtonStyle = computed(() => ({
   right: `${safeRightOffset.value}px`,
 }))
 
-let mediaQuery
+let coarsePointerQuery
 
-const updateMediaQuery = (e) => {
-  isMobileDevice.value = e.matches
+const evaluateIsMobileDevice = () => {
+  if (typeof window === 'undefined') return false
+
+  const width = window.innerWidth
+  const height = window.innerHeight
+  const hasCoarsePointer = coarsePointerQuery?.matches ?? window.matchMedia('(pointer: coarse)').matches
+  
+  // Estrategia combinada:
+  // 1. Si NO tiene puntero táctil (mouse/trackpad), definitivamente NO es móvil
+  if (!hasCoarsePointer) return false
+  
+  // 2. Si tiene puntero táctil, verificar tamaño de pantalla:
+  //    - Si ambas dimensiones son pequeñas (< 768px ancho O < 600px alto), ES móvil
+  //    - Si alguna dimensión es grande, probablemente sea tablet/laptop con touch
+  const isSmallScreen = width < MOBILE_MAX_WIDTH || height < MOBILE_MAX_HEIGHT
+  
+  return isSmallScreen
+}
+
+const updateDeviceProfile = () => {
+  isMobileDevice.value = evaluateIsMobileDevice()
 }
 
 // Mapea claves de la prop a los prefijos de variables del @theme actual
@@ -629,9 +654,25 @@ watch(
 
 onMounted(() => {
   try {
-    mediaQuery = window.matchMedia('(max-width: 767px)')
-    isMobileDevice.value = mediaQuery.matches
-    mediaQuery.addEventListener('change', updateMediaQuery)
+    if (typeof window !== 'undefined') {
+      coarsePointerQuery = window.matchMedia('(pointer: coarse)')
+      updateDeviceProfile()
+      
+      // Escuchar cambios de tamaño y orientación
+      window.addEventListener('resize', updateDeviceProfile)
+      window.addEventListener('orientationchange', updateDeviceProfile)
+      
+      try {
+        if (typeof coarsePointerQuery.addEventListener === 'function') {
+          coarsePointerQuery.addEventListener('change', updateDeviceProfile)
+        } else if (typeof coarsePointerQuery.addListener === 'function') {
+          coarsePointerQuery.addListener(updateDeviceProfile)
+        }
+      } catch (pointerError) {
+        console.warn('No se pudo suscribir a cambios de pointer media query', pointerError)
+      }
+    }
+
     provide('externalServicesAPI', externalServicesAPI)
 
     // Inicializar visibilidad del sidebar basado en el dispositivo
@@ -648,10 +689,21 @@ onMounted(() => {
 onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('beforeunload', handleBeforeUnload)
+    window.removeEventListener('resize', updateDeviceProfile)
+    window.removeEventListener('orientationchange', updateDeviceProfile)
   }
 
-  if (mediaQuery) {
-    mediaQuery.removeEventListener('change', updateMediaQuery)
+  if (coarsePointerQuery) {
+    try {
+      if (typeof coarsePointerQuery.removeEventListener === 'function') {
+        coarsePointerQuery.removeEventListener('change', updateDeviceProfile)
+      } else if (typeof coarsePointerQuery.removeListener === 'function') {
+        coarsePointerQuery.removeListener(updateDeviceProfile)
+      }
+    } catch (pointerError) {
+      console.warn('No se pudo remover la suscripción de pointer media query', pointerError)
+    }
+    coarsePointerQuery = null
   }
 })
 
