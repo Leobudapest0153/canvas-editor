@@ -1,7 +1,20 @@
 <template>
   <div class="h-full flex flex-col bg-white border-l border-gray-200" data-properties-panel>
-    <div class="p-4 border-b border-gray-200 flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-gray-800">Propiedades</h2>
+    <div class="p-3 border-b border-gray-200 flex items-center justify-between">
+      <div class="flex items-center gap-1">
+        <button
+          type="button"
+          class="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+          @click="canvasStore.togglePropertiesPanel()"
+          aria-label="Ocultar panel de propiedades"
+          title="Ocultar panel de propiedades"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
+        <h2 class="text-lg font-semibold text-gray-800">Propiedades</h2>
+      </div>
       <!-- Botón Identificador -->
       <button
         v-if="elementoSeleccionado"
