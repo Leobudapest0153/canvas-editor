@@ -28,8 +28,8 @@ describe('runFinalClamp stroke-safe finalize', () => {
     // strokeHalf=2 -> maxX efectivo=98 -> clamp final = 98 - 20 = 78
     expect(res.x).toBe(78)
     expect(shape.x()).toBe(78)
-    // y no se modifica
-    expect(shape.y()).toBe(5)
+    // el snap a grilla ajusta Y al múltiplo más cercano (10)
+    expect(shape.y()).toBe(10)
   })
 
   it('sin stroke también clava exacto al borde', async () => {

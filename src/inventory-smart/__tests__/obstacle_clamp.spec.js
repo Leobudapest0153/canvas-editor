@@ -35,4 +35,24 @@ describe('resolveBlockingOverlap', () => {
     expect(res.x).toBe(165)
     expect(res.y).toBe(165)
   })
+
+  it('modo elastic sin polígono evita clamp y aún separa bloqueos', () => {
+    const elasticArea = { ...areaBounds, mode: 'elastic', polygon: null }
+    const movingEl = { id: 'A', x: 0, y: 0, width: 40, height: 40, ubicacion: 'suelo' }
+    const neighbor = { id: 'B', x: 30, y: 0, width: 40, height: 40, ubicacion: 'suelo' }
+    const candidate = { x: 20, y: 0 } // empuja hacia -X si clampa
+
+    const res = resolveBlockingOverlap({
+      candidate,
+      movingEl,
+      neighbors: [neighbor],
+      areaBounds: elasticArea,
+      strokePx: 0,
+      maxIters: 4,
+    })
+
+    expect(res.x).toBeLessThan(candidate.x) // se despega hacia la izquierda
+    expect(res.y).toBe(0)
+    expect(res.x).toBeLessThan(0) // no se clampa al minX artificial
+  })
 })

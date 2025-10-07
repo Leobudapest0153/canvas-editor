@@ -10,18 +10,28 @@ import { evaluateConflict, computeMTD } from '@/inventory-smart/utils/collision'
 
 const EPS = 1e-6
 
+function isInfiniteArea(bounds) {
+  if (!bounds) return false
+  if (bounds.mode === 'elastic') return true
+  return !!(bounds.polygon && bounds.polygon._isInfinite === true)
+}
+
 function shrinkBoundsByStroke(areaBounds, strokeHalf) {
   if (!strokeHalf || strokeHalf <= 0) return { ...areaBounds }
-  const { minX, minY, maxX, maxY } = areaBounds
+  const { minX, minY, maxX, maxY, polygon, mode, ...rest } = areaBounds
   return {
+    ...rest,
     minX: minX + strokeHalf,
     minY: minY + strokeHalf,
     maxX: maxX - strokeHalf,
     maxY: maxY - strokeHalf,
+    ...(mode !== undefined ? { mode } : {}),
+    ...(polygon ? { polygon } : {}),
   }
 }
 
 function clampRectToBounds(x, y, w, h, b) {
+  if (!b || isInfiniteArea(b)) return { x, y }
   const nx = Math.max(b.minX, Math.min(x, b.maxX - w))
   const ny = Math.max(b.minY, Math.min(y, b.maxY - h))
   return { x: nx, y: ny }
@@ -66,6 +76,7 @@ export function resolveBlockingOverlap({
   const h = movingEl.height || 0
   const strokeHalf = (strokePx || 0) / 2
   const b = shrinkBoundsByStroke(areaBounds, strokeHalf)
+  const isInf = isInfiniteArea(b)
 
   // Estado mutable del candidato (top-left de bbox de modelo)
   let x = candidate.x
@@ -98,10 +109,10 @@ export function resolveBlockingOverlap({
     if (!foundBlocking) break
 
     // Proyección contra límites para no empujar fuera del área
-    const atMinX = approxEqual(x, b.minX)
-    const atMaxX = approxEqual(x, b.maxX - w)
-    const atMinY = approxEqual(y, b.minY)
-    const atMaxY = approxEqual(y, b.maxY - h)
+    const atMinX = !isInf && approxEqual(x, b.minX)
+    const atMaxX = !isInf && approxEqual(x, b.maxX - w)
+    const atMinY = !isInf && approxEqual(y, b.minY)
+    const atMaxY = !isInf && approxEqual(y, b.maxY - h)
 
     if (atMinX && accDx < 0) accDx = 0
     if (atMaxX && accDx > 0) accDx = 0

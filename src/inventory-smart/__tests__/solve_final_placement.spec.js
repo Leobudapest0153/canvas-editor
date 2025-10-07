@@ -109,4 +109,49 @@ describe('resolveFinalByIntervals - finalize sin solapes ni desbordes', () => {
     expect(res.x).toBeGreaterThanOrEqual(area.minX + strokeHalf - 1e-6)
     expect(res.y).toBeGreaterThanOrEqual(area.minY + strokeHalf - 1e-6)
   })
+
+  it('(5) modo elastic sin polígono no clampa al rectángulo base', () => {
+    const elasticArea = { ...area, mode: 'elastic', polygon: null }
+    const B = makeEl('B', 0, 0, 40, 30)
+    const candidate = { x: 260, y: -15 }
+
+    const res = resolveFinalByIntervals({
+      candidate,
+      movingEl: { ...B },
+      neighbors: [],
+      areaBounds: elasticArea,
+      grid: 10,
+      CM_TO_PX: 1,
+      lastValidPos: { x: 0, y: 0 },
+      lastVelocity: { x: 5, y: -2 },
+      strokePx: 0,
+      marginPx: 0,
+    })
+
+    expect(res.x).toBe(260)
+    expect(res.y).toBe(-10) // snapToGrid(-15) => -10 en JS, sin reclamp
+  })
+
+  it('(6) modo elastic sigue resolviendo solapes contra vecinos', () => {
+    const elasticArea = { ...area, mode: 'elastic', polygon: null }
+    const A = makeEl('A', 50, 0, 60, 80)
+    const B = makeEl('B', 0, 10, 40, 40)
+    const candidate = { x: 40, y: 10 } // solapa 50..80 con A 50..110
+
+    const res = resolveFinalByIntervals({
+      candidate,
+      movingEl: { ...B },
+      neighbors: [A],
+      areaBounds: elasticArea,
+      grid: 10,
+      CM_TO_PX: 1,
+      lastValidPos: { x: -40, y: 10 },
+      lastVelocity: { x: 12, y: 0 },
+      strokePx: 0,
+      marginPx: 0,
+    })
+
+    expect(res.x).toBe(10) // queda pegado a la izquierda del vecino tras snap (0..40)
+    expect(res.y).toBe(10)
+  })
 })
