@@ -790,13 +790,13 @@ const toggleMenu = (index, event) => {
   if (event) {
     event.stopPropagation()
   }
-  
+
   // Si ya está abierto el mismo menú, cerrarlo
   if (openMenuIndex.value === index) {
     openMenuIndex.value = null
     return
   }
-  
+
   // Capturar posición del clic para posicionar el menú
   if (event) {
     const rect = event.target.getBoundingClientRect()
@@ -805,7 +805,7 @@ const toggleMenu = (index, event) => {
       y: rect.top // A la misma altura del botón
     }
   }
-  
+
   // Abrir el menú y guardar el ID del piso actual
   openMenuIndex.value = index
   currentPisoId.value = index
