@@ -14,8 +14,13 @@ export function applyEdgeConstraint(candidate, el, areaBounds, opts = {}) {
   const w = Math.max(0, el?.width || 0)
   const h = Math.max(0, el?.height || 0)
 
-  // Bypass de límites si la planta es infinita (consultar polígono activo si existe)
-  if (areaBounds && areaBounds.polygon && areaBounds.polygon._isInfinite === true) {
+  // Bypass de límites si la planta es infinita (polígono infinito o modo elástico)
+  const isInfinite = !!(areaBounds && (
+    (areaBounds.polygon && areaBounds.polygon._isInfinite === true) ||
+    areaBounds.mode === 'elastic'
+  ))
+
+  if (isInfinite) {
     // Limpiar estado de borde y registrar última posición para mantener histéresis estable
     try {
       setEdgeState(id, { edgeX: null, edgeY: null })
