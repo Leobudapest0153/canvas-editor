@@ -13,7 +13,7 @@
         v-if="visible && !isDestroyed"
         :class="customPosition"
         :style="tooltipStyle"
-  class="pointer-events-none absolute z-50 px-2 py-1 rounded-md bg-slate-900 text-white text-xs shadow whitespace-normal leading-snug normal-case"
+        class="pointer-events-none absolute z-[120] px-2 py-1 rounded-md bg-slate-900 text-white text-xs shadow whitespace-normal leading-snug normal-case"
         role="tooltip"
       >
         {{ label }}
