@@ -16,6 +16,8 @@ const props = defineProps({
   stageY: { type: Number, required: true },
   pixelsPerUnit: { type: Number, required: true },
   unit: { type: String, default: 'm' },
+  originX: { type: Number, default: 0 },
+  originY: { type: Number, default: 0 },
 })
 
 const rulerSize = 28
@@ -41,6 +43,8 @@ function drawRulers() {
   const stageX = Number(props.stageX) || 0
   const stageY = Number(props.stageY) || 0
   const unit = props.unit === 'cm' ? 'cm' : 'm'
+  const originX = Number(props.originX) || 0
+  const originY = Number(props.originY) || 0
 
   const innerW = Math.max(0, props.width - rulerSize)
   const innerH = Math.max(0, props.height - rulerSize)
@@ -67,7 +71,7 @@ function drawRulers() {
     hctx.strokeStyle = '#94a3b8'
     hctx.fillStyle = '#0f172a'
     hctx.lineWidth = 1
-    const worldX0 = -stageX / s
+    const worldX0 = originX + -stageX / s
     const worldX1 = worldX0 + (innerW / s)
     const startX = Math.floor(worldX0 / minorStepWorldPx) * minorStepWorldPx
     for (let xw = startX; xw <= worldX1; xw += minorStepWorldPx) {
@@ -101,7 +105,7 @@ function drawRulers() {
     vctx.strokeStyle = '#94a3b8'
     vctx.fillStyle = '#0f172a'
     vctx.lineWidth = 1
-    const worldY0 = -stageY / s
+    const worldY0 = originY + -stageY / s
     const worldY1 = worldY0 + (innerH / s)
     const startY = Math.floor(worldY0 / minorStepWorldPx) * minorStepWorldPx
     for (let yw = startY; yw <= worldY1; yw += minorStepWorldPx) {
@@ -132,7 +136,20 @@ function drawRulers() {
 
 onMounted(() => { drawRulers() })
 onBeforeUnmount(() => {})
-watch(() => [props.scale, props.stageX, props.stageY, props.pixelsPerUnit, props.unit, props.width, props.height], () => {
-  nextTick(() => drawRulers())
-})
+watch(
+  () => [
+    props.scale,
+    props.stageX,
+    props.stageY,
+    props.pixelsPerUnit,
+    props.unit,
+    props.width,
+    props.height,
+    props.originX,
+    props.originY,
+  ],
+  () => {
+    nextTick(() => drawRulers())
+  },
+)
 </script>

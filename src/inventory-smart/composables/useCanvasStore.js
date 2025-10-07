@@ -18,7 +18,7 @@ import { resolvePasilloAssignment, PASILLO_ASSIGNMENT_DEFAULTS } from '@/invento
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, reactive } from 'vue'
 import { CM_TO_PX, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
@@ -256,6 +256,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   const plantaEnEdicion = ref(null)
   const panX = ref(0)
   const panY = ref(0)
+  const floatingOrigin = reactive({ x: 0, y: 0 })
+  const floatingRebaseThreshold = ref(50000)
 
   const elementoDestacadoId = ref(null)
   const idsElementosFiltrados = ref(null)
@@ -1146,6 +1148,14 @@ const calcularCanvasAdaptativo = (elemento) => {
     }
   }
 
+  const configureStagePosition = () => {
+    const stage = window.__konvaStage
+    if (stage && typeof stage.position === 'function') {
+      stage.position({ x: panX.value, y: panY.value })
+      stage.batchDraw?.()
+    }
+  }
+
   const configurarPan = (x, y) => {
     const panXAnterior = panX.value
     const panYAnterior = panY.value
@@ -1153,16 +1163,35 @@ const calcularCanvasAdaptativo = (elemento) => {
     panY.value = y
 
     // Sincronizar con Konva Stage
-    const stage = window.__konvaStage
-    if (stage && typeof stage.position === 'function') {
-      stage.position({ x: panX.value, y: panY.value })
-      stage.batchDraw?.()
-    }
+    configureStagePosition()
 
     // Solo guardar en historial si cambió significativamente
     if (Math.abs(x - panXAnterior) > 1 || Math.abs(y - panYAnterior) > 1) {
       saveZoomPanToHistory()
     }
+  }
+
+  const shiftFloatingOrigin = (dx = 0, dy = 0) => {
+    const deltaX = Number(dx)
+    const deltaY = Number(dy)
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return
+    if (Math.abs(deltaX) < 0.0001 && Math.abs(deltaY) < 0.0001) return
+
+    floatingOrigin.x += deltaX
+    floatingOrigin.y += deltaY
+
+    const z = zoom.value || 1
+    if (Number.isFinite(z)) {
+      panX.value += deltaX * z
+      panY.value += deltaY * z
+      configureStagePosition()
+    }
+  }
+
+  const setFloatingRebaseThreshold = (value) => {
+    const next = Number(value)
+    if (!Number.isFinite(next) || next <= 0) return
+    floatingRebaseThreshold.value = next
   }
 
   // Actions para plantas
@@ -2342,9 +2371,11 @@ const calcularCanvasAdaptativo = (elemento) => {
           const scale = stage.scaleX ? (stage.scaleX() || 1) : 1
           const stageX = stage.x ? (stage.x() || 0) : 0
           const stageY = stage.y ? (stage.y() || 0) : 0
+          const originX = floatingOrigin.x || 0
+          const originY = floatingOrigin.y || 0
           // Convertir de coords de pantalla (aplican pan+scale) a coords de mundo lógico
-          worldX = (rect.x - stageX) / scale
-          worldY = (rect.y - stageY) / scale
+          worldX = (rect.x - stageX) / scale + originX
+          worldY = (rect.y - stageY) / scale + originY
           worldW = rect.width / scale
           worldH = rect.height / scale
         }
@@ -2568,8 +2599,10 @@ const calcularCanvasAdaptativo = (elemento) => {
           const sc = stage.scaleX ? (stage.scaleX() || 1) : 1
           const sx = stage.x ? (stage.x() || 0) : 0
           const sy = stage.y ? (stage.y() || 0) : 0
-          const rx = (rect.x - sx) / sc
-          const ry = (rect.y - sy) / sc
+          const originX = floatingOrigin.x || 0
+          const originY = floatingOrigin.y || 0
+          const rx = (rect.x - sx) / sc + originX
+          const ry = (rect.y - sy) / sc + originY
           const rw = rect.width / sc
           const rh = rect.height / sc
           if (!(rw > 0 && rh > 0)) return
@@ -2673,8 +2706,10 @@ const calcularCanvasAdaptativo = (elemento) => {
           const sc = stage.scaleX ? (stage.scaleX() || 1) : 1
           const sx = stage.x ? (stage.x() || 0) : 0
           const sy = stage.y ? (stage.y() || 0) : 0
-          const rx = (rect.x - sx) / sc
-          const ry = (rect.y - sy) / sc
+          const originX = floatingOrigin.x || 0
+          const originY = floatingOrigin.y || 0
+          const rx = (rect.x - sx) / sc + originX
+          const ry = (rect.y - sy) / sc + originY
           const rw = rect.width / sc
           const rh = rect.height / sc
           if (Number.isFinite(rw) && rw > 0 && Number.isFinite(rh) && rh > 0) {
@@ -2923,6 +2958,8 @@ const calcularCanvasAdaptativo = (elemento) => {
     zoom,
     panX,
     panY,
+    floatingOrigin,
+    floatingRebaseThreshold,
     gridSize,
     gridVisible,
     snapGridEps,
@@ -2982,6 +3019,8 @@ const calcularCanvasAdaptativo = (elemento) => {
     persist,
     configurarZoom,
     configurarPan,
+    shiftFloatingOrigin,
+    setFloatingRebaseThreshold,
     setGridSize,
     setSnapGridEps,
     toggleGridVisible,
@@ -3077,6 +3116,4 @@ const calcularCanvasAdaptativo = (elemento) => {
     recomputePasilloAssignments,
   }
 })
-
-
 
