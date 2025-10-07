@@ -1,7 +1,7 @@
 <template>
   <div ref="infoRef" class="canvas-info" :style="styleObject">
     <span>Zoom: {{ (store.zoom * 100).toFixed(2) }}%</span>
-    <span>{{ t('views.label') }}: {{ t(`views.${store.vistaActiva}`) }}</span>
+    <span v-if="store.vistaActiva === 'XY'">{{ t('views.label') }}: {{ t(`views.${store.vistaActiva}`) }}</span>
     <template v-if="store.estaEnPlanta && store.plantaActivaData?.isInfinite === true">
       <UiTooltip
   label="Modo elástico: no hay límites de planta. Usa la grilla y el minimapa para orientarte"

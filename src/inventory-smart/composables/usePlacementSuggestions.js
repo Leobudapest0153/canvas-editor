@@ -273,11 +273,130 @@ export function usePlacementSuggestions() {
   }
 
   /**
+   * Calcula ajustes proporcionales para los hijos de un elemento
+   * cuando el elemento padre es redimensionado
+   *
+   * @param {Object} elemento - Elemento padre original
+   * @param {Object} suggestions - Sugerencias de ajuste del padre
+   * @returns {Object} Objeto con ajustes para hijos del store y contenedores predefinidos
+   */
+  const calculateChildrenAdjustments = (elemento, suggestions) => {
+    const result = {
+      storeChildren: [],
+      predefinedContainers: []
+    }
+    
+    // Verificar si hay ajuste dimensional
+    if (!suggestions.dimensionAdjustment) {
+      return result
+    }
+
+    const originalDims = elemento.dimensiones || {}
+    const adjustedDims = suggestions.dimensionAdjustment
+
+    // Calcular factores de escala
+    const scaleFactorAncho = adjustedDims.ancho / (originalDims.ancho || adjustedDims.ancho)
+    const scaleFactorLargo = adjustedDims.largo / (originalDims.largo || adjustedDims.largo)
+    const scaleFactorAlto = adjustedDims.alto / (originalDims.alto || adjustedDims.alto)
+
+    // Calcular factor de escala para peso (basado en el volumen)
+    const scaleFactorWeight = scaleFactorAncho * scaleFactorLargo * scaleFactorAlto
+
+    // 1. Procesar hijos del store (elementos ya creados)
+    const hijosIds = Array.isArray(elemento.hijos) ? elemento.hijos : []
+    
+    if (hijosIds.length > 0) {
+      const elementosStore = canvasStore.elementosVisibles || []
+      const hijos = hijosIds
+        .map((id) => elementosStore.find((e) => e && e.id === id))
+        .filter(Boolean)
+
+      for (const hijo of hijos) {
+        const hijoDims = hijo.dimensiones || {}
+        const hijoCapacidad = Number(hijo.capacidadCarga || 0)
+
+        // Calcular nuevas dimensiones escaladas
+        const newAncho = Math.max(1, Math.floor((hijoDims.ancho || 0) * scaleFactorAncho))
+        const newLargo = Math.max(1, Math.floor((hijoDims.largo || 0) * scaleFactorLargo))
+        const newAlto = Math.max(1, Math.floor((hijoDims.alto || 0) * scaleFactorAlto))
+
+        // Calcular nueva capacidad escalada
+        const newCapacidad = hijoCapacidad > 0 
+          ? Math.max(1, Math.floor(hijoCapacidad * scaleFactorWeight))
+          : 0
+
+        // Escalar posición dentro del padre
+        const newX = (hijo.x || 0) * scaleFactorAncho
+        const newY = (hijo.y || 0) * scaleFactorLargo
+
+        result.storeChildren.push({
+          id: hijo.id,
+          dimensiones: {
+            ancho: newAncho,
+            largo: newLargo,
+            alto: newAlto,
+          },
+          capacidadCarga: newCapacidad,
+          x: newX,
+          y: newY,
+          originalDimensiones: { ...hijoDims },
+          originalCapacidad: hijoCapacidad,
+          scaleFactors: {
+            ancho: scaleFactorAncho,
+            largo: scaleFactorLargo,
+            alto: scaleFactorAlto,
+            weight: scaleFactorWeight,
+          }
+        })
+      }
+    }
+
+    // 2. Procesar contenedores predefinidos (del catálogo)
+    const contenedores = Array.isArray(elemento.contenedores) ? elemento.contenedores : []
+    
+    if (contenedores.length > 0) {
+      for (const contenedor of contenedores) {
+        const contDims = contenedor.dimensiones || {}
+        const contCapacidad = Number(contenedor.capacidadCarga || 0)
+
+        // Calcular nuevas dimensiones escaladas
+        const newAncho = Math.max(1, Math.floor((contDims.ancho || 0) * scaleFactorAncho))
+        const newLargo = Math.max(1, Math.floor((contDims.largo || 0) * scaleFactorLargo))
+        const newAlto = Math.max(1, Math.floor((contDims.alto || 0) * scaleFactorAlto))
+
+        // Calcular nueva capacidad escalada
+        const newCapacidad = contCapacidad > 0 
+          ? Math.max(1, Math.floor(contCapacidad * scaleFactorWeight))
+          : 0
+
+        // Escalar posición dentro del padre (si tiene)
+        const newX = (contenedor.x || 0) * scaleFactorAncho
+        const newY = (contenedor.y || 0) * scaleFactorLargo
+
+        // Crear nuevo objeto contenedor con dimensiones escaladas
+        result.predefinedContainers.push({
+          ...contenedor,
+          dimensiones: {
+            ancho: newAncho,
+            largo: newLargo,
+            alto: newAlto,
+          },
+          capacidadCarga: newCapacidad,
+          x: newX,
+          y: newY,
+        })
+      }
+    }
+
+    return result
+  }
+
+  /**
    * Aplica los ajustes sugeridos a un elemento
    *
    * @param {Object} elemento - Elemento original
    * @param {Object} suggestions - Sugerencias calculadas
-   * @returns {Object} Elemento con ajustes aplicados
+   * @returns {Object} Elemento con ajustes aplicados y ajustes para hijos
    */
   const applySuggestedAdjustments = (elemento, suggestions) => {
     const adjusted = { ...elemento }
@@ -297,6 +416,19 @@ export function usePlacementSuggestions() {
       adjusted.capacidadCarga = suggestions.weightAdjustment.capacidadAjustada
     }
 
+    // Calcular ajustes para hijos
+    const childrenAdjustments = calculateChildrenAdjustments(elemento, suggestions)
+    
+    // Aplicar contenedores predefinidos escalados (si existen)
+    if (childrenAdjustments.predefinedContainers.length > 0) {
+      adjusted.contenedores = childrenAdjustments.predefinedContainers
+    }
+    
+    // Incluir ajustes de hijos del store en el objeto retornado (para aplicar después de crear)
+    if (childrenAdjustments.storeChildren.length > 0) {
+      adjusted._childrenAdjustments = childrenAdjustments.storeChildren
+    }
+
     return adjusted
   }
 
@@ -305,5 +437,6 @@ export function usePlacementSuggestions() {
     applySuggestedAdjustments,
     calculateDimensionAdjustment,
     calculateWeightAdjustment,
+    calculateChildrenAdjustments,
   }
 }
