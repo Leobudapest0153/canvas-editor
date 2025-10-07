@@ -188,3 +188,24 @@ Orden exacto aplicado durante drag/drop (rectas y círculos usando AABB):
 Notas:
 
 - Las colisiones con paredes (suelo–pared, pared–pared) no bloquean; solo generan advertencias visuales.
+
+## 🐛 Sistema de Coordenadas y Culling (Fix 2025-10-07)
+
+### Diferencia entre coordenadas de stage y coordenadas de mundo
+
+El sistema de canvas maneja dos espacios de coordenadas distintos:
+
+- **Coordenadas de stage**: Sistema local de Konva donde opera la cámara (pan/zoom)
+- **Coordenadas de mundo**: Sistema global donde se almacenan las posiciones reales de elementos
+
+Para futuras expansiones (planta infinita real), se podría aplicar offset con histéresis y cooldown.
+
+### Por qué el culling siempre debe operar en coordenadas de mundo
+
+El **floating origin** introduce un offset dinámico entre ambos sistemas. El culling debe:
+
+1. Convertir el viewport de coordenadas de stage a coordenadas de mundo
+2. Sumar el `floatingOrigin.offsetX/Y` para obtener la vista real en el mundo
+3. Comparar elementos (que ya están en coordenadas de mundo) contra este viewport corregido
+
+Menciona que, para futuras expansiones (planta infinita real), se podría aplicar offset con histéresis y cooldown.
