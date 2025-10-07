@@ -65,13 +65,16 @@ function recomputeFloatingRight() {
   try {
     const panel = document.querySelector('[data-properties-panel]')
     const margin = 12
+    let base = props.safeRight
     if (panel && panel.offsetParent !== null) {
       const rect = panel.getBoundingClientRect()
-      floatingRight.value = Math.ceil(props.safeRight + rect.width + margin)
-    } else {
-      floatingRight.value = props.safeRight
+      const panelWidth = rect?.width || 0
+      base = Math.max(base, panelWidth + margin)
     }
-  } catch { floatingRight.value = props.safeRight }
+    floatingRight.value = Math.ceil(base)
+  } catch {
+    floatingRight.value = props.safeRight
+  }
 }
 
 onMounted(() => {
@@ -116,7 +119,7 @@ watch(() => props.safeRight, recomputeFloatingRight)
   right: 36px; /* valor por defecto, será sobrescrito por :style */
   display: flex;
   gap: 8px;
-  z-index: 10;
+  z-index: 140;
 }
 
 .floating-btn {

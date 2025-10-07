@@ -275,6 +275,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const elementoEslObjetivo = ref(null)
   const sidebarActiveTab = ref('elementos')
   const sidebarVisible = ref(false)
+  const propertiesPanelVisible = ref(true)
 
   const editorPermissions = computed(() => ({
     modo: modoEdicion.value ? 'edicion' : 'visualizacion',
@@ -399,6 +400,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!elementoSeleccionado.value) return null
     return elementos.value.find((el) => el.id === elementoSeleccionado.value)
   })
+
+  const mostrarPropiedades = computed(() => propertiesPanelVisible.value && Boolean(elementoSeleccionado.value))
 
   // === COMPUTED PARA NAVEGACIÓN JERÁRQUICA ===
   const contextoActual = computed(() => {
@@ -2774,6 +2777,14 @@ const calcularCanvasAdaptativo = (elemento) => {
     sidebarVisible.value = isDesktop
   }
 
+  const setPropertiesPanelVisible = (visible) => {
+    propertiesPanelVisible.value = Boolean(visible)
+  }
+
+  const togglePropertiesPanel = () => {
+    propertiesPanelVisible.value = !propertiesPanelVisible.value
+  }
+
   // === INTEGRACIÓN CON AUTOSAVE ===
   // Instancia del autosave - se establece desde App.vue o el componente principal
   const autoSaveInstance = ref(null)
@@ -2905,8 +2916,9 @@ const calcularCanvasAdaptativo = (elemento) => {
     gridVisible,
     snapGridEps,
     modoEdicion,
-  sidebarActiveTab,
+    sidebarActiveTab,
     sidebarVisible,
+    propertiesPanelVisible,
     editorPermissions,
     crearPlanta,
     plantaEnEdicion,
@@ -2932,6 +2944,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     plantaActivaData,
     elementosEnPlanta,
     elementoSeleccionadoCompleto,
+    mostrarPropiedades,
 
     // Navegación jerárquica - Getters
     contextoActual,
@@ -2976,6 +2989,8 @@ const calcularCanvasAdaptativo = (elemento) => {
     setSidebarVisible,
     toggleSidebar,
     initializeSidebarVisibility,
+    setPropertiesPanelVisible,
+    togglePropertiesPanel,
 
     // Actions - Plantas
     seleccionarPlanta,

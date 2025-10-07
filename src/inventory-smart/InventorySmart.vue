@@ -36,7 +36,7 @@
 
       <!-- Canvas principal -->
       <div class="app-canvas">
-        <CanvasView ref="canvasViewRef" :safeRight="canvasStore.mostrarPropiedades ? 320 : 20" />
+        <CanvasView ref="canvasViewRef" :safeRight="safeRightOffset" />
       </div>
 
       <!-- Botón flotante para mostrar sidebar cuando está oculto -->
@@ -51,10 +51,31 @@
         </svg>
       </button>
 
+      <!-- Botón flotante para mostrar panel de propiedades cuando está oculto -->
+      <button
+        v-if="
+          !isMobileDevice &&
+          canvasStore.modoEdicion &&
+          canvasStore.elementoSeleccionado &&
+          !canvasStore.propertiesPanelVisible
+        "
+  class="properties-show-btn"
+  :style="propertiesButtonStyle"
+        @pointerdown.stop
+        @mousedown.stop
+        @touchstart.stop
+        @click.stop="canvasStore.setPropertiesPanelVisible(true)"
+        title="Mostrar panel de propiedades"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 6l-6 6 6 6" />
+        </svg>
+      </button>
+
       <!-- Panel de propiedades (superpuesto para no empujar el canvas) -->
       <div
         class="app-sidebar-right absolute inset-y-0 right-0"
-        v-if="canvasStore.elementoSeleccionado"
+        v-if="canvasStore.mostrarPropiedades"
         data-properties-panel
       >
         <PropiedadesPanel @showIdentifier="handleShowIdentifier" />
@@ -242,6 +263,17 @@ provide('placementSuggestions', placementSuggestions)
 
 // Estado reactivo para saber si es móvil
 const isMobileDevice = ref(false)
+
+const PROPERTIES_PANEL_WIDTH = 300
+const SAFE_RIGHT_MARGIN = 12
+
+const safeRightOffset = computed(() =>
+  canvasStore.mostrarPropiedades ? PROPERTIES_PANEL_WIDTH + SAFE_RIGHT_MARGIN : 20,
+)
+
+const propertiesButtonStyle = computed(() => ({
+  right: `${safeRightOffset.value}px`,
+}))
 
 let mediaQuery
 
@@ -1089,10 +1121,9 @@ watch(
   height: 100%;
 }
 
-.sidebar-show-btn {
+.sidebar-show-btn,
+.properties-show-btn {
   position: absolute;
-  top: 16px;
-  left: 16px;
   width: 40px;
   height: 40px;
   background: var(--ui-bg);
@@ -1109,13 +1140,26 @@ watch(
   z-index: 100;
 }
 
-.sidebar-show-btn:hover {
+.sidebar-show-btn {
+  top: 16px;
+  left: 16px;
+}
+
+.properties-show-btn {
+  top: calc(36px + 48px + 12px);
+  width: 48px;
+  height: 48px;
+}
+
+.sidebar-show-btn:hover,
+.properties-show-btn:hover {
   background: #f1f5f9;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.sidebar-show-btn svg {
+.sidebar-show-btn svg,
+.properties-show-btn svg {
   width: 16px;
   height: 16px;
 }
