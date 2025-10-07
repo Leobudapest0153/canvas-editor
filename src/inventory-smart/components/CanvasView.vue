@@ -651,6 +651,7 @@
     <CanvasInfo />
 
     <FloatingControls
+      v-if="props.showFloatingControls"
       :safe-right="safeRight"
       :can-undo="canUndo"
       :can-redo="canRedo"
@@ -719,6 +720,7 @@ const placementSuggestions = inject('placementSuggestions')
 // Espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
   safeRight: { type: Number, default: 20 },
+  showFloatingControls: { type: Boolean, default: true },
 })
 
 // Referencia segura a Konva (cuando está disponible globalmente via vue-konva)
