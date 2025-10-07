@@ -256,18 +256,36 @@ export const useCanvasStore = defineStore('canvas', () => {
   const plantaEnEdicion = ref(null)
   const panX = ref(0)
   const panY = ref(0)
+  const createFloatingOriginTelemetry = () => ({
+    windowStart: Date.now(),
+    rebasesInWindow: 0,
+    rebasesPerMinute: 0,
+    lastOrigin: { x: 0, y: 0 },
+    lastScale: 1,
+    lastViewCenter: { x: 0, y: 0 },
+  })
+
   const floatingOrigin = reactive({
     offsetX: 0,
     offsetY: 0,
     threshold: 50000,
+    hysteresisRatio: 0.08,
+    cooldownMs: 180,
     rebaseCount: 0,
     lastShift: null,
+    lastRebaseAt: 0,
+    interactionsSuspended: false,
+    telemetry: createFloatingOriginTelemetry(),
   })
 
   const setFloatingOriginThreshold = (value) => {
     const v = Number(value)
     if (!Number.isFinite(v) || v <= 0) return
     floatingOrigin.threshold = Math.max(1000, Math.round(v))
+  }
+
+  const setFloatingOriginSuspended = (value) => {
+    floatingOrigin.interactionsSuspended = value === true
   }
 
   const elementoDestacadoId = ref(null)
@@ -1254,11 +1272,38 @@ const calcularCanvasAdaptativo = (elemento) => {
     floatingOrigin.offsetX += deltaX
     floatingOrigin.offsetY += deltaY
     floatingOrigin.rebaseCount += 1
+    const now = Date.now()
+    floatingOrigin.lastRebaseAt = now
     floatingOrigin.lastShift = {
       x: deltaX,
       y: deltaY,
       reason: metadata?.reason || 'manual',
-      timestamp: Date.now(),
+      timestamp: now,
+      scale: Number(metadata?.scale) || Number(zoom.value) || 1,
+      origin: metadata?.viewCenter && Number.isFinite(metadata.viewCenter.x)
+        ? { x: Number(metadata.viewCenter.x), y: Number(metadata.viewCenter.y) }
+        : null,
+    }
+
+    if (floatingOrigin.telemetry) {
+      const tele = floatingOrigin.telemetry
+      if (!tele.windowStart || now - tele.windowStart > 60000) {
+        tele.windowStart = now
+        tele.rebasesInWindow = 0
+      }
+      tele.rebasesInWindow = (tele.rebasesInWindow || 0) + 1
+      const elapsed = Math.max(1, now - tele.windowStart)
+      tele.rebasesPerMinute = Math.round((tele.rebasesInWindow * 60000) / elapsed)
+      tele.lastOrigin = { x: floatingOrigin.offsetX, y: floatingOrigin.offsetY }
+      const candidateScale = Number(metadata?.scale)
+      if (Number.isFinite(candidateScale) && candidateScale > 0) {
+        tele.lastScale = candidateScale
+      } else if (!Number.isFinite(tele.lastScale) || tele.lastScale <= 0) {
+        tele.lastScale = 1
+      }
+      if (metadata?.viewCenter && Number.isFinite(metadata.viewCenter.x) && Number.isFinite(metadata.viewCenter.y)) {
+        tele.lastViewCenter = { x: Number(metadata.viewCenter.x), y: Number(metadata.viewCenter.y) }
+      }
     }
 
     return true
@@ -1905,6 +1950,11 @@ const calcularCanvasAdaptativo = (elemento) => {
     floatingOrigin.offsetY = 0
     floatingOrigin.rebaseCount = 0
     floatingOrigin.lastShift = null
+    floatingOrigin.lastRebaseAt = 0
+    floatingOrigin.interactionsSuspended = false
+    if (floatingOrigin.telemetry) {
+      Object.assign(floatingOrigin.telemetry, createFloatingOriginTelemetry())
+    }
 
     try {
       const storeActions = {
@@ -3088,6 +3138,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     configurarZoom,
     configurarPan,
     setFloatingOriginThreshold,
+    setFloatingOriginSuspended,
     shiftWorldCoordinates,
     setGridSize,
     setSnapGridEps,

@@ -57,7 +57,8 @@
               closed: true,
               stroke: '#0ea5e9',
               fill: 'transparent',
-              strokeWidth: 2 / canvasStore.zoom,
+              strokeWidth: Math.max(0.75, 2 / Math.max(canvasStore.zoom || 1, 0.001)),
+              strokeScaleEnabled: false,
               listening: false,
             }"
           />
@@ -163,19 +164,26 @@
                 strokeWidth:
                   (elemento.tipo || '').toLowerCase() === 'pasillos'
                     ? showPasillosDash
-                      ? 1 / canvasStore.zoom
+                      ? Math.max(0.5, 1 / Math.max(canvasStore.zoom || 1, 0.001))
                       : 0
                     : (elemento.tipo || '').toLowerCase() === 'pisos'
-                      ? 1 / canvasStore.zoom
+                      ? Math.max(0.5, 1 / Math.max(canvasStore.zoom || 1, 0.001))
                       : 0,
                 dash:
                   (elemento.tipo || '').toLowerCase() === 'pasillos'
                     ? showPasillosDash
-                      ? [6 / canvasStore.zoom, 4 / canvasStore.zoom]
+                      ? [
+                          Math.max(3, 6 / Math.max(canvasStore.zoom || 1, 0.001)),
+                          Math.max(2, 4 / Math.max(canvasStore.zoom || 1, 0.001)),
+                        ]
                       : undefined
                     : (elemento.tipo || '').toLowerCase() === 'pisos'
-                      ? [6 / canvasStore.zoom, 4 / canvasStore.zoom]
+                      ? [
+                          Math.max(3, 6 / Math.max(canvasStore.zoom || 1, 0.001)),
+                          Math.max(2, 4 / Math.max(canvasStore.zoom || 1, 0.001)),
+                        ]
                       : undefined,
+                strokeScaleEnabled: false,
                 opacity: isElementLocked(elemento.id) ? 0.35 : 0.8,
                 shadowColor:
                   (elemento.tipo || '').toLowerCase() === 'pasillos'
@@ -556,9 +564,13 @@
             width: marqueeRect.width,
             height: marqueeRect.height,
             stroke: '#3b82f6',
-            strokeWidth: 2 / canvasStore.zoom,
+            strokeWidth: Math.max(0.75, 2 / Math.max(canvasStore.zoom || 1, 0.001)),
             fill: 'rgba(59, 130, 246, 0.1)',
-            dash: [4 / canvasStore.zoom, 4 / canvasStore.zoom],
+            dash: [
+              Math.max(2, 4 / Math.max(canvasStore.zoom || 1, 0.001)),
+              Math.max(2, 4 / Math.max(canvasStore.zoom || 1, 0.001)),
+            ],
+            strokeScaleEnabled: false,
             listening: false,
           }"
         />
@@ -594,7 +606,8 @@
               radius: 8 / canvasStore.zoom,
               fill: getUsageIndicatorColor(elemento),
               stroke: '#ffffff',
-              strokeWidth: 2 / canvasStore.zoom,
+              strokeWidth: Math.max(0.5, 2 / Math.max(canvasStore.zoom || 1, 0.001)),
+              strokeScaleEnabled: false,
               listening: false,
               opacity: 0.9,
             }"
@@ -924,6 +937,19 @@ const floatingOriginThreshold = computed(() => {
   if (!Number.isFinite(t) || t <= 0) return 50000
   return Math.max(1000, t)
 })
+const floatingOriginHysteresisRatio = computed(() => {
+  const raw = Number(floatingOriginState.value.hysteresisRatio)
+  if (!Number.isFinite(raw) || raw <= 0) return 0.08
+  return Math.min(0.1, Math.max(0.05, raw))
+})
+const floatingOriginTriggerDistance = computed(
+  () => floatingOriginThreshold.value * (1 + floatingOriginHysteresisRatio.value),
+)
+const floatingOriginCooldownMs = computed(() => {
+  const raw = Number(floatingOriginState.value.cooldownMs)
+  if (!Number.isFinite(raw) || raw <= 0) return 180
+  return Math.min(250, Math.max(150, Math.round(raw)))
+})
 
 const getViewState = () => {
   const zoom = canvasStore.zoom || 1
@@ -942,10 +968,12 @@ const getViewState = () => {
   }
 }
 
-const chooseAxisOffset = (current, candidate, threshold) => {
+const chooseAxisOffset = (current, candidate, threshold, triggerDistance) => {
   if (!Number.isFinite(candidate)) return current
-  if (Math.abs(candidate) <= threshold) return current
-  if (!Number.isFinite(current) || Math.abs(current) < 1) return candidate
+  const baseThreshold = Math.max(1, Number(threshold) || 0)
+  const limit = Number.isFinite(triggerDistance) && triggerDistance > 0 ? triggerDistance : baseThreshold
+  if (Math.abs(candidate) <= limit) return current
+  if (!Number.isFinite(current) || Math.abs(current) < baseThreshold) return candidate
   if (Math.abs(candidate) > Math.abs(current)) return candidate
   return current
 }
@@ -1134,7 +1162,8 @@ const elementosVisiblesEnCanvas = computed(() => {
   const viewY = -canvasStore.panY / zoom
   const viewW = stageWidth / zoom
   const viewH = stageHeight / zoom
-  const padding = 200 / zoom
+  const zoomSafe = zoom <= 0 ? 1 : zoom
+  const padding = Math.max(200 / zoomSafe, 120 / Math.max(zoomSafe, 0.35))
 
   const minX = viewX - padding
   const maxX = viewX + viewW + padding
@@ -1173,7 +1202,7 @@ const updateInfiniteClipRect = () => {
   const view = getViewState()
   const zoom = canvasStore.zoom || 1
   const safeZoom = zoom === 0 ? 1 : zoom
-  const expansion = 3 + Math.max(1, 1 / safeZoom)
+  const expansion = 2.5 + Math.max(1.5, 2 / safeZoom)
   const width = Math.max(1, view.width * expansion)
   const height = Math.max(1, view.height * expansion)
   const rect = {
@@ -1255,6 +1284,13 @@ watch(
   { flush: 'post' },
 )
 
+watch(
+  () => [floatingOriginState.value.offsetX, floatingOriginState.value.offsetY],
+  () => {
+    if (isInfinitePlant.value) updateInfiniteClipRect()
+  },
+)
+
 const elementPositionsSignature = computed(() =>
   elementosVisiblesEnCanvas.value
     .map((el) => {
@@ -1265,52 +1301,136 @@ const elementPositionsSignature = computed(() =>
     .join('|'),
 )
 
+const suspendInteractionsForRebase = () => {
+  const previousStageDrag = stageDragEnabled.value
+  const previousSnapping = isSnappingEnabled.value
+  const layer = layerRef.value?.getNode?.() || null
+  const transformerNode = transformerRef.value?.getNode?.() || null
+
+  try {
+    canvasStore.setFloatingOriginSuspended?.(true)
+  } catch {
+    /* ignore */
+  }
+
+  if (layer && typeof layer.setAttr === 'function') {
+    try {
+      layer.setAttr('floatingRebaseActive', true)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  stageDragEnabled.value = false
+  isSnappingEnabled.value = false
+
+  try {
+    transformerNode?.stopTransform?.()
+  } catch {
+    /* ignore */
+  }
+
+  const release = (options = {}) => {
+    const apply = () => {
+      stageDragEnabled.value = previousStageDrag
+      isSnappingEnabled.value = previousSnapping
+      try {
+        canvasStore.setFloatingOriginSuspended?.(false)
+      } catch {
+        /* ignore */
+      }
+      if (layer && typeof layer.setAttr === 'function') {
+        try {
+          layer.setAttr('floatingRebaseActive', false)
+        } catch {
+          /* ignore */
+        }
+      }
+      try {
+        transformerNode?.getLayer?.()?.batchDraw?.()
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (options?.immediate === true) {
+      apply()
+      return
+    }
+
+    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(apply)
+    } else {
+      setTimeout(apply, 16)
+    }
+  }
+
+  return release
+}
+
 const ensureFloatingOrigin = (reason = 'auto') => {
   const stage = stageRef.value?.getNode?.()
   const layer = layerRef.value?.getNode?.()
   if (!stage || !layer) return false
 
+  const now = Date.now()
+  const lastTimestamp = Number(
+    floatingOriginState.value.lastRebaseAt || floatingOriginState.value.lastShift?.timestamp || 0,
+  )
+  if (lastTimestamp && now - lastTimestamp < floatingOriginCooldownMs.value) {
+    return false
+  }
+
   const threshold = floatingOriginThreshold.value
+  const triggerDistance = floatingOriginTriggerDistance.value
   let offsetXCandidate = 0
   let offsetYCandidate = 0
 
   const view = getViewState()
-  offsetXCandidate = chooseAxisOffset(offsetXCandidate, view.centerX, threshold)
-  offsetYCandidate = chooseAxisOffset(offsetYCandidate, view.centerY, threshold)
+  offsetXCandidate = chooseAxisOffset(offsetXCandidate, view.centerX, threshold, triggerDistance)
+  offsetYCandidate = chooseAxisOffset(offsetYCandidate, view.centerY, threshold, triggerDistance)
 
   const selectedFull = canvasStore.elementoSeleccionadoCompleto
   if (selectedFull) {
     const centerX = (Number(selectedFull.x) || 0) + getDrawWidth(selectedFull) / 2
     const centerY = (Number(selectedFull.y) || 0) + getDrawHeight(selectedFull) / 2
-    offsetXCandidate = chooseAxisOffset(offsetXCandidate, centerX, threshold)
-    offsetYCandidate = chooseAxisOffset(offsetYCandidate, centerY, threshold)
+    offsetXCandidate = chooseAxisOffset(offsetXCandidate, centerX, threshold, triggerDistance)
+    offsetYCandidate = chooseAxisOffset(offsetYCandidate, centerY, threshold, triggerDistance)
   }
 
   const aura = canvasStore.elementoAura
   if (aura) {
     const auraCenterX = (Number(aura.x) || 0) + (Number(aura.width) || 0) / 2
     const auraCenterY = (Number(aura.y) || 0) + (Number(aura.height) || 0) / 2
-    offsetXCandidate = chooseAxisOffset(offsetXCandidate, auraCenterX, threshold)
-    offsetYCandidate = chooseAxisOffset(offsetYCandidate, auraCenterY, threshold)
+    offsetXCandidate = chooseAxisOffset(offsetXCandidate, auraCenterX, threshold, triggerDistance)
+    offsetYCandidate = chooseAxisOffset(offsetYCandidate, auraCenterY, threshold, triggerDistance)
   }
 
   if (isMarqueeActive.value) {
     const mx = marqueeRect.value.x + marqueeRect.value.width / 2
     const my = marqueeRect.value.y + marqueeRect.value.height / 2
-    offsetXCandidate = chooseAxisOffset(offsetXCandidate, mx, threshold)
-    offsetYCandidate = chooseAxisOffset(offsetYCandidate, my, threshold)
+    offsetXCandidate = chooseAxisOffset(offsetXCandidate, mx, threshold, triggerDistance)
+    offsetYCandidate = chooseAxisOffset(offsetYCandidate, my, threshold, triggerDistance)
   }
 
   dragLastValidPositions.value?.forEach((pos) => {
     if (!pos) return
-    if (Math.abs(pos.x ?? 0) > threshold) offsetXCandidate = chooseAxisOffset(offsetXCandidate, pos.x, threshold)
-    if (Math.abs(pos.y ?? 0) > threshold) offsetYCandidate = chooseAxisOffset(offsetYCandidate, pos.y, threshold)
+    if (Math.abs(pos.x ?? 0) > triggerDistance) {
+      offsetXCandidate = chooseAxisOffset(offsetXCandidate, pos.x, threshold, triggerDistance)
+    }
+    if (Math.abs(pos.y ?? 0) > triggerDistance) {
+      offsetYCandidate = chooseAxisOffset(offsetYCandidate, pos.y, threshold, triggerDistance)
+    }
   })
 
   for (const pos of boundLastWorldPos.values()) {
     if (!pos) continue
-    if (Math.abs(pos.x ?? 0) > threshold) offsetXCandidate = chooseAxisOffset(offsetXCandidate, pos.x, threshold)
-    if (Math.abs(pos.y ?? 0) > threshold) offsetYCandidate = chooseAxisOffset(offsetYCandidate, pos.y, threshold)
+    if (Math.abs(pos.x ?? 0) > triggerDistance) {
+      offsetXCandidate = chooseAxisOffset(offsetXCandidate, pos.x, threshold, triggerDistance)
+    }
+    if (Math.abs(pos.y ?? 0) > triggerDistance) {
+      offsetYCandidate = chooseAxisOffset(offsetYCandidate, pos.y, threshold, triggerDistance)
+    }
   }
 
   if (offsetXCandidate === 0 || offsetYCandidate === 0) {
@@ -1320,9 +1440,9 @@ const ensureFloatingOrigin = (reason = 'auto') => {
       const height = getDrawHeight(elemento) || 0
       const candidateX = (Number(elemento.x) || 0) + width / 2
       const candidateY = (Number(elemento.y) || 0) + height / 2
-      offsetXCandidate = chooseAxisOffset(offsetXCandidate, candidateX, threshold)
-      offsetYCandidate = chooseAxisOffset(offsetYCandidate, candidateY, threshold)
-      if (Math.abs(offsetXCandidate) > threshold && Math.abs(offsetYCandidate) > threshold) {
+      offsetXCandidate = chooseAxisOffset(offsetXCandidate, candidateX, threshold, triggerDistance)
+      offsetYCandidate = chooseAxisOffset(offsetYCandidate, candidateY, threshold, triggerDistance)
+      if (Math.abs(offsetXCandidate) > triggerDistance && Math.abs(offsetYCandidate) > triggerDistance) {
         break
       }
     }
@@ -1332,8 +1452,17 @@ const ensureFloatingOrigin = (reason = 'auto') => {
   const shiftY = Math.round(offsetYCandidate)
   if (Math.abs(shiftX) < 1 && Math.abs(shiftY) < 1) return false
 
-  const didShift = canvasStore.shiftWorldCoordinates(shiftX, shiftY, { reason })
-  if (!didShift) return false
+  const releaseInteractions = suspendInteractionsForRebase()
+
+  const didShift = canvasStore.shiftWorldCoordinates(shiftX, shiftY, {
+    reason,
+    scale: canvasStore.zoom || 1,
+    viewCenter: { x: view.centerX, y: view.centerY },
+  })
+  if (!didShift) {
+    releaseInteractions({ immediate: true })
+    return false
+  }
 
   try {
     shiftDragStateBy(shiftX, shiftY)
@@ -1363,6 +1492,7 @@ const ensureFloatingOrigin = (reason = 'auto') => {
 
   conflictsApi.clear()
   updateInfiniteClipRect()
+  releaseInteractions()
   return true
 }
 
@@ -1948,6 +2078,20 @@ const {
   computeBoundary,
 })
 
+const toWorldPoint = (stage, pointer) => {
+  if (!stage || !pointer) return { x: 0, y: 0 }
+  const stageX = typeof stage.x === 'function' ? stage.x() || 0 : Number(stage.x) || 0
+  const stageY = typeof stage.y === 'function' ? stage.y() || 0 : Number(stage.y) || 0
+  const scaleX = typeof stage.scaleX === 'function' ? stage.scaleX() || 1 : Number(stage.scaleX) || 1
+  const scaleY = typeof stage.scaleY === 'function' ? stage.scaleY() || 1 : Number(stage.scaleY) || 1
+  const safeScaleX = scaleX === 0 ? 1 : scaleX
+  const safeScaleY = scaleY === 0 ? 1 : scaleY
+  return {
+    x: (Number(pointer.x) - stageX) / safeScaleX,
+    y: (Number(pointer.y) - stageY) / safeScaleY,
+  }
+}
+
 // Función auxiliar para convertir coordenadas del puntero a coordenadas de mundo
 const getWorldCoordinatesFromPointer = (dropEvent) => {
   const stage = stageRef.value.getNode()
@@ -1964,10 +2108,7 @@ const getWorldCoordinatesFromPointer = (dropEvent) => {
   }
 
   // Convertir a coordenadas de mundo (layer) considerando transformación del stage
-  const worldX = (pointerPos.x - stage.x()) / stage.scaleX()
-  const worldY = (pointerPos.y - stage.y()) / stage.scaleY()
-
-  return { x: worldX, y: worldY }
+  return toWorldPoint(stage, pointerPos)
 }
 
 // Pipeline unificado de validaciones previas al drop
@@ -3586,16 +3727,27 @@ const getStageSizeSnapshot = () => ({
 
 const getViewportWorldRect = () => {
   const stage = getStageInstance()
-  if (!stage) return null
-  const scale = typeof stage.scaleX === 'function' ? stage.scaleX() || 1 : 1
-  if (!Number.isFinite(scale) || scale === 0) return null
-  const stageX = typeof stage.x === 'function' ? stage.x() || 0 : 0
-  const stageY = typeof stage.y === 'function' ? stage.y() || 0 : 0
+  if (stage) {
+    const scale = typeof stage.scaleX === 'function' ? stage.scaleX() || 1 : 1
+    if (Number.isFinite(scale) && scale !== 0) {
+      const stageX = typeof stage.x === 'function' ? stage.x() || 0 : 0
+      const stageY = typeof stage.y === 'function' ? stage.y() || 0 : 0
+      return {
+        minX: (0 - stageX) / scale,
+        minY: (0 - stageY) / scale,
+        maxX: (stageSize.value.width - stageX) / scale,
+        maxY: (stageSize.value.height - stageY) / scale,
+      }
+    }
+  }
+
+  const fallback = getViewState()
+  if (!fallback) return null
   return {
-    minX: (0 - stageX) / scale,
-    minY: (0 - stageY) / scale,
-    maxX: (stageSize.value.width - stageX) / scale,
-    maxY: (stageSize.value.height - stageY) / scale,
+    minX: fallback.x,
+    minY: fallback.y,
+    maxX: fallback.x + fallback.width,
+    maxY: fallback.y + fallback.height,
   }
 }
 

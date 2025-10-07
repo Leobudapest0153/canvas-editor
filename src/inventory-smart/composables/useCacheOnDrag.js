@@ -20,6 +20,17 @@ export function useCacheOnDrag(refNode) {
     try {
       if (isPlantInfinite()) return
 
+      const layer = node?.getLayer?.()
+      if (layer && typeof layer.getAttr === 'function') {
+        try {
+          if (layer.getAttr('floatingRebaseActive')) {
+            return
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
       // Obtener dimensiones del nodo para ajustar el cache
       if (node && node.cache) {
         const width = typeof node.width === 'function' ? node.width() : (node.width || 0)

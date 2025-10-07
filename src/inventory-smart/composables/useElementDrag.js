@@ -821,6 +821,9 @@ export function useElementDrag({
   }
 
   const onShapeDragMove = (e, el) => {
+    if (canvasStore.floatingOrigin?.interactionsSuspended) {
+      return
+    }
     const data = innerSessions.get(el.id)
     if (data) {
       const { session, parent } = data
