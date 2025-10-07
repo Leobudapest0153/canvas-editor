@@ -1,15 +1,15 @@
 <template>
   <div id="inventory-smart" :style="themeStyle">
-    <!-- Mensaje para móviles -->
+    <!-- Mensaje para dispositivos móviles pequeños -->
     <div
       v-if="isMobileDevice"
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary"
     >
       <div class="bg-white/95 rounded-2xl p-10 max-w-md w-full text-center shadow-2xl">
         <div class="text-7xl mb-6">📱</div>
-        <h2 class="text-slate-800 text-2xl font-semibold mb-6">Dispositivo no compatible</h2>
+        <h2 class="text-slate-800 text-2xl font-semibold mb-6">Pantalla muy pequeña</h2>
         <p class="text-slate-600 text-lg leading-relaxed mb-3">
-          Esta aplicación requiere una pantalla de al menos 768px de ancho.
+          Esta aplicación requiere una pantalla más grande para funcionar correctamente.
         </p>
         <p class="text-slate-600 text-lg leading-relaxed">
           Por favor, usa una tablet, laptop o computadora de escritorio.
