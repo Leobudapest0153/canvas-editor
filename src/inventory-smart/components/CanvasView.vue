@@ -2576,12 +2576,6 @@ const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => 
   const adjustedPayload = { ...originalPayload }
   const elements = [...(originalPayload.elements || [])]
 
-  console.log('📦 [createAdjustedTemplatePayload] Ajustando payload:', {
-    rootId: originalPayload.rootId,
-    totalElements: elements.length,
-    adjustedRoot: adjustedRootElement
-  })
-
   // Encontrar y reemplazar el elemento raíz con los ajustes
   const rootIndex = elements.findIndex(e => e.id === originalPayload.rootId)
   if (rootIndex >= 0) {
@@ -2607,21 +2601,7 @@ const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => 
       scaleFactorAncho = linearScale
       scaleFactorLargo = linearScale
       scaleFactorAlto = linearScale
-      
-      console.log('⚖️ Ajuste solo de capacidad detectado. Calculando escala dimensional desde capacidad:', {
-        originalCapacity,
-        adjustedCapacity,
-        capacityRatio: scaleFactorWeight,
-        linearScale
-      })
     }
-
-    console.log('📊 Factores de escala calculados:', {
-      ancho: scaleFactorAncho,
-      largo: scaleFactorLargo,
-      alto: scaleFactorAlto,
-      weight: scaleFactorWeight
-    })
 
     // Actualizar elemento raíz
     elements[rootIndex] = {
@@ -2630,31 +2610,39 @@ const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => 
       capacidadCarga: adjustedRootElement.capacidadCarga
     }
 
-    console.log('✅ Elemento raíz actualizado')
-
     // Solo escalar hijos si hay un cambio real (factor diferente de 1)
     if (scaleFactorWeight !== 1) {
-      // Escalar todos los hijos (elementos que tienen padre === rootId)
       const rootId = originalPayload.rootId
-      let childrenScaled = 0
+      const children = elements.filter(e => e.id !== rootId && e.padre === rootId)
+      const isSingleChild = children.length === 1
 
       for (let i = 0; i < elements.length; i++) {
         const elem = elements[i]
         
-        // Si es hijo del root (directamente o indirectamente)
+        // Si es hijo del root (directamente)
         if (elem.id !== rootId && elem.padre === rootId) {
           const originalChildDims = elem.dimensiones || {}
           const originalChildCapacity = Number(elem.capacidadCarga || 0)
 
-          console.log(`  👶 Escalando hijo: ${elem.nombre || elem.id}`, {
-            dimensionesOriginales: originalChildDims,
-            capacidadOriginal: originalChildCapacity
-          })
+          // Si el hijo único tenía las mismas dimensiones que el padre original, mantener 100%
+          const childMatchedParent = 
+            originalChildDims.ancho === originalDims.ancho &&
+            originalChildDims.largo === originalDims.largo &&
+            originalChildDims.alto === originalDims.alto
 
-          // Escalar dimensiones
-          const newAncho = Math.max(1, Math.floor((originalChildDims.ancho || 0) * scaleFactorAncho))
-          const newLargo = Math.max(1, Math.floor((originalChildDims.largo || 0) * scaleFactorLargo))
-          const newAlto = Math.max(1, Math.floor((originalChildDims.alto || 0) * scaleFactorAlto))
+          let newAncho, newLargo, newAlto
+
+          if (isSingleChild && childMatchedParent) {
+            // Hijo único que ocupaba 100% del padre, asignar dimensiones completas del padre ajustado
+            newAncho = adjustedDims.ancho
+            newLargo = adjustedDims.largo
+            newAlto = adjustedDims.alto
+          } else {
+            // Escalar proporcionalmente
+            newAncho = Math.max(1, Math.floor((originalChildDims.ancho || 0) * scaleFactorAncho))
+            newLargo = Math.max(1, Math.floor((originalChildDims.largo || 0) * scaleFactorLargo))
+            newAlto = Math.max(1, Math.floor((originalChildDims.alto || 0) * scaleFactorAlto))
+          }
 
           // Escalar capacidad
           const newCapacidad = originalChildCapacity > 0 
@@ -2677,19 +2665,8 @@ const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => 
             x: newX,
             y: newY
           }
-
-          console.log(`  ✨ Hijo escalado:`, {
-            nuevasDimensiones: elements[i].dimensiones,
-            nuevaCapacidad: elements[i].capacidadCarga
-          })
-
-          childrenScaled++
         }
       }
-
-      console.log(`🎯 Total de hijos escalados: ${childrenScaled}`)
-    } else {
-      console.log('ℹ️ No hay cambios de escala, hijos mantienen dimensiones originales')
     }
   }
 
