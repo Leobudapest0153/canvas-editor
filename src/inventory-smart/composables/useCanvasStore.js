@@ -1818,20 +1818,31 @@ const calcularCanvasAdaptativo = (elemento) => {
           setModoEdicion(value)
         },
         setInitialNavigation: (plantaId, plantaNombre) => {
-          // Establecer la primera planta como activa siempre
-          plantaActiva.value = plantaId
+          // Si ya existe un contexto de navegación válido, preservarlo
+          const currentContext = contextoNavegacion.value
+          const isValidCurrentContext = currentContext?.tipo === 'plantas' && 
+                                      currentContext?.id && 
+                                      plantas.value.some(p => p.id === currentContext.id)
 
-          // Establecer contexto de navegación siempre en la primera planta
-          contextoNavegacion.value = {
-            tipo: 'plantas',
-            id: plantaId,
-            path: [
-              {
-                tipo: 'plantas',
-                id: plantaId,
-                nombre: plantaNombre,
-              },
-            ],
+          if (isValidCurrentContext) {
+            // Preservar el contexto actual si es válido
+            plantaActiva.value = currentContext.id
+            // No modificar contextoNavegacion.value para mantener el contexto actual
+          } else {
+            // Solo establecer la primera planta si no hay contexto válido (importación inicial)
+            plantaActiva.value = plantaId
+
+            contextoNavegacion.value = {
+              tipo: 'plantas',
+              id: plantaId,
+              path: [
+                {
+                  tipo: 'plantas',
+                  id: plantaId,
+                  nombre: plantaNombre,
+                },
+              ],
+            }
           }
 
           // Resetear valores temporales a sus defaults
