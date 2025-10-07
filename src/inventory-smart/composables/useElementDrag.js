@@ -821,6 +821,9 @@ export function useElementDrag({
   }
 
   const onShapeDragMove = (e, el) => {
+    if (canvasStore.floatingOrigin?.interactionsSuspended) {
+      return
+    }
     const data = innerSessions.get(el.id)
     if (data) {
       const { session, parent } = data
@@ -934,6 +937,41 @@ export function useElementDrag({
     }
   }
 
+  const shiftMapPositions = (map, deltaX, deltaY) => {
+    if (!map || typeof map.forEach !== 'function') return
+    map.forEach((pos, key) => {
+      if (!pos || typeof pos !== 'object') return
+      const next = { ...pos }
+      if (next.x != null && Number.isFinite(Number(next.x))) {
+        next.x = Number(next.x) - deltaX
+      }
+      if (next.y != null && Number.isFinite(Number(next.y))) {
+        next.y = Number(next.y) - deltaY
+      }
+      map.set(key, next)
+    })
+  }
+
+  const shiftDragStateBy = (dx = 0, dy = 0) => {
+    const deltaX = Number(dx) || 0
+    const deltaY = Number(dy) || 0
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return
+    if (Math.abs(deltaX) < 1e-6 && Math.abs(deltaY) < 1e-6) return
+    shiftMapPositions(dragStartPositions.value, deltaX, deltaY)
+    shiftMapPositions(lastValidPositions.value, deltaX, deltaY)
+    shiftMapPositions(lastDesiredPosMap.value, deltaX, deltaY)
+    innerSessions.forEach((session) => {
+      if (session && session.initial) {
+        if (session.initial.x != null && Number.isFinite(Number(session.initial.x))) {
+          session.initial.x = Number(session.initial.x) - deltaX
+        }
+        if (session.initial.y != null && Number.isFinite(Number(session.initial.y))) {
+          session.initial.y = Number(session.initial.y) - deltaY
+        }
+      }
+    })
+  }
+
   return {
     // Refs
     isElementDragging,
@@ -950,6 +988,7 @@ export function useElementDrag({
     onShapeDragMove,
     onShapeDragEnd,
     registerDraggableRef,
+    shiftDragStateBy,
 
     // Utils
     scheduleDraw,

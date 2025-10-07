@@ -395,11 +395,33 @@ export function useObjectSnapping() {
     isSnapping.value = false
   }
 
+  function shiftGuidesBy(dx = 0, dy = 0) {
+    const deltaX = Number(dx) || 0
+    const deltaY = Number(dy) || 0
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return
+    if (Math.abs(deltaX) < 1e-6 && Math.abs(deltaY) < 1e-6) return
+    activeGuides.value = activeGuides.value.map((guide) => {
+      if (!guide || typeof guide !== 'object') return guide
+      const next = { ...guide }
+      if (next.type === 'vertical') {
+        if (next.x != null && Number.isFinite(Number(next.x))) next.x = Number(next.x) - deltaX
+        if (next.y1 != null && Number.isFinite(Number(next.y1))) next.y1 = Number(next.y1) - deltaY
+        if (next.y2 != null && Number.isFinite(Number(next.y2))) next.y2 = Number(next.y2) - deltaY
+      } else if (next.type === 'horizontal') {
+        if (next.y != null && Number.isFinite(Number(next.y))) next.y = Number(next.y) - deltaY
+        if (next.x1 != null && Number.isFinite(Number(next.x1))) next.x1 = Number(next.x1) - deltaX
+        if (next.x2 != null && Number.isFinite(Number(next.x2))) next.x2 = Number(next.x2) - deltaX
+      }
+      return next
+    })
+  }
+
   // Retornar solo lo que se usa externamente (evitar exportar utilidades internas)
   return {
     activeGuides: computed(() => activeGuides.value),
     isSnapping: computed(() => isSnapping.value),
     performSnap,
     clearGuides,
+    shiftGuidesBy,
   }
 }

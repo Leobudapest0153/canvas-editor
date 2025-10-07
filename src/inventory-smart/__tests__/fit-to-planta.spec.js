@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
+import { nextTick, defineComponent, h } from 'vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 
 vi.mock('vue-konva', () => ({ VueKonva: {}, default: { install: () => {} } }))
@@ -155,5 +156,253 @@ describe('fitToPlanta', () => {
     expect(scaleCall[0].y).toBeCloseTo(firstFit.scale)
     expect(positionCall[0].x).toBeCloseTo(firstFit.position.x)
     expect(positionCall[0].y).toBeCloseTo(firstFit.position.y)
+  })
+})
+
+describe('floating origin rebase integration', () => {
+  let originalRaf
+  let originalCancelRaf
+  let originalWindowRaf
+  let originalWindowCancelRaf
+
+  beforeEach(() => {
+    originalRaf = globalThis.requestAnimationFrame
+    originalCancelRaf = globalThis.cancelAnimationFrame
+    originalWindowRaf = typeof window !== 'undefined' ? window.requestAnimationFrame : undefined
+    originalWindowCancelRaf = typeof window !== 'undefined' ? window.cancelAnimationFrame : undefined
+    globalThis.requestAnimationFrame = (cb) => {
+      if (typeof cb === 'function') {
+        cb(16)
+      }
+      return 1
+    }
+    globalThis.cancelAnimationFrame = vi.fn()
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame = globalThis.requestAnimationFrame
+      window.cancelAnimationFrame = globalThis.cancelAnimationFrame
+    }
+  })
+
+  afterEach(() => {
+    if (originalRaf) {
+      globalThis.requestAnimationFrame = originalRaf
+    } else {
+      delete globalThis.requestAnimationFrame
+    }
+    if (originalCancelRaf) {
+      globalThis.cancelAnimationFrame = originalCancelRaf
+    } else {
+      delete globalThis.cancelAnimationFrame
+    }
+    if (typeof window !== 'undefined') {
+      if (originalWindowRaf) {
+        window.requestAnimationFrame = originalWindowRaf
+      } else {
+        delete window.requestAnimationFrame
+      }
+      if (originalWindowCancelRaf) {
+        window.cancelAnimationFrame = originalWindowCancelRaf
+      } else {
+        delete window.cancelAnimationFrame
+      }
+    }
+    vi.useRealTimers()
+  })
+
+  it('rebases at most once per 300ms and keeps overlays aligned', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'))
+
+    const store = mockStore
+    store.plantas = [
+      {
+        id: 'planta_1',
+        nombre: 'Infinita',
+        isInfinite: true,
+        dimensiones: { ancho: 200000, largo: 200000 },
+      },
+    ]
+    store.plantaActiva = 'planta_1'
+    store.contextoNavegacion = { tipo: 'plantas', id: 'planta_1', path: [{ tipo: 'plantas', id: 'planta_1' }] }
+    store.canvasAdaptativo = {
+      width: 200000,
+      height: 200000,
+      escala: 1,
+      frame: { x: 0, y: 0, width: 200000, height: 200000 },
+    }
+    store.elementos = [
+      {
+        id: 'rack-1',
+        tipo: 'elementos',
+        forma: 'rectangular',
+        plantaId: 'planta_1',
+        x: 60010,
+        y: 40,
+        width: 80,
+        height: 40,
+        visible: true,
+        posicion: { x: 60010, y: 40 },
+      },
+    ]
+    store.zoom = 1
+    store.configurarPan(-59500, 0)
+
+    const layerCallLog = []
+    const stageNode = {
+      x: () => store.panX,
+      y: () => store.panY,
+      scaleX: () => store.zoom,
+      scaleY: () => store.zoom,
+      scale: vi.fn(),
+      position: vi.fn(),
+      batchDraw: vi.fn(),
+      findOne: vi.fn(() => null),
+    }
+    const layerNode = {
+      setAttr: vi.fn((key, value) => {
+        layerCallLog.push([key, value])
+      }),
+      getAttr: vi.fn(() => null),
+      clipFunc: vi.fn(),
+      batchDraw: vi.fn(),
+      clearCache: vi.fn(),
+    }
+    layerNode.getLayer = () => layerNode
+
+    const backgroundLayerNode = {
+      setAttr: vi.fn(),
+      getAttr: vi.fn(() => null),
+      clipFunc: vi.fn(),
+      batchDraw: vi.fn(),
+      clearCache: vi.fn(),
+    }
+    backgroundLayerNode.getLayer = () => backgroundLayerNode
+
+    const makeGenericLayerNode = () => {
+      const node = {
+        setAttr: vi.fn(),
+        getAttr: vi.fn(() => null),
+        clipFunc: vi.fn(),
+        batchDraw: vi.fn(),
+        clearCache: vi.fn(),
+      }
+      node.getLayer = () => node
+      return node
+    }
+
+    const layerNodes = [backgroundLayerNode, layerNode, makeGenericLayerNode(), makeGenericLayerNode(), makeGenericLayerNode()]
+    let layerIndex = 0
+
+    const StageComponentStub = defineComponent({
+      name: 'StageStub',
+      props: { config: { type: Object, default: () => ({}) } },
+      setup(props, { slots, expose }) {
+        expose({ getNode: () => stageNode })
+        return () => h('div', slots.default ? slots.default() : [])
+      },
+    })
+
+    const LayerComponentStub = defineComponent({
+      name: 'LayerStub',
+      props: { config: { type: Object, default: () => ({}) } },
+      setup(props, { slots, expose }) {
+        const node = layerNodes[layerIndex] || makeGenericLayerNode()
+        layerIndex += 1
+        expose({ getNode: () => node })
+        return () => h('div', slots.default ? slots.default() : [])
+      },
+    })
+
+    const wrapper = mount(CanvasView, {
+      global: {
+        provide: {
+          placementSuggestions: mockPlacementSuggestions,
+        },
+        stubs: {
+          'v-stage': StageComponentStub,
+          'v-layer': LayerComponentStub,
+        },
+      },
+    })
+
+    await nextTick()
+    await nextTick()
+
+    const setupState = wrapper.vm.$.setupState
+
+    if (!setupState.layerRef.value || typeof setupState.layerRef.value.getNode !== 'function') {
+      setupState.layerRef.value = { getNode: () => layerNode }
+    }
+    if (
+      !setupState.backgroundLayerRef.value ||
+      typeof setupState.backgroundLayerRef.value.getNode !== 'function'
+    ) {
+      setupState.backgroundLayerRef.value = { getNode: () => backgroundLayerNode }
+    }
+
+    expect(wrapper.vm.getStage()).toBe(stageNode)
+    expect(setupState.layerRef.value?.getNode?.()).toBe(layerNode)
+
+    wrapper.vm.stageSize.width = 1000
+    wrapper.vm.stageSize.height = 800
+
+    store.zoom = 1
+    store.configurarPan(-59500, 0)
+
+    await nextTick()
+
+    store.zoom = 1
+    store.configurarPan(-59500, 0)
+
+    const viewport = wrapper.vm.getViewportWorldRect()
+    expect(viewport).not.toBeNull()
+
+    wrapper.vm.startMarquee({ x: 60020, y: 50 })
+    wrapper.vm.updateMarquee({ x: 60080, y: 110 })
+    if (wrapper.vm.dragLastValidPositions?.value?.set) {
+      wrapper.vm.dragLastValidPositions.value.set('rack-1', { x: 60010, y: 40 })
+    }
+
+    await nextTick()
+
+    const originalShift = store.shiftWorldCoordinates
+    const shiftSpy = vi
+      .spyOn(store, 'shiftWorldCoordinates')
+      .mockImplementation((...args) => originalShift(...args))
+
+    const marqueeBefore = wrapper.vm.marqueeRect.x
+    const rebaseTriggered = wrapper.vm.ensureFloatingOrigin('spec')
+    await nextTick()
+
+    expect(shiftSpy).toHaveBeenCalledTimes(1)
+    expect(store.floatingOrigin.rebaseCount).toBe(1)
+    expect(store.floatingOrigin.telemetry.lastViewCenter.x).toBeCloseTo(60000, 0)
+    expect(store.floatingOrigin.telemetry.lastScale).toBeCloseTo(1, 5)
+    const shiftDelta = store.floatingOrigin.lastShift?.x || 0
+    expect(wrapper.vm.marqueeRect.x).toBeCloseTo(marqueeBefore - shiftDelta, 0)
+    expect(store.floatingOrigin.telemetry.rebasesPerMinute).toBeGreaterThanOrEqual(1)
+
+    const firstTimestamp = store.floatingOrigin.lastRebaseAt
+
+    store.configurarPan(-59500, 0)
+    vi.setSystemTime(new Date('2024-01-01T00:00:00.100Z'))
+    const suppressed = wrapper.vm.ensureFloatingOrigin('cooldown')
+    await nextTick()
+    expect(suppressed).toBe(false)
+    expect(store.floatingOrigin.rebaseCount).toBe(1)
+    expect(shiftSpy).toHaveBeenCalledTimes(1)
+
+    store.panX = -59500
+    vi.setSystemTime(new Date('2024-01-01T00:00:00.520Z'))
+    const secondRebase = wrapper.vm.ensureFloatingOrigin('after-cooldown')
+    await nextTick()
+    expect(secondRebase).toBe(true)
+    expect(store.floatingOrigin.rebaseCount).toBe(2)
+    expect(shiftSpy).toHaveBeenCalledTimes(2)
+    expect(store.floatingOrigin.lastRebaseAt - firstTimestamp).toBeGreaterThanOrEqual(300)
+
+    expect(layerCallLog.some(([key, value]) => key === 'floatingRebaseActive' && value === true)).toBe(true)
+
+    shiftSpy.mockRestore()
   })
 })
