@@ -256,6 +256,12 @@ export const useCanvasStore = defineStore('canvas', () => {
   const plantaEnEdicion = ref(null)
   const panX = ref(0)
   const panY = ref(0)
+  const floatingOriginThreshold = ref(50000)
+  const worldOffsetX = ref(0)
+  const worldOffsetY = ref(0)
+  const worldRebaseVersion = ref(0)
+  const worldRebaseDelta = ref({ x: 0, y: 0 })
+  const isWorldRebasing = ref(false)
 
   const elementoDestacadoId = ref(null)
   const idsElementosFiltrados = ref(null)
@@ -402,6 +408,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   })
 
   const mostrarPropiedades = computed(() => propertiesPanelVisible.value && Boolean(elementoSeleccionado.value))
+
+  const worldOffset = computed(() => ({ x: worldOffsetX.value, y: worldOffsetY.value }))
 
   // === COMPUTED PARA NAVEGACIÓN JERÁRQUICA ===
   const contextoActual = computed(() => {
@@ -952,6 +960,8 @@ const calcularCanvasAdaptativo = (elemento) => {
 
       elementos.value.splice(idx, 1, next);
 
+      maybeRebaseWorldForElement(next, 'element-update:sin-validacion')
+
       const ctx = buildPasilloAssignmentContext()
       if (next.tipo === 'pasillos') {
         const newScope = ctx.getScope(next)
@@ -1072,6 +1082,7 @@ const calcularCanvasAdaptativo = (elemento) => {
         }
       } catch (e) { /* noop */ }
     }
+    maybeRebaseWorldForElement(elemento, 'element-update')
     return true
   }
 
@@ -1163,6 +1174,150 @@ const calcularCanvasAdaptativo = (elemento) => {
     if (Math.abs(x - panXAnterior) > 1 || Math.abs(y - panYAnterior) > 1) {
       saveZoomPanToHistory()
     }
+  }
+
+  const setFloatingOriginThreshold = (value) => {
+    const next = Number(value)
+    if (!Number.isFinite(next)) return
+    floatingOriginThreshold.value = Math.max(1000, Math.abs(Math.round(next)))
+  }
+
+  const translatePoint = (point, dx, dy) => {
+    if (!point || typeof point !== 'object') return
+    if (Number.isFinite(point.x)) point.x -= dx
+    if (Number.isFinite(point.y)) point.y -= dy
+  }
+
+  const translatePointArray = (arr, dx, dy) => {
+    if (!Array.isArray(arr)) return
+    for (const item of arr) {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        translatePoint(item, dx, dy)
+      }
+    }
+  }
+
+  const translateElementState = (elemento, dx, dy) => {
+    if (!elemento || typeof elemento !== 'object') return
+    if (Number.isFinite(elemento.x)) elemento.x -= dx
+    if (Number.isFinite(elemento.y)) elemento.y -= dy
+    if (elemento.posicion && typeof elemento.posicion === 'object') {
+      translatePoint(elemento.posicion, dx, dy)
+    }
+    if (Array.isArray(elemento.poligono)) {
+      translatePointArray(elemento.poligono, dx, dy)
+    }
+    if (Array.isArray(elemento.vertices)) {
+      translatePointArray(elemento.vertices, dx, dy)
+    }
+    for (const key of Object.keys(elemento)) {
+      if (['x', 'y', 'posicion', 'poligono', 'vertices'].includes(key)) continue
+      const value = elemento[key]
+      if (Array.isArray(value) && value.length) {
+        const allPoints = value.every((item) => item && typeof item === 'object' && !Array.isArray(item) && (Number.isFinite(item.x) || Number.isFinite(item.y)))
+        if (allPoints) {
+          translatePointArray(value, dx, dy)
+        }
+      } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+        if (Number.isFinite(value.x) || Number.isFinite(value.y)) {
+          translatePoint(value, dx, dy)
+        }
+      }
+    }
+  }
+
+  const translatePlantState = (planta, dx, dy) => {
+    if (!planta || typeof planta !== 'object') return
+    if (Array.isArray(planta.poligono)) {
+      translatePointArray(planta.poligono, dx, dy)
+    }
+    if (planta.frame && typeof planta.frame === 'object') {
+      translatePoint(planta.frame, dx, dy)
+    }
+    if (planta.boundingBox && typeof planta.boundingBox === 'object') {
+      translatePoint(planta.boundingBox, dx, dy)
+      if (Number.isFinite(planta.boundingBox.minX)) planta.boundingBox.minX -= dx
+      if (Number.isFinite(planta.boundingBox.minY)) planta.boundingBox.minY -= dy
+      if (Number.isFinite(planta.boundingBox.maxX)) planta.boundingBox.maxX -= dx
+      if (Number.isFinite(planta.boundingBox.maxY)) planta.boundingBox.maxY -= dy
+    }
+  }
+
+  const applyWorldTranslation = (dx, dy, meta = {}) => {
+    if (!dx && !dy) return false
+    if (isWorldRebasing.value) return false
+    isWorldRebasing.value = true
+    try {
+      for (const el of elementos.value) {
+        translateElementState(el, dx, dy)
+      }
+      for (const planta of plantas.value) {
+        translatePlantState(planta, dx, dy)
+      }
+      if (elementoAura.value) {
+        translateElementState(elementoAura.value, dx, dy)
+      }
+
+      worldOffsetX.value += dx
+      worldOffsetY.value += dy
+      worldRebaseDelta.value = { x: dx, y: dy, reason: meta.reason || 'manual' }
+      worldRebaseVersion.value += 1
+
+      const zoomFactor = zoom.value || 1
+      panX.value += dx * zoomFactor
+      panY.value += dy * zoomFactor
+
+      const stage = typeof window !== 'undefined' ? window.__konvaStage : null
+      if (stage && typeof stage.position === 'function') {
+        stage.position({ x: panX.value, y: panY.value })
+        try {
+          const layers = typeof stage.getLayers === 'function' ? stage.getLayers() : []
+          layers?.forEach?.((layer) => layer?.batchDraw?.())
+        } catch {
+          stage.batchDraw?.()
+        }
+      }
+
+      const planta = plantaActivaData.value
+      if (planta) {
+        calcularCanvasAdaptativoPlanta(planta)
+      }
+
+      return true
+    } finally {
+      isWorldRebasing.value = false
+    }
+  }
+
+  const computeRebaseShift = (value) => {
+    if (!Number.isFinite(value)) return 0
+    const threshold = Math.max(1000, floatingOriginThreshold.value)
+    if (Math.abs(value) < threshold) return 0
+    const quotient = Math.trunc(value / threshold)
+    if (quotient === 0) return 0
+    return quotient * threshold
+  }
+
+  const maybeRebaseWorld = ({ focusX = 0, focusY = 0, reason = 'manual' } = {}) => {
+    if (!estaEnPlanta.value) return { rebased: false, dx: 0, dy: 0, reason }
+    const planta = plantaActivaData.value
+    if (!planta || planta.isInfinite !== true) {
+      return { rebased: false, dx: 0, dy: 0, reason }
+    }
+    const shiftX = computeRebaseShift(focusX)
+    const shiftY = computeRebaseShift(focusY)
+    if (!shiftX && !shiftY) {
+      return { rebased: false, dx: 0, dy: 0, reason }
+    }
+    const applied = applyWorldTranslation(shiftX, shiftY, { reason })
+    return { rebased: applied, dx: shiftX, dy: shiftY, reason }
+  }
+
+  const maybeRebaseWorldForElement = (elemento, reason = 'element') => {
+    if (!elemento) return { rebased: false, dx: 0, dy: 0, reason }
+    const px = Number.isFinite(elemento.x) ? elemento.x : Number(elemento.posicion?.x) || 0
+    const py = Number.isFinite(elemento.y) ? elemento.y : Number(elemento.posicion?.y) || 0
+    return maybeRebaseWorld({ focusX: px, focusY: py, reason })
   }
 
   // Actions para plantas
@@ -1509,6 +1664,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     }
 
     elementos.value.push(nuevoElemento)
+    maybeRebaseWorldForElement(nuevoElemento, 'element-insert')
 
     // Normalización inmediata post-inserción: asegurar que en vista XY height represente largo (caso Anaquel)
     try {
@@ -1592,6 +1748,7 @@ const calcularCanvasAdaptativo = (elemento) => {
 
       // Insertar directamente en el store
       elementos.value.push(next);
+      maybeRebaseWorldForElement(next, 'element-insert:sin-validacion')
 
       const ctx = buildPasilloAssignmentContext()
       if (next.tipo === 'pasillos') {
@@ -2947,6 +3104,13 @@ const calcularCanvasAdaptativo = (elemento) => {
     setTiposProductoAdmitidos,
     gestionPisosPropiedadesModal,
     nivelAEditar,
+    floatingOriginThreshold,
+    worldOffset,
+    worldOffsetX,
+    worldOffsetY,
+    worldRebaseVersion,
+    worldRebaseDelta,
+    isWorldRebasing,
 
     // Getters
     elementosVisibles,
@@ -2982,6 +3146,9 @@ const calcularCanvasAdaptativo = (elemento) => {
     persist,
     configurarZoom,
     configurarPan,
+    setFloatingOriginThreshold,
+    maybeRebaseWorld,
+    maybeRebaseWorldForElement,
     setGridSize,
     setSnapGridEps,
     toggleGridVisible,

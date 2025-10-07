@@ -99,6 +99,18 @@ export function useMarqueeSelection({ canvasStore, stageRef }) {
     selectedElementIds.value.clear()
   }
 
+  const translateMarquee = (dx, dy) => {
+    if (!dx && !dy) return
+    marqueeStart.value = {
+      x: marqueeStart.value.x - dx,
+      y: marqueeStart.value.y - dy,
+    }
+    marqueeEnd.value = {
+      x: marqueeEnd.value.x - dx,
+      y: marqueeEnd.value.y - dy,
+    }
+  }
+
   /**
    * Verifica si un elemento intersecta con el rectángulo de marquesina
    * @param {Object} elemento - Elemento del canvas
@@ -147,5 +159,6 @@ export function useMarqueeSelection({ canvasStore, stageRef }) {
     endMarquee,
     cancelMarquee,
     stageToLayerCoords,
+    translateMarquee,
   }
 }
