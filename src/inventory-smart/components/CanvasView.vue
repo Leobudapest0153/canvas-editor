@@ -41,31 +41,34 @@
       @dbltap="handleStageDoubleTap"
     >
       <v-layer ref="backgroundLayerRef" :config="{ listening: false }">
-        <!-- GridLayer DEBAJO de todo para que los elementos lo tapen -->
-        <GridLayer
-          v-if="canvasStore.gridVisible"
-          :scale="canvasStore.zoom"
-          :pixels-per-unit="10 * 100"
-          :unit="'m'"
-          :bbox="floorBoundary"
-        />
-        <v-line
-          v-if="plantPolygon.length && !isInfinitePlant"
-          :config="{
-            points: plantPolygonFlat,
-            closed: true,
-            stroke: '#0ea5e9',
-            fill: 'transparent',
-            strokeWidth: 2 / canvasStore.zoom,
-            listening: false,
-          }"
-        />
+        <v-group :config="worldBackgroundGroupConfig">
+          <!-- GridLayer DEBAJO de todo para que los elementos lo tapen -->
+          <GridLayer
+            v-if="canvasStore.gridVisible"
+            :scale="canvasStore.zoom"
+            :pixels-per-unit="10 * 100"
+            :unit="'m'"
+            :bbox="floorBoundary"
+          />
+          <v-line
+            v-if="plantPolygon.length && !isInfinitePlant"
+            :config="{
+              points: plantPolygonFlat,
+              closed: true,
+              stroke: '#0ea5e9',
+              fill: 'transparent',
+              strokeWidth: 2 / canvasStore.zoom,
+              listening: false,
+            }"
+          />
+        </v-group>
       </v-layer>
       <v-layer ref="layerRef">
-        <template v-if="canvasStore.elementoAura">
+        <v-group ref="worldGroupRef" :config="worldLayerGroupConfig">
           <v-rect
             v-if="
-              canvasStore.elementoAura.forma === 'rectangular' || !canvasStore.elementoAura.forma
+              canvasStore.elementoAura &&
+              (canvasStore.elementoAura.forma === 'rectangular' || !canvasStore.elementoAura.forma)
             "
             :config="{
               id: canvasStore.elementoAura.id,
@@ -78,10 +81,12 @@
               cornerRadius: 10,
               listening: false,
             }"
-          />
+          ></v-rect>
           <v-circle
-            v-else-if="
-              canvasStore.elementoAura.forma === 'circular' && canvasStore.vistaActiva === 'XY'
+            v-if="
+              canvasStore.elementoAura &&
+              canvasStore.elementoAura.forma === 'circular' &&
+              canvasStore.vistaActiva === 'XY'
             "
             :config="{
               id: canvasStore.elementoAura.id,
@@ -93,8 +98,7 @@
               cornerRadius: 10,
               listening: false,
             }"
-          />
-        </template>
+          ></v-circle>
 
         <!-- Renderizado de elementos del store -->
         <template v-for="elemento in elementosVisiblesEnCanvas" :key="elemento.id">
@@ -116,9 +120,9 @@
             @dragstart="(e) => handleShapeDragStart(e, elemento)"
             @dragmove="(e) => handleShapeDragMove(e, elemento)"
             @dragend="(e) => handleShapeDragEnd(e, elemento)"
-            @transformstart="(e) => handleTransformStart(e, elemento.id)"
-            @transform="(e) => handleTransformMove(e, elemento.id)"
-            @transformend="(e) => handleTransformEnd(e, elemento.id)"
+            @transformstart="(e) => handleTransformStartWrapper(e, elemento.id)"
+            @transform="(e) => handleTransformMoveWrapper(e, elemento.id)"
+            @transformend="(e) => handleTransformEndWrapper(e, elemento.id)"
             @contextmenu="(e) => onShapeContextMenu(e, elemento)"
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
             @pointerup.passive="onShapePointerUp"
@@ -256,9 +260,9 @@
             @dragstart="(e) => handleShapeDragStart(e, elemento)"
             @dragmove="(e) => handleShapeDragMove(e, elemento)"
             @dragend="(e) => handleShapeDragEnd(e, elemento)"
-            @transformstart="(e) => handleTransformStart(e, elemento.id)"
-            @transform="(e) => handleTransformMove(e, elemento.id)"
-            @transformend="(e) => handleTransformEnd(e, elemento.id)"
+            @transformstart="(e) => handleTransformStartWrapper(e, elemento.id)"
+            @transform="(e) => handleTransformMoveWrapper(e, elemento.id)"
+            @transformend="(e) => handleTransformEndWrapper(e, elemento.id)"
             @contextmenu="(e) => onShapeContextMenu(e, elemento)"
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
             @pointerup.passive="onShapePointerUp"
@@ -315,9 +319,9 @@
             @dragstart="(e) => handleShapeDragStart(e, elemento)"
             @dragmove="(e) => handleShapeDragMove(e, elemento)"
             @dragend="(e) => handleShapeDragEnd(e, elemento)"
-            @transformstart="(e) => handleTransformStart(e, elemento.id)"
-            @transform="(e) => handleTransformMove(e, elemento.id)"
-            @transformend="(e) => handleTransformEnd(e, elemento.id)"
+            @transformstart="(e) => handleTransformStartWrapper(e, elemento.id)"
+            @transform="(e) => handleTransformMoveWrapper(e, elemento.id)"
+            @transformend="(e) => handleTransformEndWrapper(e, elemento.id)"
             @contextmenu="(e) => onShapeContextMenu(e, elemento)"
             @pointerdown.passive="(e) => onShapePointerDown(e, elemento)"
             @pointerup.passive="onShapePointerUp"
@@ -446,6 +450,7 @@
 
           <!-- Etiqueta centrada por grupo aplicada; se elimina texto flotante anterior -->
         </template>
+        </v-group>
       </v-layer>
       <v-layer ref="uiLayerRef" :config="{ listening: false }">
         <!-- Debug: mostrar información según el contexto -->
@@ -734,7 +739,21 @@ const layerRef = ref(null)
 const backgroundLayerRef = ref(null)
 const overlaysLayerRef = ref(null)
 const indicatorsLayerRef = ref(null)
+const worldGroupRef = ref(null)
 const lastFitTarget = ref(null)
+
+const worldBackgroundGroupConfig = computed(() => ({
+  id: 'world-background',
+  listening: false,
+  x: 0,
+  y: 0,
+}))
+
+const worldLayerGroupConfig = computed(() => ({
+  id: 'world-root',
+  x: 0,
+  y: 0,
+}))
 
 // Estado de contacto y último pos para dragBound en plantas (memoria por elemento)
 const boundContactState = new Map()
@@ -779,7 +798,13 @@ const closeTemplateModal = () => {
 const dimensionValidation = useDimensionValidation()
 
 // Object snapping
-const { activeGuides: snapGuides, isSnapping, performSnap, clearGuides } = useObjectSnapping()
+const {
+  activeGuides: snapGuides,
+  isSnapping,
+  performSnap,
+  clearGuides,
+  shiftGuidesBy,
+} = useObjectSnapping()
 
 // Estado para controlar si el snapping está habilitado
 const isSnappingEnabled = ref(true)
@@ -794,6 +819,7 @@ const {
   endMarquee,
   cancelMarquee,
   stageToLayerCoords,
+  shiftMarqueeBy,
 } = useMarqueeSelection({ canvasStore, stageRef })
 
 // === HELPERS DE CONVERSIÓN ===
@@ -891,6 +917,38 @@ const stageConfig = computed(() => {
     draggable: !bloqueado && stageDragEnabled.value,
   }
 })
+
+const floatingOriginState = computed(() => canvasStore.floatingOrigin || {})
+const floatingOriginThreshold = computed(() => {
+  const t = Number(floatingOriginState.value.threshold)
+  if (!Number.isFinite(t) || t <= 0) return 50000
+  return Math.max(1000, t)
+})
+
+const getViewState = () => {
+  const zoom = canvasStore.zoom || 1
+  const safeZoom = zoom === 0 ? 1 : zoom
+  const width = stageSize.value.width / safeZoom
+  const height = stageSize.value.height / safeZoom
+  const x = -canvasStore.panX / safeZoom
+  const y = -canvasStore.panY / safeZoom
+  return {
+    x,
+    y,
+    width,
+    height,
+    centerX: x + width / 2,
+    centerY: y + height / 2,
+  }
+}
+
+const chooseAxisOffset = (current, candidate, threshold) => {
+  if (!Number.isFinite(candidate)) return current
+  if (Math.abs(candidate) <= threshold) return current
+  if (!Number.isFinite(current) || Math.abs(current) < 1) return candidate
+  if (Math.abs(candidate) > Math.abs(current)) return candidate
+  return current
+}
 
 const activeBounds = computed(() => getActiveBounds(canvasStore))
 const isInfinitePlant = computed(() => canvasStore.estaEnPlanta && canvasStore.plantaActivaData?.isInfinite === true)
@@ -1107,6 +1165,36 @@ const elementosVisiblesEnCanvas = computed(() => {
   })
 })
 
+const updateInfiniteClipRect = () => {
+  if (!isInfinitePlant.value) return
+  const layer = layerRef.value?.getNode?.()
+  const stage = stageRef.value?.getNode?.()
+  if (!layer || !stage) return
+  const view = getViewState()
+  const zoom = canvasStore.zoom || 1
+  const safeZoom = zoom === 0 ? 1 : zoom
+  const expansion = 3 + Math.max(1, 1 / safeZoom)
+  const width = Math.max(1, view.width * expansion)
+  const height = Math.max(1, view.height * expansion)
+  const rect = {
+    x: view.centerX - width / 2,
+    y: view.centerY - height / 2,
+    width,
+    height,
+  }
+  try {
+    layer.setAttr('floatingClipRect', rect)
+    layer.clipFunc((ctx) => {
+      const r = layer.getAttr('floatingClipRect') || rect
+      ctx.beginPath()
+      ctx.rect(r.x, r.y, Math.max(1, r.width), Math.max(1, r.height))
+    })
+  } catch {
+    /* ignore */
+  }
+  layer.batchDraw?.()
+}
+
 // Detectar si existen pasillos visibles y toggle para su borde punteado
 const hasPasillos = computed(() =>
   elementosVisiblesEnCanvas.value.some((e) => (e.tipo || '').toLowerCase() === 'pasillos'),
@@ -1119,13 +1207,20 @@ watch(
     const layer = layerRef.value?.getNode?.()
     if (!layer) return
 
-    if (infinite || !poly?.length) {
+    if (infinite) {
       try {
         layer.clipFunc(null)
-        if (typeof layer.clipWidth === 'function') layer.clipWidth(null)
-        if (typeof layer.clipHeight === 'function') layer.clipHeight(null)
-        if (typeof layer.clipX === 'function') layer.clipX(0)
-        if (typeof layer.clipY === 'function') layer.clipY(0)
+      } catch {
+        /* ignore */
+      }
+      updateInfiniteClipRect()
+      return
+    }
+
+    if (!Array.isArray(poly) || !poly.length) {
+      try {
+        layer.clipFunc(null)
+        layer.setAttr?.('floatingClipRect', null)
       } catch {
         /* ignore */
       }
@@ -1133,15 +1228,196 @@ watch(
       return
     }
 
-    layer.clipFunc((ctx) => {
-      ctx.beginPath()
-      poly.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
-      ctx.closePath()
-    })
+    const safePoly = poly.map((p) => ({ x: Number(p?.x) || 0, y: Number(p?.y) || 0 }))
+    try {
+      layer.setAttr?.('floatingClipRect', null)
+      layer.clipFunc((ctx) => {
+        ctx.beginPath()
+        safePoly.forEach((pt, index) => {
+          if (index === 0) ctx.moveTo(pt.x, pt.y)
+          else ctx.lineTo(pt.x, pt.y)
+        })
+        ctx.closePath()
+      })
+    } catch {
+      /* ignore */
+    }
     layer.batchDraw?.()
   },
   { immediate: true, deep: true },
 )
+
+watch(
+  () => [canvasStore.panX, canvasStore.panY, canvasStore.zoom, stageSize.value.width, stageSize.value.height, isInfinitePlant.value],
+  () => {
+    if (isInfinitePlant.value) updateInfiniteClipRect()
+  },
+  { flush: 'post' },
+)
+
+const elementPositionsSignature = computed(() =>
+  elementosVisiblesEnCanvas.value
+    .map((el) => {
+      const x = Math.round(Number(el?.x) || 0)
+      const y = Math.round(Number(el?.y) || 0)
+      return `${el?.id ?? ''}:${x}:${y}`
+    })
+    .join('|'),
+)
+
+const ensureFloatingOrigin = (reason = 'auto') => {
+  const stage = stageRef.value?.getNode?.()
+  const layer = layerRef.value?.getNode?.()
+  if (!stage || !layer) return false
+
+  const threshold = floatingOriginThreshold.value
+  let offsetXCandidate = 0
+  let offsetYCandidate = 0
+
+  const view = getViewState()
+  offsetXCandidate = chooseAxisOffset(offsetXCandidate, view.centerX, threshold)
+  offsetYCandidate = chooseAxisOffset(offsetYCandidate, view.centerY, threshold)
+
+  const selectedFull = canvasStore.elementoSeleccionadoCompleto
+  if (selectedFull) {
+    const centerX = (Number(selectedFull.x) || 0) + getDrawWidth(selectedFull) / 2
+    const centerY = (Number(selectedFull.y) || 0) + getDrawHeight(selectedFull) / 2
+    offsetXCandidate = chooseAxisOffset(offsetXCandidate, centerX, threshold)
+    offsetYCandidate = chooseAxisOffset(offsetYCandidate, centerY, threshold)
+  }
+
+  const aura = canvasStore.elementoAura
+  if (aura) {
+    const auraCenterX = (Number(aura.x) || 0) + (Number(aura.width) || 0) / 2
+    const auraCenterY = (Number(aura.y) || 0) + (Number(aura.height) || 0) / 2
+    offsetXCandidate = chooseAxisOffset(offsetXCandidate, auraCenterX, threshold)
+    offsetYCandidate = chooseAxisOffset(offsetYCandidate, auraCenterY, threshold)
+  }
+
+  if (isMarqueeActive.value) {
+    const mx = marqueeRect.value.x + marqueeRect.value.width / 2
+    const my = marqueeRect.value.y + marqueeRect.value.height / 2
+    offsetXCandidate = chooseAxisOffset(offsetXCandidate, mx, threshold)
+    offsetYCandidate = chooseAxisOffset(offsetYCandidate, my, threshold)
+  }
+
+  dragLastValidPositions.value?.forEach((pos) => {
+    if (!pos) return
+    if (Math.abs(pos.x ?? 0) > threshold) offsetXCandidate = chooseAxisOffset(offsetXCandidate, pos.x, threshold)
+    if (Math.abs(pos.y ?? 0) > threshold) offsetYCandidate = chooseAxisOffset(offsetYCandidate, pos.y, threshold)
+  })
+
+  for (const pos of boundLastWorldPos.values()) {
+    if (!pos) continue
+    if (Math.abs(pos.x ?? 0) > threshold) offsetXCandidate = chooseAxisOffset(offsetXCandidate, pos.x, threshold)
+    if (Math.abs(pos.y ?? 0) > threshold) offsetYCandidate = chooseAxisOffset(offsetYCandidate, pos.y, threshold)
+  }
+
+  if (offsetXCandidate === 0 || offsetYCandidate === 0) {
+    for (const elemento of elementosVisiblesEnCanvas.value) {
+      if (!elemento) continue
+      const width = getDrawWidth(elemento) || 0
+      const height = getDrawHeight(elemento) || 0
+      const candidateX = (Number(elemento.x) || 0) + width / 2
+      const candidateY = (Number(elemento.y) || 0) + height / 2
+      offsetXCandidate = chooseAxisOffset(offsetXCandidate, candidateX, threshold)
+      offsetYCandidate = chooseAxisOffset(offsetYCandidate, candidateY, threshold)
+      if (Math.abs(offsetXCandidate) > threshold && Math.abs(offsetYCandidate) > threshold) {
+        break
+      }
+    }
+  }
+
+  const shiftX = Math.round(offsetXCandidate)
+  const shiftY = Math.round(offsetYCandidate)
+  if (Math.abs(shiftX) < 1 && Math.abs(shiftY) < 1) return false
+
+  const didShift = canvasStore.shiftWorldCoordinates(shiftX, shiftY, { reason })
+  if (!didShift) return false
+
+  try {
+    shiftDragStateBy(shiftX, shiftY)
+    shiftGuidesBy(shiftX, shiftY)
+    shiftMarqueeBy(shiftX, shiftY)
+  } catch {
+    /* ignore */
+  }
+
+  boundLastWorldPos.forEach((pos, key) => {
+    if (!pos || typeof pos !== 'object') return
+    const next = { ...pos }
+    if (Number.isFinite(Number(next.x))) next.x = Number(next.x) - shiftX
+    if (Number.isFinite(Number(next.y))) next.y = Number(next.y) - shiftY
+    boundLastWorldPos.set(key, next)
+  })
+
+  try {
+    layer.clearCache?.()
+    layer.batchDraw?.()
+  } catch {
+    /* ignore */
+  }
+  const bgLayer = backgroundLayerRef.value?.getNode?.()
+  bgLayer?.batchDraw?.()
+  stage.batchDraw?.()
+
+  conflictsApi.clear()
+  updateInfiniteClipRect()
+  return true
+}
+
+let pendingFloatingOriginCheck = false
+let pendingFloatingOriginReason = 'auto'
+
+const runFloatingOriginCheck = () => {
+  pendingFloatingOriginCheck = false
+  const reason = pendingFloatingOriginReason
+  pendingFloatingOriginReason = 'auto'
+  try {
+    ensureFloatingOrigin(reason)
+  } catch (err) {
+    console.warn('Floating origin update failed', err)
+  }
+}
+
+const scheduleFloatingOriginCheck = (reason = 'auto') => {
+  pendingFloatingOriginReason = reason
+  if (pendingFloatingOriginCheck) return
+  pendingFloatingOriginCheck = true
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(runFloatingOriginCheck)
+  } else {
+    setTimeout(runFloatingOriginCheck, 16)
+  }
+}
+
+watch(elementPositionsSignature, () => scheduleFloatingOriginCheck('elements'))
+watch(
+  () => [canvasStore.panX, canvasStore.panY, canvasStore.zoom],
+  () => scheduleFloatingOriginCheck('view'),
+)
+watch(
+  () => [stageSize.value.width, stageSize.value.height],
+  () => scheduleFloatingOriginCheck('resize'),
+)
+watch(
+  () => floatingOriginThreshold.value,
+  () => scheduleFloatingOriginCheck('threshold'),
+)
+watch(
+  () => canvasStore.elementoAura,
+  () => scheduleFloatingOriginCheck('aura'),
+  { deep: true },
+)
+watch(
+  () =>
+    isMarqueeActive.value
+      ? [marqueeRect.value.x, marqueeRect.value.y, marqueeRect.value.width, marqueeRect.value.height]
+      : null,
+  () => scheduleFloatingOriginCheck('marquee'),
+)
+
+watch(isInfinitePlant, () => scheduleFloatingOriginCheck('mode'))
 
 // Contorno activo siempre expresado como polígono
 const computeBoundary = () => {
@@ -1623,6 +1899,7 @@ const {
   onShapeDragEnd,
   registerDraggableRef,
   innerSessions,
+  shiftDragStateBy,
 } = useElementDrag({
   canvasStore,
   stageRef,
@@ -2901,6 +3178,8 @@ onMounted(async () => {
   document.addEventListener('touchdragstart', handleTouchDragStart)
   document.addEventListener('touchdragover', handleTouchDragOver)
   document.addEventListener('touchdrop', handleTouchDrop)
+
+  scheduleFloatingOriginCheck('init')
 })
 
 onUnmounted(() => {
@@ -3236,11 +3515,28 @@ const handleShapeDragStart = (evt, elemento) => {
 const handleShapeDragMove = (evt, elemento) => {
   if (!canDragElement(elemento) || !canStartDrag(elemento)) return
   onShapeDragMove(evt, elemento)
+  scheduleFloatingOriginCheck('drag')
 }
 
 const handleShapeDragEnd = (evt, elemento) => {
   if (!canDragElement(elemento)) return
   onShapeDragEnd(evt, elemento)
+  scheduleFloatingOriginCheck('drag')
+}
+
+const handleTransformStartWrapper = (evt, elementoId) => {
+  handleTransformStart(evt, elementoId)
+  scheduleFloatingOriginCheck('transform')
+}
+
+const handleTransformMoveWrapper = (evt, elementoId) => {
+  handleTransformMove(evt, elementoId)
+  scheduleFloatingOriginCheck('transform')
+}
+
+const handleTransformEndWrapper = (evt, elementoId) => {
+  handleTransformEnd(evt, elementoId)
+  scheduleFloatingOriginCheck('transform')
 }
 
 // Acción bloquear/desbloquear desde el menú contextual
@@ -3307,6 +3603,8 @@ defineExpose({
   getStage: getStageInstance,
   getStageSize: getStageSizeSnapshot,
   getViewportWorldRect,
+  ensureFloatingOrigin,
+  scheduleFloatingOriginCheck,
 })
 </script>
 

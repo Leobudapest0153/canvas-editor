@@ -18,7 +18,7 @@ import { resolvePasilloAssignment, PASILLO_ASSIGNMENT_DEFAULTS } from '@/invento
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, reactive } from 'vue'
 import { CM_TO_PX, DEFAULT_TIPOS_PRODUCTO_ADMITIDOS, CATALOGO, OFFSETS, TIPOS_ENTIDAD } from '@/inventory-smart/utils/constants'
 import { computeDimsByAxisScale, toCanvasSizePx } from '@/inventory-smart/utils/dimensionPolicy'
 import { useToast } from '@/inventory-smart/composables/useToast'
@@ -256,6 +256,19 @@ export const useCanvasStore = defineStore('canvas', () => {
   const plantaEnEdicion = ref(null)
   const panX = ref(0)
   const panY = ref(0)
+  const floatingOrigin = reactive({
+    offsetX: 0,
+    offsetY: 0,
+    threshold: 50000,
+    rebaseCount: 0,
+    lastShift: null,
+  })
+
+  const setFloatingOriginThreshold = (value) => {
+    const v = Number(value)
+    if (!Number.isFinite(v) || v <= 0) return
+    floatingOrigin.threshold = Math.max(1000, Math.round(v))
+  }
 
   const elementoDestacadoId = ref(null)
   const idsElementosFiltrados = ref(null)
@@ -1165,6 +1178,92 @@ const calcularCanvasAdaptativo = (elemento) => {
     }
   }
 
+  const shiftWorldCoordinates = (dx = 0, dy = 0, metadata = {}) => {
+    const deltaX = Number(dx) || 0
+    const deltaY = Number(dy) || 0
+    if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) return false
+    if (Math.abs(deltaX) < 1e-6 && Math.abs(deltaY) < 1e-6) return false
+
+    const shiftNumber = (value, delta) => {
+      const num = Number(value)
+      if (!Number.isFinite(num)) return value
+      const next = num - delta
+      return Math.abs(next) < 1e-6 ? 0 : next
+    }
+
+    const shiftPointInPlace = (point) => {
+      if (!point || typeof point !== 'object') return
+      if (point.x != null) point.x = shiftNumber(point.x, deltaX)
+      if (point.y != null) point.y = shiftNumber(point.y, deltaY)
+    }
+
+    const shiftRectLike = (rect) => {
+      if (!rect || typeof rect !== 'object') return
+      if (rect.x != null) rect.x = shiftNumber(rect.x, deltaX)
+      if (rect.y != null) rect.y = shiftNumber(rect.y, deltaY)
+      if (rect.minX != null) rect.minX = shiftNumber(rect.minX, deltaX)
+      if (rect.minY != null) rect.minY = shiftNumber(rect.minY, deltaY)
+      if (rect.maxX != null) rect.maxX = shiftNumber(rect.maxX, deltaX)
+      if (rect.maxY != null) rect.maxY = shiftNumber(rect.maxY, deltaY)
+    }
+
+    for (const el of elementos.value) {
+      if (!el || typeof el !== 'object') continue
+      if (el.x != null) el.x = shiftNumber(el.x, deltaX)
+      if (el.y != null) el.y = shiftNumber(el.y, deltaY)
+      if (el.posicion && typeof el.posicion === 'object') {
+        if (el.posicion.x != null) el.posicion.x = shiftNumber(el.posicion.x, deltaX)
+        if (el.posicion.y != null) el.posicion.y = shiftNumber(el.posicion.y, deltaY)
+      }
+      if (Array.isArray(el.poligono)) {
+        el.poligono.forEach(shiftPointInPlace)
+      }
+      if (Array.isArray(el.polygon)) {
+        el.polygon.forEach(shiftPointInPlace)
+      }
+      if (Array.isArray(el.vertices)) {
+        el.vertices.forEach(shiftPointInPlace)
+      }
+      if (el.boundingBox) shiftRectLike(el.boundingBox)
+      if (el.previewBounds) shiftRectLike(el.previewBounds)
+    }
+
+    for (const planta of plantas.value) {
+      if (!planta || typeof planta !== 'object') continue
+      if (Array.isArray(planta.poligono)) planta.poligono.forEach(shiftPointInPlace)
+      if (planta.frame) shiftRectLike(planta.frame)
+    }
+
+    if (canvasAdaptativo.value) {
+      const adapt = canvasAdaptativo.value
+      if (adapt.originX != null) adapt.originX = shiftNumber(adapt.originX, deltaX)
+      if (adapt.originY != null) adapt.originY = shiftNumber(adapt.originY, deltaY)
+      if (adapt.frame) shiftRectLike(adapt.frame)
+    }
+
+    if (elementoAura.value) {
+      elementoAura.value = {
+        ...elementoAura.value,
+        x: shiftNumber(elementoAura.value.x, deltaX),
+        y: shiftNumber(elementoAura.value.y, deltaY),
+      }
+    }
+
+    configurarPan(panX.value + deltaX, panY.value + deltaY)
+
+    floatingOrigin.offsetX += deltaX
+    floatingOrigin.offsetY += deltaY
+    floatingOrigin.rebaseCount += 1
+    floatingOrigin.lastShift = {
+      x: deltaX,
+      y: deltaY,
+      reason: metadata?.reason || 'manual',
+      timestamp: Date.now(),
+    }
+
+    return true
+  }
+
   // Actions para plantas
   const seleccionarPlanta = (plantaId) => {
     // Limpiar timer de zoom/pan
@@ -1801,6 +1900,11 @@ const calcularCanvasAdaptativo = (elemento) => {
     }
     const prevZoom = zoom.value
     const prevPan = { x: panX.value, y: panY.value }
+
+    floatingOrigin.offsetX = 0
+    floatingOrigin.offsetY = 0
+    floatingOrigin.rebaseCount = 0
+    floatingOrigin.lastShift = null
 
     try {
       const storeActions = {
@@ -2923,6 +3027,7 @@ const calcularCanvasAdaptativo = (elemento) => {
     zoom,
     panX,
     panY,
+    floatingOrigin,
     gridSize,
     gridVisible,
     snapGridEps,
@@ -2982,6 +3087,8 @@ const calcularCanvasAdaptativo = (elemento) => {
     persist,
     configurarZoom,
     configurarPan,
+    setFloatingOriginThreshold,
+    shiftWorldCoordinates,
     setGridSize,
     setSnapGridEps,
     toggleGridVisible,
