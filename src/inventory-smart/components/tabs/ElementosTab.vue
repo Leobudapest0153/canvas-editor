@@ -232,22 +232,20 @@
         </div>
       </div>
 
-      <div
-        v-if="ctxMenu.visible"
-        class="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-1"
-        :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
-        role="menu"
-        :id="`tpl-menu-${ctxMenu.template?.id || 'ctx'}`"
-        @keydown.esc.stop.prevent="closeTemplateContextMenu"
+      <ContextMenu
+        :visible="ctxMenu.visible"
+        :x="ctxMenu.x"
+        :y="ctxMenu.y"
+        aria-label="Opciones de plantilla"
+        @close="closeTemplateContextMenu"
       >
-        <button
-          class="block cursor-pointer w-full text-left px-3 py-2 rounded text-red-600 hover:bg-red-50"
-          role="menuitem"
-          @click.stop="handleDeleteTemplate(ctxMenu.template)"
-        >
-          Eliminar
-        </button>
-      </div>
+        <MenuItem
+          :icon="DeleteIcon"
+          label="Eliminar"
+          variant="danger"
+          @click="handleDeleteTemplateWrapper"
+        />
+      </ContextMenu>
     </div>
   </div>
 </template>
@@ -257,6 +255,9 @@ import { ref, onMounted, watch, computed, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useCatalogStore } from '@/inventory-smart/stores/catalog'
 import ElementosCatalogo from '@/inventory-smart/components/ElementosCatalogo.vue'
+import ContextMenu from '@/inventory-smart/components/ui/ContextMenu.vue'
+import MenuItem from '@/inventory-smart/components/ui/MenuItem.vue'
+import DeleteIcon from '@/inventory-smart/components/ui/icons/DeleteIcon.vue'
 import { useCanvasStore } from '@/inventory-smart/composables/useCanvasStore'
 import { useConfirmDialog } from '@/inventory-smart/composables/useConfirmDialog'
 import { useToast } from '@/inventory-smart/composables/useToast'
@@ -536,6 +537,10 @@ const onGlobalClick = (e) => {
 }
 
 // Eliminar plantilla con confirmación reutilizando ConfirmModal
+const handleDeleteTemplateWrapper = () => {
+  handleDeleteTemplate(ctxMenu.value.template)
+}
+
 const handleDeleteTemplate = async (tpl) => {
   if (!tpl) return closeTemplateContextMenu()
 
