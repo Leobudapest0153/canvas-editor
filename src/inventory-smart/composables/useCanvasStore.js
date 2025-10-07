@@ -1820,8 +1820,8 @@ const calcularCanvasAdaptativo = (elemento) => {
         setInitialNavigation: (plantaId, plantaNombre) => {
           // Si ya existe un contexto de navegación válido, preservarlo
           const currentContext = contextoNavegacion.value
-          const isValidCurrentContext = currentContext?.tipo === 'plantas' && 
-                                      currentContext?.id && 
+          const isValidCurrentContext = currentContext?.tipo === 'plantas' &&
+                                      currentContext?.id &&
                                       plantas.value.some(p => p.id === currentContext.id)
 
           if (isValidCurrentContext) {
