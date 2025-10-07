@@ -15,6 +15,8 @@
     @click="$emit('click', $event)"
     @keydown="$emit('keydown', $event)"
     @blur="onBlur"
+    @mouseenter="onMouseEnter"
+    @mouseleave="onMouseLeave"
   >
     <span v-if="$slots.icon || icon" class="menu-item__icon">
       <slot name="icon">
@@ -77,8 +79,13 @@ defineProps({
 const emit = defineEmits(['click', 'keydown'])
 
 function onBlur(e) {
-  // Limpiar el fondo visual al perder el foco
-  e.target.classList.remove('focus')
+  e.target.blur()
+}
+function onMouseEnter(e) {
+  e.target.focus()
+}
+function onMouseLeave(e) {
+  e.target.blur()
 }
 </script>
 
