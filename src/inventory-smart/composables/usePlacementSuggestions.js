@@ -286,21 +286,13 @@ export function usePlacementSuggestions() {
       predefinedContainers: []
     }
     
-    console.log('🔍 [calculateChildrenAdjustments] Iniciando cálculo para:', elemento.nombre)
-    
     // Verificar si hay ajuste dimensional
     if (!suggestions.dimensionAdjustment) {
-      console.log('⚠️ No hay ajuste dimensional, retornando vacío')
       return result
     }
 
     const originalDims = elemento.dimensiones || {}
     const adjustedDims = suggestions.dimensionAdjustment
-
-    console.log('📏 Dimensiones:', {
-      original: originalDims,
-      ajustadas: adjustedDims
-    })
 
     // Calcular factores de escala
     const scaleFactorAncho = adjustedDims.ancho / (originalDims.ancho || adjustedDims.ancho)
@@ -310,24 +302,14 @@ export function usePlacementSuggestions() {
     // Calcular factor de escala para peso (basado en el volumen)
     const scaleFactorWeight = scaleFactorAncho * scaleFactorLargo * scaleFactorAlto
 
-    console.log('📊 Factores de escala:', {
-      ancho: scaleFactorAncho,
-      largo: scaleFactorLargo,
-      alto: scaleFactorAlto,
-      weight: scaleFactorWeight
-    })
-
     // 1. Procesar hijos del store (elementos ya creados)
     const hijosIds = Array.isArray(elemento.hijos) ? elemento.hijos : []
-    console.log('👶 Hijos en el store:', hijosIds)
     
     if (hijosIds.length > 0) {
       const elementosStore = canvasStore.elementosVisibles || []
       const hijos = hijosIds
         .map((id) => elementosStore.find((e) => e && e.id === id))
         .filter(Boolean)
-
-      console.log('✅ Hijos encontrados en el store:', hijos.length)
 
       for (const hijo of hijos) {
         const hijoDims = hijo.dimensiones || {}
@@ -371,20 +353,11 @@ export function usePlacementSuggestions() {
 
     // 2. Procesar contenedores predefinidos (del catálogo)
     const contenedores = Array.isArray(elemento.contenedores) ? elemento.contenedores : []
-    console.log('📦 Contenedores predefinidos:', contenedores.length)
     
     if (contenedores.length > 0) {
-      console.log('📦 Procesando contenedores predefinidos:', contenedores)
-      
       for (const contenedor of contenedores) {
         const contDims = contenedor.dimensiones || {}
         const contCapacidad = Number(contenedor.capacidadCarga || 0)
-
-        console.log('  📦 Contenedor original:', {
-          nombre: contenedor.nombre,
-          dimensiones: contDims,
-          capacidad: contCapacidad
-        })
 
         // Calcular nuevas dimensiones escaladas
         const newAncho = Math.max(1, Math.floor((contDims.ancho || 0) * scaleFactorAncho))
@@ -399,12 +372,6 @@ export function usePlacementSuggestions() {
         // Escalar posición dentro del padre (si tiene)
         const newX = (contenedor.x || 0) * scaleFactorAncho
         const newY = (contenedor.y || 0) * scaleFactorLargo
-
-        console.log('  ✨ Contenedor escalado:', {
-          nombre: contenedor.nombre,
-          dimensiones: { ancho: newAncho, largo: newLargo, alto: newAlto },
-          capacidad: newCapacidad
-        })
 
         // Crear nuevo objeto contenedor con dimensiones escaladas
         result.predefinedContainers.push({
@@ -421,11 +388,6 @@ export function usePlacementSuggestions() {
       }
     }
 
-    console.log('🎯 Resultado final calculateChildrenAdjustments:', {
-      storeChildrenCount: result.storeChildren.length,
-      predefinedContainersCount: result.predefinedContainers.length
-    })
-
     return result
   }
 
@@ -439,13 +401,6 @@ export function usePlacementSuggestions() {
   const applySuggestedAdjustments = (elemento, suggestions) => {
     const adjusted = { ...elemento }
 
-    console.log('🔧 [applySuggestedAdjustments] Elemento original:', {
-      nombre: elemento.nombre,
-      dimensiones: elemento.dimensiones,
-      contenedores: elemento.contenedores,
-      hijos: elemento.hijos
-    })
-
     // Aplicar ajuste de dimensiones
     if (suggestions.dimensionAdjustment) {
       adjusted.dimensiones = {
@@ -454,36 +409,26 @@ export function usePlacementSuggestions() {
         largo: suggestions.dimensionAdjustment.largo,
         alto: suggestions.dimensionAdjustment.alto,
       }
-      console.log('📐 Dimensiones ajustadas:', adjusted.dimensiones)
     }
 
     // Aplicar ajuste de peso
     if (suggestions.weightAdjustment) {
       adjusted.capacidadCarga = suggestions.weightAdjustment.capacidadAjustada
-      console.log('⚖️ Capacidad ajustada:', adjusted.capacidadCarga)
     }
 
     // Calcular ajustes para hijos
     const childrenAdjustments = calculateChildrenAdjustments(elemento, suggestions)
     
-    console.log('👶 Ajustes de hijos calculados:', {
-      storeChildren: childrenAdjustments.storeChildren.length,
-      predefinedContainers: childrenAdjustments.predefinedContainers.length
-    })
-    
     // Aplicar contenedores predefinidos escalados (si existen)
     if (childrenAdjustments.predefinedContainers.length > 0) {
       adjusted.contenedores = childrenAdjustments.predefinedContainers
-      console.log('📦 Contenedores escalados aplicados:', adjusted.contenedores)
     }
     
     // Incluir ajustes de hijos del store en el objeto retornado (para aplicar después de crear)
     if (childrenAdjustments.storeChildren.length > 0) {
       adjusted._childrenAdjustments = childrenAdjustments.storeChildren
-      console.log('👨‍👩‍👧‍👦 Ajustes de hijos del store marcados para aplicar después')
     }
 
-    console.log('✅ Elemento ajustado final:', adjusted)
     return adjusted
   }
 

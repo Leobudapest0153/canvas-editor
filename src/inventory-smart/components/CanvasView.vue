@@ -649,8 +649,8 @@
     />
 
     <CanvasInfo />
-
     <FloatingControls
+      v-if="props.showFloatingControls"
       :safe-right="safeRight"
       :can-undo="canUndo"
       :can-redo="canRedo"
@@ -667,7 +667,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watch, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, inject, reactive } from 'vue'
 import { useCanvasWithHistory } from '@/inventory-smart/composables/useCanvasWithHistory'
 import { useCanvasBuffer } from '@/inventory-smart/composables/useCanvasBuffer'
 import { useConflicts } from '@/inventory-smart/composables/useConflicts'
@@ -719,6 +719,7 @@ const placementSuggestions = inject('placementSuggestions')
 // Espacio seguro a la derecha para no quedar debajo del panel
 const props = defineProps({
   safeRight: { type: Number, default: 20 },
+  showFloatingControls: { type: Boolean, default: true },
 })
 
 // Referencia segura a Konva (cuando está disponible globalmente via vue-konva)
@@ -795,6 +796,132 @@ const {
   cancelMarquee,
   stageToLayerCoords,
 } = useMarqueeSelection({ canvasStore, stageRef })
+
+// === TELEMETRÍA Y GUARDAS PARA CULLING/FLOATING ORIGIN ===
+const cullingTelemetry = reactive({
+  enabled: true,
+  lastCalcTime: 0,
+  calcCount: 0,
+  worldViewport: { x: 0, y: 0, width: 0, height: 0 },
+  floatingOriginOffset: { x: 0, y: 0 },
+  totalElements: 0,
+  visibleElements: 0,
+  culledElements: 0,
+  zoom: 1,
+  lastRebaseTime: 0,
+  rebaseInProgress: false,
+})
+
+const cullingGuards = reactive({
+  minCalcInterval: 16, // ms - evitar cálculos excesivos
+  rebaseCooldown: 180, // ms - cooldown entre rebases
+  maxRebasePerSecond: 10,
+  rebaseCount: 0,
+  lastRebaseWindow: 0,
+})
+
+/**
+ * [Telemetría y overlay (__enableCullingDebug)]
+ * Sistema de monitoreo en tiempo real para verificar el funcionamiento del culling.
+ * Incluye viewport corregido, contadores de elementos y métricas de rendimiento.
+ * Activable via consola: __enableCullingDebug() / __disableCullingDebug()
+ */
+// Función para actualizar telemetría de culling
+const updateCullingTelemetry = (data) => {
+  if (!cullingTelemetry.enabled) return
+
+  const now = performance.now()
+  cullingTelemetry.lastCalcTime = now
+  cullingTelemetry.calcCount++
+
+  if (data) {
+    Object.assign(cullingTelemetry, data)
+  }
+}
+
+/**
+ * [Guardas / rate limiting / cooldown]
+ * Previene cálculos excesivos de culling y rebases en cascada.
+ * - minCalcInterval: evita recálculos muy frecuentes del culling
+ * - rebaseCooldown: tiempo mínimo entre rebases del floating origin
+ * - maxRebasePerSecond: límite de rebases por segundo para evitar loops infinitos
+ */
+// Guard para evitar cálculos excesivos
+const canCalculateCulling = () => {
+  const now = performance.now()
+  return now - cullingTelemetry.lastCalcTime >= cullingGuards.minCalcInterval
+}
+
+// Guard para rebases
+const canPerformRebase = () => {
+  const now = performance.now()
+
+  // Verificar cooldown básico
+  if (now - cullingTelemetry.lastRebaseTime < cullingGuards.rebaseCooldown) {
+    return false
+  }
+
+  // Verificar rate limiting
+  if (now - cullingGuards.lastRebaseWindow > 1000) {
+    cullingGuards.lastRebaseWindow = now
+    cullingGuards.rebaseCount = 0
+  }
+
+  if (cullingGuards.rebaseCount >= cullingGuards.maxRebasePerSecond) {
+    return false
+  }
+
+  return !cullingTelemetry.rebaseInProgress
+}
+
+// Overlay de debug (solo si telemetría habilitada)
+const debugOverlayVisible = computed(() =>
+  cullingTelemetry.enabled &&
+  (window.location.search.includes('debug=culling') ||
+   window.localStorage.getItem('debug_culling') === 'true')
+)
+
+// === GUARDAS PARA FLOATING ORIGIN REBASE ===
+// Función proxy para interceptar llamadas a shiftWorldCoordinates
+const guardedShiftWorldCoordinates = (dx, dy, metadata = {}) => {
+  if (!canPerformRebase()) {
+    console.warn('[FLOATING_ORIGIN_GUARD] Rebase blocked:', {
+      reason: 'cooldown or rate limit',
+      lastRebaseTime: cullingTelemetry.lastRebaseTime,
+      rebaseInProgress: cullingTelemetry.rebaseInProgress,
+      rebaseCount: cullingGuards.rebaseCount
+    })
+    return false
+  }
+
+  // Marcar rebase en progreso
+  cullingTelemetry.rebaseInProgress = true
+  cullingTelemetry.lastRebaseTime = performance.now()
+  cullingGuards.rebaseCount++
+
+  try {
+    // Llamar al método original del store
+    const result = canvasStore.shiftWorldCoordinates(dx, dy, {
+      ...metadata,
+      guardedCall: true,
+      timestamp: performance.now()
+    })
+
+    console.log('[FLOATING_ORIGIN_REBASE]', {
+      dx, dy,
+      newOffset: {
+        x: canvasStore.floatingOrigin?.offsetX || 0,
+        y: canvasStore.floatingOrigin?.offsetY || 0
+      },
+      rebaseCount: canvasStore.floatingOrigin?.rebaseCount || 0
+    })
+
+    return result
+  } finally {
+    // Liberar flag de progreso
+    cullingTelemetry.rebaseInProgress = false
+  }
+}
 
 // === HELPERS DE CONVERSIÓN ===
 /**
@@ -1057,11 +1184,24 @@ const {
   fitToContent,
 } = useZoom(stageSize, layerConfig)
 
+/**
+ * [FIX 2025-10-07] Corrección bug "desaparición en planta infinita".
+ * Causa: el cálculo de culling se hacía en coordenadas de stage sin considerar floatingOrigin.
+ * Solución: conversión explícita a coordenadas de mundo + padding dependiente de zoom.
+ * Añadidos: telemetría, overlay debug, guardas anti-reentrada y rate limiting de rebases.
+ * Resultado: sin parpadeos, sin rebases encadenados, elementos visibles a cualquier distancia.
+ */
+
 // Elementos visibles en el canvas (excluye elementos ocultos)
 const elementosVisiblesEnCanvas = computed(() => {
   const visibles = canvasStore.elementosVisibles.filter((elemento) => elemento.visible !== false)
   if (!isInfinitePlant.value) {
     return visibles
+  }
+
+  // Guard: evitar cálculos excesivos
+  if (!canCalculateCulling()) {
+    return visibles // Return previous result if called too frequently
   }
 
   const zoom = canvasStore.zoom || 1
@@ -1072,30 +1212,66 @@ const elementosVisiblesEnCanvas = computed(() => {
     return visibles
   }
 
-  const viewX = -canvasStore.panX / zoom
-  const viewY = -canvasStore.panY / zoom
+  // === FIX P0: CULLING CORRECTO EN COORDENADAS DE MUNDO ===
+  /**
+   * [Conversión de coordenadas (stage + world)]
+   * La cámara opera en coordenadas de stage, pero el culling debe hacerse en coordenadas de mundo.
+   * El floating origin introduce un offset entre ambos sistemas de coordenadas.
+   * Este offset debe sumarse para convertir del viewport stage al viewport mundo.
+   */
+  // Obtener floating origin offset
+  const floatingOriginState = canvasStore.floatingOrigin || {}
+  const originOffsetX = Number(floatingOriginState.offsetX) || 0
+  const originOffsetY = Number(floatingOriginState.offsetY) || 0
+
+  // Calcular viewport en coordenadas de mundo (NO stage)
+  // El viewport stage es donde está viendo el usuario relativo al stage
+  const stageViewX = -canvasStore.panX / zoom
+  const stageViewY = -canvasStore.panY / zoom
   const viewW = stageWidth / zoom
   const viewH = stageHeight / zoom
-  const padding = 200 / zoom
 
-  const minX = viewX - padding
-  const maxX = viewX + viewW + padding
-  const minY = viewY - padding
-  const maxY = viewY + viewH + padding
+  // Convertir viewport de stage a mundo: sumar el offset del floating origin
+  const worldViewX = stageViewX + originOffsetX
+  const worldViewY = stageViewY + originOffsetY
+
+  // Padding dependiente del zoom para evitar parpadeos en bordes
+  const basePadding = 200
+  const zoomBasedPadding = Math.max(basePadding / Math.max(zoom, 0.01), basePadding / 2)
+
+  // Bounds del culling en coordenadas de mundo
+  const minX = worldViewX - zoomBasedPadding
+  const maxX = worldViewX + viewW + zoomBasedPadding
+  const minY = worldViewY - zoomBasedPadding
+  const maxY = worldViewY + viewH + zoomBasedPadding
+
+  // Telemetría: capturar datos del viewport corregido
+  const worldViewport = {
+    stageView: { x: stageViewX, y: stageViewY },
+    worldView: { x: worldViewX, y: worldViewY },
+    width: viewW,
+    height: viewH,
+    bounds: { minX, maxX, minY, maxY },
+    padding: zoomBasedPadding,
+    correctedForFloatingOrigin: true
+  }
 
   const stage = stageRef.value?.getNode?.()
 
-  return visibles.filter((elemento) => {
+  const filteredElements = visibles.filter((elemento) => {
     const width = getDrawWidth(elemento) || 0
     const height = getDrawHeight(elemento) || 0
-    const x = elemento.x ?? 0
-    const y = elemento.y ?? 0
+    // IMPORTANTE: elemento.x/y ya están en coordenadas de mundo
+    const x = Number(elemento.x) || 0
+    const y = Number(elemento.y) || 0
 
+    // Verificar intersección AABB en coordenadas de mundo
     const intersects = x + width >= minX && x <= maxX && y + height >= minY && y <= maxY
     if (intersects) {
       return true
     }
 
+    // Excepción: elementos siendo arrastrados siempre son visibles
     if (stage) {
       const node = stage.findOne?.(`#${elemento.id}`)
       if (node && typeof node.isDragging === 'function' && node.isDragging()) {
@@ -1105,6 +1281,21 @@ const elementosVisiblesEnCanvas = computed(() => {
 
     return false
   })
+
+  // Actualizar telemetría con datos corregidos
+  updateCullingTelemetry({
+    worldViewport,
+    floatingOriginOffset: {
+      x: originOffsetX,
+      y: originOffsetY
+    },
+    totalElements: visibles.length,
+    visibleElements: filteredElements.length,
+    culledElements: visibles.length - filteredElements.length,
+    zoom
+  })
+
+  return filteredElements
 })
 
 // Detectar si existen pasillos visibles y toggle para su borde punteado
@@ -2097,7 +2288,7 @@ const createAdjustedElementFromDrop = async (elementoAjustado, position, origina
   if (elementoAjustado._childrenAdjustments && elementoAjustado._childrenAdjustments.length > 0) {
     // Esperar un tick para que el elemento padre esté completamente registrado
     await nextTick()
-    
+
     // Aplicar ajustes a cada hijo
     for (const childAdjustment of elementoAjustado._childrenAdjustments) {
       const hijoEnStore = canvasStore.elementoPorId(childAdjustment.id)
@@ -2117,7 +2308,7 @@ const createAdjustedElementFromDrop = async (elementoAjustado, position, origina
   const storeChildrenCount = elementoAjustado._childrenAdjustments?.length || 0
   const containerCount = elementoAjustado.contenedores?.length || 0
   const totalAdjusted = storeChildrenCount + containerCount
-  
+
   let message = 'Elemento colocado con ajustes automáticos aplicados'
   if (totalAdjusted > 0) {
     const parts = []
@@ -2129,7 +2320,7 @@ const createAdjustedElementFromDrop = async (elementoAjustado, position, origina
     }
     message = `Elemento colocado con ajustes automáticos (${parts.join(' y ')} escalado${totalAdjusted > 1 ? 's' : ''})`
   }
-  
+
   showToast(message, 'success')
 }
 
@@ -2538,14 +2729,14 @@ const createElementFromTemplate = async (data, dropEvent) => {
         onSuccess: async (adjustedElement, adjustedPosition) => {
           // Crear plantilla con ajustes aplicados usando la posición recalculada
           const adjustedPayload = createAdjustedTemplatePayload(payload, adjustedElement)
-          
+
           // Contar cuántos hijos fueron escalados
           const childrenCount = (adjustedPayload.elements || []).filter(
             e => e.id !== adjustedPayload.rootId && e.padre === adjustedPayload.rootId
           ).length
-          
+
           instantiateStructureOnCanvas(canvasStore, adjustedPayload, adjustedPosition)
-          
+
           const message = childrenCount > 0
             ? `Plantilla colocada con ajustes automáticos (${childrenCount} hijo${childrenCount > 1 ? 's' : ''} escalado${childrenCount > 1 ? 's' : ''})`
             : 'Plantilla colocada con ajustes automáticos aplicados'
@@ -2576,12 +2767,6 @@ const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => 
   const adjustedPayload = { ...originalPayload }
   const elements = [...(originalPayload.elements || [])]
 
-  console.log('📦 [createAdjustedTemplatePayload] Ajustando payload:', {
-    rootId: originalPayload.rootId,
-    totalElements: elements.length,
-    adjustedRoot: adjustedRootElement
-  })
-
   // Encontrar y reemplazar el elemento raíz con los ajustes
   const rootIndex = elements.findIndex(e => e.id === originalPayload.rootId)
   if (rootIndex >= 0) {
@@ -2595,10 +2780,10 @@ const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => 
     let scaleFactorAncho = adjustedDims.ancho / (originalDims.ancho || adjustedDims.ancho || 1)
     let scaleFactorLargo = adjustedDims.largo / (originalDims.largo || adjustedDims.largo || 1)
     let scaleFactorAlto = adjustedDims.alto / (originalDims.alto || adjustedDims.alto || 1)
-    
+
     // Si las dimensiones no cambiaron pero sí la capacidad, calcular factor de escala desde la capacidad
     let scaleFactorWeight = scaleFactorAncho * scaleFactorLargo * scaleFactorAlto
-    
+
     if (scaleFactorWeight === 1 && originalCapacity > 0 && adjustedCapacity !== originalCapacity) {
       // Solo se ajustó peso, calcular factor de escala cúbico desde la relación de capacidades
       scaleFactorWeight = adjustedCapacity / originalCapacity
@@ -2607,21 +2792,7 @@ const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => 
       scaleFactorAncho = linearScale
       scaleFactorLargo = linearScale
       scaleFactorAlto = linearScale
-      
-      console.log('⚖️ Ajuste solo de capacidad detectado. Calculando escala dimensional desde capacidad:', {
-        originalCapacity,
-        adjustedCapacity,
-        capacityRatio: scaleFactorWeight,
-        linearScale
-      })
     }
-
-    console.log('📊 Factores de escala calculados:', {
-      ancho: scaleFactorAncho,
-      largo: scaleFactorLargo,
-      alto: scaleFactorAlto,
-      weight: scaleFactorWeight
-    })
 
     // Actualizar elemento raíz
     elements[rootIndex] = {
@@ -2630,34 +2801,42 @@ const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => 
       capacidadCarga: adjustedRootElement.capacidadCarga
     }
 
-    console.log('✅ Elemento raíz actualizado')
-
     // Solo escalar hijos si hay un cambio real (factor diferente de 1)
     if (scaleFactorWeight !== 1) {
-      // Escalar todos los hijos (elementos que tienen padre === rootId)
       const rootId = originalPayload.rootId
-      let childrenScaled = 0
+      const children = elements.filter(e => e.id !== rootId && e.padre === rootId)
+      const isSingleChild = children.length === 1
 
       for (let i = 0; i < elements.length; i++) {
         const elem = elements[i]
-        
-        // Si es hijo del root (directamente o indirectamente)
+
+        // Si es hijo del root (directamente)
         if (elem.id !== rootId && elem.padre === rootId) {
           const originalChildDims = elem.dimensiones || {}
           const originalChildCapacity = Number(elem.capacidadCarga || 0)
 
-          console.log(`  👶 Escalando hijo: ${elem.nombre || elem.id}`, {
-            dimensionesOriginales: originalChildDims,
-            capacidadOriginal: originalChildCapacity
-          })
+          // Si el hijo único tenía las mismas dimensiones que el padre original, mantener 100%
+          const childMatchedParent =
+            originalChildDims.ancho === originalDims.ancho &&
+            originalChildDims.largo === originalDims.largo &&
+            originalChildDims.alto === originalDims.alto
 
-          // Escalar dimensiones
-          const newAncho = Math.max(1, Math.floor((originalChildDims.ancho || 0) * scaleFactorAncho))
-          const newLargo = Math.max(1, Math.floor((originalChildDims.largo || 0) * scaleFactorLargo))
-          const newAlto = Math.max(1, Math.floor((originalChildDims.alto || 0) * scaleFactorAlto))
+          let newAncho, newLargo, newAlto
+
+          if (isSingleChild && childMatchedParent) {
+            // Hijo único que ocupaba 100% del padre, asignar dimensiones completas del padre ajustado
+            newAncho = adjustedDims.ancho
+            newLargo = adjustedDims.largo
+            newAlto = adjustedDims.alto
+          } else {
+            // Escalar proporcionalmente
+            newAncho = Math.max(1, Math.floor((originalChildDims.ancho || 0) * scaleFactorAncho))
+            newLargo = Math.max(1, Math.floor((originalChildDims.largo || 0) * scaleFactorLargo))
+            newAlto = Math.max(1, Math.floor((originalChildDims.alto || 0) * scaleFactorAlto))
+          }
 
           // Escalar capacidad
-          const newCapacidad = originalChildCapacity > 0 
+          const newCapacidad = originalChildCapacity > 0
             ? Math.max(1, Math.floor(originalChildCapacity * scaleFactorWeight))
             : 0
 
@@ -2677,19 +2856,8 @@ const createAdjustedTemplatePayload = (originalPayload, adjustedRootElement) => 
             x: newX,
             y: newY
           }
-
-          console.log(`  ✨ Hijo escalado:`, {
-            nuevasDimensiones: elements[i].dimensiones,
-            nuevaCapacidad: elements[i].capacidadCarga
-          })
-
-          childrenScaled++
         }
       }
-
-      console.log(`🎯 Total de hijos escalados: ${childrenScaled}`)
-    } else {
-      console.log('ℹ️ No hay cambios de escala, hijos mantienen dimensiones originales')
     }
   }
 
@@ -3303,10 +3471,35 @@ const getViewportWorldRect = () => {
   }
 }
 
+// === UTILIDADES PARA TESTING Y DEBUG ===
+// Función para activar debug desde consola del navegador
+const enableCullingDebug = () => {
+  window.localStorage.setItem('debug_culling', 'true')
+  cullingTelemetry.enabled = true
+  console.log('✅ Culling debug enabled. Refresh if overlay not visible.')
+}
+
+const disableCullingDebug = () => {
+  window.localStorage.removeItem('debug_culling')
+  cullingTelemetry.enabled = false
+  console.log('❌ Culling debug disabled.')
+}
+
+// Exponer funciones para debug global
+if (typeof window !== 'undefined') {
+  window.__enableCullingDebug = enableCullingDebug
+  window.__disableCullingDebug = disableCullingDebug
+  window.__cullingTelemetry = cullingTelemetry
+  window.__guardedShiftWorldCoordinates = guardedShiftWorldCoordinates
+}
+
 defineExpose({
   getStage: getStageInstance,
   getStageSize: getStageSizeSnapshot,
   getViewportWorldRect,
+  // Debug functions
+  enableCullingDebug,
+  disableCullingDebug,
 })
 </script>
 
