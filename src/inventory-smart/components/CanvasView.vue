@@ -1678,19 +1678,12 @@ const handleElementDoubleClick = (evt, elemento) => {
   }
 }
 
-const toLayerCoords = (pos) => {
-  const stage = stageRef.value.getNode()
-  const scale = stage.scaleX() || 1
-  const x = (pos.x - stage.x()) / scale
-  const y = (pos.y - stage.y()) / scale
-  return { x, y }
-}
+// Konva entrega `pos` relativo al parent inmediato del nodo (nuestro layer).
+// No debemos aplicar la transformación del stage aquí porque ocasiona saltos
+// cuando hay pan/zoom: el store ya trabaja en el mismo espacio del layer.
+const toLayerCoords = (pos) => ({ x: pos.x, y: pos.y })
 
-const toStageCoords = (pos) => {
-  const stage = stageRef.value.getNode()
-  const scale = stage.scaleX() || 1
-  return { x: pos.x * scale + stage.x(), y: pos.y * scale + stage.y() }
-}
+const toStageCoords = (pos) => ({ x: pos.x, y: pos.y })
 
 // Drag bound para cada elemento y forma (clamp mínimo al contorno)
 const dragBoundForElement = (pos, elemento) => {
