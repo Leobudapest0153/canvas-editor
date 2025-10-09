@@ -28,8 +28,8 @@ describe('runFinalClamp stroke-safe finalize', () => {
     // strokeHalf=2 -> maxX efectivo=98 -> clamp final = 98 - 20 = 78
     expect(res.x).toBe(78)
     expect(shape.x()).toBe(78)
-    // y no se modifica
-    expect(shape.y()).toBe(5)
+    // el snap a grilla ajusta Y al múltiplo más cercano (10)
+    expect(shape.y()).toBe(10)
   })
 
   it('sin stroke también clava exacto al borde', async () => {
@@ -62,6 +62,19 @@ describe('runFinalClamp stroke-safe finalize', () => {
     // strokeHalf=1 -> maxX efectivo=99 -> 99-20 = 79
     expect(res.x).toBe(79)
     expect(shape.x()).toBe(79)
+  })
+
+  it('modo elastic sin polígono no usa fallback de lastValidPos', async () => {
+    const areaBounds = { minX: 0, minY: 0, maxX: 100, maxY: 100, mode: 'elastic' }
+    const el = { id: 'e5', width: 20, height: 10 }
+    const shape = makeRectShape({ x: 250, y: 150, w: 20, h: 10, stroke: true, strokeW: 4 })
+    const lastValidPos = { x: 10, y: 10 }
+    const res = await runFinalClamp({ shape, el, areaBounds, grid, elements, lastValidPos, CM_TO_PX: 1 })
+    expect(res.appliedFallback).toBe(false)
+    expect(res.x).toBe(250)
+    expect(res.y).toBe(150)
+    expect(shape.x()).toBe(250)
+    expect(shape.y()).toBe(150)
   })
 })
 

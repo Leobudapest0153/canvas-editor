@@ -7,7 +7,14 @@ import { snapToGrid } from '@/inventory-smart/utils/geometry'
 
 const EPS = 1e-6
 
+function isInfiniteArea(bounds) {
+  if (!bounds) return false
+  if (bounds.mode === 'elastic') return true
+  return !!(bounds.polygon && bounds.polygon._isInfinite === true)
+}
+
 function clampRectToBounds(x, y, w, h, b) {
+  if (!b || isInfiniteArea(b)) return { x, y }
   const nx = Math.max(b.minX, Math.min(x, b.maxX - w))
   const ny = Math.max(b.minY, Math.min(y, b.maxY - h))
   return { x: nx, y: ny }
@@ -15,12 +22,15 @@ function clampRectToBounds(x, y, w, h, b) {
 
 function shrinkBoundsByStroke(areaBounds, strokeHalf) {
   if (!strokeHalf || strokeHalf <= 0) return { ...areaBounds }
-  const { minX, minY, maxX, maxY } = areaBounds
+  const { minX, minY, maxX, maxY, polygon, mode, ...rest } = areaBounds
   return {
+    ...rest,
     minX: minX + strokeHalf,
     minY: minY + strokeHalf,
     maxX: maxX - strokeHalf,
     maxY: maxY - strokeHalf,
+    ...(mode !== undefined ? { mode } : {}),
+    ...(polygon ? { polygon } : {}),
   }
 }
 
@@ -112,6 +122,7 @@ export function resolveFinalByIntervals({
 
   const w = movingEl.width || 0
   const h = movingEl.height || 0
+  const isInf = isInfiniteArea(areaBounds)
   const strokeHalf = (strokePx || 0) / 2
   const pad = (marginPx || 0) + strokeHalf
 
@@ -124,7 +135,9 @@ export function resolveFinalByIntervals({
   let allowed
   if (axis === 'x') {
     // base interval for top-left x
-    const base = [areaBounds.minX, areaBounds.maxX - w]
+    const base = isInf
+      ? [Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY]
+      : [areaBounds.minX, areaBounds.maxX - w]
     // Start with base as allowed set
     allowed = [base]
     // Consider vecinos que se solapan con el candidato en Y (inflado)
@@ -144,7 +157,9 @@ export function resolveFinalByIntervals({
       if (!allowed.length) break
     }
   } else {
-    const base = [areaBounds.minY, areaBounds.maxY - h]
+    const base = isInf
+      ? [Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY]
+      : [areaBounds.minY, areaBounds.maxY - h]
     allowed = [base]
     const candX0 = candidate.x
     const candX1 = candidate.x + w
@@ -172,9 +187,19 @@ export function resolveFinalByIntervals({
   if (axis === 'x') px = projectCoordToAllowed(candidate.x, allowed)
   else py = projectCoordToAllowed(candidate.y, allowed)
 
-  // Validación rápida: adentro del área
-  if (px < areaBounds.minX - EPS || py < areaBounds.minY - EPS || px + w > areaBounds.maxX + EPS || py + h > areaBounds.maxY + EPS) {
-    return lastValidPos ? { ...lastValidPos } : { x: movingEl.x || 0, y: movingEl.y || 0 }
+  // Validación rápida: si el clamp duro sigue dejando el elemento fuera, fallback
+  if (!isInf) {
+    const preview = clampRectToBounds(px, py, w, h, areaBounds)
+    if (
+      preview.x < areaBounds.minX - EPS ||
+      preview.y < areaBounds.minY - EPS ||
+      preview.x + w > areaBounds.maxX + EPS ||
+      preview.y + h > areaBounds.maxY + EPS
+    ) {
+      return lastValidPos ? { ...lastValidPos } : { x: movingEl.x || 0, y: movingEl.y || 0 }
+    }
+    px = preview.x
+    py = preview.y
   }
 
   // (5) snap-to-grid post-proyección y reproyección del eje principal

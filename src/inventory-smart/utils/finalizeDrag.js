@@ -26,20 +26,28 @@ function getModelBBoxFromShape(shape) {
 
 function shrinkBoundsByStroke(areaBounds, strokeHalf) {
   if (!strokeHalf || strokeHalf <= 0) return { ...areaBounds }
-  const { minX, minY, maxX, maxY, polygon } = areaBounds
-  // Preservar referencia a polígono (incl. flag _isInfinite) para chequeos posteriores
+  const { minX, minY, maxX, maxY, polygon, mode, ...rest } = areaBounds
+  // Preservar referencia a polígono (incl. flag _isInfinite) y modo para chequeos posteriores
   return {
+    ...rest,
     minX: minX + strokeHalf,
     minY: minY + strokeHalf,
     maxX: maxX - strokeHalf,
     maxY: maxY - strokeHalf,
+    ...(mode !== undefined ? { mode } : {}),
     ...(polygon ? { polygon } : {}),
   }
 }
 
+function isInfiniteArea(bounds) {
+  if (!bounds) return false
+  if (bounds.mode === 'elastic') return true
+  return !!(bounds.polygon && bounds.polygon._isInfinite === true)
+}
+
 function clampRectToBounds(x, y, w, h, b) {
   // Bypass si área infinita
-  if (b && b.polygon && b.polygon._isInfinite === true) return { x, y }
+  if (!b || isInfiniteArea(b)) return { x, y }
   const nx = Math.max(b.minX, Math.min(x, b.maxX - w))
   const ny = Math.max(b.minY, Math.min(y, b.maxY - h))
   return { x: nx, y: ny }
@@ -47,7 +55,7 @@ function clampRectToBounds(x, y, w, h, b) {
 
 function rectOutsideBounds(x, y, w, h, b, eps = 1e-6) {
   // Bypass si área infinita
-  if (b && b.polygon && b.polygon._isInfinite === true) return false
+  if (!b || isInfiniteArea(b)) return false
   return x < b.minX - eps || y < b.minY - eps || x + w > b.maxX + eps || y + h > b.maxY + eps
 }
 
@@ -80,7 +88,7 @@ function circlePairOptions(movingEl, x, y, w, h, other) {
 function corridorFeasible({ movingEl, neighbors = [], areaBounds, axis = 'x', CM_TO_PX, strokeHalf = 0, marginPx = 0 }) {
   void CM_TO_PX
   // Bypass de corredor si el área es infinita
-  if (areaBounds && areaBounds.polygon && areaBounds.polygon._isInfinite === true) return true
+  if (isInfiniteArea(areaBounds)) return true
   const EPS = 1e-6
   const w = movingEl.width || 0
   const h = movingEl.height || 0
@@ -165,14 +173,17 @@ export async function runFinalClamp({ shape, el, areaBounds, grid = GRID_SIZE, e
   const strokeWidth = typeof shape.strokeWidth === 'function' ? shape.strokeWidth() : (shape.strokeWidth || 0)
   const strokeHalf = strokeEnabled ? (strokeWidth / 2) : 0
   const bStroke = shrinkBoundsByStroke(areaBounds, strokeHalf)
-  const isInf = !!(bStroke && bStroke.polygon && bStroke.polygon._isInfinite === true)
+  const isInf = isInfiniteArea(bStroke)
 
   // Leer bbox de modelo actual del shape (sin sombras)
   const bbox = getModelBBoxFromShape(shape)
   let candidate = { x: bbox.x, y: bbox.y }
 
   // (a) clamp con histéresis: en infinito, applyEdgeConstraint devolverá pos original si preservamos polygon
-  const { pos: posA } = applyEdgeConstraint(candidate, el, bStroke)
+  const edgeResult = isInf
+    ? { pos: { ...candidate }, hitX: false, hitY: false }
+    : applyEdgeConstraint(candidate, el, bStroke)
+  const { pos: posA } = edgeResult
 
   // (b) resolver bloqueantes (independiente de límites)
   const { x: xB, y: yB } = resolveBlockingCollisions(posA.x, posA.y, el, elements, bStroke)
@@ -276,7 +287,7 @@ export function solveFinalPlacement({
   const EPS = 1e-6
   const w = movingEl.width || 0
   const h = movingEl.height || 0
-  const isInf = !!(areaBounds && areaBounds.polygon && areaBounds.polygon._isInfinite === true)
+  const isInf = isInfiniteArea(areaBounds)
 
   // (A) determinar eje por lastVelocity (default 'x')
   const axis = lastVelocity ? dominantAxisFromVelocity(lastVelocity.x || 0, lastVelocity.y || 0) : 'x'
@@ -383,7 +394,7 @@ export function finalizePlacement({
   // Función auxiliar para calcular gap disponible
   function gapDisponible(axis, neighbors, areaBounds) {
     // Bypass total si es infinita
-    if (areaBounds && areaBounds.polygon && areaBounds.polygon._isInfinite === true) return Infinity
+    if (isInfiniteArea(areaBounds)) return Infinity
     const EPS = 1e-6
     const strokeHalf = strokePx / 2
 
@@ -444,7 +455,7 @@ export function finalizePlacement({
     return clampAreaStrokeSafe(pos, areaBounds, strokePx)
   }
 
-  const isInf = !!(areaBounds && areaBounds.polygon && areaBounds.polygon._isInfinite === true)
+  const isInf = isInfiniteArea(areaBounds)
 
   // (2) Verificar si el corredor es factible
   const corredorFactible = gapDisponible(axis, neighbors, areaBounds) >= size(movingEl, axis)
