@@ -477,6 +477,55 @@ export const useCanvasBuffer = () => {
     return false
   }
 
+  const translatePoint = (point, dx, dy) => {
+    if (!point || typeof point !== 'object') return
+    if (Number.isFinite(point.x)) point.x -= dx
+    if (Number.isFinite(point.y)) point.y -= dy
+  }
+
+  const translateElementShape = (elemento, dx, dy) => {
+    if (!elemento || typeof elemento !== 'object') return
+    if (Number.isFinite(elemento.x)) elemento.x -= dx
+    if (Number.isFinite(elemento.y)) elemento.y -= dy
+    if (elemento.posicion && typeof elemento.posicion === 'object') {
+      translatePoint(elemento.posicion, dx, dy)
+    }
+    if (Array.isArray(elemento.poligono)) {
+      for (const p of elemento.poligono) translatePoint(p, dx, dy)
+    }
+    for (const key of Object.keys(elemento)) {
+      if (['x', 'y', 'posicion', 'poligono'].includes(key)) continue
+      const value = elemento[key]
+      if (Array.isArray(value) && value.length) {
+        const allPoints = value.every((item) => item && typeof item === 'object' && (Number.isFinite(item.x) || Number.isFinite(item.y)))
+        if (allPoints) {
+          for (const p of value) translatePoint(p, dx, dy)
+        }
+      } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+        if (Number.isFinite(value.x) || Number.isFinite(value.y)) {
+          translatePoint(value, dx, dy)
+        }
+      }
+    }
+  }
+
+  const translateBuffer = (dx, dy) => {
+    if (!dx && !dy) return
+    for (const item of bufferItems.value) {
+      if (!item) continue
+      if (item.elemento) translateElementShape(item.elemento, dx, dy)
+      const info = item.sourceInfo || {}
+      if (info.position) translatePoint(info.position, dx, dy)
+      if (info.originalPosition) translatePoint(info.originalPosition, dx, dy)
+      if (info.allElements instanceof Map) {
+        info.allElements.forEach((el, id) => {
+          translateElementShape(el, dx, dy)
+          info.allElements.set(id, el)
+        })
+      }
+    }
+  }
+
   return {
     // Estado
     bufferItems: computed(() =>
@@ -502,5 +551,6 @@ export const useCanvasBuffer = () => {
 
     // Utilidades
     serializeElementForTemplate,
+    translateBuffer,
   }
 }

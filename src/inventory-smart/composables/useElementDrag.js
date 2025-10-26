@@ -934,6 +934,34 @@ export function useElementDrag({
     }
   }
 
+  const translateMapPositions = (mapRef, dx, dy) => {
+    const map = mapRef?.value
+    if (!map || typeof map.entries !== 'function') return
+    for (const [key, value] of map.entries()) {
+      if (!value || typeof value !== 'object') continue
+      const next = { ...value }
+      if (Number.isFinite(next.x)) next.x -= dx
+      if (Number.isFinite(next.y)) next.y -= dy
+      map.set(key, next)
+    }
+  }
+
+  const translateDragState = (dx, dy) => {
+    if (!dx && !dy) return
+    translateMapPositions(dragStartPositions, dx, dy)
+    translateMapPositions(lastValidPositions, dx, dy)
+    translateMapPositions(lastDesiredPosMap, dx, dy)
+    innerSessions.forEach((sessionData, key) => {
+      if (!sessionData || typeof sessionData !== 'object') return
+      if (sessionData.initial && typeof sessionData.initial === 'object') {
+        const next = { ...sessionData.initial }
+        if (Number.isFinite(next.x)) next.x -= dx
+        if (Number.isFinite(next.y)) next.y -= dy
+        sessionData.initial = next
+      }
+    })
+  }
+
   return {
     // Refs
     isElementDragging,
@@ -950,6 +978,7 @@ export function useElementDrag({
     onShapeDragMove,
     onShapeDragEnd,
     registerDraggableRef,
+    translateDragState,
 
     // Utils
     scheduleDraw,
